@@ -6,6 +6,7 @@ import sys
 import datetime
 import re
 from collections import Counter
+from StringIO import StringIO
 
 """
 Functions to check the contents of a SAFE project formatted Excel dataset.
@@ -21,6 +22,7 @@ re_email = re.compile('\S+@\S+\.\S+')
 re_name = re.compile('[^,]+,[ ]?[^,]+')
 re_whitespace_only = re.compile('^\s+$')
 
+
 class Messages(object):
 
     """
@@ -28,30 +30,60 @@ class Messages(object):
     user and keeps a tally of warnings.
     """
 
-    def __init__(self, header):
+    def __init__(self, header, verbose):
         self.header = header
-        self.msg = []
-        self.type = []
+        self.messages = []
+        self.verbose = verbose
+        self.kinds = {'info': '-', 'hint':'?', 'warn':'!'}
+        if verbose:
+            print(self.header)
 
-    def info(self, message):
-        self.msg.append(message)
-        self.type.append('info')
 
-    def warn(self, message):
-        self.msg.append(message)
-        self.type.append('warn')
+    # several different levels of message:
+    # - info: just reports progress and when all is ok.
+    # - hint: things we might like differently, but we'll let pass
+    # - warn: this is not ok.
 
-    def subhead(self, message):
-        self.msg.append(message)
-        self.type.append('subhead')
+    def info(self, message, level=1):
+        msg = ('info', message, level)
+        self.messages.append(msg)
+        if self.verbose:
+            self.print_msg(*msg)
 
-    def abort(self, message):
-        self.msg.append(message)
-        self.type.append('abort')
+    def warn(self, message, level=1):
+        msg = ('warn', message, level)
+        self.messages.append(msg)
+        if self.verbose:
+            self.print_msg(*msg)
+
+    def hint(self, message, level=1):
+        msg = ('hint', message, level)
+        self.messages.append(msg)
+        if self.verbose:
+            self.print_msg(*msg)
+
+    # Functions to print a message to the screen and to
+    # return the text report as a StringIO object
+
+    def print_msg(self, kind, msg, level):
+
+        print('  ' * level + self.kinds[kind] + msg)
+
+    def report(self):
+
+        report = StringIO()
+        report.writelines([self.header])
+
+        msgs = ['  ' * lv + self.kinds[kn] + msg for lv, kn, msg in self.messages]
+        report.writelines(msgs)
+
+        return report
+
+    # Functions to report errors
 
     def count_warnings(self):
 
-        return sum([msg == 'warn' for msg in self.type])
+        return sum([msg[0] == 'warn' for msg in self.messages])
 
     def no_warnings(self):
 
@@ -60,31 +92,8 @@ class Messages(object):
         else:
             return True
 
-    def display(self):
 
-        print(self.header)
-        for m, t in zip(self.msg, self.type):
-            if t == 'info':
-                print(' - ' + m)
-            elif t == 'warn':
-                print(' ! ' + m)
-            elif t == 'subhead':
-                print(' * ' + m)
-            elif t == 'abort':
-                print(' !!! Aborting - ' + m)
-
-
-def open_file(fname):
-
-    try:
-        wb = openpyxl.load_workbook(filename=fname, data_only=True, read_only=True)
-    except:
-        raise IOError('Could not open file')
-
-    return wb
-
-
-def get_summary(wb):
+def get_summary(wb, m):
 
     """
     Checks the information in the summary worksheet and looks for the metadata and
@@ -94,17 +103,17 @@ def get_summary(wb):
 
     Parameters:
         wb: An openpyxl Workbook instance
+        m: A Messages instance
     Returns:
         A dictionary of the available summary metadata
     """
 
     # try and get the summary worksheet
-    m = Messages("Checking Summary worksheet")
+    m.info("Checking Summary worksheet")
     try:
         ws = wb['Summary']
     except KeyError:
-        m.abort("Summary worksheet not found")
-        m.display()
+        m.warn("Summary worksheet not found, moving on.")
         return None
 
     # load dictionary of summary information block, allowing for multiple
@@ -252,21 +261,18 @@ def get_summary(wb):
     else:
         m.info('Summary contains {} errors'.format(m.count_warnings()))
 
-    m.display()
-
     return ret_dict
 
 
-def get_locations(wb):
+def get_locations(wb, m):
 
     # try and get the locations worksheet
-    m = Messages("Checking Locations worksheet")
+    m.info("Checking Locations worksheet")
     try:
         locs = wb['Locations']
     except KeyError:
         # No locations is pretty implausible
-        m.abort("No lcoations worksheet found")
-        m.display()
+        m.warn("No lcoations worksheet found. Moving on")
         return None
 
     # Check the headers
@@ -279,8 +285,7 @@ def get_locations(wb):
 
     # check the key fields are there
     if not set(fields).issuperset({'Location name'}):
-        m.abort('Location name must be included')
-        m.display()
+        m.warn('Location name column not found.')
         return None
 
     # get the location names
@@ -290,7 +295,7 @@ def get_locations(wb):
 
     # check for duplicate names
     if len(set(loc_names)) != len(loc_names):
-        m.warn('Duplicated location names in Locations worksheet')
+        m.warn('Duplicated location names')
 
     loc_names = set(loc_names)
 
@@ -299,12 +304,10 @@ def get_locations(wb):
     else:
         m.info('Locations contains {} errors'.format(m.count_warnings()))
 
-    m.display()
-
     return loc_names
 
 
-def get_taxa(wb):
+def get_taxa(wb, m):
 
     """
     Checks and reads the content of the taxa worksheet.
@@ -316,13 +319,13 @@ def get_taxa(wb):
     """
 
     # try and get the taxon worksheet
-    m = Messages("Checking Taxa worksheet")
+    m.info("Checking Taxa worksheet")
     try:
         taxa = wb['Taxa']
     except KeyError:
         # This might mean that the study doesn't have any taxa, so return an empty
         # set. If the datasets then contain taxonomic names, it'll fail gracefully.
-        m.info("No taxa worksheet found - assuming no taxa in data for now!")
+        m.hint("No taxa worksheet found - assuming no taxa in data for now!")
         return set()
 
     # Check the headers
@@ -335,7 +338,7 @@ def get_taxa(wb):
 
     # check the two key fields are there
     if not set(fields).issuperset({'Taxon name', 'Taxon type'}):
-        m.abort('Taxon name and Taxon type columns must be included')
+        m.warn('One or both of Taxon name and Taxon type columns not found')
         return None
 
     # get the taxon names and types
@@ -347,7 +350,7 @@ def get_taxa(wb):
 
     # check for duplicate names
     if len(set(taxon_names)) != len(taxon_names):
-        m.warn('Duplicated taxon names in taxa worksheet')
+        m.warn('Duplicated taxon names')
 
     # Check for some common taxonomic levels. We want as much taxonomic
     # context as possible, but if all taxa are morphospecies / functional
@@ -368,12 +371,10 @@ def get_taxa(wb):
     else:
         m.info('Taxa contains {} errors'.format(m.count_warnings()))
 
-    m.display()
-
     return set(taxon_names)
 
 
-def check_dataframe(wb, ws_name, taxa, locations):
+def check_dataframe(wb, ws_name, taxa, locations, m):
 
     """
     This function carries out basic checks on a 'dataframe' worksheet -
@@ -388,7 +389,7 @@ def check_dataframe(wb, ws_name, taxa, locations):
     :return:
     """
 
-    m = Messages('Checking dataframe {}'.format(ws_name))
+    m.info('Checking dataframe {}'.format(ws_name))
     # get the worksheet and data dimensions
     ws = wb[ws_name]
     max_col = ws.max_column
@@ -402,8 +403,7 @@ def check_dataframe(wb, ws_name, taxa, locations):
         field_name_row = descriptors.index('field_name') + 1
         descriptors = descriptors[:field_name_row]
     else:
-        m.abort('Cannot parse data: field_name row not found')
-        m.display()
+        m.warn('Cannot parse data: field_name row not found')
         return None
 
     # get the metadata for each field
@@ -449,7 +449,7 @@ def check_dataframe(wb, ws_name, taxa, locations):
             break
 
         # prep the messages instance to pass to functions
-        m.subhead('Checking field {}'.format(meta['field_name']))
+        m.info('Checking field {}'.format(meta['field_name']))
 
         # read the values
         data_block = ws.get_squared_range(idx + 2, field_name_row + 1, idx + 2, max_row)
@@ -474,8 +474,6 @@ def check_dataframe(wb, ws_name, taxa, locations):
         m.info('Dataframe formatted correctly')
     else:
         m.info('Dataframe contains {} errors'.format(m.count_warnings()))
-
-    m.display()
 
     return None
 
@@ -596,23 +594,37 @@ def check_field_taxa(meta, data, m, taxa):
         m.warn('Includes taxa missing from Taxa worksheet: {}'.format(', '.join(found - taxa)))
 
 
-def main():
+def check_file(fname, verbose=True):
 
-    fn = sys.argv[1]
-    wb = open_file(fname=fn)
-    summary = get_summary(wb)
-    locations = get_locations(wb)
-    taxa = get_taxa(wb)
+    try:
+        wb = openpyxl.load_workbook(filename=fname, data_only=True, read_only=True)
+    except:
+        raise IOError('Could not open file {}'.format(fname))
+
+    # now that we have a file, initialise the message tracker
+    m = Messages("Checking file '{}'".format(fname), verbose)
+
+    # check the metadata sheets
+    summary = get_summary(wb, m)
+    locations = get_locations(wb, m)
+    taxa = get_taxa(wb, m)
+
 
     if summary is not None:
         for ds in summary['datasets']:
             if ds['type'] == 'Dataframe':
-                check_dataframe(wb, ds['worksheet'], taxa, locations)
+                check_dataframe(wb, ds['worksheet'], taxa, locations, m)
             elif ds['type'] == 'Matrix':
                 # check_matrix(wb, ds['name'], taxa, locations)
                 pass
     else:
         pass
+
+    return m
+
+def main():
+
+    check_file(sys.argv[1])
 
 
 if __name__ == "__main__":
