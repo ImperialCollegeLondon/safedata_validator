@@ -88,12 +88,14 @@ def get_summary(wb):
 
     """
     Checks the information in the summary worksheet and looks for the metadata and
-    dataset worksheets.
+    dataset worksheets. The function is intended to try and get as much information
+    as possible from the worksheet: the dictionary of metadata returned will have
+    None for any missing data, which should be handled by downstream code.
 
     Parameters:
         wb: An openpyxl Workbook instance
     Returns:
-        A dictionary of the summary metadata
+        A dictionary of the available summary metadata
     """
 
     # try and get the summary worksheet
@@ -133,13 +135,28 @@ def get_summary(wb):
     if any([set(x) == {None} for x in summary_dict.values()]):
         m.warn('Metadata fields with no information.')
 
-    #
+    # CHECK PROJECT ID
     if 'SAFE Project ID' not in summary_dict:
         m.warn('SAFE Project ID missing')
-    elif type(summary_dict['SAFE Project ID'][0]) != long:
-        m.warn('SAFE Project ID is not an integer.')
+        ret_dict['project_id'] = None
     else:
+        if type(summary_dict['SAFE Project ID'][0]) != long:
+            m.warn('SAFE Project ID is not an integer.')
         ret_dict['project_id'] = summary_dict['SAFE Project ID'][0]
+
+    # CHECK DATASET TITLE
+    if 'Title' not in summary_dict:
+        m.warn('Dataset title missing')
+        ret_dict['title'] = None
+    else:
+        ret_dict['title'] = summary_dict['Title'][0]
+
+    # CHECK DATASET DESCRIPTION
+    if 'Description' not in summary_dict:
+        m.warn('Dataset title missing')
+        ret_dict['description'] = None
+    else:
+        ret_dict['description'] = summary_dict['Title'][0]
 
     # CHECK ACCESS STATUS AND EMBARGO DETAILS
     if 'Access status' in summary_dict:
