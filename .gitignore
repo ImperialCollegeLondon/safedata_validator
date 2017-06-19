@@ -1,0 +1,12 @@
+# Ignore test datasets for now
+SAFE_import_files*
+
+# ignore Excel backup files
+~*
+
+# PyCharm
+.idea/
+
+# Mac DS files
+.DS_Store
+
