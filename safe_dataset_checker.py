@@ -14,13 +14,14 @@ Where possible, the functions will try to keep on running to give a list
 
 """
 
-# Global definition of set of acceptable NA values: blank cells or 'NA'
-NA = {None, u'NA'}
+# Global definition of set of acceptable NA values: 'NA'
+NA = {u'NA'}
+
 # define some regular expressions used to check validity
 re_orcid = re.compile('[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}')
 re_email = re.compile('\S+@\S+\.\S+')
 re_name = re.compile('[^,]+,[ ]?[^,]+')
-re_whitespace_only = re.compile('^\s+$')
+re_whitespace_only = re.compile('^\s*$')
 
 
 class Messages(object):
@@ -486,16 +487,20 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
     return None
 
 
+
 def check_missing_data(data, m):
 
-    # two acceptable options for missing data: None (blank cell) or u'NA'
-    # - what about blank strings?
-
-    na_vals = [vl in NA for vl in data]
+    # Only NA is acceptable
+    vals = [vl in NA for vl in data]
     if any(na_vals):
-        m.info('{} / {} values missing'.format(sum(na_vals), len(na_vals)), 2)
+        m.hint('{} / {} values missing'.format(sum(na_vals), len(na_vals)), 2)
 
-    # and then there are non-empty cells containing only whitespace strings
+    # We won't tolerate:
+    # 1) empty cells (just to avoid ambiguity - e.g. in abundance data)
+    is_empty = [vl is None for vl in vals]
+    if sum(is_empty) in vals:
+        m.warn('cells are empty'.format(sum(is_empty)), 2)
+    # 2) non-empty cells containing only whitespace strings
     ws_only = [re_whitespace_only.match(vl) for vl in data if type(vl) in [str, unicode]]
     if any(ws_only):
         m.warn('{} cells contain whitespace only text'.format(sum(ws_only)), 2)
