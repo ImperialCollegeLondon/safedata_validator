@@ -388,13 +388,13 @@ def check_data_worksheet(wb, ws_name, taxa, locations, m):
 
     Parameters:
         wb: An openpyxl Workbook instance
-        ws: The worksheet name
+        ws_name: The worksheet name
         taxa: A list of valid taxa
         locations: A list of valid locations
         m: A Messages instance
     """
 
-    if not ws_name in wb.get_sheet_names():
+    if ws_name not in wb.get_sheet_names():
         m.warn('Data worksheet {} not found'.format(ws_name))
         return None
     else:
@@ -558,6 +558,7 @@ and empty/whitespace elegantly. The first few cross check against
 taxa or locations and the rest just check the data consistency
 """
 
+
 def check_field_taxa(meta, data, taxa, m):
 
     # check if taxa are all provided
@@ -641,12 +642,14 @@ def check_field_time(meta, data, m):
     if type_check != {datetime.time}:
         m.warn('Non-time formatted data found.', 2)
 
+
 def is_integer_string(s):
     try:
         int(s)
         return True
     except ValueError:
         return False
+
 
 def check_field_categorical(meta, data, m):
 
@@ -668,7 +671,7 @@ def check_field_categorical(meta, data, m):
 
         # check for numeric levels
         integer_codes = [is_integer_string(vl) for vl in category_labels]
-        if(any(integer_codes)):
+        if any(integer_codes):
             m.warn('Integer category labels not permitted', 2)
 
         # get the unique values reported in the data and then convert
