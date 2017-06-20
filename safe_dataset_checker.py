@@ -276,9 +276,10 @@ def get_locations(wb, m):
     try:
         locs = wb['Locations']
     except KeyError:
-        # No locations is pretty implausible
+        # No locations is pretty implausible, but still persevere as if
+        # they aren't going to be required
         m.warn("No locations worksheet found - moving on", 1)
-        return None
+        loc_names = None
 
     # Check the headers
     fields = []
@@ -291,22 +292,22 @@ def get_locations(wb, m):
     # check the key fields are there
     if not set(fields).issuperset({'Location name'}):
         m.warn('Location name column not found', 1)
-        return None
+        loc_names = None
+    else:
+        # get the location names
+        names_col = fields.index('Location name') + 1
+        rows = range(2, max_row + 1)
+        loc_names = [locs.cell(row=rw, column=names_col).value for rw in rows]
 
-    # get the location names
-    names_col = fields.index('Location name') + 1
-    rows = range(2, max_row + 1)
-    loc_names = [locs.cell(row=rw, column=names_col).value for rw in rows]
+        # check for duplicate names
+        if len(set(loc_names)) != len(loc_names):
+            m.warn('Duplicated location names', 1)
 
-    # check for duplicate names
-    if len(set(loc_names)) != len(loc_names):
-        m.warn('Duplicated location names', 1)
-
-    loc_names = set(loc_names)
+        loc_names = set(loc_names)
 
     new_warn = m.new_warnings()
     if new_warn:
-        m.info('Locations contains {} errors'.format(m.count_warnings()), 1)
+        m.info('Locations contains {} errors'.format(new_warn), 1)
     else:
         m.info('{} locations loaded correctly'.format(len(loc_names)), 1)
 
@@ -372,10 +373,12 @@ def get_taxa(wb, m):
         m.warn('Some rows have taxon types that do not match a column name: '
                '{}'.format(','.join(types_found - types_valid)), 1)
 
-    if m.no_warnings():
-        m.info('{} taxa loaded correctly'.format(len(taxon_names)), 1)
+
+    new_warn = m.new_warnings()
+    if new_warn:
+        m.info('Taxa contains {} errors'.format(new_warn), 1)
     else:
-        m.info('Taxa contains {} errors'.format(m.count_warnings()), 1)
+        m.info('{} taxa loaded correctly'.format(len(taxon_names)), 1)
 
     return set(taxon_names)
 
@@ -611,8 +614,7 @@ def check_file(fname, verbose=True):
     locations = get_locations(wb, m)
     taxa = get_taxa(wb, m)
 
-
-    if summary is not None:
+    if 'datasets' in summary:
         for ds in summary['datasets']:
             if ds['type'] == 'Dataframe':
                 check_dataframe(wb, ds['worksheet'], taxa, locations, m)
