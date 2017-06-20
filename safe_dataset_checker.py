@@ -134,7 +134,7 @@ def get_summary(wb, m):
     # Check the minimal keys are expected
     required = {"SAFE Project ID", "Access status", "Title", "Description",
                 "Author name", "Author email", "Author affiliation", "Author ORCID",
-                "Worksheet name", "Worksheet title", "Worksheet description", "Worksheet type", }
+                "Worksheet name", "Worksheet title", "Worksheet description"}
 
     found = set(summary_dict.keys())
 
@@ -223,7 +223,7 @@ def get_summary(wb, m):
         ret_dict['authors'] = None
 
     # CHECK DATASETS
-    ds_keys = ['Worksheet name', 'Worksheet title', 'Worksheet description', 'Worksheet format']
+    ds_keys = ['Worksheet name', 'Worksheet title', 'Worksheet description']
     valid_sheets = set(wb.get_sheet_names())
 
     if set(summary_dict.keys()).issuperset(ds_keys):
@@ -234,7 +234,7 @@ def get_summary(wb, m):
 
         # validate
         for ind, dt in enumerate(datasets):
-            dt = {k: v for k, v in zip(['worksheet', 'title', 'description', 'format'], dt)}
+            dt = {k: v for k, v in zip(['worksheet', 'title', 'description'], dt)}
             # look for missing values
             for k, v in dt.iteritems():
                 if v is None:
@@ -242,8 +242,6 @@ def get_summary(wb, m):
             # validate
             if dt['worksheet'] not in valid_sheets:
                 m.warn('Dataset worksheet not found: {}.'.format(dt['worksheet']), 1)
-            if dt['format'] not in ['Dataframe', 'Matrix']:
-                m.warn('Dataset format not valid: {}.'.format(dt['format']), 1)
             datasets[ind] = dt
 
         ret_dict['datasets'] = datasets
@@ -382,7 +380,7 @@ def get_taxa(wb, m):
     return set(taxon_names)
 
 
-def check_dataframe(wb, ws_name, taxa, locations, m):
+def check_data_worksheet(wb, ws_name, taxa, locations, m):
 
     """
     This function checks the formatting of a data worksheet and
@@ -396,16 +394,26 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
         m: A Messages instance
     """
 
-    m.info('Checking dataframe {}'.format(ws_name))
+    if not ws_name in wb.get_sheet_names():
+        m.warn('Data worksheet {} not found'.format(ws_name))
+        return None
+    else:
+        m.info('Checking data worksheet {}'.format(ws_name))
+
     # get the worksheet and data dimensions
     ws = wb[ws_name]
     max_col = ws.max_column
     max_row = ws.max_row
 
+    # trap completely empty worksheets
+    if max_row == 1:
+        m.warn('Worksheet is empty', 2)
+        return None
+
     # get the metadata field names
-    # - first search the first 20 rows for the 'field_name' descriptor which
-    #   shows the end of the metadata and the start of the data
-    descriptors = [ws.cell(column=1, row=rw).value for rw in range(1, 21)]
+    # - first search at most the first 20 rows for the 'field_name' descriptor
+    #   which shows the end of the metadata and the start of the data
+    descriptors = [ws.cell(column=1, row=rw).value for rw in range(1, min(20, max_row) + 1)]
     if 'field_name' in descriptors:
         field_name_row = descriptors.index('field_name') + 1
         descriptors = descriptors[:field_name_row]
@@ -702,14 +710,7 @@ def check_file(fname, verbose=True):
 
     if 'datasets' in summary and len(summary['datasets']):
         for ds in summary['datasets']:
-            if ds['format'] == 'Dataframe':
-                check_dataframe(wb, ds['worksheet'], taxa, locations, m)
-            elif ds['format'] == 'Matrix':
-                pass
-                # check_matrix(wb, ds['name'], taxa, locations)
-            else:
-                m.warn("Data worksheet {worksheet} in "
-                       "unknown format {format}".format(**ds))
+            check_data_worksheet(wb, ds['worksheet'], taxa, locations, m)
     else:
         m.info('No data worksheets found')
 
