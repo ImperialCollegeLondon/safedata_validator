@@ -431,15 +431,15 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
     ft_known = {'Location', 'Date', 'Time', 'Datetime', 'Categorical',
                 'Continuous', 'Abundance', 'Comments', 'Taxa', None}
 
-    if not ft_found.issubset(ft_known):
-        m.warn('Unknown field types: {}'.format(','.join(ft_found - ft_known)), 1)
-
     # check extra descriptors
     if 'Categorical' in ft_found and 'categories' not in descriptors:
         m.warn('Categorical data fields found but no category descriptions provided.', 1)
 
     if 'Continuous' in ft_found and 'units' not in descriptors:
         m.warn('Continuous data fields found but no units provided.', 1)
+
+    if 'Location' in ft_found and locations is None:
+        m.warn('Location field found but no Location worksheet provided.', 1)
 
     # check field names unique (drop None)
     fn_found = Counter([fld['field_name'] for fld in field_metadata
@@ -458,7 +458,7 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
             break
 
         # prep the messages instance to pass to functions
-        m.info('Checking field {}'.format(meta['field_name']), 1)
+        m.info('Checking field {field_name}'.format(**meta), 1)
 
         # read the values
         data_block = ws.get_squared_range(idx + 2, field_name_row + 1, idx + 2, max_row)
@@ -475,9 +475,13 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
         elif meta['field_type'] == 'Time':
             check_field_time(meta, data, m)
         elif meta['field_type'] == 'Taxa':
-            check_field_taxa(meta, data, m, taxa)
+            check_field_taxa(meta, data, taxa, m)
+        elif meta['field_type'] == 'Location':
+            check_field_locations(meta, data, locations, m)
+        elif meta['field_type'] is None:
+            m.warn('Field type is empty', 2)
         else:
-            pass
+            m.warn('Unknown field type {field_type}'.format(**meta), 2)
 
     if m.no_warnings():
         m.info('Dataframe formatted correctly', 1)
@@ -488,17 +492,18 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
 
 
 
+
 def check_missing_data(data, m):
 
     # Only NA is acceptable
-    vals = [vl in NA for vl in data]
+    na_vals = [vl in NA for vl in data]
     if any(na_vals):
         m.hint('{} / {} values missing'.format(sum(na_vals), len(na_vals)), 2)
 
     # We won't tolerate:
     # 1) empty cells (just to avoid ambiguity - e.g. in abundance data)
-    is_empty = [vl is None for vl in vals]
-    if sum(is_empty) in vals:
+    is_empty = [vl is None for vl in data]
+    if sum(is_empty):
         m.warn('cells are empty'.format(sum(is_empty)), 2)
     # 2) non-empty cells containing only whitespace strings
     ws_only = [re_whitespace_only.match(vl) for vl in data if type(vl) in [str, unicode]]
@@ -525,7 +530,7 @@ def check_field_datelike(meta, data, m):
     type_check = set([type(vl) for vl in data if vl not in NA])
     if type_check != {datetime.datetime}:
         if datetime.time in type_check:
-            m.warn('Time formatted data found in date field.', 2)
+            m.warn('Some data only contains time information, not date.', 2)
         else:
             m.warn('Non-date formatted data found.', 2)
 
@@ -594,13 +599,21 @@ def check_field_continuous(meta, data, m):
         m.warn('Non numeric data found in {}.'.format(meta['field_name']), 2)
 
 
-def check_field_taxa(meta, data, m, taxa):
+def check_field_taxa(meta, data, taxa, m):
 
     # check if taxa are all provided
     found = set(data)
     if not found.issubset(taxa):
         m.warn('Includes taxa missing from Taxa worksheet:'
                ' {}'.format(', '.join(found - taxa)), 2)
+
+def check_field_locations(meta, data, locations, m):
+
+    # check if taxa are all provided
+    found = set(data)
+    if not found.issubset(locations):
+        m.warn('Includes locations missing from Locations worksheet:'
+               ' {}'.format(', '.join(found - locations)), 2)
 
 
 def check_file(fname, verbose=True):
