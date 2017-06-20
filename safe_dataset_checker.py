@@ -2,20 +2,19 @@
 
 from __future__ import print_function
 import openpyxl
+from openpyxl import utils
 import sys
 import datetime
 import re
 from collections import Counter
 from StringIO import StringIO
+import numbers
 
 """
 Functions to check the contents of a SAFE project formatted Excel dataset.
 Where possible, the functions will try to keep on running to give a list
 
 """
-
-# Global definition of set of acceptable NA values: 'NA'
-NA = {u'NA'}
 
 # define some regular expressions used to check validity
 re_orcid = re.compile('[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}')
@@ -386,8 +385,8 @@ def get_taxa(wb, m):
 def check_dataframe(wb, ws_name, taxa, locations, m):
 
     """
-    This function carries out basic checks on a 'dataframe' worksheet -
-    that is, tabular data with fields of different types of variable
+    This function checks the formatting of a data worksheet and
+    updates the Messages instance `m` with the results.
 
     Parameters:
         wb: An openpyxl Workbook instance
@@ -395,8 +394,6 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
         taxa: A list of valid taxa
         locations: A list of valid locations
         m: A Messages instance
-
-    :return:
     """
 
     m.info('Checking dataframe {}'.format(ws_name))
@@ -441,6 +438,9 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
     if 'Location' in ft_found and locations is None:
         m.warn('Location field found but no Location worksheet provided.', 1)
 
+    if 'Abundance' in ft_found and 'taxon_name' not in descriptors:
+        m.warn('Abundance field found but no taxon name description provided.', 1)
+
     # check field names unique (drop None)
     fn_found = Counter([fld['field_name'] for fld in field_metadata
                         if fld['field_name'] is not None])
@@ -458,14 +458,18 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
             break
 
         # prep the messages instance to pass to functions
-        m.info('Checking field {field_name}'.format(**meta), 1)
+        if meta['field_name'] is None or re_whitespace_only.match(meta['field_name']):
+            m.info('Checking Column {}'.format(openpyxl.utils.get_column_letter(idx + 2)), 1)
+            m.warn('Field name is blank', 2)
+        else:
+            m.info('Checking field {field_name}'.format(**meta), 1)
 
         # read the values
         data_block = ws.get_squared_range(idx + 2, field_name_row + 1, idx + 2, max_row)
         data = [cl[0].value for cl in data_block]
 
-        # check for missing data
-        check_missing_data(data, m)
+        # filter out missing and blank data
+        data = filter_missing_or_blank_data(data, m)
 
         # run consistency checks where needed
         if meta['field_type'] == 'Categorical':
@@ -478,25 +482,39 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
             check_field_taxa(meta, data, taxa, m)
         elif meta['field_type'] == 'Location':
             check_field_locations(meta, data, locations, m)
+        elif meta['field_type'] == 'Observation count':
+            check_field_observations(meta, data, taxa, m)
         elif meta['field_type'] is None:
             m.warn('Field type is empty', 2)
         else:
             m.warn('Unknown field type {field_type}'.format(**meta), 2)
 
-    if m.no_warnings():
-        m.info('Dataframe formatted correctly', 1)
+    new_warn = m.new_warnings()
+    if new_warn:
+        m.info('Dataframe contains {} errors'.format(new_warn), 1)
     else:
-        m.info('Dataframe contains {} errors'.format(m.count_warnings()), 1)
+        m.info('Dataframe formatted correctly', 1)
 
     return None
 
 
+def filter_missing_or_blank_data(data, m):
 
+    """
+    This function takes a list of data and filters out any missing
+    or blank data, reporting to the Messages instance as it goes.
+    Field checker functions then need to detect field type specific
+    invalid data, but at least there is no NA or blanks.
 
-def check_missing_data(data, m):
+    Parameters:
+        data: A list of values read from the Worksheet
+        m: A Messages instance
+    Returns:
+        A list of data values filtered to remove NA and blanks.
+    """
 
     # Only NA is acceptable
-    na_vals = [vl in NA for vl in data]
+    na_vals = [vl == u'NA' for vl in data]
     if any(na_vals):
         m.hint('{} / {} values missing'.format(sum(na_vals), len(na_vals)), 2)
 
@@ -504,16 +522,59 @@ def check_missing_data(data, m):
     # 1) empty cells (just to avoid ambiguity - e.g. in abundance data)
     is_empty = [vl is None for vl in data]
     if sum(is_empty):
-        m.warn('cells are empty'.format(sum(is_empty)), 2)
+        m.warn('{} cells are blank'.format(sum(is_empty)), 2)
     # 2) non-empty cells containing only whitespace strings
-    ws_only = [re_whitespace_only.match(vl) for vl in data if type(vl) in [str, unicode]]
+    ws_only = [re_whitespace_only.match(unicode(vl)) is not None for vl in data]
     if any(ws_only):
         m.warn('{} cells contain whitespace only text'.format(sum(ws_only)), 2)
 
+    # Return the values that aren't NA, blank or whitespace only
+    na_or_blank = [any(tst) for tst in zip(na_vals, is_empty, ws_only)]
+    data = [dt for dt, nb in zip(data, na_or_blank) if not nb]
+
+    return data
+
 
 """
-Field checker functions below. Must be capable of handling the NA values elegantly
+Field checker functions below. Must be capable of handling NA
+and empty/whitespace elegantly. The first few cross check against
+taxa or locations and the rest just check the data consistency
 """
+
+def check_field_taxa(meta, data, taxa, m):
+
+    # check if taxa are all provided
+    found = set(data)
+    if taxa is None:
+        m.warn('No Taxa worksheet provided', 2)
+    if not found.issubset(taxa):
+        m.warn('Includes taxa missing from Taxa worksheet:'
+               ' {}'.format(', '.join(found - taxa)), 2)
+
+
+def check_field_locations(meta, data, locations, m):
+
+    # check if taxa are all provided
+    found = set(data)
+    if locations is None:
+        m.warn('No Locations worksheet provided', 2)
+    elif not found.issubset(locations):
+        m.warn('Includes locations missing from Locations worksheet:'
+               ' {}'.format(', '.join(found - locations)), 2)
+
+
+def check_field_abundance(meta, data, taxa, m):
+
+    # check the taxon
+    if 'taxon_name' not in meta:
+        m.warn('No taxon name provided for field', 2)
+    elif meta['taxon_name'] not in taxa:
+        m.warn('Taxon for abundance field not in Taxon worksheet', 2)
+    else:
+        # We're not going to insist on integers here.
+        is_numeric = [isinstance(vl, numbers.Number) for vl in data]
+        if not all(is_numeric):
+            m.warn('Field contains non-numeric data', 2)
 
 
 def check_field_datelike(meta, data, m):
@@ -527,7 +588,7 @@ def check_field_datelike(meta, data, m):
     """
 
     # Check type (excluding NA values)
-    type_check = set([type(vl) for vl in data if vl not in NA])
+    type_check = set([type(vl) for vl in data])
     if type_check != {datetime.datetime}:
         if datetime.time in type_check:
             m.warn('Some data only contains time information, not date.', 2)
@@ -536,7 +597,7 @@ def check_field_datelike(meta, data, m):
 
     # Check no time component in date fields
     if meta['field_type'] == 'Date':
-        no_time = [vl.time() == datetime.time(0, 0) for vl in data if vl not in NA]
+        no_time = [vl.time() == datetime.time(0, 0) for vl in data]
         if not all(no_time):
             m.warn('Datetimes found in field of type Date.', 2)
 
@@ -552,10 +613,16 @@ def check_field_time(meta, data, m):
     """
 
     # Check type (excluding NA values)
-    type_check = set([type(vl) for vl in data if vl not in NA])
+    type_check = set([type(vl) for vl in data])
     if type_check != {datetime.time}:
         m.warn('Non-time formatted data found.', 2)
 
+def is_integer_string(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
 
 def check_field_categorical(meta, data, m):
 
@@ -567,20 +634,28 @@ def check_field_categorical(meta, data, m):
     elif type(meta['categories']) is not unicode:
         m.warn('Category description does not seem to be text', 2)
     else:
+        # strip terminal semicolon if present
+        if meta['categories'][-1] == ';':
+            meta['categories'] = meta['categories'][:-1]
         # split the text up by semi-colon
         categories = meta['categories'].split(';')
         # strip off any description after a colon
         category_labels = set([ct.split(':')[0] for ct in categories])
 
-        # get the unique values reported in the data, removing missing values and
-        # then convert to unicode in case anyone has used numeric level names.
-        reported = set(data) - NA
+        # check for numeric levels
+        integer_codes = [is_integer_string(vl) for vl in category_labels]
+        if(any(integer_codes)):
+            m.warn('Integer category labels not permitted', 2)
+
+        # get the unique values reported in the data and then convert
+        # to unicode in case anyone has used numeric level names.
+        reported = set(data)
         reported = {unicode(lv) for lv in reported}
 
         # check for completeness
         if not reported.issubset(category_labels):
-            m.warn('Categories found in data missing from description'
-                   '{}: '.format(','.join(reported - category_labels)), 2)
+            m.warn('Categories found in data missing from description: '
+                   '{}'.format(', '.join(reported - category_labels)), 2)
 
 
 def check_field_continuous(meta, data, m):
@@ -594,29 +669,23 @@ def check_field_continuous(meta, data, m):
     """
 
     # Check type (excluding NA values)
-    type_check = set([type(vl) for vl in data if vl not in NA])
+    type_check = set([type(vl) for vl in data])
     if not type_check.issubset({long, float}):
         m.warn('Non numeric data found in {}.'.format(meta['field_name']), 2)
 
 
-def check_field_taxa(meta, data, taxa, m):
-
-    # check if taxa are all provided
-    found = set(data)
-    if not found.issubset(taxa):
-        m.warn('Includes taxa missing from Taxa worksheet:'
-               ' {}'.format(', '.join(found - taxa)), 2)
-
-def check_field_locations(meta, data, locations, m):
-
-    # check if taxa are all provided
-    found = set(data)
-    if not found.issubset(locations):
-        m.warn('Includes locations missing from Locations worksheet:'
-               ' {}'.format(', '.join(found - locations)), 2)
-
+# High level functions
 
 def check_file(fname, verbose=True):
+
+    """
+    Parameters:
+        fname: Path to an Excel file
+        verbose: Print the report as the program runs?
+
+    Returns:
+         A Messages instance containing the information from the file check
+    """
 
     try:
         wb = openpyxl.load_workbook(filename=fname, data_only=True, read_only=True)
