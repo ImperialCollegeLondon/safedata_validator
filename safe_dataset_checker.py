@@ -446,8 +446,11 @@ def check_data_worksheet(wb, ws_name, taxa, locations, m):
     if 'Location' in ft_found and locations is None:
         m.warn('Location field found but no Location worksheet provided.', 1)
 
-    if 'Abundance' in ft_found and 'taxon_name' not in descriptors:
-        m.warn('Abundance field found but no taxon name description provided.', 1)
+    if 'Abundance' in ft_found:
+        if 'taxon_name' not in descriptors:
+            m.warn('Abundance field found but no taxon name description provided.', 1)
+        if 'sampling' not in descriptors:
+            m.warn('Abundance field found but no sampling description provided.', 1)
 
     # check field names unique (drop None)
     fn_found = Counter([fld['field_name'] for fld in field_metadata
@@ -456,7 +459,10 @@ def check_data_worksheet(wb, ws_name, taxa, locations, m):
     if len(duplicated) > 0:
         m.warn('Field names duplicated: {}'.format(', '.join(duplicated)), 1)
 
-    # check mandatory fields
+    # get taxa field names for cross checking observation and trait data
+    taxa_fields = [fld['field_name'] for fld in field_metadata if fld['field_type'] == 'Taxa']
+
+    # TODO - check mandatory fields
 
     # check each field
     for idx, meta in enumerate(field_metadata):
@@ -472,6 +478,9 @@ def check_data_worksheet(wb, ws_name, taxa, locations, m):
         else:
             m.info('Checking field {field_name}'.format(**meta), 1)
 
+        # check the description
+        if meta['description'] is None or re_whitespace_only.match(meta['description']):
+            m.warn('Description is missing', 2)
         # read the values
         data_block = ws.get_squared_range(idx + 2, field_name_row + 1, idx + 2, max_row)
         data = [cl[0].value for cl in data_block]
@@ -490,8 +499,8 @@ def check_data_worksheet(wb, ws_name, taxa, locations, m):
             check_field_taxa(meta, data, taxa, m)
         elif meta['field_type'] == 'Location':
             check_field_locations(meta, data, locations, m)
-        elif meta['field_type'] == 'Observation count':
-            check_field_observations(meta, data, taxa, m)
+        elif meta['field_type'] == 'Abundance':
+            check_field_abundance(meta, data, taxa, taxa_fields, m)
         elif meta['field_type'] is None:
             m.warn('Field type is empty', 2)
         else:
@@ -571,18 +580,25 @@ def check_field_locations(meta, data, locations, m):
                ' {}'.format(', '.join(found - locations)), 2)
 
 
-def check_field_abundance(meta, data, taxa, m):
+def check_field_abundance(meta, data, taxa, taxa_fields,  m):
 
     # check the taxon
     if 'taxon_name' not in meta:
-        m.warn('No taxon name provided for field', 2)
-    elif meta['taxon_name'] not in taxa:
-        m.warn('Taxon for abundance field not in Taxon worksheet', 2)
-    else:
-        # We're not going to insist on integers here.
-        is_numeric = [isinstance(vl, numbers.Number) for vl in data]
-        if not all(is_numeric):
-            m.warn('Field contains non-numeric data', 2)
+        m.warn('Taxon name descriptor missing', 2)
+    elif meta['taxon_name'] is None or re_whitespace_only.match(meta['taxon_name']):
+        m.warn('Taxon name descriptor is blank', 2)
+    elif meta['taxon_name'] not in taxa and meta['taxon_name'] not in taxa_fields:
+        m.warn('Taxon name neither in the Taxa worksheet nor the name of a Taxa field', 2)
+
+    if 'sampling' not in meta:
+        m.warn('No sampling provided for field', 2)
+    elif meta['sampling'] is None or re_whitespace_only.match(meta['sampling']):
+        m.warn('Sampling descriptor is blank', 2)
+
+    # We're not going to insist on integers here.
+    is_numeric = [isinstance(vl, numbers.Number) for vl in data]
+    if not all(is_numeric):
+        m.warn('Field contains non-numeric data', 2)
 
 
 def check_field_datelike(meta, data, m):
