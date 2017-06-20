@@ -34,11 +34,10 @@ class Messages(object):
         self.header = header
         self.messages = []
         self.verbose = verbose
-        self.kinds = {'info': '-', 'hint':'?', 'warn':'!'}
-        self.count_new_warnings= 0
+        self.kinds = {'info': '-', 'hint': '?', 'warn': '!'}
+        self.count_new_warnings = 0
         if verbose:
             print(self.header)
-
 
     # several different levels of message:
     # - info: just reports progress and when all is ok.
@@ -194,7 +193,7 @@ def get_summary(wb, m):
             m.warn('Access status must be Open or Embargo not {}'.format(access_status), 1)
 
     # CHECK AUTHORS
-    author_keys  = ['Author name', 'Author affiliation', 'Author email', 'Author ORCID']
+    author_keys = ['Author name', 'Author affiliation', 'Author email', 'Author ORCID']
     if set(summary_dict.keys()).issuperset(author_keys):
         authors = zip(*[summary_dict[x] for x in author_keys])
 
@@ -224,7 +223,7 @@ def get_summary(wb, m):
         ret_dict['authors'] = None
 
     # CHECK DATASETS
-    ds_keys = ['Worksheet name', 'Worksheet title', 'Worksheet description', 'Worksheet type']
+    ds_keys = ['Worksheet name', 'Worksheet title', 'Worksheet description', 'Worksheet format']
     valid_sheets = set(wb.get_sheet_names())
 
     if set(summary_dict.keys()).issuperset(ds_keys):
@@ -235,7 +234,7 @@ def get_summary(wb, m):
 
         # validate
         for ind, dt in enumerate(datasets):
-            dt = {k: v for k, v in zip(['worksheet', 'title', 'description', 'type'], dt)}
+            dt = {k: v for k, v in zip(['worksheet', 'title', 'description', 'format'], dt)}
             # look for missing values
             for k, v in dt.iteritems():
                 if v is None:
@@ -243,8 +242,8 @@ def get_summary(wb, m):
             # validate
             if dt['worksheet'] not in valid_sheets:
                 m.warn('Dataset worksheet not found: {}.'.format(dt['worksheet']), 1)
-            if dt['type'] not in ['Dataframe', 'Matrix']:
-                m.warn('Dataset type not valid: {}.'.format(dt['type']), 1)
+            if dt['format'] not in ['Dataframe', 'Matrix']:
+                m.warn('Dataset format not valid: {}.'.format(dt['format']), 1)
             datasets[ind] = dt
 
         ret_dict['datasets'] = datasets
@@ -279,7 +278,7 @@ def get_locations(wb, m):
         # No locations is pretty implausible, but still persevere as if
         # they aren't going to be required
         m.warn("No locations worksheet found - moving on", 1)
-        loc_names = None
+        return None
 
     # Check the headers
     fields = []
@@ -321,6 +320,7 @@ def get_taxa(wb, m):
 
     Parameters:
         wb: An openpyxl Workbook instance.
+        m: A Messages instance.
     Returns:
         A set of the taxon names to be used in the datasets.
     """
@@ -373,7 +373,6 @@ def get_taxa(wb, m):
         m.warn('Some rows have taxon types that do not match a column name: '
                '{}'.format(','.join(types_found - types_valid)), 1)
 
-
     new_warn = m.new_warnings()
     if new_warn:
         m.info('Taxa contains {} errors'.format(new_warn), 1)
@@ -394,6 +393,7 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
         ws: The worksheet name
         taxa: A list of valid taxa
         locations: A list of valid locations
+        m: A Messages instance
 
     :return:
     """
@@ -450,7 +450,6 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
     # check mandatory fields
 
     # check each field
-    data_rows = range(field_name_row + 1, max_row + 1)
     for idx, meta in enumerate(field_metadata):
 
         # skip any field with no metadata
@@ -465,7 +464,7 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
         data = [cl[0].value for cl in data_block]
 
         # check for missing data
-        check_missing_data(meta, data, m)
+        check_missing_data(data, m)
 
         # run consistency checks where needed
         if meta['field_type'] == 'Categorical':
@@ -487,7 +486,7 @@ def check_dataframe(wb, ws_name, taxa, locations, m):
     return None
 
 
-def check_missing_data(meta, data, m):
+def check_missing_data(data, m):
 
     # two acceptable options for missing data: None (blank cell) or u'NA'
     # - what about blank strings?
@@ -614,17 +613,27 @@ def check_file(fname, verbose=True):
     locations = get_locations(wb, m)
     taxa = get_taxa(wb, m)
 
-    if 'datasets' in summary:
+    if 'datasets' in summary and len(summary['datasets']):
         for ds in summary['datasets']:
-            if ds['type'] == 'Dataframe':
+            if ds['format'] == 'Dataframe':
                 check_dataframe(wb, ds['worksheet'], taxa, locations, m)
-            elif ds['type'] == 'Matrix':
-                # check_matrix(wb, ds['name'], taxa, locations)
+            elif ds['format'] == 'Matrix':
                 pass
+                # check_matrix(wb, ds['name'], taxa, locations)
+            else:
+                m.warn("Data worksheet {worksheet} in "
+                       "unknown format {format}".format(**ds))
     else:
-        pass
+        m.info('No data worksheets found')
+
+    if verbose:
+        if m.count_warnings():
+            m.info('FAIL: file contained {} errors'.format(m.count_warnings()))
+        else:
+            m.info('PASS: file formatted correctly')
 
     return m
+
 
 def main():
 
