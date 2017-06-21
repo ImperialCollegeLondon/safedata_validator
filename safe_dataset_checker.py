@@ -11,9 +11,14 @@ from StringIO import StringIO
 import numbers
 
 """
-Functions to check the contents of a SAFE project formatted Excel dataset.
-Where possible, the functions will try to keep on running to give a list
+Module containing code to verify the format of a SAFE project Excel dataset.
 
+The functions are written to extract as much information as possible from
+checking a file so, rather than raising an error and halting at the first
+fault, functions are written to check as much as they can on the inputs.
+Any information and warnings are added on to a Messages instance, passed
+to each function, which is used to keep a report of issues throughout the
+file check.
 """
 
 # define some regular expressions used to check validity
@@ -28,6 +33,15 @@ class Messages(object):
     """
     This class keeps a record of messages to be conveyed to the
     user and keeps a tally of warnings.
+
+    Attributes:
+        header: A header for the messages report.
+        verbose: If True, messages are printed to the screen as they are added.
+        kinds: A dictionary keyed by available message kinds, with values as string
+            prefixes for messages of that kind.
+        messages: A list of tuples of messages giving (kind, text, level).
+        new_warnings: A count of the warning messages added since the instance was
+            created or since the get_new_warnings_count() method was last called.
     """
 
     def __init__(self, header, verbose):
@@ -35,41 +49,64 @@ class Messages(object):
         self.messages = []
         self.verbose = verbose
         self.kinds = {'info': '-', 'hint': '?', 'warn': '!'}
-        self.count_new_warnings = 0
+        self.new_warnings = 0
         if verbose:
             print(self.header)
 
-    # several different levels of message:
-    # - info: just reports progress and when all is ok.
-    # - hint: things we might like differently, but we'll let pass
-    # - warn: this is not ok.
-
     def info(self, message, level=0):
+        """
+        Adds an information message to the instance.
+        Args:
+            message: The information message text.
+            level: The message indent level
+        """
         msg = ('info', message, level)
         self.messages.append(msg)
         if self.verbose:
             self.print_msg(*msg)
 
     def warn(self, message, level=0):
+        """
+        Adds a warning message to the instance.
+        Args:
+            message: The warning message text.
+            level: The message indent level
+        """
         msg = ('warn', message, level)
         self.messages.append(msg)
-        self.count_new_warnings += 1
+        self.new_warnings += 1
         if self.verbose:
             self.print_msg(*msg)
 
     def hint(self, message, level=0):
+        """
+        Adds an hint message to the instance. This is used to indicate where
+        something might need to be checked but isn't necessarily an error
+        Args:
+            message: The hint text.
+            level: The hint indent level
+        """
         msg = ('hint', message, level)
         self.messages.append(msg)
         if self.verbose:
             self.print_msg(*msg)
 
-    # Functions to print a message to the screen and to
-    # return the text report as a StringIO object
-
     def print_msg(self, kind, msg, level):
+        """
+        Prints a message to the screen
+        Args:
+            kind: The message kind
+            msg: The message text
+            level: The message indent level
+        """
         print('  ' * level + self.kinds[kind] + ' ' + msg)
 
     def report(self):
+        """
+        Formats all the messages into a report.
+        Returns:
+            A StringIO() instance containing the report text
+        """
         report = StringIO()
         report.writelines([self.header])
         msgs = ['  ' * lv + self.kinds[kn] + msg for lv, kn, msg in self.messages]
@@ -77,22 +114,27 @@ class Messages(object):
         return report
 
     # Functions to check warnings
-    def new_warnings(self):
-        if self.count_new_warnings:
-            new = self.count_new_warnings
-            self.count_new_warnings = 0
+    def get_new_warning_count(self):
+        """
+        Reports the number of warnings since the instance was initialised or
+        since this function was last called.
+        Returns:
+            An integer
+        """
+        if self.new_warnings:
+            new = self.new_warnings
+            self.new_warnings = 0
             return new
         else:
             return 0
 
     def count_warnings(self):
+        """
+        Calculates the total number of warnings in the instances
+        Returns:
+            An integer
+        """
         return sum([msg[0] == 'warn' for msg in self.messages])
-
-    def no_warnings(self):
-        if self.count_warnings() > 0:
-            return False
-        else:
-            return True
 
 
 def get_summary(wb, m):
@@ -103,7 +145,7 @@ def get_summary(wb, m):
     as possible from the worksheet: the dictionary of metadata returned will have
     None for any missing data, which should be handled by downstream code.
 
-    Parameters:
+    Args:
         wb: An openpyxl Workbook instance
         m: A Messages instance
     Returns:
@@ -257,7 +299,7 @@ def get_summary(wb, m):
             m.warn('Extra sheets found in workbook: '
                    '{}'.format(','.join(valid_sheets - expected_sheets)), 1)
 
-    new_warn = m.new_warnings()
+    new_warn = m.get_new_warning_count()
     if new_warn:
         m.info('Summary contains {} errors'.format(new_warn), 1)
     else:
@@ -267,6 +309,16 @@ def get_summary(wb, m):
 
 
 def get_locations(wb, m):
+
+    """
+    Attempts to load and check the contents of the Locations worksheet.
+    Args:
+        wb: An openpyxl Workbook instance
+        m: A Messages instance
+    Returns:
+        A set of provided location names or None if the worksheet cannot
+        be found or no locations can be loaded.
+    """
 
     # try and get the locations worksheet
     m.info("Checking Locations worksheet")
@@ -302,7 +354,7 @@ def get_locations(wb, m):
 
         loc_names = set(loc_names)
 
-    new_warn = m.new_warnings()
+    new_warn = m.get_new_warning_count()
     if new_warn:
         m.info('Locations contains {} errors'.format(new_warn), 1)
     else:
@@ -314,13 +366,13 @@ def get_locations(wb, m):
 def get_taxa(wb, m):
 
     """
-    Checks and reads the content of the taxa worksheet.
-
-    Parameters:
+    Attempts to load and check the content of the Taxa worksheet.
+    Args:
         wb: An openpyxl Workbook instance.
         m: A Messages instance.
     Returns:
-        A set of the taxon names to be used in the datasets.
+        A set of provided taxon names or None if the worksheet cannot
+        be found or no taxa can be loaded.
     """
 
     # try and get the taxon worksheet
@@ -371,7 +423,7 @@ def get_taxa(wb, m):
         m.warn('Some rows have taxon types that do not match a column name: '
                '{}'.format(','.join(types_found - types_valid)), 1)
 
-    new_warn = m.new_warnings()
+    new_warn = m.get_new_warning_count()
     if new_warn:
         m.info('Taxa contains {} errors'.format(new_warn), 1)
     else:
@@ -383,10 +435,10 @@ def get_taxa(wb, m):
 def check_data_worksheet(wb, ws_name, taxa, locations, m):
 
     """
-    This function checks the formatting of a data worksheet and
-    updates the Messages instance `m` with the results.
+    Attempt to load and checks the formatting and content of a data worksheet,
+    updating the Messages instance `m` with the results.
 
-    Parameters:
+    Args:
         wb: An openpyxl Workbook instance
         ws_name: The worksheet name
         taxa: A list of valid taxa
@@ -427,30 +479,26 @@ def check_data_worksheet(wb, ws_name, taxa, locations, m):
         this_field = {k: ws.cell(column=cl, row=i + 1).value for i, k in enumerate(descriptors)}
         field_metadata.append(this_field)
 
-    # check field types - allow for empty field metadata, could be:
-    # i) spacer column within fields
-    # ii) the user has some comments or noise out to the right (or did,
-    #     and Excel just can't let it go).
-    # We don't much care about this.
-    ft_found = set(fld['field_type'] for fld in field_metadata)
-    ft_known = {'Location', 'Date', 'Time', 'Datetime', 'Categorical',
-                'Continuous', 'Abundance', 'Comments', 'Taxa', None}
+    # check required descriptors are present and if locations and taxa
+    # turn out to be needed after all!
+    ft_found = [fld['field_type'] for fld in field_metadata]
+    if 'Categorical' in ft_found and 'levels' not in descriptors:
+        m.warn('Categorical data fields found but no levels descriptor provided.', 1)
 
-    # check extra descriptors
-    if 'Categorical' in ft_found and 'categories' not in descriptors:
-        m.warn('Categorical data fields found but no category descriptions provided.', 1)
-
-    if 'Continuous' in ft_found and 'units' not in descriptors:
-        m.warn('Continuous data fields found but no units provided.', 1)
+    if 'Numeric' in ft_found:
+        if 'units' not in descriptors:
+            m.warn('Numeric data fields found but no units descriptor provided.', 1)
+        if 'method' not in descriptors:
+            m.warn('Numeric data fields found but no units descriptor provided.', 1)
 
     if 'Location' in ft_found and locations is None:
         m.warn('Location field found but no Location worksheet provided.', 1)
 
     if 'Abundance' in ft_found:
         if 'taxon_name' not in descriptors:
-            m.warn('Abundance field found but no taxon name description provided.', 1)
-        if 'sampling' not in descriptors:
-            m.warn('Abundance field found but no sampling description provided.', 1)
+            m.warn('Abundance field found but no taxon name descriptor provided.', 1)
+        if 'method' not in descriptors:
+            m.warn('Abundance field found but no sampling method descriptor provided.', 1)
 
     # check field names unique (drop None)
     fn_found = Counter([fld['field_name'] for fld in field_metadata
@@ -481,32 +529,43 @@ def check_data_worksheet(wb, ws_name, taxa, locations, m):
         # check the description
         if meta['description'] is None or re_whitespace_only.match(meta['description']):
             m.warn('Description is missing', 2)
+
         # read the values
         data_block = ws.get_squared_range(idx + 2, field_name_row + 1, idx + 2, max_row)
         data = [cl[0].value for cl in data_block]
 
-        # filter out missing and blank data
-        data = filter_missing_or_blank_data(data, m)
+        # filter out missing and blank data, except for comments fields, where
+        # blanks are not an error
+        if meta['field_type'] != 'Comments':
+            data = filter_missing_or_blank_data(data, m)
 
-        # run consistency checks where needed
-        if meta['field_type'] == 'Categorical':
-            check_field_categorical(meta, data, m)
-        elif meta['field_type'] in ['Date', 'Datetime']:
-            check_field_datelike(meta, data, m)
+        # run consistency checks where needed and trap unknown field types
+        if meta['field_type'] == 'Date':
+            check_field_date(data, m)
+        elif meta['field_type'] == 'Datetime':
+            check_field_datetime(data, m)
         elif meta['field_type'] == 'Time':
-            check_field_time(meta, data, m)
+            check_field_time(data, m)
         elif meta['field_type'] == 'Taxa':
-            check_field_taxa(meta, data, taxa, m)
+            check_field_taxa(data, taxa, m)
         elif meta['field_type'] == 'Location':
-            check_field_locations(meta, data, locations, m)
+            check_field_locations(data, locations, m)
+        elif meta['field_type'] == 'Categorical':
+            check_field_categorical(meta, data, m)
+        elif meta['field_type'] == 'Numeric':
+            check_field_numeric(meta, data, m)
         elif meta['field_type'] == 'Abundance':
             check_field_abundance(meta, data, taxa, taxa_fields, m)
+        elif meta['field_type'] == 'Trait':
+            check_field_trait(meta, data, taxa, taxa_fields, m)
+        elif meta['field_type'] == 'Comments':
+            pass
         elif meta['field_type'] is None:
             m.warn('Field type is empty', 2)
         else:
             m.warn('Unknown field type {field_type}'.format(**meta), 2)
 
-    new_warn = m.new_warnings()
+    new_warn = m.get_new_warning_count()
     if new_warn:
         m.info('Dataframe contains {} errors'.format(new_warn), 1)
     else:
@@ -518,13 +577,13 @@ def check_data_worksheet(wb, ws_name, taxa, locations, m):
 def filter_missing_or_blank_data(data, m):
 
     """
-    This function takes a list of data and filters out any missing
-    or blank data, reporting to the Messages instance as it goes.
-    Field checker functions then need to detect field type specific
-    invalid data, but at least there is no NA or blanks.
+    Takes a list of data and filters out any missing or blank data,
+    reporting to the Messages instance as it goes. The filtered list
+    is returned for feeding to field type checker functions so that
+    they can assume no NA or blank data in their checks.
 
-    Parameters:
-        data: A list of values read from the Worksheet
+    Args:
+        data: A list of values read from the Worksheet.
         m: A Messages instance
     Returns:
         A list of data values filtered to remove NA and blanks.
@@ -553,88 +612,105 @@ def filter_missing_or_blank_data(data, m):
 
 
 """
-Field checker functions below. Must be capable of handling NA
-and empty/whitespace elegantly. The first few cross check against
-taxa or locations and the rest just check the data consistency
+Field checker functions and a couple of helper functions below.
 """
 
 
-def check_field_taxa(meta, data, taxa, m):
+def _check_meta(meta, descriptor, m):
+    """
+    A standardised check to see if a required descriptor is present for
+    a field and that it isn't simply empty or whitespace. The function
+    reports problems to the Messages instance and returns a boolean
+    showing if the checks passed successfully.
 
-    # check if taxa are all provided
-    found = set(data)
-    if taxa is None:
-        m.warn('No Taxa worksheet provided', 2)
-    if not found.issubset(taxa):
-        m.warn('Includes taxa missing from Taxa worksheet:'
-               ' {}'.format(', '.join(found - taxa)), 2)
+    Args:
+        meta: A dictionary of field metadata descriptors
+        descriptor: The name of the descriptor to check.
+        m: An instance of class Messages
 
+    Returns:
+        A boolean, with True showing no problems and False showing
+        that warnings occurred.
+    """
 
-def check_field_locations(meta, data, locations, m):
-
-    # check if taxa are all provided
-    found = set(data)
-    if locations is None:
-        m.warn('No Locations worksheet provided', 2)
-    elif not found.issubset(locations):
-        m.warn('Includes locations missing from Locations worksheet:'
-               ' {}'.format(', '.join(found - locations)), 2)
-
-
-def check_field_abundance(meta, data, taxa, taxa_fields,  m):
-
-    # check the taxon
-    if 'taxon_name' not in meta:
-        m.warn('Taxon name descriptor missing', 2)
-    elif meta['taxon_name'] is None or re_whitespace_only.match(meta['taxon_name']):
-        m.warn('Taxon name descriptor is blank', 2)
-    elif meta['taxon_name'] not in taxa and meta['taxon_name'] not in taxa_fields:
-        m.warn('Taxon name neither in the Taxa worksheet nor the name of a Taxa field', 2)
-
-    if 'sampling' not in meta:
-        m.warn('No sampling provided for field', 2)
-    elif meta['sampling'] is None or re_whitespace_only.match(meta['sampling']):
-        m.warn('Sampling descriptor is blank', 2)
-
-    # We're not going to insist on integers here.
-    is_numeric = [isinstance(vl, numbers.Number) for vl in data]
-    if not all(is_numeric):
-        m.warn('Field contains non-numeric data', 2)
+    if descriptor not in meta:
+        m.warn('{} descriptor missing'.format(descriptor), 2)
+        return False
+    elif meta[descriptor] is None or re_whitespace_only.match(meta[descriptor]):
+        m.warn('{} descriptor is blank'.format(descriptor), 2)
+        return False
+    else:
+        return True
 
 
-def check_field_datelike(meta, data, m):
+def is_integer_string(s):
+    """
+    Checks if a string value can represent an integer.
+    Args:
+        s: A string
+
+    Returns:
+        A boolean.
+    """
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
+def check_field_date(data, m):
 
     """
-    Checks for consistency in date and datetime fields
+    Checks for data consistency in date fields and reports to the
+    Messages instance.
 
-    :param meta:
-    :param data:
-    :return:
+    Args:
+        data: A list of data values, allegedly of type datetime.date
+        m: A Messages instance
     """
 
     # Check type (excluding NA values)
     type_check = set([type(vl) for vl in data])
     if type_check != {datetime.datetime}:
+        m.warn('Non-date data in field.', 2)
         if datetime.time in type_check:
-            m.warn('Some data only contains time information, not date.', 2)
-        else:
-            m.warn('Non-date formatted data found.', 2)
+            m.hint('Some values _only_  contain time components', 2)
 
-    # Check no time component in date fields
-    if meta['field_type'] == 'Date':
-        no_time = [vl.time() == datetime.time(0, 0) for vl in data]
-        if not all(no_time):
-            m.warn('Datetimes found in field of type Date.', 2)
+    # Check no time component in actual dates
+    no_time = [vl.time() == datetime.time(0, 0) for vl in data]
+    if not all(no_time):
+        m.warn('Some values also contain time components', 2)
 
 
-def check_field_time(meta, data, m):
+def check_field_datetime(data, m):
 
     """
-    Checks for consistency in time fields
+    Checks for data consistency in datetime fields and reports to the
+    Messages instance.
 
-    :param meta:
-    :param data:
-    :return:
+    Args:
+        data: A list of data values, allegedly of type datetime.datetime
+        m: A Messages instance
+    """
+
+    # Check type (excluding NA values)
+    type_check = set([type(vl) for vl in data])
+    if type_check != {datetime.datetime}:
+        m.warn('Non-date data in field.', 2)
+        if datetime.time in type_check:
+            m.hint('Some values _only_  contain time components', 2)
+
+
+def check_field_time(data, m):
+
+    """
+    Checks for data consistency in time fields and reports to the
+    Messages instance.
+
+    Args:
+        data: A list of data values, allegedly of type datetime.time
+        m: A Messages instance
     """
 
     # Check type (excluding NA values)
@@ -643,62 +719,167 @@ def check_field_time(meta, data, m):
         m.warn('Non-time formatted data found.', 2)
 
 
-def is_integer_string(s):
-    try:
-        int(s)
-        return True
-    except ValueError:
-        return False
+def check_field_taxa(data, taxa, m):
+
+    """
+    Checks if all the values provided in a Taxon field are found
+    in the Taxa worksheet, reporting to the Messages instance.
+
+    Args:
+        data: A list of data values, allegedly taxon names
+        taxa: A set containing taxon names from the Taxa worksheet
+        m: A Messages instance
+    """
+
+    found = set(data)
+    if taxa is None:
+        m.warn('Taxa worksheet not provided or no taxon names were found', 2)
+    if not found.issubset(taxa):
+        m.warn('Includes taxa missing from Taxa worksheet:'
+        ' {}'.format(', '.join(found - taxa)), 2)
+
+
+def check_field_locations(data, locations, m):
+
+    """
+    Checks if all the values provided in a Locations field are
+    found in the Locations worksheet, reporting to the Messages instance.
+
+    Args:
+        data: A list of data values, allegedly taxon names
+        locations: A set containing locations from the Locations worksheet
+        m: A Messages instance
+    """
+
+    # check if taxa are all provided
+    found = set(data)
+    if locations is None:
+        m.warn('No Locations worksheet provided', 2)
+    elif not found.issubset(locations):
+        m.warn('Includes locations missing from Locations worksheet:'
+        ' {}'.format(', '.join(found - locations)), 2)
+
+
+def check_field_abundance(meta, data, taxa, taxa_fields,  m):
+
+    """
+    Checks abundance type data, reporting to the Messages instance.
+
+    Args:
+        meta: A dictionary of metadata descriptors for the field
+        data: A list of data values, allegedly numeric
+        taxa: A set containing taxon names from the Taxa worksheet
+        taxa_fields: A list of Taxa fields in this worksheet.
+        m: A Messages instance
+    """
+
+    # check the required descriptors
+    tx_ok = _check_meta(meta, 'taxon_name', m)
+    mt_ok = _check_meta(meta, 'method', m)
+
+    if tx_ok and meta['taxon_name'] not in taxa and meta['taxon_name'] not in taxa_fields:
+        m.warn('Taxon name neither in the Taxa worksheet nor the name of a Taxa field', 2)
+
+    # Can still check values are numeric, whatever happens above.
+    # We're not going to insist on integers here - could be mean counts.
+    is_numeric = [isinstance(vl, numbers.Number) for vl in data]
+    if not all(is_numeric):
+        m.warn('Field contains non-numeric data', 2)
 
 
 def check_field_categorical(meta, data, m):
 
+    """
+    Checks factor data, reporting to the Messages instance.
+
+    Args:
+        meta: A dictionary of metadata descriptors for the field
+        data: A list of data values, allegedly strings from a provided set of levels
+        m: A Messages instance
+    """
+
     # this has already been tested but make it robust
-    if 'categories' not in meta:
-        m.warn('Category levels metadata not provided', 2)
-    elif meta['categories'] is None:
-        m.warn('Category descriptions empty', 2)
-    elif type(meta['categories']) is not unicode:
+    ct_ok = _check_meta(meta, 'levels', m)
+
+    if not ct_ok:
+        # Can't check further if no levels descriptor
+        pass
+    elif ct_ok and type(meta['levels']) is not unicode:
+        # Can't really check anything here either
         m.warn('Category description does not seem to be text', 2)
     else:
-        # strip terminal semicolon if present
-        if meta['categories'][-1] == ';':
-            meta['categories'] = meta['categories'][:-1]
-        # split the text up by semi-colon
-        categories = meta['categories'].split(';')
-        # strip off any description after a colon
-        category_labels = set([ct.split(':')[0] for ct in categories])
+        # Now we can test if the labels match up
+        # - strip terminal semicolon if present
+        if meta['levels'][-1] == ';':
+            meta['levels'] = meta['levels'][:-1]
+        # - split the text up by semi-colon
+        levels = meta['levels'].split(';')
+        # - strip off any description after a colon
+        level_labels = set([ct.split(':')[0] for ct in levels])
 
-        # check for numeric levels
-        integer_codes = [is_integer_string(vl) for vl in category_labels]
+        # - check for integer level names
+        integer_codes = [is_integer_string(vl) for vl in level_labels]
         if any(integer_codes):
-            m.warn('Integer category labels not permitted', 2)
+            m.warn('Integer level names not permitted', 2)
 
-        # get the unique values reported in the data and then convert
-        # to unicode in case anyone has used numeric level names.
+        # Now look for consistency: get the unique values reported in the
+        # data, convert to unicode to handle checking of integer labels and
+        # then check the reported levels are a subset of the descriptors.
         reported = set(data)
         reported = {unicode(lv) for lv in reported}
 
-        # check for completeness
-        if not reported.issubset(category_labels):
+        if not reported.issubset(level_labels):
             m.warn('Categories found in data missing from description: '
-                   '{}'.format(', '.join(reported - category_labels)), 2)
+                   '{}'.format(', '.join(reported - level_labels)), 2)
 
 
-def check_field_continuous(meta, data, m):
+def check_field_numeric(meta, data, m):
 
     """
-    Checks for consistency in time fields
+    Checks numeric type data, reporting to the Messages instance.
 
-    :param meta:
-    :param data:
-    :return:
+    Args:
+        meta: A dictionary of metadata descriptors for the field
+        data: A list of data values, allegedly numeric
+        m: A Messages instance
+    """
+    un_ok = _check_meta(meta, 'units', m)
+    mt_ok = _check_meta(meta, 'method', m)
+
+    # Regardless of the outcome of the meta checks, can still check the
+    # data is all numeric, as it claims to be.
+    is_numeric = [isinstance(vl, numbers.Number) for vl in data]
+    if not all(is_numeric):
+        m.warn('Non numeric data found', 2)
+
+
+def check_field_trait(meta, data, taxa, taxa_fields, m):
+
+    """
+    Checks trait type data - things measured on an organism - and
+    reports to the Messages instance.
+
+    Args:
+        meta: A dictionary of metadata descriptors for the field
+        data: A list of data values, allegedly numeric
+        taxa: A set containing taxon names from the Taxa worksheet
+        taxa_fields: A list of Taxa fields in this worksheet.
+        m: A Messages instance
     """
 
-    # Check type (excluding NA values)
-    type_check = set([type(vl) for vl in data])
-    if not type_check.issubset({long, float}):
-        m.warn('Non numeric data found in {}.'.format(meta['field_name']), 2)
+    un_ok = _check_meta(meta, 'units', m)
+    mt_ok = _check_meta(meta, 'method', m)
+    tx_ok = _check_meta(meta, 'taxon_name', m)
+
+    # check we can find the taxon that the trait refers to
+    if tx_ok and meta['taxon_name'] not in taxa and meta['taxon_name'] not in taxa_fields:
+        m.warn('Taxon name neither in the Taxa worksheet nor the name of a Taxa field', 2)
+
+    # Regardless of the outcome of the meta checks, can still check the
+    # data is all numeric, as it claims to be.
+    is_numeric = [isinstance(vl, numbers.Number) for vl in data]
+    if not all(is_numeric):
+        m.warn('Non numeric data found', 2)
 
 
 # High level functions
@@ -706,12 +887,16 @@ def check_field_continuous(meta, data, m):
 def check_file(fname, verbose=True):
 
     """
+    Runs the format checking across an Excel workbook.
+
     Parameters:
         fname: Path to an Excel file
-        verbose: Print the report as the program runs?
+        verbose: Boolean to indicate whether to print messages as the program runs?
 
     Returns:
-         A Messages instance containing the information from the file check
+        A dictionary containing descriptive information about the workbook:
+        - messages: The Messages instance
+        - summary: The contents of the summary Worksheet metadata
     """
 
     try:
@@ -739,7 +924,7 @@ def check_file(fname, verbose=True):
         else:
             m.info('PASS: file formatted correctly')
 
-    return m
+    return {'messages': m, 'summary':summary}
 
 
 def main():
