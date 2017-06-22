@@ -40,8 +40,7 @@ class Messages(object):
         kinds: A dictionary keyed by available message kinds, with values as string
             prefixes for messages of that kind.
         messages: A list of tuples of messages giving (kind, text, level).
-        new_warnings: A count of the warning messages added since the instance was
-            created or since the get_new_warnings_count() method was last called.
+        n_warnings: The number of warning messages added.
     """
 
     def __init__(self, header, verbose):
@@ -49,7 +48,7 @@ class Messages(object):
         self.messages = []
         self.verbose = verbose
         self.kinds = {'info': '-', 'hint': '?', 'warn': '!'}
-        self.new_warnings = 0
+        self.n_warnings = 0
         if verbose:
             print(self.header)
 
@@ -74,7 +73,7 @@ class Messages(object):
         """
         msg = ('warn', message, level)
         self.messages.append(msg)
-        self.new_warnings += 1
+        self.n_warnings += 1
         if self.verbose:
             self.print_msg(*msg)
 
@@ -113,29 +112,6 @@ class Messages(object):
         report.writelines(msgs)
         return report
 
-    # Functions to check warnings
-    def get_new_warning_count(self):
-        """
-        Reports the number of warnings since the instance was initialised or
-        since this function was last called.
-        Returns:
-            An integer
-        """
-        if self.new_warnings:
-            new = self.new_warnings
-            self.new_warnings = 0
-            return new
-        else:
-            return 0
-
-    def count_warnings(self):
-        """
-        Calculates the total number of warnings in the instances
-        Returns:
-            An integer
-        """
-        return sum([msg[0] == 'warn' for msg in self.messages])
-
 
 def get_summary(workbook, msg):
 
@@ -154,6 +130,7 @@ def get_summary(workbook, msg):
 
     # try and get the summary worksheet
     msg.info("Checking Summary worksheet")
+    start_warn = msg.n_warnings
     try:
         worksheet = workbook['Summary']
     except KeyError:
@@ -298,9 +275,8 @@ def get_summary(workbook, msg):
             msg.warn('Extra sheets found in workbook: '
                      '{}'.format(', '.join(valid_sheets - expected_sheets)), 1)
 
-    new_warn = msg.get_new_warning_count()
-    if new_warn:
-        msg.info('Summary contains {} errors'.format(new_warn), 1)
+    if (msg.n_warnings - start_warn) > 0:
+        msg.info('Summary contains {} errors'.format(msg.n_warnings - start_warn), 1)
     else:
         msg.info('Summary formatted correctly', 1)
 
@@ -321,6 +297,7 @@ def get_locations(workbook, msg):
 
     # try and get the locations worksheet
     msg.info("Checking Locations worksheet")
+    start_warn = msg.n_warnings
     try:
         locs = workbook['Locations']
     except KeyError:
@@ -353,9 +330,8 @@ def get_locations(workbook, msg):
 
         loc_names = set(loc_names)
 
-    new_warn = msg.get_new_warning_count()
-    if new_warn:
-        msg.info('Locations contains {} errors'.format(new_warn), 1)
+    if (msg.n_warnings - start_warn) > 0:
+        msg.info('Locations contains {} errors'.format(msg.n_warnings - start_warn), 1)
     else:
         msg.info('{} locations loaded correctly'.format(len(loc_names)), 1)
 
@@ -376,6 +352,7 @@ def get_taxa(workbook, msg):
 
     # try and get the taxon worksheet
     msg.info("Checking Taxa worksheet")
+    start_warn = msg.n_warnings
     try:
         taxa = workbook['Taxa']
     except KeyError:
@@ -422,9 +399,8 @@ def get_taxa(workbook, msg):
         msg.warn('Some rows have taxon types that do not match a column name: '
                  '{}'.format(', '.join(types_found - types_valid)), 1)
 
-    new_warn = msg.get_new_warning_count()
-    if new_warn:
-        msg.info('Taxa contains {} errors'.format(new_warn), 1)
+    if (msg.n_warnings - start_warn) > 0:
+        msg.info('Taxa contains {} errors'.format(msg.n_warnings - start_warn), 1)
     else:
         msg.info('{} taxa loaded correctly'.format(len(taxon_names)), 1)
 
@@ -450,6 +426,7 @@ def check_data_worksheet(workbook, ws_name, taxa, locations, msg):
         return None
     else:
         msg.info('Checking data worksheet {}'.format(ws_name))
+        start_warn = msg.n_warnings
 
     # get the worksheet and data dimensions
     worksheet = workbook[ws_name]
@@ -566,9 +543,8 @@ def check_data_worksheet(workbook, ws_name, taxa, locations, msg):
         else:
             msg.warn('Unknown field type {field_type}'.format(**meta), 2)
 
-    new_warn = msg.get_new_warning_count()
-    if new_warn:
-        msg.info('Dataframe contains {} errors'.format(new_warn), 1)
+    if (msg.n_warnings - start_warn) > 0:
+        msg.info('Dataframe contains {} errors'.format(msg.n_warnings - start_warn), 1)
     else:
         msg.info('Dataframe formatted correctly', 1)
 
@@ -915,8 +891,8 @@ def check_file(fname, verbose=True):
         msg.info('No data worksheets found')
 
     if verbose:
-        if msg.count_warnings():
-            msg.info('FAIL: file contained {} errors'.format(msg.count_warnings()))
+        if msg.n_warnings:
+            msg.info('FAIL: file contained {} errors'.format(msg.n_warnings))
         else:
             msg.info('PASS: file formatted correctly')
 
