@@ -108,7 +108,7 @@ class Messages(object):
         """
         report = StringIO()
         report.writelines([self.header])
-        msgs = ['  ' * lv + self.kinds[kn] + msg for lv, kn, msg in self.messages]
+        msgs = ['  ' * lv + self.kinds[kn] + msg for kn, msg, lv in self.messages]
         report.writelines(msgs)
         return report
 
