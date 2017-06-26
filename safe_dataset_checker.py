@@ -107,8 +107,8 @@ class Messages(object):
             A StringIO() instance containing the report text
         """
         report = StringIO()
-        report.writelines([self.header])
-        msgs = ['  ' * lv + self.kinds[kn] + msg for kn, msg, lv in self.messages]
+        report.writelines([self.header] + '\n')
+        msgs = ['  ' * lv + self.kinds[kn] + msg + '\n' for kn, msg, lv in self.messages]
         report.writelines(msgs)
         return report
 
@@ -205,7 +205,7 @@ def get_summary(workbook, msg):
             elif embargo_date > now + datetime.timedelta(days=2*365):
                 msg.warn('Embargo date more than two years in the future.', 1)
             else:
-                ret_dict['embargo_date'] = embargo_date
+                ret_dict['embargo_date'] = embargo_date.date().isoformat()
         elif access_status == 'Open':
             pass
         else:
