@@ -107,7 +107,7 @@ class Messages(object):
             A StringIO() instance containing the report text
         """
         report = StringIO()
-        report.writelines([self.header] + '\n')
+        report.writelines([self.header + '\n'])
         msgs = ['  ' * lv + self.kinds[kn] + msg + '\n' for kn, msg, lv in self.messages]
         report.writelines(msgs)
         return report
