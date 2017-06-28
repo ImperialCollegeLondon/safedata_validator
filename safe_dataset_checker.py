@@ -155,7 +155,7 @@ def get_summary(workbook, msg):
     # Check the minimal keys are expected
     required = {"SAFE Project ID", "Access status", "Title", "Description",
                 "Author name", "Author email", "Author affiliation", "Author ORCID",
-                "Worksheet name", "Worksheet title", "Worksheet description"}
+                "Worksheet name", "Worksheet title", "Worksheet description", 'Keywords'}
 
     found = set(summary_dict.keys())
 
@@ -213,6 +213,16 @@ def get_summary(workbook, msg):
         else:
             msg.warn('Access status must be Open or Embargo not {}'.format(access_status), 1)
 
+    # CHECK KEYWRODS
+    if 'Keywords' not in summary_dict:
+        msg.warn('Dataset keywords missing', 1)
+        ret_dict['keywords'] = None
+    else:
+        # drop any blanks
+        keywords = [vl for vl in summary_dict['Keywords']
+                    if vl is not None or not RE_WSPACE_ONLY.match(vl)]
+        ret_dict['keywords'] = keywords
+
     # CHECK AUTHORS
     author_keys = ['Author name', 'Author affiliation', 'Author email', 'Author ORCID']
     if set(summary_dict.keys()).issuperset(author_keys):
@@ -256,7 +266,7 @@ def get_summary(workbook, msg):
         data_worksheets = zip(*[summary_dict[x] for x in ws_keys])
 
         # remove any completely blank entries
-        data_worksheets = [x for x in data_worksheets if x != tuple([None] * 4)]
+        data_worksheets = [x for x in data_worksheets if x != tuple([None] * 3)]
 
         # validate
         for ind, data_ws in enumerate(data_worksheets):
@@ -271,17 +281,19 @@ def get_summary(workbook, msg):
             data_worksheets[ind] = data_ws
 
         ret_dict['data_worksheets'] = data_worksheets
+
+        # check for extra undocumented spreadsheets
+        if 'Worksheet name' in summary_dict:
+            expected_sheets = set([vl['worksheet'] for vl in data_worksheets]
+                                  + ['Summary', 'Taxa', 'Locations'])
+            if valid_sheets != expected_sheets:
+                msg.warn('Undocumented sheets found in workbook: '
+                         '{}'.format(', '.join(valid_sheets - expected_sheets)), 1)
     else:
         msg.warn('Data worksheet metadata block incomplete.', 1)
         ret_dict['data_worksheets'] = None
 
-    # check for extra undocumented spreadsheets
-    if 'Worksheet name' in summary_dict:
-        expected_sheets = set(summary_dict['Worksheet name'] + ['Summary', 'Taxa', 'Locations'])
-        if valid_sheets != expected_sheets:
-            msg.warn('Extra sheets found in workbook: '
-                     '{}'.format(', '.join(valid_sheets - expected_sheets)), 1)
-
+    # summary of processing
     if (msg.n_warnings - start_warn) > 0:
         msg.info('Summary contains {} errors'.format(msg.n_warnings - start_warn), 1)
     else:
@@ -490,25 +502,6 @@ def check_data_worksheet(workbook, ws_meta, taxa, locations, msg):
         one_increment = [(vl1 - vl2) == 1 for vl1, vl2 in zip(row_numbers[1:], row_numbers[:-1])]
         if not all(one_increment):
             msg.warn('Row numbering does not consistently increment by 1', 1)
-
-
-    # - check they are consecutive (a bit fussy, but might as well check, in case we
-    # use them further down the line).
-    # - find where they stop.
-    previous = row_numbers[0]
-    sequential = True
-    if previous != 1:
-        msg.warn('Row numbering does not start at 1', 1)
-
-    for idx, val in enumerate(row_numbers[1:]):
-        if not isinstance(val, numbers.Number):
-            msg.warn('Non-numeric data found inRow numbering does not start at 1', 1)
-        if val - previous != 1:
-            sequential = False
-        previous = val
-        if val is None or RE_WSPACE_ONLY.match(str(val)):
-            max_col = val - 1
-            break
 
     # report on detected size
     msg.info('Worksheet contains {} rows and {} columns'.format(max_row, max_col), 1)
