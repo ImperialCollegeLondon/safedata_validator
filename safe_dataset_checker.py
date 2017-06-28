@@ -451,10 +451,6 @@ def check_data_worksheet(workbook, ws_meta, taxa, locations, msg):
     if max_row == 1:
         msg.warn('Worksheet is empty', 1)
         return ws_meta
-    else:
-        msg.info('Worksheet contains {} rows and {} columns'.format(max_row, max_col), 1)
-        ws_meta['ncol'] = max_col
-        ws_meta['nrow'] = max_row
 
     # get the metadata field names
     # - first search at most the first 20 rows for the 'field_name' descriptor
@@ -467,6 +463,57 @@ def check_data_worksheet(workbook, ws_meta, taxa, locations, msg):
     else:
         msg.warn('Cannot parse data: field_name row not found', 1)
         return ws_meta
+
+    # Neither of the row and col maxima are particularly reliable as Excel can hang on to
+    # cell references for previously used cells. We can ignore blank columns easily but
+    # we do need to know where to actually stop for finding blank data in rows.
+    # So, we explicitly check the row numbers, making them a mandatory part of the setup.
+
+    # - get the values
+    row_number_cells = worksheet.get_squared_range(1, field_name_row + 1, 1, max_row)
+    row_numbers = [cl[0].value for cl in row_number_cells]
+
+    # - trim blank or whitespace values from the end and update the max col
+    while row_numbers[-1] is None or RE_WSPACE_ONLY.match(str(row_numbers[-1])):
+        row_numbers.pop()
+
+    max_row = len(row_numbers) + field_name_row
+
+    # now check the row numbers are numbers and if they are
+    # do they start at one and go up by one
+    if not all([isinstance(vl, numbers.Number) for vl in row_numbers]):
+        msg.warn('Non-numeric data found in row numbering', 1)
+    else:
+        if row_numbers[0] != 1:
+            msg.warn('Row numbering does not start at 1', 1)
+
+        one_increment = [(vl1 - vl2) == 1 for vl1, vl2 in zip(row_numbers[1:], row_numbers[:-1])]
+        if not all(one_increment):
+            msg.warn('Row numbering does not consistently increment by 1', 1)
+
+
+    # - check they are consecutive (a bit fussy, but might as well check, in case we
+    # use them further down the line).
+    # - find where they stop.
+    previous = row_numbers[0]
+    sequential = True
+    if previous != 1:
+        msg.warn('Row numbering does not start at 1', 1)
+
+    for idx, val in enumerate(row_numbers[1:]):
+        if not isinstance(val, numbers.Number):
+            msg.warn('Non-numeric data found inRow numbering does not start at 1', 1)
+        if val - previous != 1:
+            sequential = False
+        previous = val
+        if val is None or RE_WSPACE_ONLY.match(str(val)):
+            max_col = val - 1
+            break
+
+    # report on detected size
+    msg.info('Worksheet contains {} rows and {} columns'.format(max_row, max_col), 1)
+    ws_meta['ncol'] = max_col
+    ws_meta['nrow'] = max_row
 
     # get the metadata for each field
     field_metadata = []
