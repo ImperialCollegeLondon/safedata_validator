@@ -43,7 +43,7 @@ class Messages(object):
         n_warnings: The number of warning messages added.
     """
 
-    def __init__(self, header, verbose):
+    def __init__(self, header, verbose=True):
         self.header = header
         self.messages = []
         self.verbose = verbose
@@ -125,7 +125,9 @@ def get_summary(workbook, msg):
         workbook: An openpyxl Workbook instance
         msg: A Messages instance
     Returns:
-        A dictionary of the available summary metadata
+        A dictionary of the available summary metadata. The contents should be
+        serialisable using simplejson, so that the summary can be stored in a
+        database field.
     """
 
     # try and get the summary worksheet
@@ -407,23 +409,30 @@ def get_taxa(workbook, msg):
     return set(taxon_names)
 
 
-def check_data_worksheet(workbook, ws_name, taxa, locations, msg):
+def check_data_worksheet(workbook, ws_meta, taxa, locations, msg):
 
     """
     Attempt to load and checks the formatting and content of a data worksheet,
     updating the Messages instance `m` with the results.
 
+    The function returns the meta dictionary, updated with available information
+    on the size of the worksheet and the fields in it.
+
     Args:
         workbook: An openpyxl Workbook instance
-        ws_name: The worksheet name
+        ws_meta: The metadata for this sheet from the summary
         taxa: A list of valid taxa
         locations: A list of valid locations
         msg: A Messages instance
+
+    Returns:
+        A possibly updated version of ws_meta.
     """
 
+    ws_name = ws_meta['worksheet']
     if ws_name not in workbook.get_sheet_names():
         msg.warn('Data worksheet {} not found'.format(ws_name))
-        return None
+        return ws_meta
     else:
         msg.info('Checking data worksheet {}'.format(ws_name))
         start_warn = msg.n_warnings
@@ -435,8 +444,12 @@ def check_data_worksheet(workbook, ws_name, taxa, locations, msg):
 
     # trap completely empty worksheets
     if max_row == 1:
-        msg.warn('Worksheet is empty', 2)
-        return None
+        msg.warn('Worksheet is empty', 1)
+        return ws_meta
+    else:
+        msg.info('Worksheet contains {} rows and {} columns'.format(max_row, max_col), 1)
+        ws_meta['ncol'] = max_col
+        ws_meta['nrow'] = max_row
 
     # get the metadata field names
     # - first search at most the first 20 rows for the 'field_name' descriptor
@@ -448,7 +461,7 @@ def check_data_worksheet(workbook, ws_name, taxa, locations, msg):
         descriptors = descriptors[:field_name_row]
     else:
         msg.warn('Cannot parse data: field_name row not found', 1)
-        return None
+        return ws_meta
 
     # get the metadata for each field
     field_metadata = []
@@ -548,7 +561,10 @@ def check_data_worksheet(workbook, ws_name, taxa, locations, msg):
     else:
         msg.info('Dataframe formatted correctly', 1)
 
-    return None
+    # update ws_meta with the field information
+    ws_meta['fields'] = field_metadata
+
+    return ws_meta
 
 
 def filter_missing_or_blank_data(data, msg):
@@ -885,8 +901,9 @@ def check_file(fname, verbose=True):
     taxa = get_taxa(workbook, msg)
 
     if 'data_worksheets' in summary and len(summary['data_worksheets']):
-        for data_ws in summary['data_worksheets']:
-            check_data_worksheet(workbook, data_ws['worksheet'], taxa, locations, msg)
+        for idx, data_ws in enumerate(summary['data_worksheets']):
+            summary['data_worksheets'][idx] = check_data_worksheet(workbook, data_ws, taxa,
+                                                                   locations, msg)
     else:
         msg.info('No data worksheets found')
 
