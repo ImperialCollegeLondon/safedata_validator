@@ -188,7 +188,7 @@ def get_summary(workbook, msg):
         msg.warn('Dataset title missing', 1)
         ret_dict['description'] = None
     else:
-        ret_dict['description'] = summary_dict['Title'][0]
+        ret_dict['description'] = summary_dict['Description'][0]
 
     # CHECK ACCESS STATUS AND EMBARGO DETAILS
     if 'Access status' in summary_dict:
