@@ -222,18 +222,23 @@ def get_summary(workbook, msg):
         authors = [x for x in authors if x != tuple([None] * 4)]
 
         # convert to dict in Zenodo style and check completeness and validity
+        # - ORCID isn't mandatory
         for ind, auth in enumerate(authors):
             auth = {k: v for k, v in zip(['name', 'affiliation', 'email', 'orcid'], auth)}
             # look for missing values
             for key, val in auth.iteritems():
-                if val is None:
+                if val is None and key != 'orcid':
                     msg.warn('Author {} missing'.format(key), 1)
             # check validity
             if not RE_NAME.match(auth['name']):
                 msg.warn('Author name not formated as last_name, '
                          'first_names: {}'.format(auth['name']), 1)
-            if not RE_ORCID.match(str(auth['orcid'])) or auth['orcid'] is None:
+
+            if auth['orcid'] is None:
+                msg.hint('Consider adding an ORCiD!', 1)
+            elif not RE_ORCID.match(str(auth['orcid'])):
                 msg.warn('ORCID not properly formatted: {}'.format(auth['orcid']), 1)
+
             if not RE_EMAIL.match(auth['email']):
                 msg.warn('Email not properly formatted: {}'.format(auth['email']), 1)
             authors[ind] = auth
