@@ -213,7 +213,7 @@ def get_summary(workbook, msg):
         else:
             msg.warn('Access status must be Open or Embargo not {}'.format(access_status), 1)
 
-    # CHECK KEYWRODS
+    # CHECK KEYWORDS
     if 'Keywords' not in summary_dict:
         msg.warn('Dataset keywords missing', 1)
         ret_dict['keywords'] = None
@@ -605,6 +605,9 @@ def check_data_worksheet(workbook, ws_meta, taxa, locations, msg):
         msg.info('Dataframe contains {} errors'.format(msg.n_warnings - start_warn), 1)
     else:
         msg.info('Dataframe formatted correctly', 1)
+
+    # trim out field descriptions for blank columns
+    field_metadata = [fld for fld in field_metadata if set(fld.values()) != {None}]
 
     # update ws_meta with the field information
     ws_meta['fields'] = field_metadata
