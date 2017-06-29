@@ -955,11 +955,10 @@ def check_file(fname, verbose=True):
     else:
         msg.info('No data worksheets found')
 
-    if verbose:
-        if msg.n_warnings:
-            msg.info('FAIL: file contained {} errors'.format(msg.n_warnings))
-        else:
-            msg.info('PASS: file formatted correctly')
+    if msg.n_warnings:
+        msg.info('FAIL: file contained {} errors'.format(msg.n_warnings))
+    else:
+        msg.info('PASS: file formatted correctly')
 
     return {'messages': msg, 'summary': summary}
 
