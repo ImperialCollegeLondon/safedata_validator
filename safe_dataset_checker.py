@@ -20,6 +20,7 @@ from StringIO import StringIO
 import numbers
 import openpyxl
 from openpyxl import utils
+from ete2 import NCBITaxa
 
 # define some regular expressions used to check validity
 RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}')
@@ -360,7 +361,12 @@ def get_locations(workbook, msg):
 def get_taxa(workbook, msg):
 
     """
-    Attempts to load and check the content of the Taxa worksheet.
+    Attempts to load and check the content of the Taxa worksheet. The
+    function checks that:
+    i) all taxa have a taxon name and a taxon type,
+    ii)
+
+
     Args:
         workbook: An openpyxl Workbook instance.
         msg: A Messages instance.
@@ -381,49 +387,137 @@ def get_taxa(workbook, msg):
         return set()
 
     # Check the headers
-    fields = []
     max_col = taxa.max_column
     max_row = taxa.max_row
 
-    for col in range(1, max_col):
-        fields.append(taxa.cell(row=1, column=col).value)
+    # load the data
+    cells = taxa.get_squared_range(1, 1, max_col, max_row)
+    data = [[cl.value for cl in row] for row in cells]
 
-    # check the two key fields are there
+    # remove null columns and rows
+    null_row = [set(rw) == {None} for rw in data]
+    data = [rw for rw, nl in zip(data, null_row) if not nl]
+    data = zip(*data)
+    null_col = [set(cl) == {None} for cl in data]
+    data = [rw for rw, nl in zip(data, null_col) if not nl]
+    data = zip(*data)
+
+    # split off the field headers from the data
+    fields = data[0]
+    data = data[1:]
+
+    # Look for the names and types and check pairwise complete
     if not set(fields).issuperset({'Taxon name', 'Taxon type'}):
         msg.warn('One or both of Taxon name and Taxon type columns not found', 1)
         return None
 
-    # get the taxon names and types
-    names_col = fields.index('Taxon name') + 1
-    types_col = fields.index('Taxon type') + 1
-    rows = range(2, max_row + 1)
-    taxon_names = [taxa.cell(row=rw, column=names_col).value for rw in rows]
-    taxon_types = [taxa.cell(row=rw, column=types_col).value for rw in rows]
+    # turn the taxa into dictionaries
+    taxa = [dict(zip(fields, row)) for row in data]
+
+    # Look for rows with either or both of taxon type and taxon name missing.
+    # We've cleared rows with all None.
+    incomplete_pairs = [((rw['Taxon name'] is None) or (rw['Taxon type'] is None))
+                        for rw in taxa]
+    if any(incomplete_pairs):
+        msg.warn('Rows with taxon name and/or taxon type missing', 1)
 
     # check for duplicate names
+    taxon_names = [tx['Taxon name'] for tx in taxa]
     if len(set(taxon_names)) != len(taxon_names):
         msg.warn('Duplicated taxon names', 1)
 
-    # Check for some common taxonomic levels. We want as much taxonomic
-    # context as possible, but if all taxa are morphospecies / functional
-    # groups to family level then genus and species are just empty columns.
+    # Now check the taxonomy
+    # - We will only check the names for the big seven taxonomic levels
     taxon_levels = ['Kingdom', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
-    if len(set(taxon_types) & set(taxon_levels)) == 0:
-        msg.warn('Please provide fields giving at least some of the core taxonomic levels', 1)
 
-    # now cross check the given types against the field headers
-    types_found = set(taxon_types)
-    types_valid = set(fields) - {'Taxon name', 'Taxon type'}
-    if not types_found.issubset(types_valid):
+    # - What types are set by the user?
+    taxon_types = set([tx['Taxon type'] for tx in taxa])
+    # - Allow for missing taxon types, since that will already have issued a warning
+    available_types = set(fields) | {None}
+    if not taxon_types.issubset(available_types):
         msg.warn('Some rows have taxon types that do not match a column name: '
-                 '{}'.format(', '.join(types_found - types_valid)), 1)
+                 '{}'.format(', '.join(taxon_types - available_types)), 1)
+
+    # What levels are required given the taxon types?
+    max_taxon = max([taxon_levels.index(fld) for fld in fields if fld in taxon_levels])
+    required_levels = set(taxon_levels[:max_taxon + 1])
+    if not set(fields).issuperset(required_levels):
+        m = 'Required columns missing: {}'
+        m = m.format(', '.join(required_levels - set(fields)))
+        msg.warn(m, 1)
+
+    # Now check the available taxon columns against the NCBI database
+    #  - Could extend. NCBI knows about the following ranks:
+    # ncbi.db.execute('select distinct rank from species;').fetchall()
+
+    ncbi = NCBITaxa()
+
+    # get the levels that are both required and available, and retain order
+    available_types = [tx for tx in taxon_levels if tx in (set(fields) & required_levels)]
+
+    # collect information for a taxonomic index
+    tax_index = []
+
+    for rnk in available_types:
+        msg.info('Checking validity of {} level taxa'.format(rnk), 1)
+        # a) Read the unique entries in that column, skipping None
+        tax_vals = set([tx[rnk] for tx in taxa if tx[rnk] is not None])
+        # b) Check for whitespace only and drop them
+        ws_only = [RE_WSPACE_ONLY.match(x) for x in tax_vals]
+        if any(ws_only):
+            msg.warn('Cells with only whitespace text', 2)
+            tax_vals = [tx for tx, ws in zip(tax_vals, ws_only) if not ws]
+        # c) Look the remaining values up in the ncbi
+        ids = ncbi.get_name_translator(tax_vals)
+        # d) Did they all find a match
+        missing = set(tax_vals) - set(ids.keys())
+        if missing:
+            msg.warn('Unknown taxon: {}'.format(', '.join(missing)), 2)
+        # e) Are they all the correct rank?
+        # There is the possibility that a name might match at more than one rank
+        # (e.g. Crematogaster is a genus and subgenus), so just check if the
+        # expected rank is in the set of ranks.
+        ranks_found = {ky: ncbi.get_rank(vl).values() for ky, vl in ids.iteritems()}
+        bad_rank = [ky for ky, vl in ranks_found.iteritems() if rnk.lower() not in vl]
+        if bad_rank:
+            msg.warn('Taxa not valid at this rank: {}'.format(', '.join(bad_rank)), 2)
+
+        tax_index.extend([(tx, rnk.lower()) for tx in tax_vals])
+
+    # Finally, check completeness of taxonomic hierarchy
+    msg.info('Checking taxon hierarchies complete'.format(rnk), 1)
+    for tx in taxa:
+        tx_tp = tx['Taxon type']
+
+        # set level to check to for non-taxonomic levels
+        if tx_tp == 'Morphospecies':
+            tx_tp = 'Order'
+            wrn = 'Morphospecies taxonomy not complete to {} level: {}'
+        elif tx_tp == 'Functional Group':
+            tx_tp = 'Kingdom'
+            wrn = 'Functional group taxonomy not complete to {} level: {}'
+        else:
+            wrn = 'Taxonomy not complete to {} level: {}'
+
+        # If the type is available, are all levels up to and including
+        # it complete and non blank.
+        if tx_tp is not None and tx_tp in tx:
+            to_check = available_types[0:available_types.index(tx_tp) + 1]
+            filled = [False if ((tx[rnk] is None) or (RE_WSPACE_ONLY.match(tx[rnk])))
+                      else True for rnk in to_check]
+            if not all(filled):
+                msg.warn(wrn.format(tx_tp, tx['Taxon name']), 2)
+        elif tx_tp is not None and tx_tp not in tx:
+            msg.warn('Stated taxon type column {} is missing: {}'.format(tx_tp, tx['Taxon name']), 2)
+        else:
+            msg.warn('Taxon type blank: {}'.format(tx['Taxon name']), 2)
 
     if (msg.n_warnings - start_warn) > 0:
         msg.info('Taxa contains {} errors'.format(msg.n_warnings - start_warn), 1)
     else:
         msg.info('{} taxa loaded correctly'.format(len(taxon_names)), 1)
 
-    return set(taxon_names)
+    return set(taxon_names), tax_index
 
 
 def check_data_worksheet(workbook, ws_meta, taxa, locations, msg):
@@ -946,7 +1040,7 @@ def check_file(fname, verbose=True):
     # check the metadata sheets
     summary = get_summary(workbook, msg)
     locations = get_locations(workbook, msg)
-    taxa = get_taxa(workbook, msg)
+    taxa, tax_index = get_taxa(workbook, msg)
 
     if 'data_worksheets' in summary and len(summary['data_worksheets']):
         for idx, data_ws in enumerate(summary['data_worksheets']):
@@ -960,7 +1054,7 @@ def check_file(fname, verbose=True):
     else:
         msg.info('PASS: file formatted correctly')
 
-    return {'messages': msg, 'summary': summary}
+    return {'messages': msg, 'summary': summary, 'taxonomy': tax_index}
 
 
 def main():
