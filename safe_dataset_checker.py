@@ -469,10 +469,14 @@ def get_taxa(workbook, msg):
             tax_vals = [tx for tx, ws in zip(tax_vals, ws_only) if not ws]
         # c) Look the remaining values up in the ncbi
         ids = ncbi.get_name_translator(tax_vals)
-        # d) Did they all find a match
-        missing = set(tax_vals) - set(ids.keys())
+        # d) Did they all find a match and are the mismatches asserted to be new taxa
+        not_found = set(tax_vals) - set(ids.keys())
+        new = set([tx for tx in not_found if tx.endswith('*')])
+        if new:
+            msg.hint('New taxa reported: {}'.format(', '.join(new)), 2)
+        missing = not_found - new
         if missing:
-            msg.warn('Unknown taxon: {}'.format(', '.join(missing)), 2)
+            msg.warn('Unknown taxa: {}'.format(', '.join(missing)), 2)
         # e) Are they all the correct rank?
         # There is the possibility that a name might match at more than one rank
         # (e.g. Crematogaster is a genus and subgenus), so just check if the
@@ -1031,7 +1035,7 @@ def check_file(fname, verbose=True):
 
     try:
         workbook = openpyxl.load_workbook(filename=fname, data_only=True, read_only=True)
-    except:
+    except IOError:
         raise IOError('Could not open file {}'.format(fname))
 
     # now that we have a file, initialise the message tracker
