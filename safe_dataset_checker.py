@@ -21,6 +21,9 @@ import numbers
 import openpyxl
 from openpyxl import utils
 from ete2 import NCBITaxa
+import requests
+import simplejson
+
 
 # define some regular expressions used to check validity
 RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}')
@@ -303,12 +306,15 @@ def get_summary(workbook, msg):
     return ret_dict
 
 
-def get_locations(workbook, msg):
+def get_locations(workbook, msg, locations=None):
 
     """
     Attempts to load and check the contents of the Locations worksheet.
     Args:
         workbook: An openpyxl Workbook instance
+        locations: A path to a JSON file containing a valid set of location names.
+            With the default value of None, the function tries to get this from
+            a SAFE project website service.
         msg: A Messages instance
     Returns:
         A set of provided location names or None if the worksheet cannot
@@ -326,6 +332,24 @@ def get_locations(workbook, msg):
         msg.warn("No locations worksheet found - moving on", 1)
         return None
 
+    # get the set of valid names
+    if locations is None:
+        # If no file is provided then try and get locations from the website service
+        r = requests.get('https://www.safeproject.net/call/json/get_locations')
+        if r.status_code != 200:
+            msg.warn('Could not download valid location names. Try providing local version.')
+            valid_locations = []
+        else:
+            valid_locations = r.json()['locations']
+    else:
+        # try and load the file
+        try:
+            r = simplejson.load(file(locations))
+            valid_locations = r['locations']
+        except IOError:
+            msg.warn('Could not load location names from file.')
+            valid_locations = []
+
     # Check the headers
     fields = []
     max_col = locs.max_column
@@ -339,16 +363,21 @@ def get_locations(workbook, msg):
         msg.warn('Location name column not found', 1)
         loc_names = None
     else:
-        # get the location names
+        # get the location names as strings
         names_col = fields.index('Location name') + 1
         rows = range(2, max_row + 1)
-        loc_names = [locs.cell(row=rw, column=names_col).value for rw in rows]
+        loc_names = [str(locs.cell(row=rw, column=names_col).value) for rw in rows]
 
         # check for duplicate names
         if len(set(loc_names)) != len(loc_names):
             msg.warn('Duplicated location names', 1)
 
         loc_names = set(loc_names)
+
+        # Are they valid?
+        invalid = loc_names - set(valid_locations)
+        if len(invalid) > 0:
+            msg.warn('Invalid locations found: ' + ', '.join(invalid), 1)
 
     if (msg.n_warnings - start_warn) > 0:
         msg.info('Locations contains {} errors'.format(msg.n_warnings - start_warn), 1)
@@ -683,6 +712,8 @@ def check_data_worksheet(workbook, ws_meta, taxa, locations, msg):
         elif meta['field_type'] == 'Taxa':
             check_field_taxa(data, taxa, msg)
         elif meta['field_type'] == 'Location':
+            # location names should be strings
+            data = [str(dt) for dt in data]
             check_field_locations(data, locations, msg)
         elif meta['field_type'] == 'Categorical':
             check_field_categorical(meta, data, msg)
@@ -885,7 +916,7 @@ def check_field_locations(data, locations, msg):
         msg: A Messages instance
     """
 
-    # check if taxa are all provided
+    # check if locations are all provided
     found = set(data)
     if locations is None:
         msg.warn('No Locations worksheet provided', 2)
