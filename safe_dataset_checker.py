@@ -9,20 +9,39 @@ fault, functions are written to check as much as they can on the inputs.
 Any information and warnings are added on to a Messages instance, passed
 to each function, which is used to keep a report of issues throughout the
 file check.
+
+Taxon names and locations are both validated:
+i) Taxonomic names are validated against the NCBI database using either Entrez
+   queries or the ete2 python package. The ete2 package installation creates
+   a 300 MB local SQLITE version of the NCBI data, but does allow offline use.
+ii) Locations are validated against a list of valid locations. By default, this
+   is downloaded from a web service provided from the SAFE website, but a local
+   file can be provided for off line use.
 """
 
 from __future__ import print_function
-import sys
+import os
 import datetime
+import argparse
 import re
 from collections import Counter
 from StringIO import StringIO
 import numbers
 import openpyxl
 from openpyxl import utils
-from ete2 import NCBITaxa
 import requests
 import simplejson
+
+# if there is a local install of the ete2 package, with a built database
+# then use that for speed. Otherwise the code will try and use Entrez
+try:
+    from ete2 import NCBITaxa
+    ncbi_db = os.path.join(os.environ.get('HOME', '/'), '.etetoolkit', 'taxa.sqlite')
+    if not os.path.exists(ncbi_db):
+        raise RuntimeError()
+    USE_ETE = True
+except (ImportError, RuntimeError) as e:
+    USE_ETE = False
 
 
 # define some regular expressions used to check validity
@@ -306,16 +325,16 @@ def get_summary(workbook, msg):
     return ret_dict
 
 
-def get_locations(workbook, msg, locations=None):
+def get_locations(workbook, msg, locations_json=None):
 
     """
     Attempts to load and check the contents of the Locations worksheet.
     Args:
         workbook: An openpyxl Workbook instance
-        locations: A path to a JSON file containing a valid set of location names.
+        msg: A Messages instance
+        locations_json: A path to a JSON file containing a valid set of location names.
             With the default value of None, the function tries to get this from
             a SAFE project website service.
-        msg: A Messages instance
     Returns:
         A set of provided location names or None if the worksheet cannot
         be found or no locations can be loaded.
@@ -333,21 +352,21 @@ def get_locations(workbook, msg, locations=None):
         return None
 
     # get the set of valid names
-    if locations is None:
+    if locations_json is None:
         # If no file is provided then try and get locations from the website service
         r = requests.get('https://www.safeproject.net/call/json/get_locations')
         if r.status_code != 200:
-            msg.warn('Could not download valid location names. Try providing local version.')
+            msg.warn('Could not download valid location names. Use a local json file.', 1)
             valid_locations = []
         else:
             valid_locations = r.json()['locations']
     else:
         # try and load the file
         try:
-            r = simplejson.load(file(locations))
+            r = simplejson.load(file(locations_json))
             valid_locations = r['locations']
         except IOError:
-            msg.warn('Could not load location names from file.')
+            msg.warn('Could not load location names from file.', 1)
             valid_locations = []
 
     # Check the headers
@@ -387,22 +406,29 @@ def get_locations(workbook, msg, locations=None):
     return loc_names
 
 
-def get_taxa(workbook, msg):
+def get_taxa(workbook, msg, force_entrez=False):
 
     """
     Attempts to load and check the content of the Taxa worksheet. The
     function checks that:
-    i) all taxa have a taxon name and a taxon type,
-    ii)
-
+    i)   all taxa have a taxon name and a taxon type,
+    ii)  that taxa have a complete taxonomic hierarchy up to the taxon type
+    iii) that all taxonomic names are known to NCBI, unless they are
+         explicitly marked as new species with an asterisk suffix.
 
     Args:
         workbook: An openpyxl Workbook instance.
         msg: A Messages instance.
+        force_entrez: Use entrez queries even when a local NCBI query is available
     Returns:
         A set of provided taxon names or None if the worksheet cannot
         be found or no taxa can be loaded.
     """
+
+    if force_entrez:
+        use_ete = False
+    else:
+        use_ete = USE_ETE
 
     # try and get the taxon worksheet
     msg.info("Checking Taxa worksheet")
@@ -476,10 +502,15 @@ def get_taxa(workbook, msg):
         msg.warn(m, 1)
 
     # Now check the available taxon columns against the NCBI database
-    #  - Could extend. NCBI knows about the following ranks:
-    # ncbi.db.execute('select distinct rank from species;').fetchall()
+    #  - NCBI knows about the following ranks:
+    #    ncbi.db.execute('select distinct rank from species;').fetchall()
+    #  - The user can provide these but we currently only check and index the major seven
 
-    ncbi = NCBITaxa()
+    if use_ete:
+        ncbi = NCBITaxa()
+        msg.info('Using local NCBI database to validate names', 1)
+    else:
+        msg.info('Using Entrez queries to validate names', 1)
 
     # get the levels that are both required and available, and retain order
     available_types = [tx for tx in taxon_levels if tx in (set(fields) & required_levels)]
@@ -489,31 +520,61 @@ def get_taxa(workbook, msg):
 
     for rnk in available_types:
         msg.info('Checking validity of {} level taxa'.format(rnk), 1)
+
         # a) Read the unique entries in that column, skipping None
         tax_vals = set([tx[rnk] for tx in taxa if tx[rnk] is not None])
+
         # b) Check for whitespace only and drop them
         ws_only = [RE_WSPACE_ONLY.match(x) for x in tax_vals]
         if any(ws_only):
             msg.warn('Cells with only whitespace text', 2)
             tax_vals = [tx for tx, ws in zip(tax_vals, ws_only) if not ws]
-        # c) Look the remaining values up in the ncbi
-        ids = ncbi.get_name_translator(tax_vals)
-        # d) Did they all find a match and are the mismatches asserted to be new taxa
-        not_found = set(tax_vals) - set(ids.keys())
-        new = set([tx for tx in not_found if tx.endswith('*')])
+
+        # c) look for new species flagged as new, so they don't get tested
+        new = set([tx for tx in tax_vals if tx.endswith('*')])
         if new:
             msg.hint('New taxa reported: {}'.format(', '.join(new)), 2)
-        missing = not_found - new
-        if missing:
-            msg.warn('Unknown taxa: {}'.format(', '.join(missing)), 2)
-        # e) Are they all the correct rank?
-        # There is the possibility that a name might match at more than one rank
-        # (e.g. Crematogaster is a genus and subgenus), so just check if the
-        # expected rank is in the set of ranks.
-        ranks_found = {ky: ncbi.get_rank(vl).values() for ky, vl in ids.iteritems()}
-        bad_rank = [ky for ky, vl in ranks_found.iteritems() if rnk.lower() not in vl]
-        if bad_rank:
-            msg.warn('Taxa not valid at this rank: {}'.format(', '.join(bad_rank)), 2)
+
+        # c) Validate the remaining names at the given rank in NCBI using either:
+        #    i) a local database via ete2 or
+        #    ii) entrez queries over the web, which will be slow.
+        to_validate = set(tax_vals) - new
+
+        if use_ete:
+            # look up the names
+            ids = ncbi.get_name_translator(to_validate)
+            # isolate names that aren't found
+            not_found = set(tax_vals) - set(ids.keys())
+            # check the ranks
+            ranks_found = {ky: ncbi.get_rank(vl).values() for ky, vl in ids.iteritems()}
+            bad_rank = set([ky for ky, vl in ranks_found.iteritems() if rnk.lower() not in vl])
+            invalid = not_found & bad_rank
+            # all taxa are validated when using local query
+            unvalidated = set()
+        else:
+            # loop the names through the entrez interface to the taxonomy database
+            # - search query to see if the name exists at the given rank
+            entrez = ('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?'
+                      'db=taxonomy&term={}+AND+{}[rank]&retmode=json')
+            # compile problems into sets
+            unvalidated = set()
+            invalid = set()
+            # loop over the values
+            for tx in tax_vals:
+                tx_id = requests.get(entrez.format(tx, rnk))
+                if tx_id.status_code != 200:
+                    # internet failures just add individual taxa to the unvalidated list
+                    unvalidated.add(tx)
+                else:
+                    if tx_id.json()['esearchresult']['count'] == 0:
+                        invalid.add(tx)
+
+        # d) now report invalid taxa and unvalidated
+        if invalid:
+            msg.warn('Taxa not valid at this rank: {}'.format(', '.join(invalid)), 2)
+
+        if unvalidated:
+            msg.warn('Entrez taxon validation failed for: {}'.format(', '.join(invalid)), 2)
 
         tax_index.extend([(tx, rnk.lower()) for tx in tax_vals])
 
@@ -1049,7 +1110,7 @@ def check_field_trait(meta, data, taxa, taxa_fields, msg):
 
 # High level functions
 
-def check_file(fname, verbose=True):
+def check_file(fname, verbose=True, force_entrez=False, locations_json=None):
 
     """
     Runs the format checking across an Excel workbook.
@@ -1057,6 +1118,8 @@ def check_file(fname, verbose=True):
     Parameters:
         fname: Path to an Excel file
         verbose: Boolean to indicate whether to print messages as the program runs?
+        force_entrez: Should the taxon checking use Entrez even when a local database is available
+        locations_json: The path to a json file of valid location names
 
     Returns:
         A dictionary containing descriptive information about the workbook:
@@ -1074,8 +1137,8 @@ def check_file(fname, verbose=True):
 
     # check the metadata sheets
     summary = get_summary(workbook, msg)
-    locations = get_locations(workbook, msg)
-    taxa, tax_index = get_taxa(workbook, msg)
+    locations = get_locations(workbook, msg, locations_json=locations_json)
+    taxa, tax_index = get_taxa(workbook, msg, force_entrez=force_entrez)
 
     if 'data_worksheets' in summary and len(summary['data_worksheets']):
         for idx, data_ws in enumerate(summary['data_worksheets']):
@@ -1093,12 +1156,30 @@ def check_file(fname, verbose=True):
 
 
 def main():
+
     """
-    Simple main function to run a verbose report on a file if the module
-    is called as a command.
+    This program validates an Excel file formatted as a SAFE dataset. As it runs, it outputs
+    a report that highlights any problems with the formatting.
+
+    The program validates taxonomic names against the NCBI taxonomy database. It will use
+    the ete2 python package to use a local version if possible, but will otherwise attempt
+    to use the Entrez web service to validate names. The program also validate sampling
+    location names: by default, this is loaded automatically from the SAFE website so requires
+    an internet connection, but a local copy can be provided for offline use.
     """
 
-    check_file(sys.argv[1])
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument('fname', help="Path to the Excel file to be validated.")
+    parser.add_argument('-l', '--locations_json',  default=None,
+                        help=('Path to a locally stored json file of valid location names'))
+    parser.add_argument('--force_entrez', action="store_true", default=False,
+                        help=('Use entrez queries for taxon validation, even '
+                              'if ete2 is available.'))
+
+    args = parser.parse_args()
+
+    check_file(fname=args.fname, verbose=True, locations_json=args.locations_json,
+               force_entrez=args.force_entrez)
 
 
 if __name__ == "__main__":
