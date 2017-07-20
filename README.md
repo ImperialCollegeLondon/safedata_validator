@@ -19,31 +19,43 @@ The code validates:
   1. All taxonomic names against the NCBI taxonomy database.
   1. All location names against the SAFE Gazetteer.
 
-## Usage
+Datasets can be submitted by registered researchers at the 
+[SAFE website](https://safeproject.net/datasets/submit_dataset)
+which will automatically use this code to check that the file is formatted correctly.
+However, you may also want to run it yourself!
 
-Most users will use the package directly as a command line program. For
-guidance, run the following:
+## Installation
+
+The following steps should allow you to run the checks yourself before submitting a dataset:
+
+1. Download the `safe_file_checker.py` file from [here](https://raw.githubusercontent.com/ImperialCollegeLondon/safe_dataset_checker/master/safe_dataset_checker.py) into the same folder as the Excel file containing your dataset.
+2. Open a command line terminal and move to the directory where you saved `safe_file_checker.py`.
+3. For guidance and testing, run the following:
 
     ./safe_dataset_checker.py -h
 
+## Usage
+
 In most cases, it is used simply like this:
 
-    ./safe_dataset_checker.py My_Excel_File.xlsx
+    ./safe_dataset_checker.py path/to/My_Excel_File.xlsx
 
-This requires a web connection to get the list of valid location names
-and to validate taxon names via the Entrez interface to the NCBI
-Taxonomy database:
+Note that the program __requires a web connection__ both to get a list 
+of valid location names for SAFE and to validate taxon names via the
+Entrez interface to the NCBI Taxonomy database:
 
 https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi
 
-If you have installed and set up `ete2` (see below) then the same
-command will use the local database unless you explicitly tell it not
+You can set the program up for offline use.
+
+1. You will need to have installed and set up `ete2` (see below). Once 
+installed, the program will use `ete2` unless you explicitly tell it not
 to by adding the `--force_entrez` argument. You might want to do this
 if you think your local copy of the NCBI database is out of date.
 
-The list of valid location names is automatically downloaded directly
-from the SAFE website. If you want to work offline, then get a copy of
-the list from this link:
+2. The current list of valid location names is automatically downloaded 
+directly from the SAFE Gazetteer. To work offline, get a copy of
+this list from the following link:
 
 https://www.safeproject.net/call/json/get_locations
 
@@ -52,12 +64,10 @@ be able to run the program using the following:
 
     ./safe_dataset_checker.py My_Excel_File.xlsx --location_json SAFE_locations.json
 
-
 ## Requirements
 
-If you want to use this code yourself, then will need to install a
-couple of non-standard python packages, which ought to be simple using
-the `pip` package manager.
+You will need to install a couple of non-standard python packages, which ought
+to be simple using the `pip` package manager.
 
   * `openpyxl`, which is needed to read the Excel files.
 
