@@ -57,12 +57,12 @@ if you think your local copy of the NCBI database is out of date.
 directly from the SAFE Gazetteer. To work offline, get a copy of
 this list from the following link:
 
-https://www.safeproject.net/call/json/get_locations
+    https://www.safeproject.net/call/json/get_locations
 
-Save the output as a file (e.g. `SAFE_locations.json`). You will then
+    Save the output as a file (e.g. `SAFE_locations.json`). You will then
 be able to run the program using the following:
 
-    ./safe_dataset_checker.py My_Excel_File.xlsx --location_json SAFE_locations.json
+        ./safe_dataset_checker.py My_Excel_File.xlsx --location_json SAFE_locations.json
 
 ## Requirements
 
