@@ -32,7 +32,7 @@ The following steps should allow you to run the checks yourself before submittin
 2. Open a command line terminal and move to the directory where you saved `safe_file_checker.py`.
 3. For guidance and testing, run the following:
 
-    ./safe_dataset_checker.py -h
+       ./safe_dataset_checker.py -h
 
 ## Usage
 
