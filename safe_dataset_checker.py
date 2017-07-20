@@ -36,11 +36,10 @@ import simplejson
 # then use that for speed. Otherwise the code will try and use Entrez
 try:
     from ete2 import NCBITaxa
-    ncbi_db = os.path.join(os.environ.get('HOME', '/'), '.etetoolkit', 'taxa.sqlite')
-    if not os.path.exists(ncbi_db):
-        raise RuntimeError()
+    if not os.path.exists(os.path.join(os.environ.get('HOME', '/'), '.etetoolkit', 'taxa.sqlite')):
+        raise RuntimeError('ETE database not found')
     USE_ETE = True
-except (ImportError, RuntimeError) as e:
+except (ImportError, RuntimeError) as err:
     USE_ETE = False
 
 
@@ -354,17 +353,17 @@ def get_locations(workbook, msg, locations_json=None):
     # get the set of valid names
     if locations_json is None:
         # If no file is provided then try and get locations from the website service
-        r = requests.get('https://www.safeproject.net/call/json/get_locations')
-        if r.status_code != 200:
+        loc_json = requests.get('https://www.safeproject.net/call/json/get_locations')
+        if loc_json.status_code != 200:
             msg.warn('Could not download valid location names. Use a local json file.', 1)
             valid_locations = []
         else:
-            valid_locations = r.json()['locations']
+            valid_locations = loc_json.json()['locations']
     else:
         # try and load the file
         try:
-            r = simplejson.load(file(locations_json))
-            valid_locations = r['locations']
+            loc_json = simplejson.load(file(locations_json))
+            valid_locations = loc_json['locations']
         except IOError:
             msg.warn('Could not load location names from file.', 1)
             valid_locations = []
@@ -497,9 +496,8 @@ def get_taxa(workbook, msg, force_entrez=False):
     max_taxon = max([taxon_levels.index(fld) for fld in fields if fld in taxon_levels])
     required_levels = set(taxon_levels[:max_taxon + 1])
     if not set(fields).issuperset(required_levels):
-        m = 'Required columns missing: {}'
-        m = m.format(', '.join(required_levels - set(fields)))
-        msg.warn(m, 1)
+        warn_msg = 'Required columns missing: {}'
+        msg.warn(warn_msg.format(', '.join(required_levels - set(fields))), 1)
 
     # Now check the available taxon columns against the NCBI database
     #  - NCBI knows about the following ranks:
@@ -513,7 +511,7 @@ def get_taxa(workbook, msg, force_entrez=False):
         msg.info('Using Entrez queries to validate names', 1)
 
     # get the levels that are both required and available, and retain order
-    available_types = [tx for tx in taxon_levels if tx in (set(fields) & required_levels)]
+    available_types = [tx for tx in taxon_levels if tx in set(fields) & required_levels]
 
     # collect information for a taxonomic index
     tax_index = []
@@ -560,13 +558,13 @@ def get_taxa(workbook, msg, force_entrez=False):
             unvalidated = set()
             invalid = set()
             # loop over the values
-            for tx in tax_vals:
-                tx_id = requests.get(entrez.format(tx, rnk))
-                if tx_id.status_code != 200:
+            for each_tx in to_validate:
+                tax_id = requests.get(entrez.format(each_tx, rnk))
+                if tax_id.status_code != 200:
                     # internet failures just add individual taxa to the unvalidated list
                     unvalidated.add(tx)
                 else:
-                    if tx_id.json()['esearchresult']['count'] == 0:
+                    if tax_id.json()['esearchresult']['count'] == 0:
                         invalid.add(tx)
 
         # d) now report invalid taxa and unvalidated
@@ -579,9 +577,9 @@ def get_taxa(workbook, msg, force_entrez=False):
         tax_index.extend([(tx, rnk.lower()) for tx in tax_vals])
 
     # Finally, check completeness of taxonomic hierarchy
-    msg.info('Checking taxon hierarchies complete'.format(rnk), 1)
-    for tx in taxa:
-        tx_tp = tx['Taxon type']
+    msg.info('Checking taxon hierarchies complete', 1)
+    for each_tx in taxa:
+        tx_tp = each_tx['Taxon type']
 
         # set level to check to for non-taxonomic levels
         if tx_tp == 'Morphospecies':
@@ -595,16 +593,17 @@ def get_taxa(workbook, msg, force_entrez=False):
 
         # If the type is available, are all levels up to and including
         # it complete and non blank.
-        if tx_tp is not None and tx_tp in tx:
+        if tx_tp is not None and tx_tp in each_tx:
             to_check = available_types[0:available_types.index(tx_tp) + 1]
-            filled = [False if ((tx[rnk] is None) or (RE_WSPACE_ONLY.match(tx[rnk])))
+            filled = [False if ((each_tx[rnk] is None) or (RE_WSPACE_ONLY.match(each_tx[rnk])))
                       else True for rnk in to_check]
             if not all(filled):
-                msg.warn(wrn.format(tx_tp, tx['Taxon name']), 2)
-        elif tx_tp is not None and tx_tp not in tx:
-            msg.warn('Stated taxon type column {} is missing: {}'.format(tx_tp, tx['Taxon name']), 2)
+                msg.warn(wrn.format(tx_tp, each_tx['Taxon name']), 2)
+        elif tx_tp is not None and tx_tp not in each_tx:
+            msg.warn('Stated taxon type column {} is missing: '
+                     '{}'.format(tx_tp, each_tx['Taxon name']), 2)
         else:
-            msg.warn('Taxon type blank: {}'.format(tx['Taxon name']), 2)
+            msg.warn('Taxon type blank: {}'.format(each_tx['Taxon name']), 2)
 
     if (msg.n_warnings - start_warn) > 0:
         msg.info('Taxa contains {} errors'.format(msg.n_warnings - start_warn), 1)
@@ -1170,7 +1169,7 @@ def main():
 
     parser = argparse.ArgumentParser(description=main.__doc__)
     parser.add_argument('fname', help="Path to the Excel file to be validated.")
-    parser.add_argument('-l', '--locations_json',  default=None,
+    parser.add_argument('-l', '--locations_json', default=None,
                         help=('Path to a locally stored json file of valid location names'))
     parser.add_argument('--force_entrez', action="store_true", default=False,
                         help=('Use entrez queries for taxon validation, even '
