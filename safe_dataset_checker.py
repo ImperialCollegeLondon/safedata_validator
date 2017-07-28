@@ -547,8 +547,6 @@ def get_taxa(workbook, msngr, use_entrez=False, check_all_ranks=False):
     taxa = [{ky.lower(): vl for ky, vl in tx.iteritems()} for tx in taxa]
     hdrs = taxa[0].keys()
 
-    print(taxa[4])
-
     # basic checks on taxon names: do they exist, no duplication, no padding
     if 'taxon name' not in hdrs:
         msngr.warn('No taxon name column found - no further checking', 1)
