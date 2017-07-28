@@ -36,6 +36,35 @@ The following steps should allow you to run the checks yourself before submittin
 
 ## Usage
 
+The line above should show the message below:
+
+    usage: safe_dataset_checker.py [-h] [-l LOCATIONS_JSON] [--use_entrez]
+                                   [--check_all_ranks] fname
+
+    This program validates an Excel file formatted as a SAFE dataset. As it runs,
+    it outputs a report that highlights any problems with the formatting. The
+    program validates taxonomic names against the NCBI taxonomy database. It will
+    use the ete2 python package to use a local version if possible, but will
+    otherwise attempt to use the Entrez web service to validate names. The program
+    also validate sampling location names: by default, this is loaded
+    automatically from the SAFE website so requires an internet connection, but a
+    local copy can be provided for offline use.
+
+    positional arguments:
+      fname                 Path to the Excel file to be validated.
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -l LOCATIONS_JSON, --locations_json LOCATIONS_JSON
+                            Path to a locally stored json file of valid location
+                            names
+      --use_entrez          Use entrez queries for taxon validation, even if ete2
+                            is available.
+      --check_all_ranks     Check the validity of all taxonomic ranks included,
+                            not just the standard required ranks.
+
+
+
 In most cases, it is used simply like this:
 
     ./safe_dataset_checker.py path/to/My_Excel_File.xlsx
@@ -50,7 +79,7 @@ You can set the program up for offline use.
 
 1. You will need to have installed and set up `ete2` (see below). Once 
 installed, the program will use `ete2` unless you explicitly tell it not
-to by adding the `--force_entrez` argument. You might want to do this
+to by adding the `--use_entrez` argument. You might want to do this
 if you think your local copy of the NCBI database is out of date.
 
 2. The current list of valid location names is automatically downloaded 
