@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: UTF8 -*-
 
 """
 Module containing code to verify the format of a SAFE project Excel dataset.
@@ -50,6 +51,7 @@ RE_NAME = re.compile(r'[^,]+,[ ]?[^,]+')
 RE_WSPACE_ONLY = re.compile(r'^\s*$')
 # note that logically the next one also catches whitespace at both ends
 RE_WSPACE_AT_ENDS = re.compile(r'^\s+\w+|\w+\s+$')
+RE_DMS = re.compile(r'[°\'"dms’”]+')
 
 
 """
@@ -883,6 +885,10 @@ def check_data_worksheet(workbook, ws_meta, taxa, locations, msngr):
             check_field_abundance(meta, data, taxa, taxa_fields, msngr)
         elif meta['field_type'] == 'Trait':
             check_field_trait(meta, data, taxa, taxa_fields, msngr)
+        elif meta['field_type'] == 'Latitude':
+            check_field_geo(meta, data, msngr, which='latitude')
+        elif meta['field_type'] == 'Longitude':
+            check_field_geo(meta, data, msngr, which='longitude')
         elif meta['field_type'] == 'Comments':
             pass
         elif meta['field_type'] is None:
@@ -1217,6 +1223,38 @@ def check_field_trait(meta, data, taxa, taxa_fields, msngr):
     # data is all numeric, as it claims to be.
     if not all_numeric(data):
         msngr.warn('Non numeric data found', 2)
+
+def check_field_geo(meta, data, msngr, which='latitude'):
+
+    """
+    Checks geographic coordinates.
+
+    Args:
+        meta: A dictionary of metadata descriptors for the field
+        data: A list of data values
+        msngr: A Messages instance
+        which: One of latitude or longitude
+    """
+
+    # Are the values represented as decimal degrees - numeric.
+    if not all_numeric(data):
+        msngr.warn('Non numeric data found', 2)
+        if any([RE_DMS.search(unicode(vl)) for vl in data]):
+            msngr.hint('Possible degrees minutes and seconds formatting? Use decimal degrees', 2)
+
+    # Check the bounds
+    nums = [vl for vl in data if isinstance(vl, numbers.Number)]
+    if len(nums):
+        if which == 'latitude':
+            if min(nums) < -90 or max(nums) > 90:
+                msngr.warn('Latitude values outside [-90, 90]',2)
+            if min(nums) < -4 or max(nums) > 8:
+                msngr.hint('Latitude values not in Borneo [-4, 8]',2)
+        elif which == 'longitude':
+            if min(nums) < -180 or max(nums) > 180:
+                msngr.warn('Longitude values outside [-180, 180]', 2)
+            if min(nums) < 108 or max(nums) > 120:
+                msngr.hint('Longitude values not in Borneo [-108, 120]', 2)
 
 
 # High level functions
