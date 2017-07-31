@@ -421,7 +421,7 @@ def get_locations(workbook, msngr, locations_json=None):
     msngr.info("Checking Locations worksheet")
     start_warn = msngr.n_warnings
     try:
-        locs = workbook['Locations']
+        locs_wb = workbook['Locations']
     except KeyError:
         # No locations is pretty implausible, but still persevere as if
         # they aren't going to be required
@@ -436,51 +436,100 @@ def get_locations(workbook, msngr, locations_json=None):
             msngr.warn('Could not download valid location names. Use a local json file.', 1)
             valid_locations = []
         else:
-            valid_locations = loc_json.json()['locations']
+            valid_locations = set(loc_json.json()['locations'])
     else:
         # try and load the file
         try:
             loc_json = simplejson.load(file(locations_json))
-            valid_locations = loc_json['locations']
+            valid_locations = set(loc_json['locations'])
         except IOError:
             msngr.warn('Could not load location names from file.', 1)
             valid_locations = []
 
     # Check the headers
-    fields = []
-    max_col = locs.max_column
-    max_row = locs.max_row
+    # get and check the headers
+    loc_rows = locs_wb.rows
+    hdrs = [cl.value for cl in loc_rows.next()]
+    # duplicated headers are a problem in that it will cause values in
+    # the taxon dictionaries to be overwritten. We don't want to keep the
+    # returned values, so discard
+    _ = duplication(hdrs, msngr, 'Duplicated location sheet headers', 1)
 
-    for col in range(1, max_col):
-        fields.append(locs.cell(row=1, column=col).value)
+    # Load dictionaries of the taxa and check some taxa are found
+    locs = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in loc_rows]
 
     # check the key fields are there
-    if not set(fields).issuperset({'Location name'}):
+    if not set(hdrs).issuperset({'Location name'}):
         msngr.warn('Location name column not found', 1)
         loc_names = None
     else:
-        # get the location names as strings
-        names_col = fields.index('Location name') + 1
-        rows = range(2, max_row + 1)
-        loc_names = [str(locs.cell(row=rw, column=names_col).value) for rw in rows]
-
-        # report number of locations found
-        msngr.info('Checking {} taxa'.format(len(loc_names)), 1)
-
-        # check for duplicate names
-        _ = duplication(loc_names, msngr, 'Duplicated location names: ', 1)
-
-        # check for rogue whitespace and get representation of bad names
-        ws_padded = [vl for vl in loc_names if is_padded(vl)]
+        # check for rogue whitespace
+        ws_padded = [rw['Location name'] for rw in locs if is_padded(rw['Location name'])]
         if ws_padded:
-            msngr.warn('Locations names with whitespace padding: ', 1, join=ws_padded, as_repr=True)
+            msngr.warn('Locations names with whitespace padding: ', 1,
+                       join=ws_padded, as_repr=True)
 
-        # check they are known - white strip first.
-        loc_names = set([lc.strip() for lc in loc_names])
-        unknown= loc_names - set(valid_locations)
+        # clean whitespace padding and look for duplicates
+        for rw in locs:
+            rw['Location name'] = rw['Location name'].strip()
+
+        _ = duplication([rw['Location name'] for rw in locs], msngr, 'Duplicated location names: ', 1)
+
+        # are there any new ones?
+        if 'New' in hdrs:
+
+            # Check the New column is just yes, no
+            is_new = {rw['New'] for rw in locs}
+            if is_new != {'Yes','No'}:
+                msngr.warn('New field contains values other than Yes and No: ', 1,
+                           join=set(is_new), as_repr=True)
+
+            new_locs = {rw['Location name'] for rw in locs if rw['New'] == 'Yes'}
+            old_locs = {rw['Location name'] for rw in locs if rw['New'] == 'No'}
+
+            if new_locs:
+                # check the data for the new ones
+                new_rows = [rw for rw in locs if rw['New'] == 'Yes']
+                msngr.hint('{} new locations reported'.format(len(new_rows)), 1)
+
+                # check Lat Long and Type
+                if 'Latitude' in hdrs:
+                    lats = [vl['Latitude'] for vl in new_rows]
+                    _ = check_field_geo([], lats, msngr, which='latitude')
+                else:
+                    msngr.warn('New locations reported but Latitude field missing', 1)
+
+                if 'Longitude' in hdrs:
+                    longs = [vl['Longitude'] for vl in new_rows]
+                    _ = check_field_geo([], longs, msngr, which='longitude')
+                else:
+                    msngr.warn('New locations reported but Longitude field missing', 1)
+
+                if 'Type' in hdrs:
+                    geo_types = {vl['Type'] for vl in new_rows}
+                    bad_geo_types = geo_types - {'POINT', 'LINESTRING', 'POLYGON'}
+                    if bad_geo_types:
+                        msngr.warn('Unknown location types', 1, join=bad_geo_types, as_repr=True)
+                else:
+                    msngr.warn('New locations reported but Type field missing', 1)
+
+            # Check known/unknown
+            new_matches_existing = new_locs & valid_locations
+            if new_matches_existing :
+                msngr.warn('New locations use existing location names: ', 1,
+                           join=new_matches_existing)
+
+            unknown = old_locs - (valid_locations | new_locs)
+            loc_names = old_locs | new_locs
+        else:
+            # Are any non-new locations unknown?
+            loc_names = {rw['Location name'] for rw in locs}
+            unknown =  loc_names - valid_locations
+
         if unknown:
             msngr.warn('Unknown locations found: ', 1, join=unknown, as_repr=True)
 
+        # add the new ones back in, without the s
     if (msngr.n_warnings - start_warn) > 0:
         msngr.info('Locations contains {} errors'.format(msngr.n_warnings - start_warn), 1)
     else:
@@ -1192,7 +1241,7 @@ def check_field_categorical(meta, data, msngr):
 
         if not reported.issubset(level_labels):
             msngr.warn('Categories found in data missing from '
-                       'description: ', 2, join= reported - level_labels)
+                       'description: ', 2, join=reported - level_labels)
 
 
 def check_field_numeric(meta, data, msngr):
@@ -1260,19 +1309,23 @@ def check_field_geo(meta, data, msngr, which='latitude'):
         if any([RE_DMS.search(unicode(vl)) for vl in data]):
             msngr.hint('Possible degrees minutes and seconds formatting? Use decimal degrees', 2)
 
-    # Check the bounds
+    # Check the bounds and precision
     nums = [vl for vl in data if isinstance(vl, numbers.Number)]
+
+    # Check the locations
     if len(nums):
         if which == 'latitude':
-            if min(nums) < -90 or max(nums) > 90:
-                msngr.warn('Latitude values outside [-90, 90]',2)
-            if min(nums) < -4 or max(nums) > 8:
-                msngr.hint('Latitude values not in Borneo [-4, 8]',2)
+            bnds = [-90,-4,8,90]
         elif which == 'longitude':
-            if min(nums) < -180 or max(nums) > 180:
-                msngr.warn('Longitude values outside [-180, 180]', 2)
-            if min(nums) < 108 or max(nums) > 120:
-                msngr.hint('Longitude values not in Borneo [-108, 120]', 2)
+            bnds = [-180,108,120,180]
+
+        out_of_bounds = [vl < bnds[0] or vl > bnds[3] for vl in nums]
+        out_of_borneo = [bnds[0] <= vl < bnds[1] or bnds[2]< vl <= bnds[3] for vl in nums]
+
+        if any(out_of_bounds):
+            msngr.warn('Latitude values outside [{0[0]}, {0[3]}]'.format(bnds), 2)
+        if any(out_of_borneo):
+            msngr.hint('Latitude values not in Borneo [{0[1]}, {0[2]}]'.format(bnds), 2)
 
 
 # High level functions
