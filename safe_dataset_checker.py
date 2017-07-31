@@ -810,6 +810,7 @@ def check_data_worksheet(workbook, ws_meta, taxa, locations, msngr):
     # check required descriptors are present and if locations and taxa
     # turn out to be needed after all!
     ft_found = [fld['field_type'] for fld in field_metadata]
+
     if 'Categorical' in ft_found and 'levels' not in descriptors:
         msngr.warn('Categorical data fields found but no levels descriptor provided.', 1)
 
@@ -827,6 +828,20 @@ def check_data_worksheet(workbook, ws_meta, taxa, locations, msngr):
             msngr.warn('Abundance field found but no taxon name descriptor provided.', 1)
         if 'method' not in descriptors:
             msngr.warn('Abundance field found but no sampling method descriptor provided.', 1)
+
+    if 'Categorical Trait' in ft_found:
+        if 'levels' not in descriptors:
+            msngr.warn('Categorical trait fields found but no levels descriptor provided.', 1)
+        if 'taxon_name' not in descriptors:
+            msngr.warn('Categorical trait field found but no taxon name descriptor provided.', 1)
+
+    if 'Numeric Trait' in ft_found:
+        if 'units' not in descriptors:
+            msngr.warn('Numeric trait fields found but no units descriptor provided.', 1)
+        if 'method' not in descriptors:
+            msngr.warn('Numeric trait fields found but no method descriptor provided.', 1)
+        if 'taxon_name' not in descriptors:
+            msngr.warn('Numeric trait field found but no taxon name descriptor provided.', 1)
 
     # check field names unique (drop None)
     field_names = [fld['field_name'] for fld in field_metadata if fld['field_name'] is not None]
@@ -883,8 +898,10 @@ def check_data_worksheet(workbook, ws_meta, taxa, locations, msngr):
             check_field_numeric(meta, data, msngr)
         elif meta['field_type'] == 'Abundance':
             check_field_abundance(meta, data, taxa, taxa_fields, msngr)
-        elif meta['field_type'] == 'Trait':
-            check_field_trait(meta, data, taxa, taxa_fields, msngr)
+        elif meta['field_type'] == 'Categorical Trait':
+            check_field_trait(meta, data, taxa, taxa_fields, msngr, which='categorical')
+        elif meta['field_type'] == 'Numeric Trait':
+            check_field_trait(meta, data, taxa, taxa_fields, msngr, which='numeric')
         elif meta['field_type'] == 'Latitude':
             check_field_geo(meta, data, msngr, which='latitude')
         elif meta['field_type'] == 'Longitude':
@@ -1197,32 +1214,33 @@ def check_field_numeric(meta, data, msngr):
         msngr.warn('Non numeric data found', 2)
 
 
-def check_field_trait(meta, data, taxa, taxa_fields, msngr):
+def check_field_trait(meta, data, taxa, taxa_fields, msngr, which='categorical'):
 
     """
-    Checks trait type data - things measured on an organism - and
-    reports to the Messages instance.
+    Checks trait type data and reports to the Messages instance. Just a wrapper
+    to check that a valid taxon has been provided before handing off to
+    check_field_categorical or check_field_numeric
 
     Args:
         meta: A dictionary of metadata descriptors for the field
         data: A list of data values, allegedly numeric
         taxa: A set containing taxon names from the Taxa worksheet
         taxa_fields: A list of Taxa fields in this worksheet.
-        msngr: A Messages instance
+        msngr: A Messages instance.
+        which: The type of trait data in the field
     """
 
-    _check_meta(meta, 'units', msngr)
-    _check_meta(meta, 'method', msngr)
     tx_ok = _check_meta(meta, 'taxon_name', msngr)
-
     # check we can find the taxon that the trait refers to
     if tx_ok and meta['taxon_name'] not in taxa and meta['taxon_name'] not in taxa_fields:
         msngr.warn('Taxon name neither in the Taxa worksheet nor the name of a Taxa field', 2)
 
-    # Regardless of the outcome of the meta checks, can still check the
-    # data is all numeric, as it claims to be.
-    if not all_numeric(data):
-        msngr.warn('Non numeric data found', 2)
+    # Regardless of the outcome of the meta checks, check the contents:
+    if which == 'categorical':
+        check_field_categorical(meta, data, msngr)
+    elif which == 'numeric':
+        check_field_numeric(meta, data, msngr)
+
 
 def check_field_geo(meta, data, msngr, which='latitude'):
 
