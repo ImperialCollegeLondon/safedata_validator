@@ -434,7 +434,7 @@ def get_locations(workbook, msngr, locations_json=None):
         loc_json = requests.get('https://www.safeproject.net/call/json/get_locations')
         if loc_json.status_code != 200:
             msngr.warn('Could not download valid location names. Use a local json file.', 1)
-            valid_locations = []
+            valid_locations = {}
         else:
             valid_locations = set(loc_json.json()['locations'])
     else:
@@ -444,7 +444,7 @@ def get_locations(workbook, msngr, locations_json=None):
             valid_locations = set(loc_json['locations'])
         except IOError:
             msngr.warn('Could not load location names from file.', 1)
-            valid_locations = []
+            valid_locations = {}
 
     # Check the headers
     # get and check the headers
@@ -470,17 +470,18 @@ def get_locations(workbook, msngr, locations_json=None):
                        join=ws_padded, as_repr=True)
 
         # clean whitespace padding and look for duplicates
-        for rw in locs:
-            rw['Location name'] = rw['Location name'].strip()
+        for row in locs:
+            row['Location name'] = row['Location name'].strip()
 
-        _ = duplication([rw['Location name'] for rw in locs], msngr, 'Duplicated location names: ', 1)
+        _ = duplication([rw['Location name'] for rw in locs], msngr,
+                        'Duplicated location names: ', 1)
 
         # are there any new ones?
         if 'New' in hdrs:
 
             # Check the New column is just yes, no
             is_new = {rw['New'] for rw in locs}
-            if is_new != {'Yes','No'}:
+            if is_new != {'Yes', 'No'}:
                 msngr.warn('New field contains values other than Yes and No: ', 1,
                            join=set(is_new), as_repr=True)
 
@@ -495,13 +496,13 @@ def get_locations(workbook, msngr, locations_json=None):
                 # check Lat Long and Type
                 if 'Latitude' in hdrs:
                     lats = [vl['Latitude'] for vl in new_rows]
-                    _ = check_field_geo([], lats, msngr, which='latitude')
+                    check_field_geo(lats, msngr, which='latitude')
                 else:
                     msngr.warn('New locations reported but Latitude field missing', 1)
 
                 if 'Longitude' in hdrs:
                     longs = [vl['Longitude'] for vl in new_rows]
-                    _ = check_field_geo([], longs, msngr, which='longitude')
+                    check_field_geo(longs, msngr, which='longitude')
                 else:
                     msngr.warn('New locations reported but Longitude field missing', 1)
 
@@ -515,7 +516,7 @@ def get_locations(workbook, msngr, locations_json=None):
 
             # Check known/unknown
             new_matches_existing = new_locs & valid_locations
-            if new_matches_existing :
+            if new_matches_existing:
                 msngr.warn('New locations use existing location names: ', 1,
                            join=new_matches_existing)
 
@@ -524,7 +525,7 @@ def get_locations(workbook, msngr, locations_json=None):
         else:
             # Are any non-new locations unknown?
             loc_names = {rw['Location name'] for rw in locs}
-            unknown =  loc_names - valid_locations
+            unknown = loc_names - valid_locations
 
         if unknown:
             msngr.warn('Unknown locations found: ', 1, join=unknown, as_repr=True)
@@ -634,15 +635,15 @@ def get_taxa(workbook, msngr, use_entrez=False, check_all_ranks=False):
     # - Functional group and morphospecies are inserted here at the level we require
     # - Using an ordered dict to maintain hierarchy
     rk_known = OrderedDict([('kingdom', 0), ('functional group', 0), ('subkingdom', 0),
-                           ('superphylum', 0), ('phylum', 1), ('subphylum', 1),
-                           ('superclass', 1), ('class', 2), ('subclass', 2),
-                           ('infraclass', 2), ('cohort', 2), ('superorder', 2),
-                           ('order', 3), ('suborder', 3), ('infraorder', 3),
-                           ('parvorder', 3), ('superfamily', 3), ('morphospecies', 3),
-                           ('family', 4), ('subfamily', 4), ('tribe', 4),
-                           ('subtribe', 4), ('genus', 5), ('subgenus', 5),
-                           ('species group', 5), ('species subgroup', 5),
-                           ('species', 6), ('subspecies', 6), ('varietas', 6), ('forma', 6)])
+                            ('superphylum', 0), ('phylum', 1), ('subphylum', 1),
+                            ('superclass', 1), ('class', 2), ('subclass', 2),
+                            ('infraclass', 2), ('cohort', 2), ('superorder', 2),
+                            ('order', 3), ('suborder', 3), ('infraorder', 3),
+                            ('parvorder', 3), ('superfamily', 3), ('morphospecies', 3),
+                            ('family', 4), ('subfamily', 4), ('tribe', 4),
+                            ('subtribe', 4), ('genus', 5), ('subgenus', 5),
+                            ('species group', 5), ('species subgroup', 5),
+                            ('species', 6), ('subspecies', 6), ('varietas', 6), ('forma', 6)])
 
     # get the provided ranks
     rk_provided = set(hdrs) & set(rk_known)
@@ -952,9 +953,9 @@ def check_data_worksheet(workbook, ws_meta, taxa, locations, msngr):
         elif meta['field_type'] == 'Numeric Trait':
             check_field_trait(meta, data, taxa, taxa_fields, msngr, which='numeric')
         elif meta['field_type'] == 'Latitude':
-            check_field_geo(meta, data, msngr, which='latitude')
+            check_field_geo(data, msngr, which='latitude')
         elif meta['field_type'] == 'Longitude':
-            check_field_geo(meta, data, msngr, which='longitude')
+            check_field_geo(data, msngr, which='longitude')
         elif meta['field_type'] == 'Comments':
             pass
         elif meta['field_type'] is None:
@@ -1291,13 +1292,12 @@ def check_field_trait(meta, data, taxa, taxa_fields, msngr, which='categorical')
         check_field_numeric(meta, data, msngr)
 
 
-def check_field_geo(meta, data, msngr, which='latitude'):
+def check_field_geo(data, msngr, which='latitude'):
 
     """
     Checks geographic coordinates.
 
     Args:
-        meta: A dictionary of metadata descriptors for the field
         data: A list of data values
         msngr: A Messages instance
         which: One of latitude or longitude
@@ -1315,12 +1315,12 @@ def check_field_geo(meta, data, msngr, which='latitude'):
     # Check the locations
     if len(nums):
         if which == 'latitude':
-            bnds = [-90,-4,8,90]
+            bnds = [-90, -4, 8, 90]
         elif which == 'longitude':
-            bnds = [-180,108,120,180]
+            bnds = [-180, 108, 120, 180]
 
         out_of_bounds = [vl < bnds[0] or vl > bnds[3] for vl in nums]
-        out_of_borneo = [bnds[0] <= vl < bnds[1] or bnds[2]< vl <= bnds[3] for vl in nums]
+        out_of_borneo = [bnds[0] <= vl < bnds[1] or bnds[2] < vl <= bnds[3] for vl in nums]
 
         if any(out_of_bounds):
             msngr.warn('Latitude values outside [{0[0]}, {0[3]}]'.format(bnds), 2)
