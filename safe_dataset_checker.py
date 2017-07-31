@@ -986,6 +986,19 @@ def is_integer_string(txt):
         return False
 
 
+def all_numeric(data):
+    """
+    Tests if all values in an iterable are numeric.
+    Args:
+        data: An iterable claiming to contain numbers
+
+    Returns:
+        Boolean
+    """
+
+    return all([isinstance(vl, numbers.Number) for vl in data])
+
+
 def check_field_date(data, msngr):
 
     """
@@ -1109,8 +1122,7 @@ def check_field_abundance(meta, data, taxa, taxa_fields, msngr):
 
     # Can still check values are numeric, whatever happens above.
     # We're not going to insist on integers here - could be mean counts.
-    is_numeric = [isinstance(vl, numbers.Number) for vl in data]
-    if not all(is_numeric):
+    if not all_numeric(data):
         msngr.warn('Field contains non-numeric data', 2)
 
 
@@ -1175,8 +1187,7 @@ def check_field_numeric(meta, data, msngr):
 
     # Regardless of the outcome of the meta checks, can still check the
     # data is all numeric, as it claims to be.
-    is_numeric = [isinstance(vl, numbers.Number) for vl in data]
-    if not all(is_numeric):
+    if not all_numeric(data):
         msngr.warn('Non numeric data found', 2)
 
 
@@ -1204,8 +1215,7 @@ def check_field_trait(meta, data, taxa, taxa_fields, msngr):
 
     # Regardless of the outcome of the meta checks, can still check the
     # data is all numeric, as it claims to be.
-    is_numeric = [isinstance(vl, numbers.Number) for vl in data]
-    if not all(is_numeric):
+    if not all_numeric(data):
         msngr.warn('Non numeric data found', 2)
 
 
