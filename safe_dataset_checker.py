@@ -153,7 +153,7 @@ class DataWorksheet(object):
         self.descriptors = None
         self.taxa_fields = None
         self.field_name_row = None
-        self.fields = {}
+        self.fields = []
 
 
 class Dataset(object):
@@ -194,8 +194,8 @@ class Dataset(object):
         self.authors = []
         self.title = None
         self.description = None
-        self.dataworksheet_summaries= []
-        self.access = None
+        self.dataworksheet_summaries = []
+        self.access = 'Open'
         self.embargo_date = None
         self.dataworksheets = []
         self.keywords = []
@@ -1034,17 +1034,25 @@ class Dataset(object):
             data: A list of values
         """
 
-        # Skip any field with no metadata - spacer columns get left in
-        # to avoid disrupting the column indexing.
-        if set(meta.values()) == {None}:
-            return
-
-        # prep the messages instance to pass to functions
+        # Print out column checking header
         if is_blank(meta['field_name']):
             self.info('Checking Column {}'.format(meta['column']), 1)
-            self.warn('Field name is blank', 2)
         else:
             self.info('Checking field {field_name}'.format(**meta), 1)
+
+        # Skip any field with no user provided metadata or data
+        blank_data = [is_blank(vl) for vl in data]
+        blank_meta = [is_blank(vl) for ky, vl in meta.iteritems()
+                      if ky not in ['col_idx', 'column']]
+        if all(blank_data) and all(blank_meta):
+            return
+        elif all(blank_meta):
+            self.warn('Field contains no descriptor information but does contain values', 2)
+            return
+
+        # try and figure out what else is available
+        if is_blank(meta['field_name']):
+            self.warn('Field name is blank', 2)
 
         # check the description
         if is_blank(meta['description']):
@@ -1059,16 +1067,13 @@ class Dataset(object):
             if any(na_vals):
                 self.hint('{} / {} values missing'.format(sum(na_vals), len(na_vals)), 2)
 
-            # We won't tolerate:
-            # 1) empty cells (just to avoid ambiguity - e.g. in abundance data)
-            # 2) non-empty cells containing only whitespace strings
-            blank = [is_blank(vl) for vl in data]
-            if any(blank):
-                self.warn(
-                    '{} cells are blank or contain only whitespace text'.format(sum(blank)), 2)
+            # We won't tolerate blank data
+            if any(blank_data):
+                self.warn('{} cells are blank or contain only whitespace '
+                          'text'.format(sum(blank_data)), 2)
 
             # Return the values that aren't NA, blank or whitespace only
-            na_or_blank = [any(tst) for tst in zip(na_vals, blank)]
+            na_or_blank = [any(tst) for tst in zip(na_vals, blank_data)]
             data = [dt for dt, nb in zip(data, na_or_blank) if not nb]
 
         # run consistency checks where needed and trap unknown field types
@@ -1102,6 +1107,9 @@ class Dataset(object):
             self.warn('Field type is empty', 2)
         else:
             self.warn('Unknown field type {field_type}'.format(**meta), 2)
+
+        # extend the dataworksheet fields
+        dwsh.fields.append(meta)
 
     # Helper functions for checking data fields
     def _check_meta(self, meta, descriptor):
@@ -1389,6 +1397,28 @@ class Dataset(object):
             # Look up the extent name to update and then update it
             which_extent = {'latitude': 'latitudinal_extent', 'longitude': 'longitudinal_extent'}
             self.update_extent(extent, float, which_extent[which])
+
+    def export_metadata_dict(self):
+        """
+        Function to return a simple dictionary of the metadata content, combining
+        dataworksheets, into a single representation of the contents
+
+        Returns:
+            A dictionary of metadata
+        """
+
+        # get the required components
+        component_keys = ['access', 'authors', 'description', 'embargo_date', 'filename',
+                          'keywords', 'latitudinal_extent', 'longitudinal_extent',
+                          'project_id', 'temporal_extent', 'title']
+
+        components = {ky: vl for ky, vl in self.__dict__.iteritems() if ky in component_keys}
+
+        # add in the data worksheets
+        components['dataworksheets'] = [dwsh.__dict__ for dwsh in ds.dataworksheets]
+
+
+
 
 
 # High level functions
