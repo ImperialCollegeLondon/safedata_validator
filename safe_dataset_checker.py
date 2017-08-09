@@ -1395,7 +1395,7 @@ class Dataset(object):
             # update the field metadata and the dataset extent
             meta['range'] = extent
             # Look up the extent name to update and then update it
-            which_extent = {'latitude': 'latitudinal_extent', 'longitude': 'longitudinal_extent'}
+            which_extent = {'latitude': 'latitudinal_extent', 'longitude': 'longitudinal_extent'}git ad
             self.update_extent(extent, float, which_extent[which])
 
     def export_metadata_dict(self):
