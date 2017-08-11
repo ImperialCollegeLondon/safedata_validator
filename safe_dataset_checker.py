@@ -171,9 +171,10 @@ class Dataset(object):
     Args:
         filename: The Excel file from which to read the Dataset
         verbose: Should the reporting print to the screen during runtime
+        ete3_database: A local path to the ete3 NCBI database to be used instead of entrez.
     """
 
-    def __init__(self, filename, verbose=True):
+    def __init__(self, filename, verbose=True, ete3_database=None):
 
         try:
             self.workbook = openpyxl.load_workbook(filename=filename, data_only=True,
@@ -211,6 +212,33 @@ class Dataset(object):
         self.locations = None
         self.taxon_names = None
         self.taxon_index = None
+
+        # Setup the taxonomy validation mechanism. We have to be careful here because the
+        # NCBITaxa() class is _desperate_ to download/install/update the NCBI taxonomy
+        # database at the slightest provocation and this is a server jamming amount of
+        # processing. Recent versions of ete3 (currently from github source, not merely
+        # the pip version) provide a method that allows a provided path to be tested
+        # without triggering the rebuild.
+        if ete3_database is None:
+            self.info('Using Entrez queries to validate taxonomy', 0)
+            self.use_ete = False
+        elif ete3_database is not None and ETE_AVAILABLE is False:
+            self.info('ete3 package is not installed, using Entrez to validate taxonomy', 0)
+            self.use_ete = False
+        else:
+            try:
+                ete3_db_status = ete3.is_taxadb_up_to_date(ete3_database)
+                if ete3_db_status is False:
+                    self.info('ete3_database file invalid, using Entrez to validate taxonomy', 0)
+                    self.use_ete = False
+                else:
+                    self.info('Using ete3 to validate taxonomy', 0)
+                    self.use_ete = True
+                    self.ete3_database = ete3_database
+            except AttributeError:
+                self.info('ete3 version not sufficiently recent, using Entrez '
+                          'to validate taxonomy.', 1)
+                self.use_ete = False
 
     # Logging methods
     def info(self, message, level=0):
@@ -654,7 +682,7 @@ class Dataset(object):
 
         self.locations = loc_names | new_loc_names
 
-    def load_taxa(self, ete3_database=None, check_all_ranks=False):
+    def load_taxa(self, check_all_ranks=False):
 
         """
         Attempts to load and check the content of the Taxa worksheet. The
@@ -665,7 +693,6 @@ class Dataset(object):
              explicitly marked as new species with an asterisk suffix.
 
         Args:
-            ete3_database: A local path to the ete3 NCBI database to be used instead of entrez.
             check_all_ranks: Validate all taxonomic ranks provided, not just the required ones
         Returns:
             A set of provided taxon names or None if the worksheet cannot
@@ -682,31 +709,6 @@ class Dataset(object):
             # set. If the datasets then contain taxonomic names, it'll fail gracefully.
             self.hint("No taxa worksheet found - assuming no taxa in data for now!", 1)
             return
-
-        # Setup the validation mechanism. We have to be careful here because the
-        # NCBITaxa() class is _desperate_ to download/install/update the NCBI taxonomy
-        # database at the slightest provocation and this is a server jamming amount of
-        # processing. Recent versions of ete3 (currently from github source, not merely
-        # the pip version) provide a method that allows a provided path to be tested
-        # without triggering the rebuild.
-        if ete3_database is None:
-            self.info('Using Entrez queries to validate names', 1)
-            use_ete = False
-        elif ete3_database is not None and ETE_AVAILABLE is False:
-            self.info('ete3 package is not installed, using Entrez', 1)
-            use_ete = False
-        else:
-            try:
-                ete3_db_status = ete3.is_taxadb_up_to_date(ete3_database)
-                if ete3_db_status is False:
-                    self.info('ete3_database file invalid, using Entrez', 1)
-                    use_ete = False
-                else:
-                    self.info('Using ete3 to validate names', 1)
-                    use_ete = True
-            except AttributeError:
-                self.info('ete3 version not sufficiently recent, using Entrez.', 1)
-                use_ete = False
 
         # get and check the headers
         tx_rows = sheet.rows
@@ -837,10 +839,10 @@ class Dataset(object):
                       join=[rk.capitalize() for rk in rk_missing])
 
         # Now setup to check the taxa against the NCBI database
-        if use_ete:
+        if self.use_ete:
             # Should only happen if a checked ete3 database is provided
             # and the ete3 package is installed.
-            ncbi = ete3.NCBITaxa(dbfile=ete3_database)
+            ncbi = ete3.NCBITaxa(dbfile=self.ete3_database)
         else:
             # - search query to see if the name exists at the given rank
             entrez = ('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?'
@@ -885,7 +887,7 @@ class Dataset(object):
             # This merges taxa that aren't found at all or  which aren't found at the
             # stated rank - this is marginally less clear for users but two entrez
             # queries are needed to discriminate, so keep the mechanism simple.
-            if use_ete:
+            if self.use_ete:
                 # look up the names
                 ids = ncbi.get_name_translator(tx_to_check)
                 # isolate names that aren't found
@@ -1465,11 +1467,11 @@ def check_file(fname, verbose=True, ete3_database=None,
     """
 
     # initialise the dataset object
-    dataset = Dataset(fname, verbose=verbose)
+    dataset = Dataset(fname, verbose=verbose, ete3_database=ete3_database)
 
     # load the metadata sheets
     dataset.load_summary()
-    dataset.load_taxa(ete3_database=ete3_database, check_all_ranks=check_all_ranks)
+    dataset.load_taxa(check_all_ranks=check_all_ranks)
     dataset.load_locations(locations_json=locations_json)
 
     # check the datasets
