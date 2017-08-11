@@ -7,14 +7,22 @@ Module containing code to verify the format of a SAFE project Excel dataset.
 The functions are written to extract as much information as possible from
 checking a file so, rather than raising an error and halting at the first
 fault, functions are written to check as much as they can on the inputs.
-Any information and warnings are added on to a Messages instance, passed
-to each function, which is used to keep a report of issues throughout the
-file check.
+
+Metadata is stored in a Dataset object, which also keeps a record of any
+information and warnings issued during processing. These are optionally
+printed to screen during processing but can also be retrieved from the
+Dataset object.
 
 Taxon names and locations are both validated:
-i) Taxonomic names are validated against the NCBI database using either Entrez
-   queries or the ete2 python package. The ete2 package installation creates
-   a 300 MB local SQLITE version of the NCBI data, but does allow offline use.
+i) By default, taxonomic names are validated against the NCBI database using
+   Entrez queries over the internet. The ete3 package can also be used to do
+   this offline, but because of the installation overheads (300MB local SQLITE
+   version of the NCBI data, slow build process etc.) that can be triggered
+   simply by creating an instance of the NCBITaxa() class, this is only used
+   if an explicit link to the db file is provided, and a very up to date
+   (currently github source installation) version of ete3 is installed that
+   provides a method to check the db validity without triggering a rebuild.
+
 ii) Locations are validated against a list of valid locations. By default, this
    is downloaded from a web service provided from the SAFE website, but a local
    file can be provided for off line use.
@@ -33,15 +41,13 @@ from openpyxl import utils
 import requests
 import simplejson
 
-# if there is a local install of the ete2 package, with a built database
-# then use that for speed. Otherwise the code will try and use Entrez
+# is there a local install of the ete3 package?
 try:
-    from ete2 import NCBITaxa
-    if not os.path.exists(os.path.join(os.environ.get('HOME', '/'), '.etetoolkit', 'taxa.sqlite')):
-        raise RuntimeError('ETE database not found')
-    USE_ETE = True
+    import ete3
+    ETE_AVAILABLE = True
 except (ImportError, RuntimeError) as err:
-    USE_ETE = False
+    print(err)
+    ETE_AVAILABLE = False
 
 
 # define some regular expressions used to check validity
@@ -648,7 +654,7 @@ class Dataset(object):
 
         self.locations = loc_names | new_loc_names
 
-    def load_taxa(self, use_entrez=False, check_all_ranks=False):
+    def load_taxa(self, ete3_database=None, check_all_ranks=False):
 
         """
         Attempts to load and check the content of the Taxa worksheet. The
@@ -659,17 +665,12 @@ class Dataset(object):
              explicitly marked as new species with an asterisk suffix.
 
         Args:
-            use_entrez: Use entrez queries even when a local NCBI query is available
+            ete3_database: A local path to the ete3 NCBI database to be used instead of entrez.
             check_all_ranks: Validate all taxonomic ranks provided, not just the required ones
         Returns:
             A set of provided taxon names or None if the worksheet cannot
             be found or no taxa can be loaded.
         """
-
-        if use_entrez:
-            use_ete = False
-        else:
-            use_ete = USE_ETE
 
         # try and get the taxon worksheet
         self.info("Checking Taxa worksheet")
@@ -681,6 +682,31 @@ class Dataset(object):
             # set. If the datasets then contain taxonomic names, it'll fail gracefully.
             self.hint("No taxa worksheet found - assuming no taxa in data for now!", 1)
             return
+
+        # Setup the validation mechanism. We have to be careful here because the
+        # NCBITaxa() class is _desperate_ to download/install/update the NCBI taxonomy
+        # database at the slightest provocation and this is a server jamming amount of
+        # processing. Recent versions of ete3 (currently from github source, not merely
+        # the pip version) provide a method that allows a provided path to be tested
+        # without triggering the rebuild.
+        if ete3_database is None:
+            self.info('Using Entrez queries to validate names', 1)
+            use_ete = False
+        elif ete3_database is not None and ETE_AVAILABLE is False:
+            self.info('ete3 package is not installed, using Entrez', 1)
+            use_ete = False
+        else:
+            try:
+                ete3_db_status = ete3.is_taxadb_up_to_date(ete3_database)
+                if ete3_db_status is False:
+                    self.info('ete3_database file invalid, using Entrez', 1)
+                    use_ete = False
+                else:
+                    self.info('Using ete3 to validate names', 1)
+                    use_ete = True
+            except AttributeError:
+                self.info('ete3 version not sufficiently recent, using Entrez.', 1)
+                use_ete = False
 
         # get and check the headers
         tx_rows = sheet.rows
@@ -812,13 +838,13 @@ class Dataset(object):
 
         # Now setup to check the taxa against the NCBI database
         if use_ete:
-            ncbi = NCBITaxa()
-            self.info('Using ETE to validate names', 1)
+            # Should only happen if a checked ete3 database is provided
+            # and the ete3 package is installed.
+            ncbi = ete3.NCBITaxa(dbfile=ete3_database)
         else:
             # - search query to see if the name exists at the given rank
             entrez = ('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?'
                       'db=taxonomy&term={}+AND+{}[rank]&retmode=json')
-            self.info('Using Entrez queries to validate names', 1)
 
         # Initialise a set to record when an Entrez query fails and a list to
         # compile the taxonomic index
@@ -1421,7 +1447,7 @@ class Dataset(object):
 
 
 # High level functions
-def check_file(fname, verbose=True, use_entrez=False,
+def check_file(fname, verbose=True, ete3_database=None,
                locations_json=None, check_all_ranks=False):
 
     """
@@ -1443,7 +1469,7 @@ def check_file(fname, verbose=True, use_entrez=False,
 
     # load the metadata sheets
     dataset.load_summary()
-    dataset.load_taxa(use_entrez=use_entrez, check_all_ranks=check_all_ranks)
+    dataset.load_taxa(ete3_database=ete3_database, check_all_ranks=check_all_ranks)
     dataset.load_locations(locations_json=locations_json)
 
     # check the datasets
@@ -1467,20 +1493,23 @@ def main():
     This program validates an Excel file formatted as a SAFE dataset. As it runs, it outputs
     a report that highlights any problems with the formatting.
 
-    The program validates taxonomic names against the NCBI taxonomy database. It will use
-    the ete2 python package to use a local version if possible, but will otherwise attempt
-    to use the Entrez web service to validate names. The program also validate sampling
-    location names: by default, this is loaded automatically from the SAFE website so requires
-    an internet connection, but a local copy can be provided for offline use.
+    The program validates taxonomic names against the NCBI taxonomy database. By default, it
+    uses the Entrez web service to validate names, but if the ete3 package is installed and
+    the path to a built ete3 database is provided, then this will be used instead: this will
+    work offline and is much faster but requires installation and setup.
+
+    The program also validate sampling location names: by default, this is loaded automatically
+    from the SAFE website so requires an internet connection, but a local copy can be provided
+    for offline use.
     """
 
     parser = argparse.ArgumentParser(description=main.__doc__)
     parser.add_argument('fname', help="Path to the Excel file to be validated.")
     parser.add_argument('-l', '--locations_json', default=None,
                         help='Path to a locally stored json file of valid location names')
-    parser.add_argument('--use_entrez', action="store_true", default=False,
-                        help=('Use entrez queries for taxon validation, even '
-                              'if ete2 is available.'))
+    parser.add_argument('--ete3_database', default=None,
+                        help=('The path to a local NCBI Taxonomy database built for '
+                              'the ete3 package.'))
     parser.add_argument('--check_all_ranks', action="store_true", default=False,
                         help=('Check the validity of all taxonomic ranks included, '
                               'not just the standard required ranks.'))
@@ -1488,7 +1517,7 @@ def main():
     args = parser.parse_args()
 
     check_file(fname=args.fname, verbose=True, locations_json=args.locations_json,
-               use_entrez=args.use_entrez, check_all_ranks=args.check_all_ranks)
+               ete3_database=args.ete3_database, check_all_ranks=args.check_all_ranks)
 
 
 if __name__ == "__main__":

@@ -38,17 +38,21 @@ The following steps should allow you to run the checks yourself before submittin
 
 The line above should show the message below:
 
-    usage: safe_dataset_checker.py [-h] [-l LOCATIONS_JSON] [--use_entrez]
-                                   [--check_all_ranks] fname
+    usage: safe_dataset_checker.py [-h] [-l LOCATIONS_JSON]
+                                   [--ete3_database ETE3_DATABASE]
+                                   [--check_all_ranks]
+                                   fname
 
     This program validates an Excel file formatted as a SAFE dataset. As it runs,
     it outputs a report that highlights any problems with the formatting. The
-    program validates taxonomic names against the NCBI taxonomy database. It will
-    use the ete2 python package to use a local version if possible, but will
-    otherwise attempt to use the Entrez web service to validate names. The program
-    also validate sampling location names: by default, this is loaded
-    automatically from the SAFE website so requires an internet connection, but a
-    local copy can be provided for offline use.
+    program validates taxonomic names against the NCBI taxonomy database. By
+    default, it uses the Entrez web service to validate names, but if the ete3
+    package is installed and the path to a built ete3 database is provided, then
+    this will be used instead: this will work offline and is much faster but
+    requires installation and setup. The program also validate sampling location
+    names: by default, this is loaded automatically from the SAFE website so
+    requires an internet connection, but a local copy can be provided for offline
+    use.
 
     positional arguments:
       fname                 Path to the Excel file to be validated.
@@ -57,11 +61,13 @@ The line above should show the message below:
       -h, --help            show this help message and exit
       -l LOCATIONS_JSON, --locations_json LOCATIONS_JSON
                             Path to a locally stored json file of valid location
-                            names and their bounding boxes
-      --use_entrez          Use entrez queries for taxon validation, even if ete2
-                            is available.
+                            names
+      --ete3_database ETE3_DATABASE
+                            The path to a local NCBI Taxonomy database built for
+                            the ete3 package.
       --check_all_ranks     Check the validity of all taxonomic ranks included,
                             not just the standard required ranks.
+
 
 
 
@@ -77,10 +83,8 @@ https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi
 
 You can set the program up for offline use.
 
-1. You will need to have installed and set up `ete2` (see below). Once 
-installed, the program will use `ete2` unless you explicitly tell it not
-to by adding the `--use_entrez` argument. You might want to do this
-if you think your local copy of the NCBI database is out of date.
+1. You will need to have installed and set up `ete3` (see below) and
+ then provide the path to the `ete3` local taxonomy database.
 
 2. The current list of valid location names and bounding boxes is
 automatically downloaded directly from the SAFE Gazetteer. To work
@@ -95,22 +99,47 @@ be able to run the program using the following:
 
 ## Requirements
 
-You will need to install a couple of non-standard python packages, which ought
-to be simple using the `pip` package manager.
-
-  * `openpyxl`, which is needed to read the Excel files.
+You will need to install `openpyxl` to allow Python to read Excel files.
+This ought to be simple using the `pip` package manager.
 
         pip install openpyxl
 
-  * Optionally, `ete2`. Without this package, taxonomic names are
-  validated using the NCBI Entrez web service. As an alternative, `ete2`
-  provides an interface to a locally installed copy of the NCBI
-  database. You'll need a good internet connection to install and set up
-  `ete2` as it downloads about 40 MB from NCBI. This then needs
-  processing and about 300 MB of disk space to build the local database
-  and this can take some time (many minutes): only go down this route
-  if you really need offline validation!
+Optionally, you can use the `ete3` package to provide offline taxonomy
+validation. This is not a simple option, so only go down this route
+if you really need offline validation!
 
-        pip install ete2
-        # setup the local NCBI database
-        python -c 'from ete2 import NCBITaxa;ncbi=NCBITaxa()'
+`ete3` is a great package but the way that the taxon checking code is
+setup means that it is difficult to check the validity of the database
+without triggering a complete rebuild. This is a bad thing to happen
+if you are not expecting it since it downloads ~40MB of data from NCBI
+and then spends several minutes building that into a local database
+of around 300MB. As a result, `safe_dataset_checker` is very cautious
+before it attempts to use it!
+
+You will need a very recent version of `ete3` that provides a method
+of checking this database without risking a complete rebuild. As of
+August 2017, that means using the current `git` master:
+
+    curl -O https://github.com/etetoolkit/ete/archive/master.zip
+    unzip ete-master.zip
+    cd ete-master
+    python setup.py install
+
+You will then need to build the database yourself. This isn't hard, but
+does require a good internet connection and some time for the
+processing. Start `python` and then run the following:
+
+```python
+import ete3
+db = ete3.NCBITaxa(dbfile='path/to/loc/for/taxa.sqlite')
+quit()
+```
+
+If you run `db = ete3.NCBITaxa()`, then `ete3` will store the database
+by default in a hidden directory in your home directory
+(`~/.etetoolkit/taxa.sqlite`). You can use this or specify your own
+path as above. Either way, you will need to explicitly provide
+`safe_dataset_checker` with  the location of this file before it will
+use `ete3` for taxon validation.
+
+
