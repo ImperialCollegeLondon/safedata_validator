@@ -1395,7 +1395,7 @@ class Dataset(object):
             # update the field metadata and the dataset extent
             meta['range'] = extent
             # Look up the extent name to update and then update it
-            which_extent = {'latitude': 'latitudinal_extent', 'longitude': 'longitudinal_extent'}git ad
+            which_extent = {'latitude': 'latitudinal_extent', 'longitude': 'longitudinal_extent'}
             self.update_extent(extent, float, which_extent[which])
 
     def export_metadata_dict(self):
@@ -1415,10 +1415,9 @@ class Dataset(object):
         components = {ky: vl for ky, vl in self.__dict__.iteritems() if ky in component_keys}
 
         # add in the data worksheets
-        components['dataworksheets'] = [dwsh.__dict__ for dwsh in ds.dataworksheets]
+        components['dataworksheets'] = [dwsh.__dict__ for dwsh in self.dataworksheets]
 
-
-
+        return components
 
 
 # High level functions
