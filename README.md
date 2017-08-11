@@ -57,7 +57,7 @@ The line above should show the message below:
       -h, --help            show this help message and exit
       -l LOCATIONS_JSON, --locations_json LOCATIONS_JSON
                             Path to a locally stored json file of valid location
-                            names
+                            names and their bounding boxes
       --use_entrez          Use entrez queries for taxon validation, even if ete2
                             is available.
       --check_all_ranks     Check the validity of all taxonomic ranks included,
@@ -82,11 +82,11 @@ installed, the program will use `ete2` unless you explicitly tell it not
 to by adding the `--use_entrez` argument. You might want to do this
 if you think your local copy of the NCBI database is out of date.
 
-2. The current list of valid location names is automatically downloaded 
-directly from the SAFE Gazetteer. To work offline, get a copy of
-this list from the following link:
+2. The current list of valid location names and bounding boxes is
+automatically downloaded directly from the SAFE Gazetteer. To work
+offline, get a copy of this data from the following link:
 
-    https://www.safeproject.net/call/json/get_locations
+    https://www.safeproject.net/call/json/get_locations_bbox
 
     Save the output as a file (e.g. `SAFE_locations.json`). You will then
 be able to run the program using the following:
