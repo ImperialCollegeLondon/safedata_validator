@@ -209,9 +209,9 @@ class Dataset(object):
         self.temporal_extent = None
         self.latitudinal_extent = None
         self.longitudinal_extent = None
-        self.locations = None
-        self.taxon_names = None
-        self.taxon_index = None
+        self.locations = set()
+        self.taxon_names = set()
+        self.taxon_index = []
 
         # Setup the taxonomy validation mechanism. We have to be careful here because the
         # NCBITaxa() class is _desperate_ to download/install/update the NCBI taxonomy
@@ -222,15 +222,18 @@ class Dataset(object):
         if ete3_database is None:
             self.info('Using Entrez queries to validate taxonomy', 0)
             self.use_ete = False
+            self.ete_failure = None
         elif ete3_database is not None and ETE_AVAILABLE is False:
             self.info('ete3 package is not installed, using Entrez to validate taxonomy', 0)
             self.use_ete = False
+            self.ete_failure = 'ete3 not installed'
         else:
             try:
                 ete3_db_status = ete3.is_taxadb_up_to_date(ete3_database)
                 if ete3_db_status is False:
                     self.info('ete3_database file invalid, using Entrez to validate taxonomy', 0)
                     self.use_ete = False
+                    self.ete_failure = 'ete3 database invalid'
                 else:
                     self.info('Using ete3 to validate taxonomy', 0)
                     self.use_ete = True
@@ -239,6 +242,7 @@ class Dataset(object):
                 self.info('ete3 version not sufficiently recent, using Entrez '
                           'to validate taxonomy.', 1)
                 self.use_ete = False
+                self.ete_failure = 'Old version of ete3 installed'
 
     # Logging methods
     def info(self, message, level=0):
@@ -1230,7 +1234,7 @@ class Dataset(object):
         """
 
         found = set(data)
-        if self.taxon_names is None:
+        if self.taxon_names == set():
             self.warn('No taxa loaded', 2)
         if not found.issubset(self.taxon_names):
             self.warn('Includes taxa missing from Taxa worksheet: ', 2,
@@ -1251,7 +1255,7 @@ class Dataset(object):
 
         # check if locations are all provided
         found = set(data)
-        if self.locations is None:
+        if self.locations == set():
             self.warn('No locations loaded', 2)
         elif not found.issubset(self.locations):
             self.warn('Includes locations missing from Locations worksheet:', 2,
@@ -1479,7 +1483,7 @@ def check_file(fname, verbose=True, ete3_database=None,
         for ws in dataset.dataworksheet_summaries:
             dataset.load_data_worksheet(ws)
     else:
-        dataset.info('No data worksheets found')
+        dataset.warn('No data worksheets found')
 
     if dataset.n_warnings:
         dataset.info('FAIL: file contained {} errors'.format(dataset.n_warnings))
