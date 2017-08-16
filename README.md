@@ -117,12 +117,25 @@ of around 300MB. As a result, `safe_dataset_checker` is very cautious
 before it attempts to use it!
 
 You will need a very recent version of `ete3` that provides a method
-of checking this database without risking a complete rebuild. As of
-August 2017, that means using the current `git` master:
+of checking this database without risking a complete rebuild. You need
+this to work in Python:
 
-    curl -O https://github.com/etetoolkit/ete/archive/master.zip
-    unzip ete-master.zip
-    cd ete-master
+```python
+import ete3
+ete3.ete3.is_taxadb_up_to_date()
+```
+
+
+As of August 2017, the `pip` version of `ete3` isn't sufficiently up to
+date, so you have to install from source using the current `git` master:
+
+    curl -L -o master.zip http://github.com/etetoolkit/ete/zipball/master/
+    unzip master.zip
+
+That will give a folder called something like `etetoolkit-ete-db25665`,
+where the number is the revision number. So then:
+
+    cd etetoolkit-ete-db25665
     python setup.py install
 
 You will then need to build the database yourself. This isn't hard, but
