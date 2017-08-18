@@ -593,7 +593,7 @@ class Dataset(object):
         if dupes:
             self.warn('Duplicated location sheet headers: ', 1, join=dupes)
 
-        # Load dictionaries of the taxa and check some taxa are found
+        # Load dictionaries of the locations
         locs = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in loc_rows]
 
         # check the key fields are there
@@ -601,6 +601,10 @@ class Dataset(object):
             self.warn('Location name column not found', 1)
             loc_names = None
         else:
+            # turn the names to strings
+            for rw in locs:
+                rw['Location name'] = str(rw['Location name'])
+
             # check for rogue whitespace
             ws_padded = [rw['Location name'] for rw in locs if is_padded(rw['Location name'])]
             if ws_padded:
@@ -1119,7 +1123,7 @@ class Dataset(object):
             self.check_field_taxa(data)
         elif meta['field_type'] == 'Location':
             self.check_field_locations(data)
-        elif meta['field_type'] == 'Categorical':
+        elif meta['field_type'] in ['Categorical', 'Ordered Categorical']:
             self.check_field_categorical(meta, data)
         elif meta['field_type'] == 'Numeric':
             self.check_field_numeric(meta, data)
@@ -1133,6 +1137,9 @@ class Dataset(object):
             self.check_field_geo(meta, data, which='latitude')
         elif meta['field_type'] == 'Longitude':
             self.check_field_geo(meta, data, which='longitude')
+        elif meta['field_type'] in ['Replicate', 'ID']:
+            # We've looked for missing data, no other constraints.
+            pass
         elif meta['field_type'] == 'Comments':
             pass
         elif meta['field_type'] is None:
