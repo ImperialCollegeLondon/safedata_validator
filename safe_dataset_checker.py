@@ -614,6 +614,9 @@ class Dataset(object):
         # Convert remaining rows into a list of location dictionaries
         locs = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in loc_rows]
 
+        # strip out any rows that consist of nothing but empty cells
+        locs = [row for row in locs if not all([is_blank(vl) for vl in row.values()])]
+
         # Location name cleaning - get names as strings
         for rw in locs:
             rw['Location name'] = str(rw['Location name'])
@@ -675,7 +678,7 @@ class Dataset(object):
                 geo_types = {vl['Type'] for vl in new_locs}
                 bad_geo_types = geo_types - {'POINT', 'LINESTRING', 'POLYGON'}
                 if bad_geo_types:
-                    self.warn('Unknown location types', 1, join=bad_geo_types, as_repr=True)
+                    self.warn('Unknown location types: ', 1, join=bad_geo_types, as_repr=True)
             else:
                 self.warn('New locations reported but Type field missing', 1)
 
