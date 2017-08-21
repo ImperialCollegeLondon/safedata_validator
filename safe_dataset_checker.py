@@ -280,14 +280,18 @@ class Dataset(object):
         if self.verbose:
             self.print_msg(*msg)
 
-    def hint(self, message, level=0):
+    def hint(self, message, level=0, join=None):
         """
         Adds an hint message to the instance. This is used to indicate where
         something might need to be checked but isn't necessarily an error
         Args:
             message: The hint text.
             level: The hint indent level
+            join: A list of values to join and append to the warning
         """
+        if join:
+            message += ', '.join(join)
+
         msg = ('hint', message, level)
         self.messages.append(msg)
         if self.verbose:
@@ -565,123 +569,152 @@ class Dataset(object):
             self.hint("No locations worksheet found - moving on", 1)
             return
 
-        # get the set of valid names
+        # GET THE GAZETTEER VALIDATION INFORMATION
+        loc_payload = None
         if locations_json is None:
             # If no file is provided then try and get locations from the website service
-            loc_json = requests.get('https://www.safeproject.net/call/json/get_locations_bbox')
-            if loc_json.status_code != 200:
+            loc_get = requests.get('https://www.safeproject.net/call/json/get_locations_bbox')
+            if loc_get.status_code != 200:
                 self.warn('Could not download locations. Use a local json file.', 1)
-                valid_locations = {}
             else:
-                valid_locations = loc_json.json()
+                loc_payload = loc_get.json()
         else:
             # try and load the file
             try:
-                valid_locations = simplejson.load(file(locations_json))
+                loc_payload = simplejson.load(file(locations_json))
             except IOError:
                 self.warn('Could not load location names from file.', 1)
-                valid_locations = {}
 
-        # Check the headers
-        # get and check the headers
+        # process the payload
+        if loc_payload is not None:
+            valid_locations = loc_payload['locations']
+            aliases = loc_payload['aliases']
+        else:
+            # create empty dictionaries to continue with validation
+            valid_locations = {}
+            aliases = {}
+
+        # ITERATE OVER THE WORKSHEET ROWS
         loc_rows = locs_wb.rows
-        hdrs = [cl.value for cl in loc_rows.next()]
 
-        # duplicated headers are a problem in that it will cause values in
-        # the locations dictionaries to be overwritten.
+        # Get the field headers:
+        # Duplicated headers are a problem because the values
+        # in the locations dictionaries get overwritten.
+        hdrs = [cl.value for cl in loc_rows.next()]
         dupes = duplication(hdrs)
         if dupes:
             self.warn('Duplicated location sheet headers: ', 1, join=dupes)
 
-        # Load dictionaries of the locations
-        locs = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in loc_rows]
-
-        # check the key fields are there
+        # Check location names are available
         if 'Location name' not in hdrs:
             self.warn('Location name column not found', 1)
-            loc_names = None
+            self.locations = set()
+            return
+
+        # Convert remaining rows into a list of location dictionaries
+        locs = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in loc_rows]
+
+        # Location name cleaning - get names as strings
+        for rw in locs:
+            rw['Location name'] = str(rw['Location name'])
+
+        # check for rogue whitespace
+        ws_padded = [rw['Location name'] for rw in locs if is_padded(rw['Location name'])]
+        if ws_padded:
+            self.warn('Locations names with whitespace padding: ', 1,
+                      join=ws_padded, as_repr=True)
+            # clean whitespace padding
+            for row in locs:
+                row['Location name'] = row['Location name'].strip()
+
+        # look for duplicates
+        dupes = duplication([rw['Location name'] for rw in locs])
+        if dupes:
+            self.warn('Duplicated location names: ', 1, join=dupes, as_repr=True)
+
+        # VALIDATE LOCATIONS
+        # Get existing location names and aliases -new location names must not appear
+        # in it and existing locations must.
+        existing_loc_names = set(valid_locations.keys() + aliases.keys())
+
+        # Split up old and new if there are there any new ones?
+        if 'New' in hdrs:
+
+            # Check the New column is just yes, no
+            is_new = {rw['New'].lower() for rw in locs}
+            if not is_new.issubset({'yes', 'no'}):
+                self.warn('New field contains values other than Yes and No: ', 1,
+                          join=is_new, as_repr=True)
+
+            # extract the new and old locations
+            new_locs = [rw for rw in locs if rw['New'].lower() == 'yes']
+            locs = [rw for rw in locs if rw['New'].lower() == 'no']
         else:
-            # turn the names to strings
-            for rw in locs:
-                rw['Location name'] = str(rw['Location name'])
+            new_locs = None
 
-            # check for rogue whitespace
-            ws_padded = [rw['Location name'] for rw in locs if is_padded(rw['Location name'])]
-            if ws_padded:
-                self.warn('Locations names with whitespace padding: ', 1,
-                          join=ws_padded, as_repr=True)
-                # clean whitespace padding
-                for row in locs:
-                    row['Location name'] = row['Location name'].strip()
+        # Process new locations if there are any
+        if new_locs:
+            self.hint('{} new locations reported'.format(len(new_locs)), 1)
 
-            # look for duplicates
-            dupes = duplication([rw['Location name'] for rw in locs])
-            if dupes:
-                self.warn('Duplicated location names: ', 1, join=dupes, as_repr=True)
-
-            # split up old and new if there are there any new ones?
-            if 'New' in hdrs:
-
-                # Check the New column is just yes, no
-                is_new = {rw['New'].lower() for rw in locs}
-                if not is_new.issubset({'yes', 'no'}):
-                    self.warn('New field contains values other than Yes and No: ', 1,
-                              join=is_new, as_repr=True)
-
-                # extract the new and old locations
-                new_locs = [rw for rw in locs if rw['New'].lower() == 'yes']
-                locs = [rw for rw in locs if rw['New'].lower() == 'no']
+            # check Lat Long and Type, which automatically updates the extents.
+            # Unlike a data worksheet field, here we don't have any metadata or want
+            # to keep it, so field checker gets passed an empty dictionary, which is discarded.
+            if 'Latitude' in hdrs:
+                lats = [vl['Latitude'] for vl in new_locs]
+                self.check_field_geo({}, lats, which='latitude')
             else:
-                new_locs = None
+                self.warn('New locations reported but Latitude field missing', 1)
 
-            # process new locations
-            if new_locs:
-                self.hint('{} new locations reported'.format(len(new_locs)), 1)
-
-                # check Lat Long and Type, which automatically updates the extents.
-                # Unlike a data worksheet field, here we don't have any metadata or want
-                # to keep it, so field checker gets passed an empty dictionary, which is discarded.
-                if 'Latitude' in hdrs:
-                    lats = [vl['Latitude'] for vl in new_locs]
-                    self.check_field_geo({}, lats, which='latitude')
-                else:
-                    self.warn('New locations reported but Latitude field missing', 1)
-
-                if 'Longitude' in hdrs:
-                    longs = [vl['Longitude'] for vl in new_locs]
-                    self.check_field_geo({}, longs, which='longitude')
-                else:
-                    self.warn('New locations reported but Longitude field missing', 1)
-
-                if 'Type' in hdrs:
-                    geo_types = {vl['Type'] for vl in new_locs}
-                    bad_geo_types = geo_types - {'POINT', 'LINESTRING', 'POLYGON'}
-                    if bad_geo_types:
-                        self.warn('Unknown location types', 1, join=bad_geo_types, as_repr=True)
-                else:
-                    self.warn('New locations reported but Type field missing', 1)
-
-                # new location names
-                new_loc_names = {rw['Location name'] for rw in new_locs}
+            if 'Longitude' in hdrs:
+                longs = [vl['Longitude'] for vl in new_locs]
+                self.check_field_geo({}, longs, which='longitude')
             else:
-                new_loc_names = set()
+                self.warn('New locations reported but Longitude field missing', 1)
 
-            # process existing locations if there are any
-            if locs:
-                loc_names = {rw['Location name'] for rw in locs}
-                # get the extents
-                bbox = [vl[1] for vl in valid_locations if vl[0] in loc_names]
-                bbox = zip(*bbox)
-                self.update_extent((min(bbox[0]), max(bbox[1])), float, 'longitudinal_extent')
-                self.update_extent((min(bbox[2]), max(bbox[3])), float, 'latitudinal_extent')
+            if 'Type' in hdrs:
+                geo_types = {vl['Type'] for vl in new_locs}
+                bad_geo_types = geo_types - {'POINT', 'LINESTRING', 'POLYGON'}
+                if bad_geo_types:
+                    self.warn('Unknown location types', 1, join=bad_geo_types, as_repr=True)
             else:
-                loc_names = set()
+                self.warn('New locations reported but Type field missing', 1)
 
-            # look for unknown locations
-            valid_loc_names = {vl[0] for vl in valid_locations}
-            unknown = loc_names - (valid_loc_names | new_loc_names)
+            duplicates_existing = [rw['Location name'] for rw in new_locs
+                                   if rw['Location name'] in existing_loc_names]
+
+            if duplicates_existing:
+                self.warn('New location names duplicate existing names and aliases: ', 1,
+                          join=duplicates_existing)
+
+            # new location names
+            new_loc_names = {rw['Location name'] for rw in new_locs}
+        else:
+            new_loc_names = set()
+
+        # Process existing locations if there are any
+        if locs:
+            # check names exist
+            loc_names = {rw['Location name'] for rw in locs}
+            unknown = loc_names - existing_loc_names
             if unknown:
                 self.warn('Unknown locations found: ', 1, join=unknown, as_repr=True)
+
+            # are aliases being used?
+            aliased = loc_names & set(aliases.keys())
+            if aliased:
+                self.hint('Locations aliases used. Maybe change to primary location names: ',
+                          1, join=aliased)
+
+            # Get the bounding box of known locations and aliased locations
+            bbox_keys = (loc_names - (unknown | aliased)) | {aliases[ky] for ky in aliased}
+
+            # get the extents
+            bbox = [vl for ky, vl in valid_locations.iteritems() if ky in bbox_keys]
+            bbox = zip(*bbox)
+            self.update_extent((min(bbox[0]), max(bbox[1])), float, 'longitudinal_extent')
+            self.update_extent((min(bbox[2]), max(bbox[3])), float, 'latitudinal_extent')
+        else:
+            loc_names = set()
 
         # reporting
         if (self.n_warnings - start_warn) > 0:
@@ -690,6 +723,7 @@ class Dataset(object):
             self.info('{} locations loaded correctly'.format(len(loc_names)), 1)
 
         self.locations = loc_names | new_loc_names
+
 
     def load_taxa(self, check_all_ranks=False):
 
@@ -886,7 +920,7 @@ class Dataset(object):
             # Look for new taxa flagged as new
             new = {vl for vl in tx_to_check if vl.endswith('*')}
             if new:
-                self.hint('New taxon reported: ' + ', '.join(new), 3)
+                self.hint('New taxon reported: ', 3, join=new)
 
             # drop new taxa
             tx_to_check -= new
