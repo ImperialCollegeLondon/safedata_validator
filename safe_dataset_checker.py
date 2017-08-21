@@ -623,13 +623,14 @@ class Dataset(object):
             if 'New' in hdrs:
 
                 # Check the New column is just yes, no
-                is_new = {rw['New'] for rw in locs}
-                if is_new != {'Yes', 'No'}:
+                is_new = {rw['New'].lower() for rw in locs}
+                if not is_new.issubset({'yes', 'no'}):
                     self.warn('New field contains values other than Yes and No: ', 1,
                               join=is_new, as_repr=True)
 
-                new_locs = [rw for rw in locs if rw['New'] == 'Yes']
-                locs = [rw for rw in locs if rw['New'] == 'No']
+                # extract the new and old locations
+                new_locs = [rw for rw in locs if rw['New'].lower() == 'yes']
+                locs = [rw for rw in locs if rw['New'].lower() == 'no']
             else:
                 new_locs = None
 
