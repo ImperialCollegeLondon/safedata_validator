@@ -601,7 +601,7 @@ class Dataset(object):
         # Duplicated headers are a problem because the values
         # in the locations dictionaries get overwritten.
         hdrs = [cl.value for cl in loc_rows.next()]
-        dupes = duplication(hdrs)
+        dupes = duplication([h for h in hdrs if not is_blank(h)])
         if dupes:
             self.warn('Duplicated location sheet headers: ', 1, join=dupes)
 
@@ -727,7 +727,6 @@ class Dataset(object):
 
         self.locations = loc_names | new_loc_names
 
-
     def load_taxa(self, check_all_ranks=False):
 
         """
@@ -763,12 +762,15 @@ class Dataset(object):
         # duplicated headers are a problem in that it will cause values in
         # the taxon dictionaries to be overwritten. We don't want to keep the
         # returned values, so discard
-        dupes = duplication(hdrs)
+        dupes = duplication([h for h in hdrs if not is_blank(h)])
         if dupes:
             self.warn('Duplicated taxon sheet headers', 1, join=dupes)
 
         # Load dictionaries of the taxa and check some taxa are found
         taxa = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in tx_rows]
+
+        # strip out any rows that consist of nothing but empty cells
+        taxa = [row for row in taxa if not all([is_blank(vl) for vl in row.values()])]
 
         # report number of taxa found
         if len(taxa) == 0:
@@ -871,7 +873,7 @@ class Dataset(object):
                 idx_required = rk_known[tx_tp.lower()]
                 max_taxon_depth = max(max_taxon_depth, idx_required)
                 vals_required = [this_taxon[rnk] for rnk in rk_required[0:idx_required]
-                                 if rnk not in tx_types_missing]
+                                 if rnk in rk_provided]
                 vals_empty = [is_blank(vl) for vl in vals_required]
                 if any(vals_empty):
                     txt = '[R{}{}] Taxon information not complete to {} level'
