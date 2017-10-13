@@ -364,9 +364,22 @@ class Dataset(object):
 
         # load dictionary of summary information block, allowing for multiple
         # columns for fields (data compilers, dataset sheets).
-        cols = worksheet.columns
-        hdrs = [cl.value for cl in cols[0]]
-        values = [[cl.value for cl in row] for row in zip(*cols[1:])]
+        # Note that worksheet.columns can load some odd invisible empty cells:
+        # it doesn't guarantee an equal number of cells in each column. So 
+        # use the squared range.
+        mxcl = worksheet.max_column
+        mxrw = worksheet.max_row
+
+        # populate block of rows of cell objects
+        data = list(worksheet.get_squared_range(1, 1, mxcl, mxrw))
+
+        # transpose and get values
+        data = zip(*data)
+        cols = tuple(tuple(cell.value for cell in col) for col in data)
+
+        # convert into dictionary
+        hdrs = cols[0]
+        values = zip(*cols[1:])
         summary = {ky: vl for ky, vl in zip(hdrs, values)}
 
         # Check the minimal keys are expected
@@ -380,9 +393,9 @@ class Dataset(object):
         if not found.issuperset(required):
             self.warn('Missing metadata fields: ', 1, join=required - found)
 
-        # check for contents
-        if any([set(x) == {None} for x in summary.values()]):
-            self.warn('Metadata fields with no information.', 1)
+        # # check for contents
+        # if any([set(x) == {None} for x in summary.values()]):
+        #     self.warn('Metadata fields with no information.', 1)
 
         # CHECK PROJECT ID
         if 'SAFE Project ID' not in summary:
@@ -394,13 +407,17 @@ class Dataset(object):
 
         # CHECK DATASET TITLE
         if 'Title' not in summary:
-            self.warn('Dataset title missing', 1)
+            self.warn('Dataset title row missing', 1)
+        elif is_blank(summary['Title'][0]):
+            self.warn('Dataset title is blank', 1)
         else:
             self.title = summary['Title'][0]
 
         # CHECK DATASET DESCRIPTION
         if 'Description' not in summary:
-            self.warn('Dataset description missing', 1)
+            self.warn('Dataset description row missing', 1)
+        elif is_blank(summary['Description'][0]):
+            self.warn('Dataset description is blank', 1)
         else:
             self.description = summary['Description'][0]
 
@@ -413,7 +430,9 @@ class Dataset(object):
         elif summary['Access status'] == 'Embargo':
             self.access = 'Embargo'
             if 'Embargo date' not in summary:
-                self.warn('Dataset embargoed but no date provided.', 1)
+                self.warn('Dataset embargoed but embargo date row missing.', 1)
+            elif is_blank(summary['Embargo'][0]):
+                self.warn('Dataset embargo date  is blank', 1)
             else:
                 embargo_date = summary['Embargo date'][0]
                 now = datetime.datetime.now()
@@ -428,7 +447,10 @@ class Dataset(object):
 
         # CHECK KEYWORDS
         if 'Keywords' not in summary:
-            self.warn('Dataset keywords missing', 1)
+            self.warn('Dataset keywords row missing', 1)
+        # TODO _ all blank _
+        elif all([is_blank(kywd) for kywd in summary['Keywords']]):
+            self.warn('Dataset description is blank', 1)
         else:
             # drop any blanks
             self.keywords = [vl for vl in summary['Keywords'] if not is_blank(vl)]
@@ -460,7 +482,7 @@ class Dataset(object):
         if author_names:
             bad_names = [vl for vl in author_names if not RE_NAME.match(vl)]
             if bad_names:
-                self.warn('Author name not formated as last_name, first_names: ', 1,
+                self.warn('Author name not formatted as last_name, first_names: ', 1,
                           join=bad_names, as_repr=True)
 
         # ii) Affiliations (no regex checking)
@@ -480,7 +502,7 @@ class Dataset(object):
         # iii) ORCiD (not mandatory)
         author_orcid = [str(vl) for vl in authors['orcid'] if vl is not None]
         if len(author_orcid) < len(authors['orcid']):
-            self.hint('Missing ORCiD, consider adding one!', 1)
+            self.hint('Missing ORCiDs, consider adding them!', 1)
         if author_orcid:
             bad_orcid = [vl for vl in author_orcid if not RE_ORCID.match(vl)]
             if bad_orcid:
