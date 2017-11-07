@@ -488,12 +488,12 @@ class Dataset(object):
         # ii) Affiliations (no regex checking)
         blank_affil = [is_blank(vl) for vl in authors['affiliation']]
         if any(blank_affil):
-            self.warn('Missing affiliations', 1)
+            self.hint('Missing affiliations - please provide if available', 1)
 
         # iii) Email
         author_emails = [str(vl) for vl in authors['email'] if vl is not None]
         if len(author_emails) < len(authors['email']):
-            self.warn('Missing author emails', 1)
+            self.hint('Missing author emails - please provide if available', 1)
         if author_emails:
             bad_emails = [vl for vl in author_emails if not RE_EMAIL.match(vl)]
             if bad_emails:
