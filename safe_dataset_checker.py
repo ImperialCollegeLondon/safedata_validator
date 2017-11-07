@@ -556,7 +556,7 @@ class Dataset(object):
         # check for extra undocumented spreadsheets
         if 'Worksheet name' in summary:
             expected_sheets = set(data_worksheets['name']) | {'Summary', 'Taxa', 'Locations'}
-            if self.sheet_names != expected_sheets:
+            if not self.sheet_names.issubset(expected_sheets):
                 self.warn('Undocumented sheets found in  workbook: ', 1,
                           join=self.sheet_names - expected_sheets)
 
