@@ -448,12 +448,13 @@ class Dataset(object):
         # CHECK KEYWORDS
         if 'Keywords' not in summary:
             self.warn('Dataset keywords row missing', 1)
-        # TODO _ all blank _
         elif all([is_blank(kywd) for kywd in summary['Keywords']]):
-            self.warn('Dataset description is blank', 1)
+            self.warn('No keywords provided', 1)
         else:
             # drop any blanks
             self.keywords = [vl for vl in summary['Keywords'] if not is_blank(vl)]
+            if len(self.keywords) == 1 and ',' in self.keywords[0]:
+                self.warn('Put keywords in separate cells, not comma delimited in one cell', 1)
 
         # CHECK AUTHORS
         # Get the set of author fields and create blank entries for any missing fields
