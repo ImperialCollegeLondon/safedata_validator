@@ -1090,8 +1090,6 @@ class Dataset(object):
             fld[u'column'] = utils.get_column_letter(idx + 2)
 
         # check field names unique (drop None)
-        # TODO - think about the None values - might allow Nones in end column
-        # but not within the main data block?
         field_names = [fld['field_name'] for fld in metadata if fld['field_name'] is not None]
         dupes = duplication(field_names)
         if dupes:
@@ -1238,6 +1236,44 @@ class Dataset(object):
         else:
             return True
 
+    def _check_taxon_meta(self, meta, taxa_fields):
+
+        """
+        Checks the taxonomic metadata of abundance and trait fields.
+        This is more involved that the simple _check_meta(), because
+        of the option to provide taxon_name or taxon_field descriptors
+
+        Args:
+            meta: A dictionary of metadata descriptors for the field
+            taxa_fields: A list of Taxa fields in this worksheet.
+
+        Returns:
+            A boolean, with True showing no problems and False showing
+            that warnings occurred.
+        """
+
+        # Are taxon_name and taxon_field provided and not blank: note use of
+        # 'and' rather than '&' to allow missing descriptors to short cut
+
+        tx_nm_prov = ('taxon_name' in meta) and (not is_blank(meta['taxon_name']))
+        tx_fd_prov = ('taxon_field' in meta) and (not is_blank(meta['taxon_field']))
+
+        if tx_nm_prov and tx_fd_prov:
+            self.warn('Taxon name and taxon field both provided, use one only', 2)
+            return False
+        elif tx_nm_prov and meta['taxon_name'] not in self.taxon_names:
+            self.warn('Taxon name not found in the Taxa worksheet', 2)
+            return False
+        elif tx_fd_prov and meta['taxon_field'] not in taxa_fields:
+            self.warn("Taxon field not found in this worksheet", 2)
+            return False
+        elif not tx_nm_prov and not tx_fd_prov:
+            self.warn("One of taxon name or taxon field must be provided", 2)
+            return False
+        else:
+            return True
+
+
     def check_field_datetime(self, meta, data, which='datetime'):
 
         """
@@ -1343,11 +1379,7 @@ class Dataset(object):
 
         # check the required descriptors
         self._check_meta(meta, 'method')
-        tx_ok = self._check_meta(meta, 'taxon_name')
-
-        if tx_ok and meta['taxon_name'] not in self.taxon_names \
-                and meta['taxon_name'] not in taxa_fields:
-            self.warn('Taxon name neither in the Taxa worksheet nor the name of a Taxa field', 2)
+        self._check_taxon_meta(meta, taxa_fields)
 
         # Can still check values are numeric, whatever happens above.
         # We're not going to insist on integers here - could be mean counts.
@@ -1440,12 +1472,7 @@ class Dataset(object):
         """
 
         # Check required descriptors
-        tx_ok = self._check_meta(meta, 'taxon_name')
-
-        # check we can find the taxon that the trait refers to
-        if tx_ok and meta['taxon_name'] not in self.taxon_names and \
-                        meta['taxon_name'] not in taxa_fields:
-            self.warn('Taxon name neither in the Taxa worksheet nor the name of a Taxa field', 2)
+        self._check_taxon_meta(meta, taxa_fields)
 
         # Regardless of the outcome of the meta checks, check the contents:
         if which == 'categorical':
