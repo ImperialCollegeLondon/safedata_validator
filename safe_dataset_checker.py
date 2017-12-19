@@ -74,7 +74,7 @@ def is_blank(value):
         Boolean
     """
 
-    return (value is None) or (RE_WSPACE_ONLY.match(str(value)) is not None)
+    return (value is None) or (RE_WSPACE_ONLY.match(unicode(value)) is not None)
 
 
 def is_padded(value):
@@ -270,7 +270,7 @@ class Dataset(object):
             as_repr: Should join values be converted to a representation
         """
         if join and as_repr:
-            message += ', '.join([repr(str(vl)) for vl in join])
+            message += ', '.join([repr(unicode(vl)) for vl in join])
         elif join:
             message += ', '.join(join)
 
@@ -477,7 +477,7 @@ class Dataset(object):
 
         # now check the contents
         # i) Names
-        author_names = [str(vl) for vl in authors['name'] if vl is not None]
+        author_names = [unicode(vl) for vl in authors['name'] if vl is not None]
         if len(author_names) < len(authors['name']):
             self.warn('Missing author names', 1)
         if author_names:
@@ -492,7 +492,7 @@ class Dataset(object):
             self.hint('Missing affiliations - please provide if available', 1)
 
         # iii) Email
-        author_emails = [str(vl) for vl in authors['email'] if vl is not None]
+        author_emails = [unicode(vl) for vl in authors['email'] if vl is not None]
         if len(author_emails) < len(authors['email']):
             self.hint('Missing author emails - please provide if available', 1)
         if author_emails:
@@ -501,7 +501,7 @@ class Dataset(object):
                 self.warn('Email not properly formatted: ', 1, join=bad_emails, as_repr=True)
 
         # iii) ORCiD (not mandatory)
-        author_orcid = [str(vl) for vl in authors['orcid'] if vl is not None]
+        author_orcid = [unicode(vl) for vl in authors['orcid'] if vl is not None]
         if len(author_orcid) < len(authors['orcid']):
             self.hint('Missing ORCiDs, consider adding them!', 1)
         if author_orcid:
@@ -642,7 +642,7 @@ class Dataset(object):
 
         # Location name cleaning - get names as strings
         for rw in locs:
-            rw['Location name'] = str(rw['Location name'])
+            rw['Location name'] = unicode(rw['Location name'])
 
         # check for rogue whitespace
         ws_padded = [rw['Location name'] for rw in locs if is_padded(rw['Location name'])]
@@ -818,7 +818,7 @@ class Dataset(object):
         tx_name_blank = [is_blank(vl) for vl in tx_names]
 
         if any(tx_name_blank):
-            nm_empty = [str(idx + 2) for idx, val in enumerate(tx_name_blank) if val]
+            nm_empty = [unicode(idx + 2) for idx, val in enumerate(tx_name_blank) if val]
             tx_names = [val for val, blnk in zip(tx_names, tx_name_blank) if not blnk]
             self.warn('Taxon names blank in row(s): ', 1, join=nm_empty)
 
@@ -868,7 +868,7 @@ class Dataset(object):
 
         # get the provided ranks
         rk_provided = set(hdrs) & set(rk_known)
-        self.info('Fields provided for ' + str(len(rk_provided)) +
+        self.info('Fields provided for ' + unicode(len(rk_provided)) +
                   ' taxonomic ranks: ' + ', '.join(rk_provided), 1)
 
         # get the taxon types and those types with no matching column
@@ -1274,7 +1274,6 @@ class Dataset(object):
         else:
             return True
 
-
     def check_field_datetime(self, meta, data, which='datetime'):
 
         """
@@ -1357,7 +1356,7 @@ class Dataset(object):
         """
 
         # location names should be strings
-        data = [str(dt) for dt in data]
+        data = [unicode(dt) for dt in data]
 
         # check if locations are all provided
         found = set(data)
@@ -1559,7 +1558,7 @@ def check_file(fname, verbose=True, ete3_database=None,
     Parameters:
         fname: Path to an Excel file
         verbose: Boolean to indicate whether to print messages as the program runs?
-        use_entrez: Should the taxon checking use Entrez even when a local database is available
+        ete3_database: Path to a local ete3 database if that is to be used instead of Entrez.
         check_all_ranks: Should all provided taxonomic ranks be validated?
         locations_json: The path to a json file of valid location names
 
