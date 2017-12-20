@@ -686,13 +686,13 @@ class Dataset(object):
             # Unlike a data worksheet field, here we don't have any metadata or want
             # to keep it, so field checker gets passed an empty dictionary, which is discarded.
             if 'Latitude' in hdrs:
-                lats = [vl['Latitude'] for vl in new_locs]
+                lats = [vl['Latitude'] for vl in new_locs if vl['Latitude'] != u'NA']
                 self.check_field_geo({}, lats, which='latitude')
             else:
                 self.warn('New locations reported but Latitude field missing', 1)
 
             if 'Longitude' in hdrs:
-                longs = [vl['Longitude'] for vl in new_locs]
+                longs = [vl['Longitude'] for vl in new_locs if vl['Longitude'] != u'NA']
                 self.check_field_geo({}, longs, which='longitude')
             else:
                 self.warn('New locations reported but Longitude field missing', 1)
