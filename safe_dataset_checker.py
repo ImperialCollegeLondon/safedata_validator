@@ -204,6 +204,7 @@ class Dataset(object):
         self.dataworksheet_summaries = []
         self.access = 'Open'
         self.embargo_date = None
+        self.publication_doi = []
         self.dataworksheets = []
         self.keywords = []
         self.temporal_extent = None
@@ -344,13 +345,16 @@ class Dataset(object):
             setattr(self, which, (min(extent[0]), max(extent[1])))
 
     # Main methods to populate class attributes
-    def load_summary(self):
+    def load_summary(self, validate_doi=False):
 
         """
         Checks the information in the summary worksheet and looks for the metadata and
         dataset worksheets. The function is intended to try and get as much information
         as possible from the worksheet: the dictionary of metadata returned will have
         None for any missing data, which should be handled by downstream code.
+
+        Args:
+            validate_doi: Check any publication DOIs, requiring a web connection.
         """
 
         # try and get the summary worksheet
@@ -455,6 +459,24 @@ class Dataset(object):
             self.keywords = [vl for vl in summary['Keywords'] if not is_blank(vl)]
             if len(self.keywords) == 1 and ',' in self.keywords[0]:
                 self.warn('Put keywords in separate cells, not comma delimited in one cell', 1)
+
+        # CHECK FOR PUBLICATION DOIs if any are provided
+        if 'Publication DOI' in summary:
+            pub_doi = [vl for vl in summary['Publication DOI'] if not is_blank(vl)]
+            # check formatting - basically make sure they have a proxy URL
+            doi_is_url = [vl.startswith('https://doi.org/') for vl in pub_doi]
+            if not all(doi_is_url ):
+                self.warn('Please provide publication DOIs as a URL: https://doi.org/...', 1)
+
+            if validate_doi:
+                for doi, is_doi in zip(pub_doi, doi_is_url):
+                    if is_doi:
+                        api_call = 'https://doi.org/api/handles/{}'.format(doi[16:])
+                        r = requests.get(api_call)
+                        if r.json()['responseCode'] != 1:
+                            self.warn('DOI not found: {}'.format(doi), 1)
+
+            self.publication_doi = pub_doi
 
         # CHECK AUTHORS
         # Get the set of author fields and create blank entries for any missing fields
@@ -667,10 +689,11 @@ class Dataset(object):
         if 'New' in hdrs:
 
             # Check the New column is just yes, no
-            is_new = {rw['New'].lower() for rw in locs}
-            if not is_new.issubset({'yes', 'no'}):
+            is_new = {rw['New'] for rw in locs}
+            valid_new = {'yes', 'no', 'Yes', 'No'}
+            if not is_new.issubset(valid_new):
                 self.warn('New field contains values other than Yes and No: ', 1,
-                          join=is_new, as_repr=True)
+                          join=is_new - valid_new, as_repr=True)
 
             # extract the new and old locations
             new_locs = [rw for rw in locs if rw['New'].lower() == 'yes']
@@ -687,29 +710,35 @@ class Dataset(object):
             # to keep it, so field checker gets passed an empty dictionary, which is discarded.
             if 'Latitude' in hdrs:
                 lats = [vl['Latitude'] for vl in new_locs if vl['Latitude'] != u'NA']
-                self.check_field_geo({}, lats, which='latitude')
+                non_blank_lats = [vl for vl in lats if not is_blank(vl)]
+                if len(non_blank_lats) < len(lats):
+                    self.warn('Blank latitude values for new locations: use NA.', 2)
+                self.check_field_geo({}, non_blank_lats, which='latitude')
             else:
-                self.warn('New locations reported but Latitude field missing', 1)
+                self.warn('New locations reported but Latitude field missing', 2)
 
             if 'Longitude' in hdrs:
                 longs = [vl['Longitude'] for vl in new_locs if vl['Longitude'] != u'NA']
-                self.check_field_geo({}, longs, which='longitude')
+                non_blank_longs = [vl for vl in longs if not is_blank(vl)]
+                if len(non_blank_longs) < len(longs):
+                    self.warn('Blank longitude values for new locations: use NA.', 2)
+                self.check_field_geo({}, non_blank_longs, which='longitude')
             else:
-                self.warn('New locations reported but Longitude field missing', 1)
+                self.warn('New locations reported but Longitude field missing', 2)
 
             if 'Type' in hdrs:
                 geo_types = {vl['Type'] for vl in new_locs}
                 bad_geo_types = geo_types - {'POINT', 'LINESTRING', 'POLYGON'}
                 if bad_geo_types:
-                    self.warn('Unknown location types: ', 1, join=bad_geo_types, as_repr=True)
+                    self.warn('Unknown location types: ', 2, join=bad_geo_types, as_repr=True)
             else:
-                self.warn('New locations reported but Type field missing', 1)
+                self.warn('New locations reported but Type field missing', 2)
 
             duplicates_existing = [rw['Location name'] for rw in new_locs
                                    if rw['Location name'] in existing_loc_names]
 
             if duplicates_existing:
-                self.warn('New location names duplicate existing names and aliases: ', 1,
+                self.warn('New location names duplicate existing names and aliases: ', 2,
                           join=duplicates_existing)
 
             # new location names
@@ -1569,8 +1598,8 @@ class Dataset(object):
 
 
 # High level functions
-def check_file(fname, verbose=True, ete3_database=None,
-               locations_json=None, check_all_ranks=False):
+def check_file(fname, verbose=True, ete3_database=None, locations_json=None,
+               check_all_ranks=False, validate_doi=False):
 
     """
     Runs the format checking across an Excel workbook.
@@ -1581,6 +1610,7 @@ def check_file(fname, verbose=True, ete3_database=None,
         ete3_database: Path to a local ete3 database if that is to be used instead of Entrez.
         check_all_ranks: Should all provided taxonomic ranks be validated?
         locations_json: The path to a json file of valid location names
+        validate_doi: Check any publication DOIs resolve, requiring a web connection.
 
     Returns:
         A Dataset object
@@ -1590,7 +1620,7 @@ def check_file(fname, verbose=True, ete3_database=None,
     dataset = Dataset(fname, verbose=verbose, ete3_database=ete3_database)
 
     # load the metadata sheets
-    dataset.load_summary()
+    dataset.load_summary(validate_doi=validate_doi)
     dataset.load_taxa(check_all_ranks=check_all_ranks)
     dataset.load_locations(locations_json=locations_json)
 
@@ -1635,11 +1665,15 @@ def main():
     parser.add_argument('--check_all_ranks', action="store_true", default=False,
                         help=('Check the validity of all taxonomic ranks included, '
                               'not just the standard required ranks.'))
+    parser.add_argument('--validate_doi', action="store_true", default=False,
+                        help=('Check the validity of any publication DOIs, '
+                              'provided by the user. Requires a web connection.'))
 
     args = parser.parse_args()
 
     check_file(fname=args.fname, verbose=True, locations_json=args.locations_json,
-               ete3_database=args.ete3_database, check_all_ranks=args.check_all_ranks)
+               ete3_database=args.ete3_database, check_all_ranks=args.check_all_ranks,
+               validate_doi=args.validate_doi)
 
 
 if __name__ == "__main__":
