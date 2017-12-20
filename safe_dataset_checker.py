@@ -847,10 +847,13 @@ class Dataset(object):
             tx_types = [tx.strip() for tx in tx_types]
 
         # Now check the taxonomic levels
-        # - We only require the names for the big seven taxonomic levels
+        # - We only require and check the names for the big seven taxonomic levels,
+        #   plus subspecies if the user provides it
         rk_required = ['kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
+        if 'subspecies' in hdrs:
+            rk_required += ['subspecies']
 
-        # - Users could provide any of these, which NCBI does know about
+            # - Users could provide any of these, which NCBI does know about
         #   but which are likely to be incompletely provided. The names key to the index
         #   of the required fields for that taxonomic level.
         # - Functional group and morphospecies are inserted here at the level we require
@@ -937,32 +940,49 @@ class Dataset(object):
         for rnk in rk_to_check:
 
             self.info('Checking taxa at ' + rnk + ' level', 2)
-            # Get the set of values that aren't None or whitespace at this rank
-            tx_to_check = {tx[rnk] for tx in taxa if not is_blank(tx[rnk])}
 
-            # Check for rogue whitespace
-            ws_padded = set([tx for tx in tx_to_check if is_padded(tx)])
+            # Get the list of taxa that aren't None or whitespace at this rank
+            tx_to_check = [tx for tx in taxa if not is_blank(tx[rnk])]
+
+            # Check for rogue whitespace in the name at this rank
+            ws_padded = set([tx[rnk] for tx in tx_to_check if is_padded(tx[rnk])])
             if ws_padded:
                 self.warn('Taxon name with whitespace padding: ', 3, join=ws_padded, as_repr=True)
 
-            # Look for new taxa flagged as new
-            new = {vl for vl in tx_to_check if vl.endswith('*')}
-            if new:
-                self.hint('New taxon reported: ', 3, join=new)
+            # Look for taxa flagged as new
+            new = [vl[rnk].endswith('*') for vl in tx_to_check]
+            if any(new):
+                new_tx = [tx[rnk] for tx, nw in zip(tx_to_check, new) if nw]
+                self.hint('{} new taxon reported:'.format(sum(new)), 3, join=new_tx)
 
             # drop new taxa
-            tx_to_check -= new
-            # tidy padded taxa to check for them now
-            tx_to_check = {tx.strip() for tx in tx_to_check}
+            tx_to_check = [tx for tx, nw in zip(tx_to_check, new) if not nw]
+
+            # Tidy padded taxa to check for them now. Because tx_to_check is a shallow
+            # copy of taxa, tidying values at this rank updates taxa so the tidying is
+            # preserved for shallower ranks
+            for tx in tx_to_check:
+                tx[rnk] = tx[rnk].strip()
+
+            # Now we need to get sets of the unique values to check at this rank. This is
+            # complicated by the need to build binomials and trinomials at species
+            # and subspecies level.
+            if rnk == 'species':
+                txnm_to_check = {'{genus} {species}'.format(**tx) for tx in tx_to_check}
+            elif rnk == 'subspecies':
+                txnm_to_check = {'{genus} {species} {subspecies}'.format(**tx)
+                                 for tx in tx_to_check}
+            else:
+                txnm_to_check = {tx[rnk] for tx in tx_to_check}
 
             # This merges taxa that aren't found at all or  which aren't found at the
             # stated rank - this is marginally less clear for users but two entrez
             # queries are needed to discriminate, so keep the mechanism simple.
             if self.use_ete:
                 # look up the names
-                ids = ncbi.get_name_translator(tx_to_check)
+                ids = ncbi.get_name_translator(txnm_to_check)
                 # isolate names that aren't found
-                not_found = tx_to_check - set(ids.keys())
+                not_found = txnm_to_check - set(ids.keys())
                 # check the ranks
                 ranks_found = {ky: ncbi.get_rank(vl).values() for ky, vl in ids.iteritems()}
                 bad_rank = set([ky for ky, vl in ranks_found.iteritems() if rnk not in vl])
@@ -971,7 +991,7 @@ class Dataset(object):
                 # loop the names through the entrez interface to the taxonomy database
                 invalid = set()
                 # loop over the values
-                for each_tx in tx_to_check:
+                for each_tx in txnm_to_check:
                     entrez_response = requests.get(entrez.format(each_tx, rnk))
                     if entrez_response.status_code != 200:
                         # internet failures just add individual taxa to the unvalidated list
@@ -985,7 +1005,7 @@ class Dataset(object):
                 self.warn('Taxa not found or not valid at this rank: ', 3, join=invalid)
 
             # build taxon index - currently no validation
-            tx_index.extend([(tx, rnk) for tx in tx_to_check])
+            tx_index.extend([(tx, rnk) for tx in txnm_to_check])
 
         # report on unvalidated taxa
         if unvalidated:
