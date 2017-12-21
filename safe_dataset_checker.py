@@ -763,11 +763,12 @@ class Dataset(object):
             # Get the bounding box of known locations and aliased locations
             bbox_keys = (loc_names - (unknown | aliased)) | {aliases[ky] for ky in aliased}
 
-            # get the extents
-            bbox = [vl for ky, vl in valid_locations.iteritems() if ky in bbox_keys]
-            bbox = zip(*bbox)
-            self.update_extent((min(bbox[0]), max(bbox[1])), float, 'longitudinal_extent')
-            self.update_extent((min(bbox[2]), max(bbox[3])), float, 'latitudinal_extent')
+            # get the extents of known unaliased locations
+            if bbox_keys:
+                bbox = [vl for ky, vl in valid_locations.iteritems() if ky in bbox_keys]
+                bbox = zip(*bbox)
+                self.update_extent((min(bbox[0]), max(bbox[1])), float, 'longitudinal_extent')
+                self.update_extent((min(bbox[2]), max(bbox[3])), float, 'latitudinal_extent')
         else:
             loc_names = set()
 
@@ -947,9 +948,9 @@ class Dataset(object):
             # and the ete3 package is installed.
             ncbi = ete3.NCBITaxa(dbfile=self.ete3_database)
         else:
-            # - search query to see if the name exists at the given rank
+            # - search query to see if the exact scientific name exists at the given rank
             entrez = ('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?'
-                      'db=taxonomy&term={}+AND+{}[rank]&retmode=json')
+                      'db=taxonomy&term={}[scientific name]+AND+{}[rank]&retmode=json')
 
         # Initialise a set to record when an Entrez query fails and a list to
         # compile the taxonomic index
@@ -1004,9 +1005,33 @@ class Dataset(object):
             else:
                 txnm_to_check = {tx[rnk] for tx in tx_to_check}
 
-            # This merges taxa that aren't found at all or  which aren't found at the
+            # This merges taxa that aren't found at all or which aren't found at the
             # stated rank - this is marginally less clear for users but two entrez
             # queries are needed to discriminate, so keep the mechanism simple.
+
+            # TODO - do we want to check which of the required ranks are actually
+            #        recognized by NCBI, to avoid making users star unrecognised ones.
+
+            # Pretty easy to do via ETE3:
+            # lin = ncbi.get_lineage(62051)
+            # lin_name = ncbi.get_taxid_translator(lin)
+            # lin_rank = ncbi.get_rank(lin)
+            # lineage = [(lin_name[id], lin_rank[id]) for id in lin_name.keys()]
+
+            # For entrez, this needs a second query to e.g.
+            # https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=taxonomy&id=62051
+            # Annoyingly, this doesn't expose a JSON mode, so need to parse XML to get the lineage
+
+            # r = requests.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=taxonomy&id=62051')
+            # from xml.etree import cElementTree as ElementTree
+            # fetched = ElementTree.fromstring(r.content)
+            # lineage = fetched.findall('./Taxon/LineageEx/Taxon')
+            # lineage = [(x.find('ScientificName').text, x.find('Rank').text) for x in lineage]
+
+            # NOTE - could run multiple queries in one go:
+            # https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=taxonomy&term=(Varanus%20salvator[scientific%20name]+OR+Bos%20taurus[scientific%20name]+AND+species[rank]&retmode=json
+            # https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=taxonomy&id=62051,9913
+
             if self.use_ete:
                 # look up the names
                 ids = ncbi.get_name_translator(txnm_to_check)
