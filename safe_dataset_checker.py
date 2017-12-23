@@ -1264,10 +1264,14 @@ class Dataset(object):
             self.check_field_numeric(meta, data)
         elif meta['field_type'] == 'Abundance':
             self.check_field_abundance(meta, data, dwsh.taxa_fields)
-        elif meta['field_type'] == ['Categorical Trait', 'Ordered Categorical Trait']:
+        elif meta['field_type'] in ['Categorical Trait', 'Ordered Categorical Trait']:
             self.check_field_trait(meta, data, dwsh.taxa_fields, which='categorical')
         elif meta['field_type'] == 'Numeric Trait':
             self.check_field_trait(meta, data, dwsh.taxa_fields, which='numeric')
+        elif meta['field_type'] in ['Categorical Interaction', 'Ordered Categorical Interaction']:
+            self.check_field_interaction(meta, data, dwsh.taxa_fields, which='categorical')
+        elif meta['field_type'] == 'Numeric Interaction':
+            self.check_field_interaction(meta, data, dwsh.taxa_fields, which='numeric')
         elif meta['field_type'] == 'Latitude':
             self.check_field_geo(meta, data, which='latitude')
         elif meta['field_type'] == 'Longitude':
@@ -1280,7 +1284,7 @@ class Dataset(object):
         elif meta['field_type'] is None:
             self.warn('Field type is empty', 2)
         else:
-            self.warn('Unknown field type {field_type}'.format(**meta), 2)
+            self.warn('Unknown field type {field_type}'.format(**meta), 1)
 
         # extend the dataworksheet fields
         dwsh.fields.append(meta)
@@ -1348,6 +1352,69 @@ class Dataset(object):
         else:
             return True
 
+    def _check_interaction_meta(self, meta, taxa_fields):
+
+        """
+        Checks the taxonomic metadata of interaction fields.
+        This is more involved that the simple _check_meta(), because
+        of the option to provide taxon_name or taxon_field descriptors
+        describing at least two taxonomic identifiers.
+
+        Args:
+            meta: A dictionary of metadata descriptors for the field
+            taxa_fields: A list of Taxa fields in this worksheet.
+
+        Returns:
+            A boolean, with True showing no problems and False showing
+            that warnings occurred.
+        """
+
+        # Are interaction_name and/or interaction_field provided and not blank:
+        #  note use of 'and' rather than '&' to allow missing descriptors to short cut
+
+        iact_nm_prov = ('interaction_name' in meta) and (not is_blank(meta['interaction_name']))
+        iact_fd_prov = ('interaction_field' in meta) and (not is_blank(meta['interaction_field']))
+
+        if not iact_nm_prov and not iact_fd_prov:
+            self.warn("At least one of interaction name or interaction field must be provided", 2)
+            return False
+        else:
+            if iact_nm_prov:
+                # check any name labels match to known taxa
+                int_nm_lab, int_nm_desc = self._parse_levels(meta['interaction_name'], 2)
+                if not all([lab in self.taxon_names for lab in int_nm_lab]):
+                    self.warn('Unknown taxa in interaction_name descriptor', 2)
+                    nm_check = False
+                else:
+
+                    nm_check = True
+            else:
+                int_nm_lab, int_nm_desc = [(), ()]
+                nm_check = True
+
+            if iact_fd_prov:
+                # check any field labels match to known taxon fields
+                int_fd_lab, int_fd_desc = self._parse_levels(meta['interaction_field'], 2)
+                if not all([lab in taxa_fields for lab in int_fd_lab]):
+                    self.warn('Unknown taxon fields in interaction_field descriptor', 2)
+                    fd_check = False
+                else:
+                    fd_check = True
+            else:
+                int_fd_lab, int_fd_desc = [(), ()]
+                fd_check = True
+
+            if len(int_nm_lab + int_fd_lab) < 2:
+                self.warn('At least two interacting taxon labels or fields must be identified', 2)
+                num_check = False
+            else:
+                num_check = True
+
+            if nm_check and fd_check and num_check:
+                return True
+            else:
+                return False
+
     def _parse_levels(self, txt, warn_level=1):
         """
         Splits up category information formatted as label:desc;label:desc, which
@@ -1366,7 +1433,6 @@ class Dataset(object):
         # - split the text up by semi-colon
         parts = txt.split(';')
         # - split descriptions
-        desc = [':' in pt for pt in parts]
         parts = [pt.split(':') for pt in parts]
         n_parts = [len(pt) for pt in parts]
 
@@ -1582,6 +1648,29 @@ class Dataset(object):
 
         # Check required descriptors
         self._check_taxon_meta(meta, taxa_fields)
+
+        # Regardless of the outcome of the meta checks, check the contents:
+        if which == 'categorical':
+            self.check_field_categorical(meta, data)
+        elif which == 'numeric':
+            self.check_field_numeric(meta, data)
+
+    def check_field_interaction(self, meta, data, taxa_fields, which='categorical'):
+
+        """
+        Checks interaction type data and reports to the Messages instance.
+        Just a wrapper to check that intercating taxa have been identified
+        before handing off to check_field_categorical or check_field_numeric
+
+        Args:
+            meta: A dictionary of metadata descriptors for the field
+            data: A list of data values, allegedly numeric
+            taxa_fields: A list of Taxa fields in this worksheet.
+            which: The type of trait data in the field
+        """
+
+        # Check required descriptors
+        self._check_interaction_meta(meta, taxa_fields)
 
         # Regardless of the outcome of the meta checks, check the contents:
         if which == 'categorical':
