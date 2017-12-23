@@ -465,7 +465,7 @@ class Dataset(object):
             pub_doi = [vl for vl in summary['Publication DOI'] if not is_blank(vl)]
             # check formatting - basically make sure they have a proxy URL
             doi_is_url = [vl.startswith('https://doi.org/') for vl in pub_doi]
-            if not all(doi_is_url ):
+            if not all(doi_is_url):
                 self.warn('Please provide publication DOIs as a URL: https://doi.org/...', 1)
 
             if validate_doi:
@@ -1348,6 +1348,43 @@ class Dataset(object):
         else:
             return True
 
+    def _parse_levels(self, txt, warn_level=1):
+        """
+        Splits up category information formatted as label:desc;label:desc, which
+        is used in both levels for categorical data and interaction descriptors.
+        Args:
+            txt: The text string to parse
+            warn_level: The indent level for any warnings issued
+
+        Returns:
+            A list of two tuples of label and descriptions.
+        """
+
+        # remove terminal semi-colon, if used.
+        if txt.endswith(';'):
+            txt = txt[:-1]
+        # - split the text up by semi-colon
+        parts = txt.split(';')
+        # - split descriptions
+        desc = [':' in pt for pt in parts]
+        parts = [pt.split(':') for pt in parts]
+        n_parts = [len(pt) for pt in parts]
+
+        # simple formatting checks
+        if any([pt > 2 for pt in n_parts]):
+            self.warn('Extra colons in level description.', warn_level)
+
+        # standardise descriptions
+        if all([pt == 1 for pt in n_parts]):
+            parts = [[pt[0], None] for pt in parts]
+        elif all([pt == 2 for pt in n_parts]):
+            pass
+        else:
+            self.warn('Provide descriptions for either all or none of the categories', warn_level)
+            parts = [pt[0:2] if len(pt) >= 2 else [pt[0], None] for pt in parts]
+
+        return zip(*parts)
+
     def check_field_datetime(self, meta, data, which='datetime'):
 
         """
@@ -1485,13 +1522,11 @@ class Dataset(object):
             self.warn('Category description does not seem to be text', 2)
         else:
             # Now we can test if the labels match up
-            # - strip terminal semicolon if present
-            if meta['levels'][-1] == ';':
-                meta['levels'] = meta['levels'][:-1]
-            # - split the text up by semi-colon
-            levels = meta['levels'].split(';')
-            # - strip off any description after a colon
-            level_labels = set([ct.split(':')[0] for ct in levels])
+            level_labels, level_desc = self._parse_levels(meta['levels'], 2)
+
+            # - repeated labels?
+            if len(set(level_labels)) < len(level_labels):
+                self.warn('Repeated level labels', 2)
 
             # - check for integer level names
             integer_codes = [is_integer_string(vl) for vl in level_labels]
@@ -1506,7 +1541,7 @@ class Dataset(object):
 
             if not reported.issubset(level_labels):
                 self.warn('Categories found in data missing from '
-                          'description: ', 2, join=reported - level_labels)
+                          'description: ', 2, join=reported - set(level_labels))
 
     def check_field_numeric(self, meta, data):
 
