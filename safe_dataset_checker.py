@@ -1264,7 +1264,7 @@ class Dataset(object):
             self.check_field_numeric(meta, data)
         elif meta['field_type'] == 'Abundance':
             self.check_field_abundance(meta, data, dwsh.taxa_fields)
-        elif meta['field_type'] == 'Categorical Trait':
+        elif meta['field_type'] == ['Categorical Trait', 'Ordered Categorical Trait']:
             self.check_field_trait(meta, data, dwsh.taxa_fields, which='categorical')
         elif meta['field_type'] == 'Numeric Trait':
             self.check_field_trait(meta, data, dwsh.taxa_fields, which='numeric')
