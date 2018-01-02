@@ -33,22 +33,14 @@ import os
 import datetime
 import argparse
 import re
-from collections import Counter, OrderedDict
+from collections import Counter
 from StringIO import StringIO
 import numbers
 import openpyxl
 from openpyxl import utils
 import requests
 import simplejson
-
-# is there a local install of the ete3 package?
-try:
-    import ete3
-    ETE_AVAILABLE = True
-except (ImportError, RuntimeError) as err:
-    print(err)
-    ETE_AVAILABLE = False
-
+import sqlite3
 
 # define some regular expressions used to check validity
 RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}')
@@ -171,10 +163,11 @@ class Dataset(object):
     Args:
         filename: The Excel file from which to read the Dataset
         verbose: Should the reporting print to the screen during runtime
-        ete3_database: A local path to the ete3 NCBI database to be used instead of entrez.
+        gbif_database: A local path to an sqlite database containing the GBIF database
+        to be used instead of the web API.
     """
 
-    def __init__(self, filename, verbose=True, ete3_database=None):
+    def __init__(self, filename, verbose=True, gbif_database=None):
 
         try:
             self.workbook = openpyxl.load_workbook(filename=filename, data_only=True,
@@ -214,36 +207,38 @@ class Dataset(object):
         self.taxon_names = set()
         self.taxon_index = []
 
-        # Setup the taxonomy validation mechanism. We have to be careful here because the
-        # NCBITaxa() class is _desperate_ to download/install/update the NCBI taxonomy
-        # database at the slightest provocation and this is a server jamming amount of
-        # processing. Recent versions of ete3 (currently from github source, not merely
-        # the pip version) provide a method that allows a provided path to be tested
-        # without triggering the rebuild.
-        if ete3_database is None:
-            self.info('Using Entrez queries to validate taxonomy', 0)
-            self.use_ete = False
-            self.ete_failure = None
-        elif ete3_database is not None and ETE_AVAILABLE is False:
-            self.info('ete3 package is not installed, using Entrez to validate taxonomy', 0)
-            self.use_ete = False
-            self.ete_failure = 'ete3 not installed'
+        # Setup the taxonomy validation mechanism.
+        if gbif_database is None:
+            self.info('Using GBIF online API to validate taxonomy', 0)
+            self.use_local_gbif = False
+            self.gbif_conn = None
         else:
+            # If a GBIF file is provided, does the file exist?
+            if not os.path.exists(gbif_database):
+                self.info('Local GBIF database not found, defaulting to online API', 0)
+                self.use_local_gbif = False
+                self.gbif_conn = None
+
+            # And does the file behave like i) a sqlite database ii) containing a table 'backbone'
             try:
-                ete3_db_status = ete3.is_taxadb_up_to_date(ete3_database)
-                if ete3_db_status is False:
-                    self.info('ete3_database file invalid, using Entrez to validate taxonomy', 0)
-                    self.use_ete = False
-                    self.ete_failure = 'ete3 database invalid'
-                else:
-                    self.info('Using ete3 to validate taxonomy', 0)
-                    self.use_ete = True
-                    self.ete3_database = ete3_database
-            except AttributeError:
-                self.info('ete3 version not sufficiently recent, using Entrez '
-                          'to validate taxonomy.', 1)
-                self.use_ete = False
-                self.ete_failure = 'Old version of ete3 installed'
+                # can connect sqlite to any existing path, but only attempts to query it
+                # throw up exceptions
+                conn = sqlite3.connect(gbif_database)
+                _ = conn.execute('select count(*) from backbone;')
+            except sqlite3.OperationalError:
+                self.info('Local GBIF database does not contain the backbone table, defaulting '
+                          'to online API', 0)
+                self.use_local_gbif = False
+                self.gbif_conn = None
+            except sqlite3.DatabaseError:
+                self.info('Local SQLite database not valid, defaulting to online API', 0)
+                self.use_local_gbif = False
+                self.gbif_conn = None
+            else:
+                self.info('Using local GBIF database to validate taxonomy', 0)
+                self.use_local_gbif = True
+                self.gbif_conn = conn
+                self.gbif_conn.row_factory = sqlite3.Row
 
     # Logging methods
     def info(self, message, level=0):
@@ -780,18 +775,14 @@ class Dataset(object):
 
         self.locations = loc_names | new_loc_names
 
-    def load_taxa(self, check_all_ranks=False):
+    def load_taxa(self):
 
         """
         Attempts to load and check the content of the Taxa worksheet. The
         method checks that:
-        i)   all taxa have a taxon name and a taxon type,
-        ii)  that taxa have a complete taxonomic hierarchy up to the taxon type
-        iii) that all taxonomic names are known to NCBI, unless they are
-             explicitly marked as new species with an asterisk suffix.
+        i)  all taxa have a taxon name and a taxon type,
+        ii) looks up taxon names in the GBIF database
 
-        Args:
-            check_all_ranks: Validate all taxonomic ranks provided, not just the required ones
         Returns:
             A set of provided taxon names or None if the worksheet cannot
             be found or no taxa can be loaded.
@@ -813,13 +804,12 @@ class Dataset(object):
         hdrs = [cl.value for cl in tx_rows.next()]
 
         # duplicated headers are a problem in that it will cause values in
-        # the taxon dictionaries to be overwritten. We don't want to keep the
-        # returned values, so discard
+        # the taxon dictionaries to be overwritten.
         dupes = duplication([h for h in hdrs if not is_blank(h)])
         if dupes:
             self.warn('Duplicated taxon sheet headers', 1, join=dupes)
 
-        # Load dictionaries of the taxa and check some taxa are found
+        # Load dictionaries of the taxa
         taxa = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in tx_rows]
 
         # strip out any rows that consist of nothing but empty cells
@@ -876,190 +866,84 @@ class Dataset(object):
             # strip padding to continue with matches
             tx_types = [tx.strip() for tx in tx_types]
 
-        # Now check the taxonomic levels
-        # - We only require and check the names for the big seven taxonomic levels,
-        #   plus subspecies if the user provides it
-        rk_required = ['kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
-        if 'subspecies' in hdrs:
-            rk_required += ['subspecies']
-
-            # - Users could provide any of these, which NCBI does know about
-        #   but which are likely to be incompletely provided. The names key to the index
-        #   of the required fields for that taxonomic level.
-        # - Functional group and morphospecies are inserted here at the level we require
-        # - Using an ordered dict to maintain hierarchy order
-        rk_known = OrderedDict([('kingdom', 0), ('functional group', 0), ('subkingdom', 0),
-                                ('superphylum', 0), ('phylum', 1), ('subphylum', 1),
-                                ('superclass', 1), ('class', 2), ('subclass', 2),
-                                ('infraclass', 2), ('cohort', 2), ('superorder', 2),
-                                ('order', 3), ('suborder', 3), ('infraorder', 3),
-                                ('parvorder', 3), ('superfamily', 3), ('morphospecies', 3),
-                                ('family', 4), ('subfamily', 4), ('tribe', 4),
-                                ('subtribe', 4), ('genus', 5), ('subgenus', 5),
-                                ('species group', 5), ('species subgroup', 5),
-                                ('species', 6), ('subspecies', 6), ('varietas', 6), ('forma', 6)])
-
-        # get the provided ranks
-        rk_provided = set(hdrs) & set(rk_known)
-        self.info('Fields provided for ' + unicode(len(rk_provided)) +
-                  ' taxonomic ranks: ' + ', '.join(rk_provided), 1)
-
-        # get the taxon types and those types with no matching column
-        tx_types = set([tp.lower() for tp in tx_types if tp is not None])
-        tx_types_missing = tx_types - rk_provided
-
-        # Check hierarchy for each taxon, tracking what the highest level
-        # required is for the taxon types provided
-        max_taxon_depth = 0
-        self.info('Checking completeness of taxonomic hierarchies', 1)
-        for ridx, this_taxon in enumerate(taxa):
-            tx_tp = this_taxon['taxon type']
-            tx_nm = this_taxon['taxon name']
-            tx_nm = '' if is_blank(tx_nm) else ', ' + tx_nm
-
-            if is_blank(tx_tp):
-                # Null taxon type
-                self.warn('[R{}{}] Taxon type blank'.format(ridx + 2, tx_nm), 2)
-            elif tx_tp.lower() in tx_types_missing:
-                # Provided but no matching column
-                self.warn('[R{}{}] Taxon type {} does not match to a column '
-                          'name'.format(ridx + 2, tx_nm, tx_tp), 2)
-            else:
-                # Check there is some information up to the required level
-                idx_required = rk_known[tx_tp.lower()]
-                max_taxon_depth = max(max_taxon_depth, idx_required)
-                vals_required = [this_taxon[rnk] for rnk in rk_required[0:idx_required]
-                                 if rnk in rk_provided]
-                vals_empty = [is_blank(vl) for vl in vals_required]
-                if any(vals_empty):
-                    txt = '[R{}{}] Taxon information not complete to {} level'
-                    self.warn(txt.format(ridx + 2, tx_nm, rk_required[idx_required]), 2)
-
-        # Now report on missing required ranks
-        actually_required = rk_required[:(max_taxon_depth + 1)]
-        rk_missing = set(actually_required) - rk_provided
-        if rk_missing:
-            self.warn('Required taxon fields missing: ', 1,
-                      join=[rk.capitalize() for rk in rk_missing])
-
-        # Now setup to check the taxa against the NCBI database
-        if self.use_ete:
-            # Should only happen if a checked ete3 database is provided
-            # and the ete3 package is installed.
-            ncbi = ete3.NCBITaxa(dbfile=self.ete3_database)
-        else:
-            # - search query to see if the exact scientific name exists at the given rank
-            entrez = ('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?'
-                      'db=taxonomy&term={}[scientific name]+AND+{}[rank]&retmode=json')
-
-        # Initialise a set to record when an Entrez query fails and a list to
-        # compile the taxonomic index
+        # Initialise a set to record failed validation and a list for the taxonomic index
         unvalidated = set()
         tx_index = []
 
-        # which ranks to check - all or just required?
-        # - don't try and check ranks that haven't been provided
-        # - don't check morphospecies or functional groups against NCBI
-        if check_all_ranks:
-            rk_to_check = [rk for rk in rk_known if rk in rk_provided
-                           and rk not in ['morphospecies', 'functional group']]
-        else:
-            rk_to_check = [rk for rk in rk_required if rk in rk_provided
-                           and rk not in ['morphospecies', 'functional group']]
+        # validate against either the GBIF API or a local copy of their taxonomy backbone
+        # - the first api matches a name and rank, with strict ensuring that only taxa
+        #   at the right level are found. The second api allows a taxon id to be looked up
+        #   which is needed to find the backbone accepted usage for synonyms.
+        web_match_api = "http://api.gbif.org/v1/species/match?name={}&rank={}&strict=true"
+        web_usage_api = "http://api.gbif.org/v1/species/{}"
 
-        for rnk in rk_to_check:
+        # Note that unlike the web api, the local matching is CASE SENSITIVE!
+        local_match_api = "select * from backbone where canonicalName='{}' and taxonRank='{}';"
+        local_usage_api = "select * from backbone where taxonID = {};"
 
-            self.info('Checking taxa at ' + rnk + ' level', 2)
-
-            # Get the list of taxa that aren't None or whitespace at this rank
-            tx_to_check = [tx for tx in taxa if not is_blank(tx[rnk])]
-
-            # Check for rogue whitespace in the name at this rank
-            ws_padded = set([tx[rnk] for tx in tx_to_check if is_padded(tx[rnk])])
-            if ws_padded:
-                self.warn('Taxon name with whitespace padding: ', 3, join=ws_padded, as_repr=True)
-
-            # Look for taxa flagged as new
-            new = [vl[rnk].endswith('*') for vl in tx_to_check]
-            if any(new):
-                new_tx = [tx[rnk] for tx, nw in zip(tx_to_check, new) if nw]
-                self.hint('{} new taxon reported:'.format(sum(new)), 3, join=new_tx)
-
-            # drop new taxa
-            tx_to_check = [tx for tx, nw in zip(tx_to_check, new) if not nw]
-
-            # Tidy padded taxa to check for them now. Because tx_to_check is a shallow
-            # copy of taxa, tidying values at this rank updates taxa so the tidying is
-            # preserved for shallower ranks
-            for tx in tx_to_check:
-                tx[rnk] = tx[rnk].strip()
-
-            # Now we need to get sets of the unique values to check at this rank. This is
-            # complicated by the need to build binomials and trinomials at species
-            # and subspecies level.
-            if rnk == 'species':
-                txnm_to_check = {'{genus} {species}'.format(**tx) for tx in tx_to_check}
-            elif rnk == 'subspecies':
-                txnm_to_check = {'{genus} {species} {subspecies}'.format(**tx)
-                                 for tx in tx_to_check}
+        for tx in taxa:
+            if not is_blank(tx['parent type']) and not is_blank(tx['parent name']):
+                # A parent taxon and rank has been provided, so check that
+                taxon = tx['parent name']
+                rank = tx['parent type']
+            elif (not is_blank(tx['parent type'])) ^ (not is_blank(tx['parent name'])):
+                # Incomplete parent taxon information
+                self.warn('Incomplete parent taxon information provided for {taxon type}: '
+                          '{taxon name}'.format(**tx), 1)
+                continue
             else:
-                txnm_to_check = {tx[rnk] for tx in tx_to_check}
+                # No parent taxon info
+                if tx['taxon type'].lower() in ['morphospecies', 'functional group']:
+                    self.warn('Parent taxon information must be provided for {taxon type}: '
+                              '{taxon name}'.format(**tx), 1)
+                    continue
+                else:
+                    taxon = tx['taxon name']
+                    rank = tx['taxon type']
 
-            # This merges taxa that aren't found at all or which aren't found at the
-            # stated rank - this is marginally less clear for users but two entrez
-            # queries are needed to discriminate, so keep the mechanism simple.
+            if self.gbif_conn is None:
+                # use the GBIF API
+                tax_gbif = requests.get(web_match_api.format(taxon, rank))
+                tax_gbif_json = tax_gbif.json()
 
-            # TODO - do we want to check which of the required ranks are actually
-            #        recognized by NCBI, to avoid making users star unrecognised ones.
+                if tax_gbif_json['matchType'] == u'NONE':
+                    self.warn('No match found for {} at rank {}'.format(taxon, rank))
+                elif tax_gbif_json['status'].lower() != 'accepted':
+                    tax_acc = requests.get(web_usage_api.format(tax_gbif_json['usageKey']))
+                    tax_acc_json = tax_acc.json()
+                    self.info('Taxon {} is not an accepted name'.format(taxon))
+                else:
+                    self.info('Match found for {} at rank {}'.format(taxon, rank))
 
-            # Pretty easy to do via ETE3:
-            # lin = ncbi.get_lineage(62051)
-            # lin_name = ncbi.get_taxid_translator(lin)
-            # lin_rank = ncbi.get_rank(lin)
-            # lineage = [(lin_name[id], lin_rank[id]) for id in lin_name.keys()]
-
-            # For entrez, this needs a second query to e.g.
-            # https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=taxonomy&id=62051
-            # Annoyingly, this doesn't expose a JSON mode, so need to parse XML to get the lineage
-
-            # r = requests.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=taxonomy&id=62051')
-            # from xml.etree import cElementTree as ElementTree
-            # fetched = ElementTree.fromstring(r.content)
-            # lineage = fetched.findall('./Taxon/LineageEx/Taxon')
-            # lineage = [(x.find('ScientificName').text, x.find('Rank').text) for x in lineage]
-
-            # NOTE - could run multiple queries in one go:
-            # https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=taxonomy&term=(Varanus%20salvator[scientific%20name]+OR+Bos%20taurus[scientific%20name]+AND+species[rank]&retmode=json
-            # https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=taxonomy&id=62051,9913
-
-            if self.use_ete:
-                # look up the names
-                ids = ncbi.get_name_translator(txnm_to_check)
-                # isolate names that aren't found
-                not_found = txnm_to_check - set(ids.keys())
-                # check the ranks
-                ranks_found = {ky: ncbi.get_rank(vl).values() for ky, vl in ids.iteritems()}
-                bad_rank = set([ky for ky, vl in ranks_found.iteritems() if rnk not in vl])
-                invalid = not_found | bad_rank
             else:
-                # loop the names through the entrez interface to the taxonomy database
-                invalid = set()
-                # loop over the values
-                for each_tx in txnm_to_check:
-                    entrez_response = requests.get(entrez.format(each_tx, rnk))
-                    if entrez_response.status_code != 200:
-                        # internet failures just add individual taxa to the unvalidated list
-                        unvalidated.add(each_tx)
+                # use the local database
+                tax_sql = local_match_api.format(taxon, rank.lower())
+                tax_gbif = self.gbif_conn.execute(tax_sql).fetchall()
+
+                # example species with multiple backbone hits: Zenicomus photuroides
+                if len(tax_gbif) == 0:
+                    self.warn('No match found for {} at rank {}'.format(taxon, rank), 1)
+                    continue
+                elif len(tax_gbif) > 1:
+                    self.warn('Multiple matches found for {} at rank {}'.format(taxon, rank), 1)
+                    continue
+                else:
+                    tax_gbif = dict(tax_gbif[0])
+
+                if tax_gbif['taxonomicStatus'] == 'accepted':
+                    self.info('Match found for {} at rank {}'.format(taxon, rank), 1)
+                else:
+                    # look up the accepted name usage, which should be a single row
+                    syn_sql = local_usage_api.format(tax_gbif['acceptedNameUsageID'])
+                    syn_gbif = self.gbif_conn.execute(syn_sql).fetchall()
+                    if len(syn_gbif) != 1:
+                        self.warn('Error in synonym checking for {}'.format(taxon), 1)
+                        continue
                     else:
-                        if entrez_response.json()['esearchresult']['count'] == '0':
-                            invalid.add(each_tx)
-
-            # d) Report invalid taxa
-            if invalid:
-                self.warn('Taxa not found or not valid at this rank: ', 3, join=invalid)
-
-            # build taxon index - currently no validation
-            tx_index.extend([(tx, rnk) for tx in txnm_to_check])
+                        syn_gbif = dict(syn_gbif[0])
+                        self.hint("GBIF consider '{}' at rank {} to be a {} of '{}' "
+                                  "at rank {}".format(taxon, rank, tax_gbif['taxonomicStatus'],
+                                   syn_gbif['canonicalName'], syn_gbif['taxonRank']), 1)
 
         # report on unvalidated taxa
         if unvalidated:
@@ -1747,8 +1631,7 @@ class Dataset(object):
 
 
 # High level functions
-def check_file(fname, verbose=True, ete3_database=None, locations_json=None,
-               check_all_ranks=False, validate_doi=False):
+def check_file(fname, verbose=True, gbif_database=None, locations_json=None, validate_doi=False):
 
     """
     Runs the format checking across an Excel workbook.
@@ -1756,8 +1639,8 @@ def check_file(fname, verbose=True, ete3_database=None, locations_json=None,
     Parameters:
         fname: Path to an Excel file
         verbose: Boolean to indicate whether to print messages as the program runs?
-        ete3_database: Path to a local ete3 database if that is to be used instead of Entrez.
-        check_all_ranks: Should all provided taxonomic ranks be validated?
+        gbif_database: Path to a local copy of the GBIF taxonomy backbone if that is to be used
+        instead of the GBIF web API.
         locations_json: The path to a json file of valid location names
         validate_doi: Check any publication DOIs resolve, requiring a web connection.
 
@@ -1766,11 +1649,11 @@ def check_file(fname, verbose=True, ete3_database=None, locations_json=None,
     """
 
     # initialise the dataset object
-    dataset = Dataset(fname, verbose=verbose, ete3_database=ete3_database)
+    dataset = Dataset(fname, verbose=verbose, gbif_database=gbif_database)
 
     # load the metadata sheets
     dataset.load_summary(validate_doi=validate_doi)
-    dataset.load_taxa(check_all_ranks=check_all_ranks)
+    dataset.load_taxa()
     dataset.load_locations(locations_json=locations_json)
 
     # check the datasets
@@ -1794,10 +1677,10 @@ def main():
     This program validates an Excel file formatted as a SAFE dataset. As it runs, it outputs
     a report that highlights any problems with the formatting.
 
-    The program validates taxonomic names against the NCBI taxonomy database. By default, it
-    uses the Entrez web service to validate names, but if the ete3 package is installed and
-    the path to a built ete3 database is provided, then this will be used instead: this will
-    work offline and is much faster but requires installation and setup.
+    The program validates taxonomic names against the GBIF taxonomy backbone. By default, it
+    uses the GBIF web service to validate names, but can also use a local copy of the backbone
+    provided in a sqlite database: this will work offline and is much faster but requires
+    installation and setup.
 
     The program also validate sampling location names: by default, this is loaded automatically
     from the SAFE website so requires an internet connection, but a local copy can be provided
@@ -1808,12 +1691,9 @@ def main():
     parser.add_argument('fname', help="Path to the Excel file to be validated.")
     parser.add_argument('-l', '--locations_json', default=None,
                         help='Path to a locally stored json file of valid location names')
-    parser.add_argument('--ete3_database', default=None,
-                        help=('The path to a local NCBI Taxonomy database built for '
-                              'the ete3 package.'))
-    parser.add_argument('--check_all_ranks', action="store_true", default=False,
-                        help=('Check the validity of all taxonomic ranks included, '
-                              'not just the standard required ranks.'))
+    parser.add_argument('--gbif_database', default=None,
+                        help=('The path to a local sqlite database containing the GBIF '
+                              'taxonomy backbone.'))
     parser.add_argument('--validate_doi', action="store_true", default=False,
                         help=('Check the validity of any publication DOIs, '
                               'provided by the user. Requires a web connection.'))
@@ -1821,7 +1701,6 @@ def main():
     args = parser.parse_args()
 
     check_file(fname=args.fname, verbose=True, locations_json=args.locations_json,
-               ete3_database=args.ete3_database, check_all_ranks=args.check_all_ranks,
                validate_doi=args.validate_doi)
 
 
