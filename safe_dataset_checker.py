@@ -1370,7 +1370,7 @@ class Dataset(object):
             return False
         else:
             if tx_nm_prov:
-                self.taxon_names_used.update(meta['taxon_name'])
+                self.taxon_names_used.update([meta['taxon_name']])
             return True
 
     def _check_interaction_meta(self, meta, taxa_fields):
@@ -1765,11 +1765,15 @@ class Dataset(object):
         if self.locations_used != self.locations:
             self.warn('Provided locations not used: ', 1,
                       join=self.locations - self.locations_used)
+        else:
+            self.info('Provided locations all used in datasets', 1)
 
         # check taxa
         if self.taxon_names_used != self.taxon_names:
             self.warn('Provided taxa  not used: ', 1,
                       join=self.taxon_names - self.taxon_names_used)
+        else:
+            self.info('Provided taxa all used in datasets', 1)
 
     def export_metadata_dict(self):
         """
