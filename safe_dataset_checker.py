@@ -773,6 +773,25 @@ class Dataset(object):
 
         self.locations = loc_names | new_loc_names
 
+    @staticmethod
+    def gbif_local_to_index_tuple(row):
+        """
+        Turns a row from the local GBIF database into a tuple for the taxon index
+        Args:
+            row: A row from the GBIF backbone database as a dictionary
+
+        Returns:
+            A 5 tuple: taxon ID, parent ID, name, rank, status
+        """
+
+        if row['parentNameUsageID'] == '':
+            parent = 0
+        else:
+            parent = int(row['parentNameUsageID'])
+
+        return  [(int(row['taxonID']), parent, row['canonicalName'],
+                  row['taxonRank'], row['taxonomicStatus'])]
+
     def load_taxa(self):
 
         """
@@ -990,8 +1009,7 @@ class Dataset(object):
                                   if hi in tax_gbif and tax_gbif[hi] != u'' and hi != rank]
                         local_higher_taxa.update(add_hi)
                         # add the actual taxon to the index
-                        add = [(int(tax_gbif['taxonID']), tax_gbif['canonicalName'],
-                                tax_gbif['taxonRank'], tax_gbif['taxonomicStatus'])]
+                        add = self.gbif_local_to_index_tuple(tax_gbif)
                         self.taxon_index.update(add)
                     else:
                         # synonym or misapplied
@@ -1007,10 +1025,8 @@ class Dataset(object):
                                   if hi in acc_gbif and acc_gbif[hi] != u'']
                         local_higher_taxa.update(add_hi)
                         # add the actual taxon and accepted usage to the index
-                        add = [(int(tax_gbif['taxonID']), tax_gbif['canonicalName'],
-                                tax_gbif['taxonRank'], tax_gbif['taxonomicStatus'])]
-                        add += [(int(acc_gbif['taxonID']), acc_gbif['canonicalName'],
-                                acc_gbif['taxonRank'], acc_gbif['taxonomicStatus'])]
+                        add = self.gbif_local_to_index_tuple(tax_gbif)
+                        add += self.gbif_local_to_index_tuple(acc_gbif)
                         self.taxon_index.update(add)
                 else:
                     # Reduce the set of hits to give something like the preferred hits
@@ -1027,8 +1043,7 @@ class Dataset(object):
                                   if hi in tax_gbif and tax_gbif[hi] != u'' and hi != rank]
                         local_higher_taxa.update(add_hi)
                         # add the actual taxon to the index
-                        add = [(int(tax_gbif['taxonID']), tax_gbif['canonicalName'],
-                                tax_gbif['taxonRank'], tax_gbif['taxonomicStatus'])]
+                        add = self.gbif_local_to_index_tuple(tax_gbif)
                         self.taxon_index.update(add)
                     elif 'accepted' in tx_counts.keys() and tx_counts['accepted'] > 1:
                         # more than one accepted match
@@ -1062,10 +1077,8 @@ class Dataset(object):
                                       if hi in acc_gbif and acc_gbif[hi] != u'']
                             local_higher_taxa.update(add_hi)
                             # add the actual taxon and accepted usage to the index
-                            add = [(int(tax_gbif['taxonID']), tax_gbif['canonicalName'],
-                                    tax_gbif['taxonRank'], tax_gbif['taxonomicStatus'])]
-                            add += [(int(acc_gbif['taxonID']), acc_gbif['canonicalName'],
-                                    acc_gbif['taxonRank'], acc_gbif['taxonomicStatus'])]
+                            add = self.gbif_local_to_index_tuple(tax_gbif)
+                            add += self.gbif_local_to_index_tuple(acc_gbif)
                             self.taxon_index.update(add)
 
         # Look up anything added to the local higher taxa set
@@ -1073,10 +1086,9 @@ class Dataset(object):
             tax_sql = ("select * from backbone where canonicalName='{}' and "
                        "taxonRank='{}';".format(*hi_tax))
             tax_gbif = self.gbif_conn.execute(tax_sql).fetchall()
-            tax_gbif = [dict(tx) for tx in tax_gbif][0]
-
-            self.taxon_index.add((int(tax_gbif['taxonID']), tax_gbif['canonicalName'],
-                                  tax_gbif['taxonRank'], tax_gbif['taxonomicStatus']))
+            tax_gbif = dict(tax_gbif[0])
+            add = self.gbif_local_to_index_tuple(tax_gbif)
+            self.taxon_index.update(add)
 
         # report on unvalidated taxa
         if unvalidated:
