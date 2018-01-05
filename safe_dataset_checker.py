@@ -14,23 +14,18 @@ printed to screen during processing but can also be retrieved from the
 Dataset object.
 
 Taxon names and locations are both validated:
-i) By default, taxonomic names are validated against the NCBI database using
-   Entrez queries over the internet. The ete3 package can also be used to do
-   this offline, but because of the installation overheads (300MB local SQLITE
-   version of the NCBI data, slow build process etc.) that can be triggered
-   simply by creating an instance of the NCBITaxa() class, this is only used
-   if an explicit link to the db file is provided, and a very up to date
-   (currently github source installation) version of ete3 is installed that
-   provides a method to check the db validity without triggering a rebuild.
+i)  By default, taxonomic names are validated against the GBIF backbone taxonomy
+    using API queries over the internet. A user can download and build a local
+    sqlite copy of the database to avoid the need for a web connection and to
+    improve the speed of validation.
 
 ii) Locations are validated against a list of valid locations. By default, this
-   is downloaded from a web service provided from the SAFE website, but a local
-   file can be provided for off line use.
+    is downloaded from a web service provided from the SAFE website, but a local
+    file can be provided for off line use.
 """
 
 from __future__ import print_function
 import os
-import sys
 import datetime
 import argparse
 import re
