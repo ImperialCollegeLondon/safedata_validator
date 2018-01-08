@@ -26,7 +26,6 @@ ii) Locations are validated against a list of valid locations. By default, this
 
 from __future__ import print_function
 import os
-import sys
 import datetime
 import argparse
 import re
@@ -1177,10 +1176,16 @@ class Dataset(object):
                     local_higher_taxa.update(new_index[2])
 
             if add_taxon:
-                # add the scientific name used in the file and insert the
-                # validated parent taxon ID as parent
-                self.taxon_index.add((-1, new_index[0][0], tx['scientific name'],
-                                      tx['taxon type'], 'user provided'))
+                # For taxa that have been validated via a parent, add a name used in the file
+                # and insert the validated parent taxon ID.
+                # For non taxon groups (alt_types), insert the taxon name, otherwise use the
+                # provided (unvalidated!) scientific name.
+                if tx['taxon type'] in alt_types:
+                    alt_tx_name = tx['taxon name']
+                else:
+                    alt_tx_name = tx['scientific name']
+                self.taxon_index.add((-1, new_index[0][0][0], alt_tx_name,
+                                     tx['taxon type'], 'user provided'))
 
         # Look up anything added to the local higher taxon set
         if self.gbif_conn:
