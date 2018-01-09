@@ -21,22 +21,71 @@ The code validates:
 
 Datasets can be submitted by registered researchers at the 
 [SAFE website](https://safeproject.net/datasets/submit_dataset)
-which will automatically use this code to check that the file is formatted correctly.
-However, you may also want to run it yourself!
+which will automatically use this code to check that the file is formatted
+correctly. However, you may also want to run it yourself!
 
 ## Installation
 
-The following steps should allow you to run the checks yourself before submitting a dataset:
+The following steps should allow you to run the checks yourself before
+submitting a dataset:
 
-1. Download the `safe_file_checker.py` file from [here](https://raw.githubusercontent.com/ImperialCollegeLondon/safe_dataset_checker/master/safe_dataset_checker.py) into the same folder as the Excel file containing your dataset.
-2. Open a command line terminal and move to the directory where you saved `safe_file_checker.py`.
-3. For guidance and testing, run the following:
+1. If you're using a Mac or Linux, then it is almost certain that you
+already have Python installed. You may also do if you are using Windows.
+To find out, open a command line window (run Terminal on a Mac, or `cmd`
+on Windows) and then type `python` (on Mac or Unix) or `python.exe`
+(on Windows).
 
-       ./safe_dataset_checker.py -h
+1. If some text and a prompt (`>>>`) appears then you have Python.
+First check the version number in the first line: if it doesn't start
+Python 2.7 then you currently need to install Python 2.7 to run the
+checker. You can have multiple versions of Python installed, but it is
+going to be more complicated than is covered here.
+
+  If you've got Python 2.7 then type `quit()` and skip to step 4.
+
+  If you get a line that says the command is not found then you need to
+install Python. Download a copy from here:
+
+  https://www.python.org/downloads/
+
+  The code is currently written to use Python 2.7, so make sure you
+download an installer for Python 2.7.14 and not the more recent
+Python 3.6 versions. For Windows, choose one of the MSI installer
+options.
+
+1. Repeat the command line check from the first step: if this still
+doesn't work then you probably just need to tell the computer where to
+find Python: search online for instructions to add python to the
+`PATH` environment variable. On Windows, you will want to add (using
+the typical install location) `C:\Python27` and `C:\Python27\scripts`.
+
+1. The `safe_dataset_checker` program mostly uses commands from the
+Python Standard Library - a set of code packages that are installed
+with Python - but does use three extra packages that can be installed
+using the `pip` package installer. At the command line, type:
+
+        pip install openpyxl requests simplejson
+
+  Those packages allow Python to: read Excel files, get validation data
+over the internet and handle JSON formatted data.
+
+1. Now create a folder to keep your data checking code in and download
+the `safe_file_checker.py` file into it:
+
+       https://raw.githubusercontent.com/ImperialCollegeLondon/safe_dataset_checker/master/safe_dataset_checker.py
+
+1. Now open a command line terminal, change to your data checking
+directory and run the following:
+
+        python ./safe_dataset_checker.py -h
+
+  In Windows, you will need to change `python` to `python.exe` here and
+  in commands below that start `python`. You should see the usage
+  instructions shown below.
 
 ## Usage
 
-The line above should show the message below:
+The program usage instructions are:
 
     usage: safe_dataset_checker.py [-h] [-l LOCATIONS_JSON]
                                    [--gbif_database GBIF_DATABASE]
@@ -71,18 +120,16 @@ The line above should show the message below:
       -l LOCATIONS_JSON, --locations_json LOCATIONS_JSON
                             Path to a locally stored json file of valid location
                             names
-      --gbif_database GBIF_DATABASE
+      -g GBIF_DATABASE, --gbif_database GBIF_DATABASE
                             The path to a local sqlite database containing the
                             GBIF taxonomy backbone.
       --validate_doi        Check the validity of any publication DOIs, provided
                             by the user. Requires a web connection.
 
 
-
-
 In most cases, it is used simply like this:
 
-    ./safe_dataset_checker.py path/to/My_Excel_File.xlsx
+    python safe_dataset_checker.py path/to/My_Excel_File.xlsx
 
 Note that the program __uses a web connection__  to get a list
 of valid location names for SAFE, to validate taxon names via the
@@ -99,16 +146,24 @@ a SQLite3 database from it. This isn't particularly hard, but the
 resulting database is around 2GB, so you'll need file space! The steps
 are:
 
-    * Download the current zipped backbone from here:
-    http://rs.gbif.org/datasets/backbone/backbone-current.zip
-    * Extract the contents of the archive, which will contain a tab
-    delimited file `Taxon.tsv` that will be loaded into a new SQLite3
-    database. Create this new database and enter SQLite3:
+    * You may need to download and install SQLite3.        You want the 'bundle' installer for your operating system.
+      https://www.sqlite.org/download.html
 
-           sqlite3 current-backbone.sqlite
-    * Once you're in the new SQLite database, use the following commands
+    * Download the current zipped backbone from here:
+      http://rs.gbif.org/datasets/backbone/backbone-current.zip
+
+    * Extract the contents of the archive, which includes a tab
+    delimited file `Taxon.tsv` that needs to be loaded into an SQLite3
+    database. Move the `Taxon.tsv` file to your data checker folder and
+    then, in the command line, type the following to create this
+    new database and enter SQLite3:
+
+           sqlite3 backbone-current.sqlite
+
+    * Once you're in the new SQLite database, enter the following commands
     to import the data and then build two indices to speed up searches:
     on the canonical names of taxa and taxon ranks, and on the taxon id.
+    This is a big file, so these might take several minutes to complete.
 
            .mode tab
            .import backbone-current/Taxon.tsv backbone
@@ -116,30 +171,41 @@ are:
            create index backbone_name_rank on backbone (canonicalName, taxonRank);
            create index backbone_id on backbone (taxonID);
            .quit
-    * Put that file somewhere sensible and then tell `safe_dataset_checker.py`
-    where to find it:
 
-           ./safe_dataset_checker.py My_Excel_File.xlsx --gbif_database path/to/current-backbone.sqlite
+    * You can now delete the `Taxon.tsv` file. You should now be able
+    to use local taxonomy validation by telling `safe_dataset_checker.py`
+    about the SQLite3 database:
+
+           python safe_dataset_checker.py -g backbone-current.sqlite My_Excel_File.xlsx
 
 
 2. The current list of valid location names and bounding boxes is
 automatically downloaded directly from the SAFE Gazetteer. To work
 offline, get a copy of this data from the following link:
+https://www.safeproject.net/call/json/get_locations_bbox
 
-    https://www.safeproject.net/call/json/get_locations_bbox
+    Save the output as a file in your data checker folder (e.g.
+    `SAFE_locations.json`). You will then be able to run the program
+    using the following:
 
-    Save the output as a file (e.g. `SAFE_locations.json`). You will then
-be able to run the program using the following:
+          python safe_dataset_checker.py -l SAFE_locations.json My_Excel_File.xlsx
 
-          ./safe_dataset_checker.py My_Excel_File.xlsx --location_json SAFE_locations.json
+3. If you've done both the above steps then the following example would
+validate a file using both local datasets, and won't need the internet
+at all.
 
-## Requirements
+          python safe_dataset_checker.py -g backbone-current.sqlite -l SAFE_locations.json My_Excel_File.xlsx
 
-You will need to install `openpyxl` to allow Python to read Excel files.
-This ought to be simple using the `pip` package manager.
+4. You might want to create a shortcut to this command. On Windows,
+create a file called `local_dataset_check.cmd` with the following
+contents:
 
-        pip install openpyxl
+          python.exe safe_dataset_checker.py -g backbone-current.sqlite -l SAFE_locations.json %1
 
+  You can now run the program using the local checking from a terminal by
+typing:
+
+          local_data_check.cmd My_Excel_File.xlsx
 
 ## GBIF validation
 

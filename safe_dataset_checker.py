@@ -1979,7 +1979,7 @@ def main():
     parser.add_argument('fname', help="Path to the Excel file to be validated.")
     parser.add_argument('-l', '--locations_json', default=None,
                         help='Path to a locally stored json file of valid location names')
-    parser.add_argument('--gbif_database', default=None,
+    parser.add_argument('-g', '--gbif_database', default=None,
                         help=('The path to a local sqlite database containing the GBIF '
                               'taxonomy backbone.'))
     parser.add_argument('--validate_doi', action="store_true", default=False,
