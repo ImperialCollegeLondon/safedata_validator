@@ -636,17 +636,18 @@ class Dataset(object):
         loc_rows = locs_wb.rows
 
         # Get the field headers:
-        # Duplicated headers are a problem because the values
-        # in the locations dictionaries get overwritten.
+        # Duplicated headers are a problem because the values in the locations dictionaries get
+        # overwritten. Depending on what gets overwritten, this can produce really unpredictable
+        # bugs, so just stop here.
         hdrs = [cl.value for cl in loc_rows.next()]
         dupes = duplication([h for h in hdrs if not is_blank(h)])
         if dupes:
             self.warn('Duplicated location sheet headers: ', 1, join=dupes)
+            return
 
         # Check location names are available
         if 'Location name' not in hdrs:
             self.warn('Location name column not found', 1)
-            self.locations = set()
             return
 
         # Convert remaining rows into a list of location dictionaries
@@ -1038,11 +1039,13 @@ class Dataset(object):
         tx_rows = sheet.rows
         hdrs = [cl.value for cl in tx_rows.next()]
 
-        # duplicated headers are a problem in that it will cause values in
-        # the taxon dictionaries to be overwritten.
+        # duplicated headers are a problem in that it will cause values in the taxon
+        # dictionaries to be overwritten. Depending on what gets overwritten, this can
+        # produce really unpredictable bugs, so just stop here.
         dupes = duplication([h for h in hdrs if not is_blank(h)])
         if dupes:
             self.warn('Duplicated column headers in Taxa worksheet: ', 1, join=dupes)
+            return
 
         # Load dictionaries of the taxa
         taxa = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in tx_rows]
@@ -1294,7 +1297,9 @@ class Dataset(object):
             fld[u'col_idx'] = idx + 2
             fld[u'column'] = utils.get_column_letter(idx + 2)
 
-        # check field names unique (drop None)
+        # check field names unique (drop None). This doesn't cause as many problems
+        # as duplications in Taxa and Locations, which expect certain fields, so warn
+        # and continue.
         field_names = [fld['field_name'] for fld in metadata if fld['field_name'] is not None]
         dupes = duplication(field_names)
         if dupes:
