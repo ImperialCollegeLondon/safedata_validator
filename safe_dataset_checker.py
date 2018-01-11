@@ -32,11 +32,12 @@ import re
 from collections import Counter
 from StringIO import StringIO
 import numbers
+import logging
+import sqlite3
 import openpyxl
 from openpyxl import utils
 import requests
 import simplejson
-import sqlite3
 
 # define some regular expressions used to check validity
 RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}')
@@ -47,8 +48,100 @@ RE_WSPACE_ONLY = re.compile(r'^\s*$')
 RE_WSPACE_AT_ENDS = re.compile(r'^\s+\w+|\w+\s+$')
 RE_DMS = re.compile(r'[°\'"dms’”]+')
 
+# Taxon levels used in GBIF taxonomy. We explicitly exclude form and variety
+# because they cannot be matched into the backbone hierarchy without extra
+# API calls
+BACKBONE_TYPES = ['kingdom', 'phylum', 'order', 'class', 'family',
+                  'genus', 'species', 'subspecies']
+
+# Logger setup - setup the standard logger to provide
+# i)   A handler providing a counter of the number of calls to each log level
+# ii)  A formatter to provide user controlled indentation and to
+#      code levels as symbols for compactness
+# iii) A handler writing to a global log file written to a StringIO container
+# iv)  Optionally a handler also writing the log to stdout
+
+
+class CounterHandler(logging.Handler):
+    """
+    Handler instance that maintains a count of calls at each log level
+    """
+    def __init__(self, *args, **kwargs):
+        logging.Handler.__init__(self, *args, **kwargs)
+        self.counters = {'DEBUG': 0, 'INFO': 0, 'WARNING': 0, 'ERROR': 0, 'CRITICAL': 0}
+
+    def emit(self, rec):
+        self.counters[rec.levelname] += 1
+
+
+class IndentFormatter(logging.Formatter):
+    """
+    A formatter that provides an indentation depth and encodes the logging
+    levels as single character strings. The extra argument to logger messages
+    can be used to provide a dictionary to set:
+        - 'join': a list of entries to join as comma separated list on
+          to the end of the message.
+        - 'quote': a flag to set joined entries to be quoted to show
+          whitespace around values.
+        - 'indent_before' or 'indent_after': two options to set the indent
+          depth of the formatter.
+    """
+
+    def __init__(self, fmt=None, datefmt=None):
+        logging.Formatter.__init__(self, fmt, datefmt)
+        self.depth = 0
+
+    def format(self, rec):
+
+        # adjust indent before
+        if hasattr(rec, 'indent_before'):
+            self.depth = int(rec.indent_before)
+
+        rec.indent = '    ' * self.depth
+        # encode level
+        codes = {'DEBUG': '>', 'INFO': '-', 'WARNING': '?', 'ERROR': '!', 'CRITICAL': '*'}
+        rec.levelcode = codes[rec.levelname]
+        # format message
+        msg = logging.Formatter.format(self, rec)
+        # add any joined values
+        if hasattr(rec, 'join'):
+            if hasattr(rec, 'quote') and rec.quote:
+                # quote if requested and then avoid requoting if the
+                # formatter is emitting to more than one stream handler
+                rec.join = ["'" + unicode(o) + "'" for o in rec.join]
+                del rec.quote
+            msg += ', '.join(rec.join)
+
+        # adjust indent after
+        if hasattr(rec, 'indent_after'):
+            self.depth = int(rec.indent_after)
+
+        return msg
+
+
+# Setup the logging instance
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.DEBUG)
+
+# Add the counter handler
+CH = CounterHandler()
+CH.setLevel(logging.DEBUG)
+LOGGER.addHandler(CH)
+
+# Create the formatter
+FORMATTER = IndentFormatter("%(indent)s%(levelcode)s %(message)s")
+
+# Create a StringIO object to hold the log, set a stream handler to use that,
+# attach the custom formatter and add it to the logger. LOG will then contain
+# a complete record of logging messages.
+LOG = StringIO()
+LOG_SH = logging.StreamHandler(LOG)
+LOG_SH.setFormatter(FORMATTER)
+LOGGER.addHandler(LOG_SH)
+
+
 """
-Some simple helper functions
+Some static functions
 """
 
 
@@ -124,6 +217,291 @@ def all_numeric(data):
     return [len(nums) == len(data), nums]
 
 
+def web_gbif_validate(tax, rnk, backbone_types=BACKBONE_TYPES):
+
+    """
+    Validates a taxon name and rank against the GBIF web API.
+
+    Args:
+        tax: The (case insensitive) taxon name
+        rnk: The taxon rank
+        backbone_types: A list of higher taxon rank names to be added
+            to the index along with the target taxon. This should be
+            in rank order from root to tip.
+
+    Returns:
+        If successful, a 2-list of lists of index tuples, separating the
+        canonical match for this taxon from the rest of the taxonomic index for it
+            [[(index tuple for canonical taxon)],
+             [(index tuples for higher taxa + synonym)]]
+        Otherwise, None.
+    """
+
+    # function to walk back up the taxonomy
+    def _hierarchy_walk(json):
+        """
+        Walks back up the taxonomic hierarchy in order, robustly handling non-standard
+        parental assignments. From the single response, for an accepted species we can
+        populate the taxon and higher taxa **but** the connections don't necessarily go
+        up to the next most nested level. Analysis of the local database shows that
+        accepted taxa do always go up. Note that this code will not work if the taxon is
+        a form or variety.
+
+        Args:
+            json: The JSON response from the species/match endpoint
+
+        Returns:
+            A dictionary keyed by taxonomic level of index tuples for the taxon
+        """
+
+        # add the root in
+        json['rootKey'] = 0
+        json['root'] = 'root'
+        idx_tuples = {}
+        rnk_walk = json['rank'].lower()
+
+        # handle subspecies
+        if rnk_walk == 'subspecies':
+            json[rnk_walk] = json['canonicalName']
+
+        # walk up the hierarchy
+        while rnk_walk != 'root':
+            # find the next more nested rank in the response
+            rnk_found = [ix for ix, tp in enumerate(backbone_types)
+                         if tp in json.keys() and tp != rnk_walk]
+            next_rank = backbone_types[max(rnk_found)]
+            # link that in
+            idx_tuples[rnk_walk] = (json['usageKey'], json[next_rank + 'Key'],
+                                    json[rnk_walk], rnk_walk, 'accepted')
+            # remove the rank we've just handled
+            json['usageKey'] = json[next_rank + 'Key']
+            json.pop(rnk_walk)
+            # move up
+            rnk_walk = next_rank
+
+        return idx_tuples
+
+    # use the GBIF API
+    url_gbif = (u"http://api.gbif.org/v1/species/match"
+                "?name={}&rank={}&strict=true".format(tax, rnk))
+    tax_gbif = requests.get(url_gbif)
+
+    if tax_gbif.status_code != 200:
+        LOGGER.error('API validation issue for {}'.format(tax))
+        return
+    else:
+        resp = tax_gbif.json()
+
+    # add a root to the types
+    backbone_types = ['root'] + backbone_types
+
+    if resp['matchType'] == u'NONE':
+        # No match found: catch any notes from GBIF for odd cases (such as two equal
+        # matches as in the case of Morus, for example).
+        if 'note' in resp.keys():
+            rnk += ': ' + resp['note']
+        LOGGER.error('No unique match found for {} at rank {}'.format(tax, rnk))
+        return
+    elif resp['status'].lower() == 'doubtful':
+        # We don't accept doubtful names
+        LOGGER.error('Taxon {} is considered doubtful'.format(tax))
+        return
+    elif resp['status'].lower() == 'accepted':
+        LOGGER.info('Match found for {} at rank {}'.format(tax, rnk))
+        to_add = _hierarchy_walk(resp)
+        # Before returning, pop the canonical response off and return that
+        # separately from the rest of  the index entries.
+        canon = [to_add.pop(rnk)]
+        return [canon, to_add.values()]
+    else:
+        # A non-accepted match, so look up the accepted usage to notify the user.
+        # Need to look up the accepted key for the taxa: many taxa will have the
+        # accepted key in the species/match endpoint data (as for example,
+        # speciesKey). This does not work for subspecies: there is never a
+        # subspeciesKey entry
+        usage_url = u"http://api.gbif.org/v1/species/{}".format(resp['usageKey'])
+        usage = requests.get(usage_url)
+        if usage.status_code != 200:
+            LOGGER.error('API validation issue for {}'.format(tax))
+            return
+        else:
+            usage_data = usage.json()
+
+        # get the accepted taxonomy via the species/match interface. Note that the
+        # accepted usage is the full scientific name (including authorship) but the
+        # match API searches both canonical and full names.
+        accept_url = u"http://api.gbif.org/v1/species/match?name={}&strict=true"
+        accept = requests.get(accept_url.format(usage_data['accepted']))
+        if accept.status_code != 200:
+            LOGGER.error('API validation issue for {}'.format(tax))
+            return
+        else:
+            accept_data = accept.json()
+            to_add = _hierarchy_walk(accept_data)
+            # get the canon usage
+            canon = [to_add.pop(accept_data['rank'].lower())]
+            # add the taxon as used in the dataset.
+            to_add['user'] = (resp['usageKey'], canon[0][1], resp['canonicalName'],
+                              resp['rank'].lower(), resp['status'].lower())
+            # report
+            usage_msg = (tax, usage_data['taxonomicStatus'].lower(), accept_data['canonicalName'])
+            LOGGER.warn('{} is considered a {} of {}'.format(*usage_msg), extra={'indent': 3})
+
+            return [canon, to_add.values()]
+
+
+def local_gbif_validate(conn, tax, rnk, backbone_types=BACKBONE_TYPES):
+    """
+    Validates a taxon name and rank against a connection to a local GBIF database.
+    Because the local GBIF database does not contain higher taxon keys in each row,
+    the function returns a list of higher taxa to be looked up later. It could call
+    itself recursively but many of these entries are likely to duplicated in other taxa,
+    so it is more efficient to collate a local set and add the unique entries later.
+
+    Args:
+        conn: A connection to a SQL database containing the backbone table
+        tax: The (case sensitive) taxon name
+        rnk: The taxon rank
+        backbone_types: A list of higher taxon rank names to be added
+            to the index along with the target taxon
+
+    Returns:
+        If successful, a 3-list of lists of tuple indices:
+             [[(index tuple for canonical taxon)],
+              [(index tuple non-canon taxon)],
+              [(tuples for higher taxon lookup)]]
+        Otherwise, None.
+    """
+
+    def _row_to_index_tuple(row):
+        """
+        Turns a row from the local GBIF database into a tuple for the taxon index
+        Args:
+            row: A row from the GBIF backbone database as a dictionary
+
+        Returns:
+            A 5 tuple: taxon ID, parent ID, name, rank, status
+        """
+
+        if row['parentNameUsageID'] == '':
+            parent = 0
+        else:
+            parent = int(row['parentNameUsageID'])
+
+        return [(int(row['taxonID']), parent, row['canonicalName'],
+                row['taxonRank'], row['taxonomicStatus'])]
+
+    # Make sure the connection is returning results as sqlite.Row objects
+    if conn.row_factory != sqlite3.Row:
+        conn.row_factory = sqlite3.Row
+
+    # look up the provided name and rank
+    tax_sql = ("select * from backbone where canonicalName='{}' and "
+               "taxonRank='{}';".format(tax, rnk.lower()))
+    tax_gbif = conn.execute(tax_sql).fetchall()
+    tax_gbif = [dict(tx) for tx in tax_gbif]
+
+    # Process the hits
+    if len(tax_gbif) == 0:
+        LOGGER.error('No match found for {} at rank {}'.format(tax, rnk))
+        return
+
+    elif len(tax_gbif) == 1:
+        # A single matching canonical name - check status
+        tax_gbif = tax_gbif[0]
+
+        if tax_gbif['taxonomicStatus'] == 'doubtful':
+            # We don't accept doubtful names
+            LOGGER.error('Taxon {} is considered doubtful'.format(tax))
+            return
+
+        elif tax_gbif['taxonomicStatus'] == 'accepted':
+            # accepted taxon
+            LOGGER.info('Match found for {} at rank {}'.format(tax, rnk))
+            # store the higher taxa to lookup fully later
+            add_to_higher = [(tax_gbif[hi], hi) for hi in backbone_types
+                             if hi in tax_gbif and tax_gbif[hi] != u'' and hi != rnk]
+            # return the accepted usage, an empty list since there isn't an unaccepted
+            # usage and the list of higher taxa
+            return [_row_to_index_tuple(tax_gbif), [], add_to_higher]
+        else:
+            # synonym or misapplied, so find the accepted usage
+            acc_id = tax_gbif['acceptedNameUsageID']
+            acc_sql = 'select * from backbone where taxonID = {};'.format(acc_id)
+            acc_gbif = conn.execute(acc_sql).fetchall()
+            acc_gbif = dict(acc_gbif[0])
+            tx_tup = (tax_gbif['canonicalName'], tax_gbif['taxonomicStatus'],
+                      acc_gbif['canonicalName'])
+            LOGGER.warn('{} is considered a {} of {}'.format(*tx_tup))
+            # store the higher taxa to lookup fully later
+            add_to_higher = [(acc_gbif[hi], hi) for hi in backbone_types
+                             if hi in acc_gbif and acc_gbif[hi] != u'']
+
+            # return the accepted usage, the actual taxon and higher taxa
+            return [_row_to_index_tuple(acc_gbif), _row_to_index_tuple(tax_gbif),
+                    add_to_higher]
+
+    else:
+        # Multiple hits: reduce the set of hits to give something like the preferred
+        # hits reported by GBIF.
+        # First, get the taxon statuses
+        tx_status = [tx['taxonomicStatus'] for tx in tax_gbif]
+        tx_counts = Counter(tx_status)
+
+        if 'accepted' in tx_counts.keys() and tx_counts['accepted'] == 1:
+            # only one accepted match alongside other usages
+            LOGGER.info('Match found for {} at rank {}'.format(tax, rnk))
+            # extract that hit
+            tax_gbif = tax_gbif[tx_status.index('accepted')]
+            # store the higher taxa to lookup fully later
+            add_to_higher = [(tax_gbif[hi], hi) for hi in backbone_types
+                             if hi in tax_gbif and tax_gbif[hi] != u'' and hi != rnk]
+            # return the accepted usage, an empty list since there isn't an unaccepted
+            # usage and the list of higher taxa
+            return [_row_to_index_tuple(tax_gbif), [], add_to_higher]
+
+        elif 'accepted' in tx_counts.keys() and tx_counts['accepted'] > 1:
+            # more than one accepted match
+            LOGGER.error('No unique match found for {} at rank {}'.format(tax, rnk))
+            return
+
+        else:
+            # Rows can now contain doubtful (no accepted usage) and then synonyms
+            # (of varying kinds) and misapplied (both of which have accepted usage)
+            tx_acc = {tx['acceptedNameUsageID'] for tx in tax_gbif
+                      if tx['acceptedNameUsageID'] != u''}
+            if set(tx_counts.keys()) == {u'doubtful'}:
+                # only doubtful records?
+                LOGGER.error('Taxon {} is considered doubtful'.format(tax))
+                return
+            elif len(tx_acc) > 1:
+                # More than one accepted usage
+                LOGGER.error('Taxon {} is not accepted and can refer to more than one '
+                             'accepted usage.'.format(tax))
+                return
+            else:
+                # A single accepted usage - pick the first row to index
+                tax_gbif = tax_gbif[0]
+                acc_sql = ('select * from backbone '
+                           'where taxonID  = {};'.format(tx_acc.pop()))
+                acc_gbif = conn.execute(acc_sql).fetchall()
+                acc_gbif = dict(acc_gbif[0])
+                tx_tup = (tax, ', '.join(set(tx_status)), acc_gbif['canonicalName'])
+                LOGGER.warn('{} is considered a {} of {}'.format(*tx_tup))
+                # store the higher taxa to lookup fully later
+                add_to_higher = [(acc_gbif[hi], hi) for hi in backbone_types
+                                 if hi in acc_gbif and acc_gbif[hi] != u'']
+
+                # return the accepted usage, the actual taxon and higher taxa
+                return [_row_to_index_tuple(tax_gbif), _row_to_index_tuple(acc_gbif),
+                        add_to_higher]
+
+
+"""
+Two classes to handle datasets and the data worksheets they contain
+"""
+
+
 class DataWorksheet(object):
 
     """
@@ -174,13 +552,15 @@ class Dataset(object):
         self.filename = os.path.basename(filename)
 
         # report tracking
-        self.message_header = "Checking file '{}'".format(filename)
-        self.messages = []
-        self.verbose = verbose
-        self.kinds = {'info': '-', 'hint': '?', 'warn': '!'}
-        self.n_warnings = 0
         if verbose:
-            print(self.message_header)
+            # Add a stream handler writing to stdout, using the common formatter instance,
+            # as well as the logging to the global LOG StringIO
+            stdout = logging.StreamHandler()
+            stdout.setFormatter(FORMATTER)
+            LOGGER.addHandler(stdout)
+
+        LOGGER.info("Checking file '{}'".format(filename),
+                    extra={'indent_before': 0, 'indent_after': 1})
 
         # basic info
         self.sheet_names = set(self.workbook.get_sheet_names())
@@ -207,13 +587,13 @@ class Dataset(object):
 
         # Setup the taxonomy validation mechanism.
         if gbif_database is None:
-            self.info('Using GBIF online API to validate taxonomy', 0)
+            LOGGER.info('Using GBIF online API to validate taxonomy')
             self.use_local_gbif = False
             self.gbif_conn = None
         else:
             # If a GBIF file is provided, does the file exist?
             if not os.path.exists(gbif_database):
-                self.info('Local GBIF database not found, defaulting to online API', 0)
+                LOGGER.info('Local GBIF database not found, defaulting to online API')
                 self.use_local_gbif = False
                 self.gbif_conn = None
 
@@ -224,94 +604,28 @@ class Dataset(object):
                 conn = sqlite3.connect(gbif_database)
                 _ = conn.execute('select count(*) from backbone;')
             except sqlite3.OperationalError:
-                self.info('Local GBIF database does not contain the backbone table, defaulting '
-                          'to online API', 0)
+                LOGGER.info('Local GBIF database does not contain the backbone table, defaulting '
+                            'to online API')
                 self.use_local_gbif = False
                 self.gbif_conn = None
             except sqlite3.DatabaseError:
-                self.info('Local SQLite database not valid, defaulting to online API', 0)
+                LOGGER.info('Local SQLite database not valid, defaulting to online API')
                 self.use_local_gbif = False
                 self.gbif_conn = None
             else:
-                self.info('Using local GBIF database to validate taxonomy', 0)
+                LOGGER.info('Using local GBIF database to validate taxonomy')
                 self.use_local_gbif = True
                 self.gbif_conn = conn
                 self.gbif_conn.row_factory = sqlite3.Row
 
-    # Logging methods
-    def info(self, message, level=0):
+    @staticmethod
+    def report():
         """
-        Adds an information message to the instance.
-        Args:
-            message: The information message text.
-            level: The message indent level
-        """
-        msg = ('info', message, level)
-        self.messages.append(msg)
-        if self.verbose:
-            self.print_msg(*msg)
-
-    def warn(self, message, level=0, join=None, as_repr=False):
-        """
-        Adds a warning message to the instance, optionally adding
-        a joined set of values onto the end, possibly converting them
-        to a string representation to capture formatting more clearly
-
-        Args:
-            message: The warning message text.
-            level: The message indent level
-            join: A list of values to join and append to the warning
-            as_repr: Should join values be converted to a representation
-        """
-        if join and as_repr:
-            message += ', '.join([repr(unicode(vl)) for vl in join])
-        elif join:
-            message += ', '.join(join)
-
-        msg = ('warn', message, level)
-        self.messages.append(msg)
-        self.n_warnings += 1
-        if self.verbose:
-            self.print_msg(*msg)
-
-    def hint(self, message, level=0, join=None):
-        """
-        Adds an hint message to the instance. This is used to indicate where
-        something might need to be checked but isn't necessarily an error
-        Args:
-            message: The hint text.
-            level: The hint indent level
-            join: A list of values to join and append to the warning
-        """
-        if join:
-            message += ', '.join(join)
-
-        msg = ('hint', message, level)
-        self.messages.append(msg)
-        if self.verbose:
-            self.print_msg(*msg)
-
-    def print_msg(self, kind, msg, level):
-        """
-        Prints a message to the screen
-        Args:
-            kind: The message kind
-            msg: The message text
-            level: The message indent level
-        """
-        print('  ' * level + self.kinds[kind] + ' ' + msg)
-
-    def report(self):
-        """
-        Formats all the messages into a report.
+        Static method to return the logging report stored in the global LOG StringIO
         Returns:
-            A StringIO() instance containing the report text
+            A StringIO containing the logging report.
         """
-        report = StringIO()
-        report.writelines([self.message_header + '\n'])
-        msgs = ['  ' * lv + self.kinds[kn] + msg + '\n' for kn, msg, lv in self.messages]
-        report.writelines(msgs)
-        return report
+        return LOG
 
     # Utility method to update extents
     def update_extent(self, extent, val_type, which):
@@ -351,12 +665,13 @@ class Dataset(object):
         """
 
         # try and get the summary worksheet
-        self.info("Checking Summary worksheet")
-        start_warn = self.n_warnings
+        LOGGER.info("Checking Summary worksheet", extra={'indent_f': 0, 'indent_l': 'r'})
+        start_errors = CH.counters['ERROR']
+
         try:
             worksheet = self.workbook['Summary']
         except KeyError:
-            self.warn("Summary worksheet not found, moving on.")
+            LOGGER.error("Summary worksheet not found, moving on.")
             return None
 
         # load dictionary of summary information block, allowing for multiple
@@ -388,70 +703,70 @@ class Dataset(object):
 
         # don't bail here - try and get as far as possible
         if not found.issuperset(required):
-            self.warn('Missing metadata fields: ', 1, join=required - found)
+            LOGGER.warn('Missing metadata fields: ', extra={'join': required - found})
 
         # # check for contents
         # if any([set(x) == {None} for x in summary.values()]):
-        #     self.warn('Metadata fields with no information.', 1)
+        #     LOGGER.error('Metadata fields with no information.', 1)
 
         # CHECK PROJECT ID
         if 'SAFE Project ID' not in summary:
-            self.warn('SAFE Project ID missing', 1)
+            LOGGER.warn('SAFE Project ID missing')
         elif not isinstance(summary['SAFE Project ID'][0], long):
-            self.warn('SAFE Project ID is not an integer.', 1)
+            LOGGER.warn('SAFE Project ID is not an integer')
         else:
             self.project_id = summary['SAFE Project ID'][0]
 
         # CHECK DATASET TITLE
         if 'Title' not in summary:
-            self.warn('Dataset title row missing', 1)
+            LOGGER.error('Dataset title row missing')
         elif is_blank(summary['Title'][0]):
-            self.warn('Dataset title is blank', 1)
+            LOGGER.error('Dataset title is blank')
         else:
             self.title = summary['Title'][0]
 
         # CHECK DATASET DESCRIPTION
         if 'Description' not in summary:
-            self.warn('Dataset description row missing', 1)
+            LOGGER.error('Dataset description row missing')
         elif is_blank(summary['Description'][0]):
-            self.warn('Dataset description is blank', 1)
+            LOGGER.error('Dataset description is blank')
         else:
             self.description = summary['Description'][0]
 
         # CHECK ACCESS STATUS AND EMBARGO DETAILS
         if 'Access status' not in summary:
-            self.warn('Access status missing', 1)
+            LOGGER.error('Access status missing')
         elif summary['Access status'][0] not in ['Open', 'Embargo']:
-            self.warn('Access status must be Open or Embargo '
-                      'not {}'.format(summary['Access status'][0]), 1)
+            LOGGER.error('Access status must be Open or Embargo '
+                         'not {}'.format(summary['Access status'][0]))
         elif summary['Access status'] == 'Embargo':
             self.access = 'Embargo'
             if 'Embargo date' not in summary:
-                self.warn('Dataset embargoed but embargo date row missing.', 1)
+                LOGGER.error('Dataset embargoed but embargo date row missing.')
             elif is_blank(summary['Embargo'][0]):
-                self.warn('Dataset embargo date  is blank', 1)
+                LOGGER.error('Dataset embargo date  is blank')
             else:
                 embargo_date = summary['Embargo date'][0]
                 now = datetime.datetime.now()
                 if not isinstance(embargo_date, datetime.datetime):
-                    self.warn('Embargo date not formatted as date.', 1)
+                    LOGGER.error('Embargo date not formatted as date.')
                 elif embargo_date < now:
-                    self.warn('Embargo date is in the past.', 1)
+                    LOGGER.error('Embargo date is in the past.')
                 elif embargo_date > now + datetime.timedelta(days=2 * 365):
-                    self.warn('Embargo date more than two years in the future.', 1)
+                    LOGGER.error('Embargo date more than two years in the future.')
                 else:
                     self.embargo_date = embargo_date.date().isoformat()
 
         # CHECK KEYWORDS
         if 'Keywords' not in summary:
-            self.warn('Dataset keywords row missing', 1)
+            LOGGER.error('Dataset keywords row missing')
         elif all([is_blank(kywd) for kywd in summary['Keywords']]):
-            self.warn('No keywords provided', 1)
+            LOGGER.error('No keywords provided')
         else:
             # drop any blanks
             self.keywords = [vl for vl in summary['Keywords'] if not is_blank(vl)]
             if len(self.keywords) == 1 and ',' in self.keywords[0]:
-                self.warn('Put keywords in separate cells, not comma delimited in one cell', 1)
+                LOGGER.error('Put keywords in separate cells, not comma delimited in one cell')
 
         # CHECK FOR PUBLICATION DOIs if any are provided
         if 'Publication DOI' in summary:
@@ -459,7 +774,7 @@ class Dataset(object):
             # check formatting - basically make sure they have a proxy URL
             doi_is_url = [vl.startswith('https://doi.org/') for vl in pub_doi]
             if not all(doi_is_url):
-                self.warn('Please provide publication DOIs as a URL: https://doi.org/...', 1)
+                LOGGER.error('Please provide publication DOIs as a URL: https://doi.org/...')
 
             if validate_doi:
                 for doi, is_doi in zip(pub_doi, doi_is_url):
@@ -467,7 +782,7 @@ class Dataset(object):
                         api_call = 'https://doi.org/api/handles/{}'.format(doi[16:])
                         r = requests.get(api_call)
                         if r.json()['responseCode'] != 1:
-                            self.warn('DOI not found: {}'.format(doi), 1)
+                            LOGGER.error('DOI not found: {}'.format(doi))
 
             self.publication_doi = pub_doi
 
@@ -494,35 +809,37 @@ class Dataset(object):
         # i) Names
         author_names = [unicode(vl) for vl in authors['name'] if vl is not None]
         if len(author_names) < len(authors['name']):
-            self.warn('Missing author names', 1)
+            LOGGER.error('Missing author names')
         if author_names:
             bad_names = [vl for vl in author_names if not RE_NAME.match(vl)]
             if bad_names:
-                self.warn('Author name not formatted as last_name, first_names: ', 1,
-                          join=bad_names, as_repr=True)
+                LOGGER.error('Author name not formatted as last_name, first_names: ',
+                             extra={'join': bad_names, 'quote': True})
 
         # ii) Affiliations (no regex checking)
         blank_affil = [is_blank(vl) for vl in authors['affiliation']]
         if any(blank_affil):
-            self.hint('Missing affiliations - please provide if available', 1)
+            LOGGER.warn('Missing affiliations - please provide if available')
 
         # iii) Email
         author_emails = [unicode(vl) for vl in authors['email'] if vl is not None]
         if len(author_emails) < len(authors['email']):
-            self.hint('Missing author emails - please provide if available', 1)
+            LOGGER.warn('Missing author emails - please provide if available')
         if author_emails:
             bad_emails = [vl for vl in author_emails if not RE_EMAIL.match(vl)]
             if bad_emails:
-                self.warn('Email not properly formatted: ', 1, join=bad_emails, as_repr=True)
+                LOGGER.error('Email not properly formatted: ',
+                             extra={'join': bad_emails, 'quote': True})
 
         # iii) ORCiD (not mandatory)
         author_orcid = [unicode(vl) for vl in authors['orcid'] if vl is not None]
         if len(author_orcid) < len(authors['orcid']):
-            self.hint('Missing ORCiDs, consider adding them!', 1)
+            LOGGER.warn('Missing ORCiDs, consider adding them!')
         if author_orcid:
             bad_orcid = [vl for vl in author_orcid if not RE_ORCID.match(vl)]
             if bad_orcid:
-                self.warn('ORCID not properly formatted: ', 1, join=bad_orcid)
+                LOGGER.error('ORCID not properly formatted: ',
+                             extra={'join': bad_orcid, 'quote': True})
 
         # and finally store as a dictionary per author
         self.authors = [dict(zip(authors.keys(), vals)) for vals in zip(*authors.values())]
@@ -548,22 +865,22 @@ class Dataset(object):
         # i) Names
         ws_names = [vl for vl in data_worksheets['name'] if vl is not None]
         if len(ws_names) < len(data_worksheets['name']):
-            self.warn('Missing worksheet names', 1)
+            LOGGER.error('Missing worksheet names')
         if ws_names:
             bad_names = [vl for vl in ws_names if vl not in self.sheet_names]
             if bad_names:
-                self.warn('Worksheet names not found in workbook: ', 1,
-                          join=bad_names, as_repr=True)
+                LOGGER.error('Worksheet names not found in workbook: ',
+                             extra={'join': bad_names, 'quote': True})
 
         # ii) Titles
         blank_names = [is_blank(vl) for vl in data_worksheets['title']]
         if any(blank_names):
-            self.warn('Missing worksheet title', 1)
+            LOGGER.error('Missing worksheet title')
 
         # ii) Descriptions
         blank_desc = [is_blank(vl) for vl in data_worksheets['description']]
         if any(blank_desc):
-            self.warn('Missing worksheet description', 1)
+            LOGGER.error('Missing worksheet description')
 
         # and finally store a list of dictionaries of data worksheet summary details
         self.dataworksheet_summaries = [dict(zip(data_worksheets.keys(), vals))
@@ -573,14 +890,15 @@ class Dataset(object):
         if 'Worksheet name' in summary:
             expected_sheets = set(data_worksheets['name']) | {'Summary', 'Taxa', 'Locations'}
             if not self.sheet_names.issubset(expected_sheets):
-                self.warn('Undocumented sheets found in  workbook: ', 1,
-                          join=self.sheet_names - expected_sheets)
+                LOGGER.error('Undocumented sheets found in  workbook: ',
+                             extra={'join': self.sheet_names - expected_sheets, 'quote': True})
 
         # summary of processing
-        if (self.n_warnings - start_warn) > 0:
-            self.info('Summary contains {} errors'.format(self.n_warnings - start_warn), 1)
+        n_errors = CH.counters['ERROR'] - start_errors
+        if n_errors > 0:
+            LOGGER.info('Summary contains {} errors'.format(n_errors))
         else:
-            self.info('Summary formatted correctly', 1)
+            LOGGER.info('Summary formatted correctly')
 
     def load_locations(self, locations_json=None):
 
@@ -597,14 +915,16 @@ class Dataset(object):
         """
 
         # try and get the locations worksheet
-        self.info("Checking Locations worksheet")
-        start_warn = self.n_warnings
+        LOGGER.info("Checking Locations worksheet",
+                    extra={'indent_before': 0, 'indent_after': 1})
+        start_errors = CH.counters['ERROR']
+
         try:
             locs_wb = self.workbook['Locations']
         except KeyError:
             # No locations is pretty implausible, but still persevere as if
             # they aren't going to be required
-            self.hint("No locations worksheet found - moving on", 1)
+            LOGGER.warn("No locations worksheet found - moving on")
             return
 
         # GET THE GAZETTEER VALIDATION INFORMATION
@@ -613,7 +933,7 @@ class Dataset(object):
             # If no file is provided then try and get locations from the website service
             loc_get = requests.get('https://www.safeproject.net/call/json/get_locations_bbox')
             if loc_get.status_code != 200:
-                self.warn('Could not download locations. Use a local json file.', 1)
+                LOGGER.error('Could not download locations. Use a local json file.')
             else:
                 loc_payload = loc_get.json()
         else:
@@ -621,7 +941,7 @@ class Dataset(object):
             try:
                 loc_payload = simplejson.load(file(locations_json))
             except IOError:
-                self.warn('Could not load location names from file.', 1)
+                LOGGER.error('Could not load location names from file.')
 
         # process the payload
         if loc_payload is not None:
@@ -642,12 +962,13 @@ class Dataset(object):
         hdrs = [cl.value for cl in loc_rows.next()]
         dupes = duplication([h for h in hdrs if not is_blank(h)])
         if dupes:
-            self.warn('Duplicated location sheet headers: ', 1, join=dupes)
+            LOGGER.error('Duplicated location sheet headers: ',
+                         extra={'join': dupes})
             return
 
         # Check location names are available
         if 'Location name' not in hdrs:
-            self.warn('Location name column not found', 1)
+            LOGGER.error('Location name column not found')
             return
 
         # Convert remaining rows into a list of location dictionaries
@@ -663,8 +984,8 @@ class Dataset(object):
         # check for rogue whitespace
         ws_padded = [rw['Location name'] for rw in locs if is_padded(rw['Location name'])]
         if ws_padded:
-            self.warn('Locations names with whitespace padding: ', 1,
-                      join=ws_padded, as_repr=True)
+            LOGGER.error('Locations names with whitespace padding: ',
+                         extra={'join': ws_padded, 'quote': True})
             # clean whitespace padding
             for row in locs:
                 row['Location name'] = row['Location name'].strip()
@@ -672,7 +993,8 @@ class Dataset(object):
         # look for duplicates
         dupes = duplication([rw['Location name'] for rw in locs])
         if dupes:
-            self.warn('Duplicated location names: ', 1, join=dupes, as_repr=True)
+            LOGGER.error('Duplicated location names: ',
+                         extra={'join': dupes, 'quote': True})
 
         # VALIDATE LOCATIONS
         # Get existing location names and aliases -new location names must not appear
@@ -686,8 +1008,8 @@ class Dataset(object):
             is_new = {rw['New'] for rw in locs}
             valid_new = {'yes', 'no', 'Yes', 'No'}
             if not is_new.issubset(valid_new):
-                self.warn('New field contains values other than Yes and No: ', 1,
-                          join=is_new - valid_new, as_repr=True)
+                LOGGER.error('New field contains values other than Yes and No: ',
+                             extra={'join': is_new - valid_new, 'quote': True})
 
             # extract the new and old locations
             new_locs = [rw for rw in locs if rw['New'].lower() == 'yes']
@@ -697,7 +1019,7 @@ class Dataset(object):
 
         # Process new locations if there are any
         if new_locs:
-            self.hint('{} new locations reported'.format(len(new_locs)), 1)
+            LOGGER.info('{} new locations reported'.format(len(new_locs)))
 
             # check Lat Long and Type, which automatically updates the extents.
             # Unlike a data worksheet field, here we don't have any metadata or want
@@ -706,34 +1028,35 @@ class Dataset(object):
                 lats = [vl['Latitude'] for vl in new_locs if vl['Latitude'] != u'NA']
                 non_blank_lats = [vl for vl in lats if not is_blank(vl)]
                 if len(non_blank_lats) < len(lats):
-                    self.warn('Blank latitude values for new locations: use NA.', 2)
+                    LOGGER.error('Blank latitude values for new locations: use NA.')
                 self.check_field_geo({}, non_blank_lats, which='latitude')
             else:
-                self.warn('New locations reported but Latitude field missing', 2)
+                LOGGER.error('New locations reported but Latitude field missing')
 
             if 'Longitude' in hdrs:
                 longs = [vl['Longitude'] for vl in new_locs if vl['Longitude'] != u'NA']
                 non_blank_longs = [vl for vl in longs if not is_blank(vl)]
                 if len(non_blank_longs) < len(longs):
-                    self.warn('Blank longitude values for new locations: use NA.', 2)
+                    LOGGER.error('Blank longitude values for new locations: use NA.')
                 self.check_field_geo({}, non_blank_longs, which='longitude')
             else:
-                self.warn('New locations reported but Longitude field missing', 2)
+                LOGGER.error('New locations reported but Longitude field missing')
 
             if 'Type' in hdrs:
                 geo_types = {vl['Type'] for vl in new_locs}
                 bad_geo_types = geo_types - {'POINT', 'LINESTRING', 'POLYGON'}
                 if bad_geo_types:
-                    self.warn('Unknown location types: ', 2, join=bad_geo_types, as_repr=True)
+                    LOGGER.error('Unknown location types: ',
+                                 extra={'join': bad_geo_types, 'quote': True})
             else:
-                self.warn('New locations reported but Type field missing', 2)
+                LOGGER.error('New locations reported but Type field missing')
 
             duplicates_existing = [rw['Location name'] for rw in new_locs
                                    if rw['Location name'] in existing_loc_names]
 
             if duplicates_existing:
-                self.warn('New location names duplicate existing names and aliases: ', 2,
-                          join=duplicates_existing)
+                LOGGER.error('New location names duplicate existing names and aliases: ',
+                             extra={'join': duplicates_existing})
 
             # new location names
             new_loc_names = {rw['Location name'] for rw in new_locs}
@@ -742,17 +1065,20 @@ class Dataset(object):
 
         # Process existing locations if there are any
         if locs:
+            LOGGER.info('{} existing locations reported'.format(len(locs)))
+
             # check names exist
             loc_names = {rw['Location name'] for rw in locs}
             unknown = loc_names - existing_loc_names
             if unknown:
-                self.warn('Unknown locations found: ', 1, join=unknown, as_repr=True)
+                LOGGER.error('Unknown locations found: ',
+                             extra={'join': unknown, 'quote': True})
 
             # are aliases being used?
             aliased = loc_names & set(aliases.keys())
             if aliased:
-                self.hint('Locations aliases used. Maybe change to primary location names: ',
-                          1, join=aliased)
+                LOGGER.warn('Locations aliases used. Maybe change to primary location names: ',
+                            extra={'join': aliased})
 
             # Get the bounding box of known locations and aliased locations
             bbox_keys = (loc_names - (unknown | aliased)) | {aliases[ky] for ky in aliased}
@@ -763,248 +1089,19 @@ class Dataset(object):
                 bbox = zip(*bbox)
                 self.update_extent((min(bbox[0]), max(bbox[1])), float, 'longitudinal_extent')
                 self.update_extent((min(bbox[2]), max(bbox[3])), float, 'latitudinal_extent')
+
         else:
             loc_names = set()
 
-        # reporting
-        if (self.n_warnings - start_warn) > 0:
-            self.info('Locations contains {} errors'.format(self.n_warnings - start_warn), 1)
-        else:
-            self.info('{} locations loaded correctly'.format(len(loc_names)), 1)
-
+        # combine locations into set
         self.locations = loc_names | new_loc_names
 
-    @staticmethod
-    def gbif_local_to_index_tuple(row):
-        """
-        Turns a row from the local GBIF database into a tuple for the taxon index
-        Args:
-            row: A row from the GBIF backbone database as a dictionary
-
-        Returns:
-            A 5 tuple: taxon ID, parent ID, name, rank, status
-        """
-
-        if row['parentNameUsageID'] == '':
-            parent = 0
+        # summary of processing
+        n_errors = CH.counters['ERROR'] - start_errors
+        if n_errors > 0:
+            LOGGER.info('Locations contains {} errors'.format(n_errors))
         else:
-            parent = int(row['parentNameUsageID'])
-
-        return [(int(row['taxonID']), parent, row['canonicalName'],
-                row['taxonRank'], row['taxonomicStatus'])]
-
-    def web_gbif_validate(self, tax, rnk, backbone_types):
-
-        """
-        Validates a taxon name and rank against the GBIF web API.
-
-        Note that this function only really uses self as to get a reference to the logging,
-        which could be reimplemented using the standard logging module, and this could then
-        become a simple static method.
-
-        Args:
-            tax: The (case insensitive) taxon name
-            rnk: The taxon rank
-            backbone_types: A list of higher taxon rank names to be added
-                to the index along with the target taxon
-
-        Returns:
-            If successful, a 2-list of lists of index tuples, separating the
-            canonical match for this taxon from the rest of the taxonomic index for it
-                [[(index tuple for canonical taxon)],
-                 [(index tuples for higher taxa + synonym)]]
-            Otherwise, None.
-        """
-
-        # use the GBIF API
-        url_gbif = ("http://api.gbif.org/v1/species/match"
-                    "?name={}&rank={}&strict=true".format(tax, rnk))
-        tax_gbif = requests.get(url_gbif)
-        if tax_gbif.status_code != 200:
-            self.warn('API validation issue for {}'.format(tax))
-            return
-        else:
-            resp = tax_gbif.json()
-
-        # get a set of pairs of rank, parent rank and add a root key
-        backbone_pairs = zip(backbone_types, ['root'] + backbone_types[:-1])
-
-        if resp['matchType'] == u'NONE':
-            # No match found: catch any notes from GBIF for odd cases (such as two equal
-            # matches as in the case of Morus, for example).
-            if 'note' in resp.keys():
-                rnk += ': ' + resp['note']
-            self.warn('No unique match found for {} at rank {}'.format(tax, rnk), 2)
-            return
-        elif resp['status'].lower() == 'doubtful':
-            # We don't accept doubtful names
-            self.warn('Taxon {} is considered doubtful'.format(tax), 2)
-            return
-        elif resp['status'].lower() == 'accepted':
-            self.info('Match found for {} at rank {}'.format(tax, rnk), 2)
-            # populate the index - from the single response we can populate not
-            # only the taxon but also the higher taxa. Before returning, pop the
-            # canonical response off and return that separately from the rest of
-            # the index entries.
-            resp['rootKey'] = 0
-            to_add = {rk: (resp[rk + 'Key'], resp[pr + 'Key'], resp[rk], rk, 'accepted')
-                      for rk, pr in backbone_pairs if rk in resp}
-            canon = [to_add.pop(rnk)]
-            return [canon, to_add.values()]
-        else:
-            # A non-accepted match, so look up the accepted usage to notify the user.
-            # Need to get the taxon level key for this rank, which will be the accepted
-            # usage key
-            acc_key = resp[rnk + 'Key']
-            acc_url = "http://api.gbif.org/v1/species/{}".format(acc_key)
-            tax_acc = requests.get(acc_url)
-            if tax_acc.status_code != 200:
-                self.warn('API validation issue for ID {}'.format(acc_key))
-                return
-            else:
-                accpt = tax_acc.json()
-                tx_tup = (tax, resp['status'].lower(), accpt['canonicalName'])
-                self.hint('{} is considered a {} of {}'.format(*tx_tup), 2)
-
-                # extend the index with full taxonomy from the accepted usage
-                accpt['rootKey'] = 0
-                to_add = {rk: (accpt[rk + 'Key'], accpt[pr + 'Key'], accpt[rk], rk, 'accepted')
-                          for rk, pr in backbone_pairs if rk in accpt}
-                canon = [to_add.pop(rnk)]
-                # and then add the taxon as used in the dataset.
-                parent_key = canon[0][1]
-                to_add['user'] = (resp['usageKey'], parent_key, resp['canonicalName'],
-                                  resp['rank'].lower(), resp['status'].lower())
-                return [canon, to_add.values()]
-
-    def local_gbif_validate(self, tax, rnk, backbone_types):
-        """
-        Validates a taxon name and rank against the local GBIF database. Because the local
-        GBIF database does not contain higher taxon keys in each row, the function returns
-        a list of higher taxa to be looked up later. It could call itself recursively but
-        many of these entries are likely to duplicated in other taxa, so it is more efficient
-        to collate a local set and add the unique entries later.
-
-        Note that this function only really uses self as to get a reference to the logging,
-        which could be reimplemented using the standard logging module, and this would then
-        become a simple method.
-
-        Args:
-            tax: The (case sensitive) taxon name
-            rnk: The taxon rank
-            backbone_types: A list of higher taxon rank names to be added
-                to the index along with the target taxon
-
-        Returns:
-            If successful, a 3-list of lists of tuple indices:
-                 [[(index tuple for canonical taxon)],
-                  [(index tuple non-canon taxon)],
-                  [(tuples for higher taxon lookup)]]
-            Otherwise, None.
-        """
-
-        tax_sql = ("select * from backbone where canonicalName='{}' and "
-                   "taxonRank='{}';".format(tax, rnk.lower()))
-        tax_gbif = self.gbif_conn.execute(tax_sql).fetchall()
-        tax_gbif = [dict(tx) for tx in tax_gbif]
-
-        # Process the hits
-        if len(tax_gbif) == 0:
-            self.warn('No match found for {} at rank {}'.format(tax, rnk), 2)
-            return
-
-        elif len(tax_gbif) == 1:
-            # A single matching canonical name - check status
-            tax_gbif = tax_gbif[0]
-
-            if tax_gbif['taxonomicStatus'] == 'doubtful':
-                # We don't accept doubtful names
-                self.warn('Taxon {} is considered doubtful'.format(tax), 2)
-                return
-
-            elif tax_gbif['taxonomicStatus'] == 'accepted':
-                # accepted taxon
-                self.info('Match found for {} at rank {}'.format(tax, rnk), 2)
-                # store the higher taxa to lookup fully later
-                add_to_higher = [(tax_gbif[hi], hi) for hi in backbone_types
-                                 if hi in tax_gbif and tax_gbif[hi] != u'' and hi != rnk]
-                # return the accepted usage, an empty list since there isn't an unaccepted
-                # usage and the list of higher taxa
-                return [self.gbif_local_to_index_tuple(tax_gbif), [], add_to_higher]
-            else:
-                # synonym or misapplied, so find the accepted usage
-                acc_id = tax_gbif['acceptedNameUsageID']
-                acc_sql = 'select * from backbone where taxonID = {};'.format(acc_id)
-                acc_gbif = self.gbif_conn.execute(acc_sql).fetchall()
-                acc_gbif = dict(acc_gbif[0])
-                tx_tup = (tax_gbif['canonicalName'], tax_gbif['taxonomicStatus'],
-                          acc_gbif['canonicalName'])
-                self.hint('{} is considered a {} of {}'.format(*tx_tup), 2)
-                # store the higher taxa to lookup fully later
-                add_to_higher = [(acc_gbif[hi], hi) for hi in backbone_types
-                                 if hi in acc_gbif and acc_gbif[hi] != u'']
-
-                # return the accepted usage, the actual taxon and higher taxa
-                return [self.gbif_local_to_index_tuple(acc_gbif),
-                        self.gbif_local_to_index_tuple(tax_gbif),
-                        add_to_higher]
-
-        else:
-            # Multiple hits: reduce the set of hits to give something like the preferred
-            # hits reported by GBIF.
-            # First, get the taxon statuses
-            tx_status = [tx['taxonomicStatus'] for tx in tax_gbif]
-            tx_counts = Counter(tx_status)
-
-            if 'accepted' in tx_counts.keys() and tx_counts['accepted'] == 1:
-                # only one accepted match alongside other usages
-                self.info('Match found for {} at rank {}'.format(tax, rnk), 2)
-                # extract that hit
-                tax_gbif = tax_gbif[tx_status.index('accepted')]
-                # store the higher taxa to lookup fully later
-                add_to_higher = [(tax_gbif[hi], hi) for hi in backbone_types
-                                 if hi in tax_gbif and tax_gbif[hi] != u'' and hi != rnk]
-                # return the accepted usage, an empty list since there isn't an unaccepted
-                # usage and the list of higher taxa
-                return [self.gbif_local_to_index_tuple(tax_gbif), [], add_to_higher]
-
-            elif 'accepted' in tx_counts.keys() and tx_counts['accepted'] > 1:
-                # more than one accepted match
-                self.warn('No unique match found for {} at '
-                          'rank {}'.format(tax, rnk), 2)
-                return
-
-            else:
-                # Rows can now contain doubtful (no accepted usage) and then synonyms
-                # (of varying kinds) and misapplied (both of which have accepted usage)
-                tx_acc = {tx['acceptedNameUsageID'] for tx in tax_gbif
-                          if tx['acceptedNameUsageID'] != u''}
-                if set(tx_counts.keys()) == {u'doubtful'}:
-                    # only doubtful records?
-                    self.warn('Taxon {} is considered doubtful'.format(tax), 2)
-                    return
-                elif len(tx_acc) > 1:
-                    # More than one accepted usage
-                    self.warn('Taxon {} is not accepted and can refer to more than one '
-                              'accepted usage.'.format(tax), 2)
-                    return
-                else:
-                    # A single accepted usage - pick the first row to index
-                    tax_gbif = tax_gbif[0]
-                    acc_sql = ('select * from backbone where taxonID '
-                               '= {};'.format(tx_acc.pop()))
-                    acc_gbif = self.gbif_conn.execute(acc_sql).fetchall()
-                    acc_gbif = dict(acc_gbif[0])
-                    tx_tup = (tax, ', '.join(set(tx_status)), acc_gbif['canonicalName'])
-                    self.hint('{} is considered a {} of {}'.format(*tx_tup), 2)
-                    # store the higher taxa to lookup fully later
-                    add_to_higher = [(acc_gbif[hi], hi) for hi in backbone_types
-                                     if hi in acc_gbif and acc_gbif[hi] != u'']
-
-                    # return the accepted usage, the actual taxon and higher taxa
-                    return [self.gbif_local_to_index_tuple(tax_gbif),
-                            self.gbif_local_to_index_tuple(acc_gbif),
-                            add_to_higher]
+            LOGGER.info('{} locations loaded correctly'.format(len(self.locations)))
 
     def load_taxa(self):
 
@@ -1024,14 +1121,16 @@ class Dataset(object):
         """
 
         # try and get the taxon worksheet
-        self.info("Checking Taxa worksheet")
-        start_warn = self.n_warnings
+        LOGGER.info("Checking Taxa worksheet",
+                    extra={'indent_before': 0, 'indent_after': 1})
+        start_errors = CH.counters['ERROR']
+
         try:
             sheet = self.workbook['Taxa']
         except KeyError:
             # This might mean that the study doesn't have any taxa, so return an empty
             # set. If the datasets then contain taxonomic names, it'll fail gracefully.
-            self.hint("No taxa worksheet found - assuming no taxa in data for now!", 1)
+            LOGGER.warn("No taxa worksheet found - assuming no taxa in data for now!")
             return
 
         # A) SANITIZE INPUTS
@@ -1044,7 +1143,8 @@ class Dataset(object):
         # produce really unpredictable bugs, so just stop here.
         dupes = duplication([h for h in hdrs if not is_blank(h)])
         if dupes:
-            self.warn('Duplicated column headers in Taxa worksheet: ', 1, join=dupes)
+            LOGGER.error('Duplicated column headers in Taxa worksheet: ',
+                         extra={'join': dupes})
             return
 
         # Load dictionaries of the taxa
@@ -1055,12 +1155,11 @@ class Dataset(object):
 
         # check number of taxa found and standardise names
         if len(taxa) == 0:
-            self.info('No taxon rows found'.format(len(taxa)), 1)
+            LOGGER.info('No taxon rows found'.format(len(taxa)))
             return
         else:
             # Remove values keyed to None (blank columns),
             # convert keys to lower case and update the list of headers
-            self.info('Checking {} taxa'.format(len(taxa)), 1)
             _ = [tx.pop(None) for tx in taxa if None in tx]
             taxa = [{ky.lower(): vl for ky, vl in tx.iteritems()} for tx in taxa]
             hdrs = taxa[0].keys()
@@ -1069,14 +1168,14 @@ class Dataset(object):
         for idx, tx in enumerate(taxa):
             for ky, vl in tx.iteritems():
                 if is_padded(vl):
-                    self.warn('Whitespace padding for {} in row {}:'
-                              ' {}'.format(ky, idx + 2, repr(vl)), 2)
+                    LOGGER.error('Whitespace padding for {} in row {}:'
+                                 ' {}'.format(ky, idx + 2, repr(vl)))
                     tx[ky] = vl.strip()
 
         # check which fields are found
         if 'taxon name' not in hdrs:
             # taxon names are not found so can't continue
-            self.warn('No taxon name column found - no further checking', 1)
+            LOGGER.error('No taxon name column found - no further checking')
             self.taxon_names = set()
             return
         else:
@@ -1086,15 +1185,15 @@ class Dataset(object):
             # Any duplication in cleaned names
             dupes = duplication(taxon_names)
             if dupes:
-                self.warn('Duplicated taxon names found: ', 2, join=dupes)
+                LOGGER.error('Duplicated taxon names found: ', extra={'join': dupes})
 
             # set the unique taxon names for the dataset instance
             self.taxon_names = set(taxon_names)
 
             # check to see if the validation headers are present
             if 'scientific name' not in hdrs or 'taxon type' not in hdrs:
-                self.warn('Both taxon type and scientific name columns required '
-                          'for taxon verification', 2)
+                LOGGER.error('Both taxon type and scientific name columns required '
+                             'for taxon verification')
                 return
 
         # B) VALIDATE TAXONOMY
@@ -1103,8 +1202,7 @@ class Dataset(object):
         # the validation process
 
         # taxon and parent types that can be checked against gbif
-        backbone_types = ['kingdom', 'phylum', 'order', 'class',
-                          'family', 'genus', 'species', 'subspecies']
+        backbone_types = BACKBONE_TYPES
         # alternative types that are allowed as taxon type, but which need a parent
         alt_types = ['morphospecies', 'functional group']
 
@@ -1114,6 +1212,8 @@ class Dataset(object):
         # entries are added after checking all rows.
         local_higher_taxa = set()
         unvalidated = set()
+        LOGGER.info('Validating {} taxa'.format(len(taxa)),
+                    extra={'indent_after': 2})
 
         for idx, tx in enumerate(taxa):
 
@@ -1128,29 +1228,29 @@ class Dataset(object):
             if is_blank(tx['taxon name']) or is_blank(tx['scientific name']) \
                     or is_blank(tx['taxon type']):
                 # - mandatory three entries cannot be blank
-                self.warn('Row {}: blank taxon name, scientific name or '
-                          'taxon type'.format(idx + 2), 2)
+                LOGGER.error('Row {}: blank taxon name, scientific name or '
+                             'taxon type'.format(idx + 2))
                 continue
             elif (not is_blank(tx['parent type'])) ^ (not is_blank(tx['parent name'])):
                 # Logical XOR: incomplete parent taxon information
-                self.warn('Incomplete parent taxon information provided for {taxon type}: '
-                          '{taxon name}'.format(**tx), 2)
+                LOGGER.error('Incomplete parent taxon information provided for {taxon type}: '
+                             '{taxon name}'.format(**tx))
                 continue
             elif tx['taxon type'] in alt_types and \
                     (is_blank(tx['parent name']) or is_blank(tx['parent type'])):
                 # No parent taxon info is unacceptable for morphospecies and functional groups
-                self.warn('Parent taxon information must be provided for {taxon type}: '
-                          '{taxon name}'.format(**tx), 2)
+                LOGGER.error('Parent taxon information must be provided for {taxon type}: '
+                             '{taxon name}'.format(**tx))
                 continue
 
             # Are the taxon and parent ranks to be validated one of the big seven
             # that the GBIF backbone provided or a valid alternative in the case of taxon type?
             if tx['parent type'] is None and tx['taxon type'] not in backbone_types + alt_types:
-                self.warn('Taxon type {} is not recognized'.format(tx['taxon type']), 2)
+                LOGGER.error('Taxon type {} is not recognized'.format(tx['taxon type']))
                 continue
 
             if tx['parent type'] is not None and tx['parent type'] not in backbone_types:
-                self.warn('Parent type {} is not recognized'.format(tx['parent type']), 2)
+                LOGGER.error('Parent type {} is not recognized'.format(tx['parent type']))
                 continue
 
             # The taxon input is now sanitized of obvious problems so can be validated against
@@ -1168,12 +1268,13 @@ class Dataset(object):
                 add_taxon = True
 
             if self.gbif_conn is None:
-                new_index = self.web_gbif_validate(tx_name, tx_rank, backbone_types)
+                new_index = web_gbif_validate(tx_name, tx_rank, backbone_types)
                 if new_index is not None:
                     # add the canonical taxon and other ranks to the index
                     self.taxon_index.update(new_index[0] + new_index[1])
             else:
-                new_index = self.local_gbif_validate(tx_name, tx_rank, backbone_types)
+                new_index = local_gbif_validate(self.gbif_conn, tx_name, tx_rank,
+                                                backbone_types)
                 if new_index is not None:
                     self.taxon_index.update(new_index[0] + new_index[1])
                     local_higher_taxa.update(new_index[2])
@@ -1192,19 +1293,25 @@ class Dataset(object):
 
         # Look up anything added to the local higher taxon set
         if self.gbif_conn:
-            self.info('Adding higher taxa from local database', 1)
+            LOGGER.info('Adding higher taxa from local database',
+                        extra={'indent_before': 1, 'indent_after': 2})
             for tax, rnk in local_higher_taxa:
-                new_index = self.local_gbif_validate(tax, rnk, backbone_types)
+                new_index = local_gbif_validate(self.gbif_conn, tax, rnk, backbone_types)
                 self.taxon_index.update(new_index[0])
 
         # report on unvalidated taxa
         if unvalidated:
-            self.warn('Entrez taxon validation failed for: ', 1, join=unvalidated)
+            LOGGER.error('GBIF taxon validation failed for: ',
+                         extra={'join': unvalidated})
 
-        if (self.n_warnings - start_warn) > 0:
-            self.info('Taxa contains {} errors'.format(self.n_warnings - start_warn), 1)
+        # summary of processing
+        n_errors = CH.counters['ERROR'] - start_errors
+        if n_errors > 0:
+            LOGGER.info('Taxa contains {} errors'.format(n_errors),
+                        extra={'indent_before': 1})
         else:
-            self.info('{} taxa loaded correctly'.format(len(taxa)), 1)
+            LOGGER.info('{} taxa loaded correctly'.format(len(self.taxon_names)),
+                        extra={'indent_before': 1})
 
     def load_data_worksheet(self, meta):
 
@@ -1221,14 +1328,17 @@ class Dataset(object):
 
         # now start populating with data
         if meta['name'] not in self.sheet_names:
-            self.warn('Data worksheet {} not found'.format(meta['name']))
+            LOGGER.error('Data worksheet {} not found'.format(meta['name']),
+                         extra = {'indent_before': 0, 'indent_after': 1})
             return
-        else:
-            self.info('Checking data worksheet {}'.format(meta['name']))
-            # Create a dataworksheet to store details: basically
-            # just a dictionary with dot notation and defaults.
-            dwsh = DataWorksheet(meta)
-            start_warn = self.n_warnings
+
+        LOGGER.info('Checking data worksheet {}'.format(meta['name']),
+                    extra={'indent_before': 0, 'indent_after': 1})
+
+        # Create a dataworksheet to store details: basically
+        # just a dictionary with dot notation and defaults.
+        dwsh = DataWorksheet(meta)
+        start_errors = CH.counters['ERROR']
 
         # get the worksheet and data dimensions
         worksheet = self.workbook[dwsh.name]
@@ -1237,7 +1347,7 @@ class Dataset(object):
 
         # trap completely empty worksheets
         if dwsh.max_row == 1:
-            self.warn('Worksheet is empty', 1)
+            LOGGER.error('Worksheet is empty')
             return
 
         # get the metadata field names
@@ -1249,7 +1359,7 @@ class Dataset(object):
             dwsh.field_name_row = descriptors.index('field_name') + 1
             dwsh.descriptors = descriptors[:dwsh.field_name_row]
         else:
-            self.warn('Cannot parse data: field_name row not found', 1)
+            LOGGER.error('Cannot parse data: field_name row not found')
             return
 
         # Neither of the row and col maxima are particularly reliable as Excel can hang on to
@@ -1270,18 +1380,19 @@ class Dataset(object):
         # now check the row numbers are numbers and if they are
         # do they start at one and go up by one
         if not all([isinstance(vl, numbers.Number) for vl in row_numbers]):
-            self.warn('Non-numeric data found in row numbering', 1)
+            LOGGER.error('Non-numeric data found in row numbering')
         else:
             if row_numbers[0] != 1:
-                self.warn('Row numbering does not start at 1', 1)
+                LOGGER.error('Row numbering does not start at 1')
 
             one_increment = [(vl1 - vl2) == 1 for vl1, vl2 in
                              zip(row_numbers[1:], row_numbers[:-1])]
             if not all(one_increment):
-                self.warn('Row numbering does not consistently increment by 1', 1)
+                LOGGER.error('Row numbering does not consistently increment by 1')
 
         # report on detected size
-        self.info('Worksheet contains {} rows and {} columns'.format(dwsh.max_row, dwsh.max_col), 1)
+        LOGGER.info('Worksheet contains {} rows and {} columns'.format(dwsh.max_row, dwsh.max_col),
+                    extra={'indent_after': 2})
 
         # get the rows of metadata
         metadata = worksheet.get_squared_range(2, 1, dwsh.max_col, dwsh.field_name_row)
@@ -1303,7 +1414,7 @@ class Dataset(object):
         field_names = [fld['field_name'] for fld in metadata if fld['field_name'] is not None]
         dupes = duplication(field_names)
         if dupes:
-            self.warn('Field names duplicated: ', 1, join=dupes)
+            LOGGER.error('Field names duplicated: ', extra={'join': dupes})
 
         # get taxa field names for cross checking observation and trait data
         dwsh.taxa_fields = [fld['field_name'] for fld in metadata if fld['field_type'] == 'Taxa']
@@ -1321,10 +1432,13 @@ class Dataset(object):
         self.dataworksheets.append(dwsh)
 
         # reporting
-        if (self.n_warnings - start_warn) > 0:
-            self.info('Dataframe contains {} errors'.format(self.n_warnings - start_warn), 1)
+        n_errors = start_errors - CH.counters['ERROR']
+        if n_errors > 0:
+            LOGGER.info('Dataframe contains {} errors'.format(n_errors),
+                        extra={'indent_before': 1})
         else:
-            self.info('Dataframe formatted correctly', 1)
+            LOGGER.info('Dataframe formatted correctly',
+                        extra={'indent_before': 1})
 
     def check_field(self, dwsh, meta, data):
         """
@@ -1342,27 +1456,28 @@ class Dataset(object):
 
         # Print out column checking header
         if is_blank(meta['field_name']):
-            self.info('Checking Column {}'.format(meta['column']), 1)
+            LOGGER.info('Checking Column {}'.format(meta['column']))
         else:
-            self.info('Checking field {field_name}'.format(**meta), 1)
+            LOGGER.info('Checking field {field_name}'.format(**meta))
 
         # Skip any field with no user provided metadata or data
         blank_data = [is_blank(vl) for vl in data]
         blank_meta = [is_blank(vl) for ky, vl in meta.iteritems()
                       if ky not in ['col_idx', 'column']]
         if all(blank_data) and all(blank_meta):
+            LOGGER.info('Blank column loaded - safe to ignore')
             return
         elif all(blank_meta):
-            self.warn('Field contains no descriptor information but does contain values', 2)
+            LOGGER.error('Field contains no descriptor information but does contain values')
             return
 
         # try and figure out what else is available
         if is_blank(meta['field_name']):
-            self.warn('Field name is blank', 2)
+            LOGGER.error('Field name is blank')
 
         # check the description
         if is_blank(meta['description']):
-            self.warn('Description is missing', 2)
+            LOGGER.error('Description is missing')
 
         # filter out missing and blank data, except for comments fields, where
         # blanks are not an error
@@ -1371,12 +1486,12 @@ class Dataset(object):
             # Only NA is acceptable
             na_vals = [vl == u'NA' for vl in data]
             if any(na_vals):
-                self.hint('{} / {} values missing'.format(sum(na_vals), len(na_vals)), 2)
+                LOGGER.warn('{} / {} values missing'.format(sum(na_vals), len(na_vals)))
 
             # We won't tolerate blank data
             if any(blank_data):
-                self.warn('{} cells are blank or contain only whitespace '
-                          'text'.format(sum(blank_data)), 2)
+                LOGGER.error('{} cells are blank or contain only whitespace '
+                             'text'.format(sum(blank_data)))
 
             # Return the values that aren't NA, blank or whitespace only
             na_or_blank = [any(tst) for tst in zip(na_vals, blank_data)]
@@ -1417,15 +1532,16 @@ class Dataset(object):
         elif meta['field_type'] == 'Comments':
             pass
         elif meta['field_type'] is None:
-            self.warn('Field type is empty', 2)
+            LOGGER.error('Field type is empty')
         else:
-            self.warn('Unknown field type {field_type}'.format(**meta), 1)
+            LOGGER.error('Unknown field type {field_type}'.format(**meta))
 
         # extend the dataworksheet fields
         dwsh.fields.append(meta)
 
     # Helper functions for checking data fields
-    def _check_meta(self, meta, descriptor):
+    @staticmethod
+    def _check_meta(meta, descriptor):
         """
         A standardised check to see if a required descriptor is present for
         a field and that it isn't simply empty or whitespace. The function
@@ -1442,10 +1558,10 @@ class Dataset(object):
         """
 
         if descriptor not in meta:
-            self.warn('{} descriptor missing'.format(descriptor), 2)
+            LOGGER.error('{} descriptor missing'.format(descriptor))
             return False
         elif is_blank(meta[descriptor]):
-            self.warn('{} descriptor is blank'.format(descriptor), 2)
+            LOGGER.error('{} descriptor is blank'.format(descriptor))
             return False
         else:
             return True
@@ -1473,16 +1589,16 @@ class Dataset(object):
         tx_fd_prov = ('taxon_field' in meta) and (not is_blank(meta['taxon_field']))
 
         if tx_nm_prov and tx_fd_prov:
-            self.warn('Taxon name and taxon field both provided, use one only', 2)
+            LOGGER.error('Taxon name and taxon field both provided, use one only')
             return False
         elif tx_nm_prov and meta['taxon_name'] not in self.taxon_names:
-            self.warn('Taxon name not found in the Taxa worksheet', 2)
+            LOGGER.error('Taxon name not found in the Taxa worksheet')
             return False
         elif tx_fd_prov and meta['taxon_field'] not in taxa_fields:
-            self.warn("Taxon field not found in this worksheet", 2)
+            LOGGER.error("Taxon field not found in this worksheet")
             return False
         elif not tx_nm_prov and not tx_fd_prov:
-            self.warn("One of taxon name or taxon field must be provided", 2)
+            LOGGER.error("One of taxon name or taxon field must be provided")
             return False
         else:
             if tx_nm_prov:
@@ -1513,17 +1629,17 @@ class Dataset(object):
         iact_fd_prov = ('interaction_field' in meta) and (not is_blank(meta['interaction_field']))
 
         if not iact_nm_prov and not iact_fd_prov:
-            self.warn("At least one of interaction name or interaction field must be provided", 2)
+            LOGGER.error("At least one of interaction name or interaction field must be provided")
             return False
         else:
             if iact_nm_prov:
                 # get the taxon names and descriptions from interaction name providers
-                int_nm_lab, int_nm_desc = self._parse_levels(meta['interaction_name'], 2)
+                int_nm_lab, int_nm_desc = self._parse_levels(meta['interaction_name'])
                 # add names to used taxa
                 self.taxon_names_used.update(int_nm_lab)
                 # check they are found
                 if not all([lab in self.taxon_names for lab in int_nm_lab]):
-                    self.warn('Unknown taxa in interaction_name descriptor', 2)
+                    LOGGER.error('Unknown taxa in interaction_name descriptor')
                     nm_check = False
                 else:
 
@@ -1534,9 +1650,9 @@ class Dataset(object):
 
             if iact_fd_prov:
                 # check any field labels match to known taxon fields
-                int_fd_lab, int_fd_desc = self._parse_levels(meta['interaction_field'], 2)
+                int_fd_lab, int_fd_desc = self._parse_levels(meta['interaction_field'])
                 if not all([lab in taxa_fields for lab in int_fd_lab]):
-                    self.warn('Unknown taxon fields in interaction_field descriptor', 2)
+                    LOGGER.error('Unknown taxon fields in interaction_field descriptor')
                     fd_check = False
                 else:
                     fd_check = True
@@ -1545,7 +1661,7 @@ class Dataset(object):
                 fd_check = True
 
             if len(int_nm_lab + int_fd_lab) < 2:
-                self.warn('At least two interacting taxon labels or fields must be identified', 2)
+                LOGGER.error('At least two interacting taxon labels or fields must be identified')
                 num_check = False
             else:
                 num_check = True
@@ -1555,13 +1671,13 @@ class Dataset(object):
             else:
                 return False
 
-    def _parse_levels(self, txt, warn_level=1):
+    @staticmethod
+    def _parse_levels(txt):
         """
         Splits up category information formatted as label:desc;label:desc, which
         is used in both levels for categorical data and interaction descriptors.
         Args:
             txt: The text string to parse
-            warn_level: The indent level for any warnings issued
 
         Returns:
             A list of two tuples of label and descriptions.
@@ -1578,7 +1694,7 @@ class Dataset(object):
 
         # simple formatting checks
         if any([pt > 2 for pt in n_parts]):
-            self.warn('Extra colons in level description.', warn_level)
+            LOGGER.error('Extra colons in level description.')
 
         # standardise descriptions
         if all([pt == 1 for pt in n_parts]):
@@ -1586,7 +1702,7 @@ class Dataset(object):
         elif all([pt == 2 for pt in n_parts]):
             pass
         else:
-            self.warn('Provide descriptions for either all or none of the categories', warn_level)
+            LOGGER.error('Provide descriptions for either all or none of the categories')
             parts = [pt[0:2] if len(pt) >= 2 else [pt[0], None] for pt in parts]
 
         return zip(*parts)
@@ -1608,16 +1724,16 @@ class Dataset(object):
         # Check type (excluding NA values)
         is_datetime = [isinstance(dt, datetime.datetime) for dt in data]
         if not all(is_datetime):
-            self.warn('Non-date data in field.', 2)
+            LOGGER.error('Non-date data in field.')
             is_time = [isinstance(dt, datetime.time) for dt in data]
             if any(is_time):
-                self.hint('Some values _only_  contain time components', 2)
+                LOGGER.warn('Some values _only_  contain time components')
 
         # Check no time component in actual dates
         if which == 'date':
             no_time = [vl.time() == datetime.time(0, 0) for vl in data]
             if not all(no_time):
-                self.warn('Some values also contain time components', 2)
+                LOGGER.error('Some values also contain time components')
 
         # update the field metadata and the dataset extent
         real_dates = [dt for dt in data if isinstance(dt, datetime.datetime)]
@@ -1639,7 +1755,7 @@ class Dataset(object):
         # Check type (excluding NA values)
         type_check = set([type(vl) for vl in data])
         if type_check != {datetime.time}:
-            self.warn('Non-time formatted data found.', 2)
+            LOGGER.error('Non-time formatted data found.')
 
         # update the field metadata
         real_times = [dt for dt in data if isinstance(dt, datetime.time)]
@@ -1657,10 +1773,10 @@ class Dataset(object):
 
         found = set(data)
         if self.taxon_names == set():
-            self.warn('No taxa loaded', 2)
+            LOGGER.error('No taxa loaded', 2)
         if not found.issubset(self.taxon_names):
-            self.warn('Includes taxa missing from Taxa worksheet: ', 2,
-                      join=found - self.taxon_names, as_repr=True)
+            LOGGER.error('Includes taxa missing from Taxa worksheet: ',
+                         extra={'join': found - self.taxon_names, 'quote': True})
 
         # add the found taxa to the list of taxa used
         self.taxon_names_used.update(found)
@@ -1681,10 +1797,10 @@ class Dataset(object):
         # check if locations are all provided
         found = set(data)
         if self.locations == set():
-            self.warn('No locations loaded', 2)
+            LOGGER.error('No locations loaded')
         elif not found.issubset(self.locations):
-            self.warn('Includes locations missing from Locations worksheet:', 2,
-                      join=found - self.locations, as_repr=True)
+            LOGGER.error('Includes locations missing from Locations worksheet:',
+                         extra={'join': found - self.taxon_names, 'quote': True})
 
         # add the locations to the set of locations used
         self.locations_used.update(found)
@@ -1708,7 +1824,7 @@ class Dataset(object):
         # We're not going to insist on integers here - could be mean counts.
         all_nums, nums = all_numeric(data)
         if not all_nums:
-            self.warn('Field contains non-numeric data', 2)
+            LOGGER.error('Field contains non-numeric data')
 
         # update the field metadata
         meta['range'] = (min(nums), max(nums))
@@ -1731,19 +1847,19 @@ class Dataset(object):
             pass
         elif ct_ok and not isinstance(meta['levels'], unicode):
             # Can't really check anything here either
-            self.warn('Category description does not seem to be text', 2)
+            LOGGER.error('Category description does not seem to be text')
         else:
             # Now we can test if the labels match up
-            level_labels, level_desc = self._parse_levels(meta['levels'], 2)
+            level_labels, level_desc = self._parse_levels(meta['levels'])
 
             # - repeated labels?
             if len(set(level_labels)) < len(level_labels):
-                self.warn('Repeated level labels', 2)
+                LOGGER.error('Repeated level labels')
 
             # - check for integer level names
             integer_codes = [is_integer_string(vl) for vl in level_labels]
             if any(integer_codes):
-                self.warn('Integer level names not permitted', 2)
+                LOGGER.error('Integer level names not permitted')
 
             # Now look for consistency: get the unique values reported in the
             # data, convert to unicode to handle checking of integer labels and
@@ -1752,8 +1868,8 @@ class Dataset(object):
             reported = {unicode(lv) for lv in reported}
 
             if not reported.issubset(level_labels):
-                self.warn('Categories found in data missing from '
-                          'description: ', 2, join=reported - set(level_labels))
+                LOGGER.error('Categories found in data missing from description: ',
+                             extra={'join': reported - set(level_labels)})
 
     def check_field_numeric(self, meta, data):
 
@@ -1773,7 +1889,7 @@ class Dataset(object):
         # data is all numeric, as it claims to be.
         all_nums, nums = all_numeric(data)
         if not all_nums:
-            self.warn('Field contains non-numeric data', 2)
+            LOGGER.error('Field contains non-numeric data')
 
         # update the field metadata
         meta['range'] = (min(nums), max(nums))
@@ -1839,9 +1955,9 @@ class Dataset(object):
         # Are the values represented as decimal degrees - numeric.
         all_nums, nums = all_numeric(data)
         if not all_nums:
-            self.warn('Non numeric data found', 2)
+            LOGGER.error('Non numeric data found')
             if any([RE_DMS.search(unicode(vl)) for vl in data]):
-                self.hint('Possible degrees minutes and seconds formatting? Use decimal degrees', 2)
+                LOGGER.warn('Possible degrees minutes and seconds formatting? Use decimal degrees')
 
         # Check the locations
         if len(nums):
@@ -1858,11 +1974,11 @@ class Dataset(object):
             out_of_borneo = bnds[0] <= min_geo < bnds[1] or bnds[2] < max_geo <= bnds[3]
 
             if out_of_bounds:
-                self.warn('{0} values not in valid range[{1[0]}, {1[3]}]: '
-                          '{2}'.format(which.capitalize(), bnds, extent), 2)
+                LOGGER.error('{0} values not in valid range[{1[0]}, {1[3]}]: '
+                             '{2}'.format(which.capitalize(), bnds, extent))
             elif out_of_borneo:
-                self.hint('{0} values not in Borneo [{1[1]}, {1[2]}]: '
-                          '{2}'.format(which.capitalize(), bnds, extent), 2)
+                LOGGER.warn('{0} values not in Borneo [{1[1]}, {1[2]}]: '
+                            '{2}'.format(which.capitalize(), bnds, extent))
 
             # update the field metadata and the dataset extent
             meta['range'] = extent
@@ -1870,26 +1986,39 @@ class Dataset(object):
             which_extent = {'latitude': 'latitudinal_extent', 'longitude': 'longitudinal_extent'}
             self.update_extent(extent, float, which_extent[which])
 
-    def check_locations_and_taxa_used(self):
+    def final_checks(self):
         """
-        A method to check that the locations and taxa provided have actually been used
-        in the data worksheets scanned.
+        A method to run final checks:
+        i)  The locations and taxa provided have been used in the data worksheets scanned.
+        ii) Report the total number of errors and warnings
         """
-        self.info('Checking provided locations and taxa all used in data worksheets')
-
+        LOGGER.info('Checking provided locations and taxa all used in data worksheets',
+                    extra={'indent_before': 0, 'indent_after': 1})
         # check locations
         if self.locations_used != self.locations:
-            self.warn('Provided locations not used: ', 1,
-                      join=self.locations - self.locations_used)
+            LOGGER.error('Provided locations not used: ',
+                         extra={'join': self.locations - self.locations_used})
         else:
-            self.info('Provided locations all used in datasets', 1)
+            LOGGER.info('Provided locations all used in datasets')
 
         # check taxa
         if self.taxon_names_used != self.taxon_names:
-            self.warn('Provided taxa  not used: ', 1,
-                      join=self.taxon_names - self.taxon_names_used)
+            LOGGER.error('Provided taxa  not used: ',
+                         extra={'join': self.taxon_names - self.taxon_names_used})
         else:
-            self.info('Provided taxa all used in datasets', 1)
+            LOGGER.info('Provided taxa all used in datasets')
+
+        if CH.counters['ERROR'] > 0:
+            LOGGER.info('FAIL: file contained {} errors'.format(CH.counters['ERROR']),
+                        extra={'indent_before': 0})
+        else:
+            if CH.counters['WARNING'] > 0:
+                LOGGER.info('PASS: file formatted correctly but with {} '
+                            'warnings.'.format(CH.counters['WARNING']),
+                            extra={'indent_before': 0})
+            else:
+                LOGGER.info('PASS: file formatted correctly with no warnings',
+                            extra={'indent_before': 0})
 
     def export_metadata_dict(self):
         """
@@ -1913,7 +2042,11 @@ class Dataset(object):
         return components
 
 
-# High level functions
+"""
+Higher level functions
+"""
+
+
 def check_file(fname, verbose=True, gbif_database=None, locations_json=None, validate_doi=False):
 
     """
@@ -1944,15 +2077,9 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
         for ws in dataset.dataworksheet_summaries:
             dataset.load_data_worksheet(ws)
     else:
-        dataset.warn('No data worksheets found')
+        LOGGER.error('No data worksheets found')
 
-    # finally check if the provide locations and taxa are all used
-    dataset.check_locations_and_taxa_used()
-
-    if dataset.n_warnings:
-        dataset.info('FAIL: file contained {} errors'.format(dataset.n_warnings))
-    else:
-        dataset.info('PASS: file formatted correctly')
+    dataset.final_checks()
 
     return dataset
 
@@ -1995,6 +2122,7 @@ def main():
 
     check_file(fname=args.fname, verbose=True, locations_json=args.locations_json,
                gbif_database=args.gbif_database, validate_doi=args.validate_doi)
+
 
 if __name__ == "__main__":
     main()
