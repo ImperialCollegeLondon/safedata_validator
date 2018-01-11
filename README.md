@@ -243,6 +243,7 @@ We want three things from validation:
 
   The `parent_taxon_level_analysis.R` file in this repository contains
   some code to check this:
+  
   * All **accepted taxa** map to a more nested parent but 5%  map to a
   more nested parent more than one step up the hierarchy. The table
   below shows child taxon level as rows and parent taxon level as
@@ -355,7 +356,7 @@ When GBIF returns a synonym, there is more to be done. The JSON data
 from the `species/match` endpoint contains the `usageKey` for the search
 name. That _probably_ means that the highest taxon key provided is the
 accepted taxon and the next highest is the parent. However, the program
-currently checks this using the `species\{usageKey}` endpoint, which
+currently checks this using the `species/{usageKey}` endpoint, which
 explictly contains an `acceptedKey` and a `parentKey` which ought to
 match the previous information. For example:
 
