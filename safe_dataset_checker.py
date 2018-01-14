@@ -1279,7 +1279,7 @@ class Dataset(object):
                     self.taxon_index.update(new_index[0] + new_index[1])
                     local_higher_taxa.update(new_index[2])
 
-            if add_taxon:
+            if add_taxon and new_index is not None:
                 # For taxa that have been validated via a parent, add a name used in the file
                 # and insert the validated parent taxon ID.
                 # For non taxon groups (alt_types), insert the taxon name, otherwise use the
@@ -1371,11 +1371,9 @@ class Dataset(object):
         row_number_cells = worksheet.get_squared_range(1, dwsh.field_name_row + 1, 1, dwsh.max_row)
         row_numbers = [cl[0].value for cl in row_number_cells]
 
-        # - trim blank or whitespace values from the end and update the max row
+        # - trim blank or whitespace values from the end
         while is_blank(row_numbers[-1]):
             row_numbers.pop()
-
-        dwsh.max_row = len(row_numbers) + dwsh.field_name_row
 
         # now check the row numbers are numbers and if they are
         # do they start at one and go up by one
@@ -1390,7 +1388,18 @@ class Dataset(object):
             if not all(one_increment):
                 LOGGER.error('Row numbering does not consistently increment by 1')
 
+        # Test for data with no row number
+        data_end = len(row_numbers) + dwsh.field_name_row
+        if data_end < dwsh.max_row:
+            allegedly_blank  = worksheet.get_squared_range(1, data_end + 1,
+                                                           dwsh.max_col, dwsh.max_row)
+            not_blank = [not is_blank(cell.value) for row in allegedly_blank for cell in row]
+            if any(not_blank):
+                LOGGER.error('Data extends beyond row numbering')
+
         # report on detected size
+        dwsh.max_row = data_end
+        dwsh.n_data_row = len(row_numbers)
         LOGGER.info('Worksheet contains {} rows and {} columns'.format(dwsh.max_row, dwsh.max_col),
                     extra={'indent_after': 2})
 
