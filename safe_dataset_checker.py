@@ -1731,12 +1731,16 @@ class Dataset(object):
         """
 
         # Check type (excluding NA values)
-        is_datetime = [isinstance(dt, datetime.datetime) for dt in data]
-        if not all(is_datetime):
-            LOGGER.error('Non-date data in field.')
-            is_time = [isinstance(dt, datetime.time) for dt in data]
-            if any(is_time):
-                LOGGER.warn('Some values _only_  contain time components')
+        bad = [dt for dt in data if not isinstance(dt, (datetime.datetime, datetime.time))]
+        if len(bad):
+            LOGGER.error('Data in field not formatted as date. Note that text can look'
+                         '_exactly_ like a date: ', extra={'join': bad})
+
+        is_time = [isinstance(dt, datetime.time) for dt in data]
+        if any(is_time):
+            LOGGER.warn('Some values _only_  contain time components')
+
+        data = [dt for dt in data if isinstance(dt, datetime.datetime)]
 
         # Check no time component in actual dates
         if which == 'date':
@@ -1745,8 +1749,7 @@ class Dataset(object):
                 LOGGER.error('Some values also contain time components')
 
         # update the field metadata and the dataset extent
-        real_dates = [dt for dt in data if isinstance(dt, datetime.datetime)]
-        extent = (min(real_dates), max(real_dates))
+        extent = (min(data), max(data))
         meta['range'] = extent
         self.update_extent(extent, datetime.datetime, 'temporal_extent')
 
