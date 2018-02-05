@@ -97,6 +97,9 @@ class IndentFormatter(logging.Formatter):
         if hasattr(rec, 'indent_before'):
             self.depth = int(rec.indent_before)
 
+        # store so users don't have to provide both
+        rec.indent_before = self.depth
+
         rec.indent = '    ' * self.depth
         # encode level
         codes = {'DEBUG': '>', 'INFO': '-', 'WARNING': '?', 'ERROR': '!', 'CRITICAL': '*'}
@@ -115,6 +118,9 @@ class IndentFormatter(logging.Formatter):
         # adjust indent after
         if hasattr(rec, 'indent_after'):
             self.depth = int(rec.indent_after)
+
+        # store so users don't have to provide both
+        rec.indent_after = self.depth
 
         return msg
 
@@ -230,11 +236,12 @@ def web_gbif_validate(tax, rnk, backbone_types=BACKBONE_TYPES):
             in rank order from root to tip.
 
     Returns:
-        If successful, a 2-list of lists of index tuples, separating the
-        canonical match for this taxon from the rest of the taxonomic index for it
-            [[(index tuple for canonical taxon)],
-             [(index tuples for higher taxa + synonym)]]
-        Otherwise, None.
+        A 2 tuple: the first entry indicates the status of the lookup and the second is
+        either None when there is no match or a doubtful match or  a three list of index
+        entries with the following structure:
+            i) index tuple for the original lookup
+            ii) index tuple for the canonical usage, which might be the same
+            iii) a list of index tuples for the taxonomic hierarchy.
     """
 
     # function to walk back up the taxonomy
@@ -271,8 +278,8 @@ def web_gbif_validate(tax, rnk, backbone_types=BACKBONE_TYPES):
                          if tp in json.keys() and tp != rnk_walk]
             next_rank = backbone_types[max(rnk_found)]
             # link that in
-            idx_tuples[rnk_walk] = (json['usageKey'], json[next_rank + 'Key'],
-                                    json[rnk_walk], rnk_walk, 'accepted')
+            idx_tuples[rnk_walk] = (json[rnk_walk], rnk_walk, 'accepted',
+                                    json['usageKey'], json[next_rank + 'Key'])
             # remove the rank we've just handled
             json['usageKey'] = json[next_rank + 'Key']
             json.pop(rnk_walk)
@@ -287,8 +294,7 @@ def web_gbif_validate(tax, rnk, backbone_types=BACKBONE_TYPES):
     tax_gbif = requests.get(url_gbif)
 
     if tax_gbif.status_code != 200:
-        LOGGER.error('API validation issue for {}'.format(tax))
-        return
+        return 'validation_fail', None
     else:
         resp = tax_gbif.json()
 
@@ -296,23 +302,16 @@ def web_gbif_validate(tax, rnk, backbone_types=BACKBONE_TYPES):
     backbone_types = ['root'] + backbone_types
 
     if resp['matchType'] == u'NONE':
-        # No match found: catch any notes from GBIF for odd cases (such as two equal
-        # matches as in the case of Morus, for example).
-        if 'note' in resp.keys():
-            rnk += ': ' + resp['note']
-        LOGGER.error('No unique match found for {} at rank {}'.format(tax, rnk))
-        return
+        # No match found. Currently not trying to pass on information in resp['note']
+        return 'no_match', None
     elif resp['status'].lower() == 'doubtful':
         # We don't accept doubtful names
-        LOGGER.error('Taxon {} is considered doubtful'.format(tax))
-        return
+        return 'doubtful', None
     elif resp['status'].lower() == 'accepted':
-        LOGGER.info('Match found for {} at rank {}'.format(tax, rnk))
-        to_add = _hierarchy_walk(resp)
-        # Before returning, pop the canonical response off and return that
-        # separately from the rest of  the index entries.
-        canon = [to_add.pop(rnk)]
-        return [canon, to_add.values()]
+        hier = _hierarchy_walk(resp)
+        # Separate the search taxon from the hierarchy
+        canon = hier.pop(rnk)
+        return 'accepted', [canon, canon, hier.values()]
     else:
         # A non-accepted match, so look up the accepted usage to notify the user.
         # Need to look up the accepted key for the taxa: many taxa will have the
@@ -322,8 +321,7 @@ def web_gbif_validate(tax, rnk, backbone_types=BACKBONE_TYPES):
         usage_url = u"http://api.gbif.org/v1/species/{}".format(resp['usageKey'])
         usage = requests.get(usage_url)
         if usage.status_code != 200:
-            LOGGER.error('API validation issue for {}'.format(tax))
-            return
+            return 'validation_fail', None
         else:
             usage_data = usage.json()
 
@@ -333,30 +331,23 @@ def web_gbif_validate(tax, rnk, backbone_types=BACKBONE_TYPES):
         accept_url = u"http://api.gbif.org/v1/species/match?name={}&strict=true"
         accept = requests.get(accept_url.format(usage_data['accepted']))
         if accept.status_code != 200:
-            LOGGER.error('API validation issue for {}'.format(tax))
-            return
+            return 'validation_fail', None
         else:
             accept_data = accept.json()
-            to_add = _hierarchy_walk(accept_data)
-            # get the canon usage
-            canon = [to_add.pop(accept_data['rank'].lower())]
-            # add the taxon as used in the dataset.
-            to_add['user'] = (resp['usageKey'], canon[0][1], resp['canonicalName'],
-                              resp['rank'].lower(), resp['status'].lower())
-            # report
-            usage_msg = (tax, usage_data['taxonomicStatus'].lower(), accept_data['canonicalName'])
-            LOGGER.warn('{} is considered a {} of {}'.format(*usage_msg), extra={'indent': 3})
+            hier = _hierarchy_walk(accept_data)
 
-            return [canon, to_add.values()]
+            # user info index entry
+            user = (tax, rnk, resp['status'].lower(), resp['usageKey'], usage_data['parentKey'])
+            # get the canon usage, which is the hierarchy entry with the accepted rank
+            canon = hier.pop(accept_data['rank'].lower())
+
+            # report
+            return usage_data['taxonomicStatus'].lower(), [user, canon, hier.values()]
 
 
 def local_gbif_validate(conn, tax, rnk, backbone_types=BACKBONE_TYPES):
     """
     Validates a taxon name and rank against a connection to a local GBIF database.
-    Because the local GBIF database does not contain higher taxon keys in each row,
-    the function returns a list of higher taxa to be looked up later. It could call
-    itself recursively but many of these entries are likely to duplicated in other taxa,
-    so it is more efficient to collate a local set and add the unique entries later.
 
     Args:
         conn: A connection to a SQL database containing the backbone table
@@ -366,11 +357,17 @@ def local_gbif_validate(conn, tax, rnk, backbone_types=BACKBONE_TYPES):
             to the index along with the target taxon
 
     Returns:
-        If successful, a 3-list of lists of tuple indices:
-             [[(index tuple for canonical taxon)],
-              [(index tuple non-canon taxon)],
-              [(tuples for higher taxon lookup)]]
-        Otherwise, None.
+        A 2 tuple: the first entry indicates the status of the lookup and the second is
+        either None when there is no match or a doubtful match or  a three list of index
+        entries with the following structure:
+            i) index tuple for the original lookup
+            ii) index tuple for the canonical usage, which might be the same
+            iii) a list of _partial_ index tuples for the taxonomic hierarchy.
+
+        Because the local GBIF database does not contain higher taxon keys in each row,
+        the function does not returns complete higher taxonomic hierarchy taxon indices.
+        It is more efficient to collate incomplete entries of valid taxonID and name and
+        complete the index entries for unique entries across taxa later.
     """
 
     def _row_to_index_tuple(row):
@@ -388,8 +385,8 @@ def local_gbif_validate(conn, tax, rnk, backbone_types=BACKBONE_TYPES):
         else:
             parent = int(row['parentNameUsageID'])
 
-        return [(int(row['taxonID']), parent, row['canonicalName'],
-                row['taxonRank'], row['taxonomicStatus'])]
+        return (row['canonicalName'], row['taxonRank'], row['taxonomicStatus'],
+                int(row['taxonID']), parent)
 
     # Make sure the connection is returning results as sqlite.Row objects
     if conn.row_factory != sqlite3.Row:
@@ -403,8 +400,7 @@ def local_gbif_validate(conn, tax, rnk, backbone_types=BACKBONE_TYPES):
 
     # Process the hits
     if len(tax_gbif) == 0:
-        LOGGER.error('No match found for {} at rank {}'.format(tax, rnk))
-        return
+        return 'no_match', None
 
     elif len(tax_gbif) == 1:
         # A single matching canonical name - check status
@@ -412,34 +408,30 @@ def local_gbif_validate(conn, tax, rnk, backbone_types=BACKBONE_TYPES):
 
         if tax_gbif['taxonomicStatus'] == 'doubtful':
             # We don't accept doubtful names
-            LOGGER.error('Taxon {} is considered doubtful'.format(tax))
-            return
+            return 'doubtful', None
 
         elif tax_gbif['taxonomicStatus'] == 'accepted':
             # accepted taxon
-            LOGGER.info('Match found for {} at rank {}'.format(tax, rnk))
-            # store the higher taxa to lookup fully later
-            add_to_higher = [(tax_gbif[hi], hi) for hi in backbone_types
-                             if hi in tax_gbif and tax_gbif[hi] != u'' and hi != rnk]
+            canon = _row_to_index_tuple(tax_gbif)
+            # store incomplete indices for higher taxa to look up fully later
+            hier = [(tax_gbif[hi], hi) for hi in backbone_types
+                    if hi in tax_gbif and tax_gbif[hi] != u'' and hi != rnk]
             # return the accepted usage, an empty list since there isn't an unaccepted
             # usage and the list of higher taxa
-            return [_row_to_index_tuple(tax_gbif), [], add_to_higher]
+            return 'accepted', [canon, canon, hier]
         else:
             # synonym or misapplied, so find the accepted usage
             acc_id = tax_gbif['acceptedNameUsageID']
             acc_sql = 'select * from backbone where taxonID = {};'.format(acc_id)
             acc_gbif = conn.execute(acc_sql).fetchall()
             acc_gbif = dict(acc_gbif[0])
-            tx_tup = (tax_gbif['canonicalName'], tax_gbif['taxonomicStatus'],
-                      acc_gbif['canonicalName'])
-            LOGGER.warn('{} is considered a {} of {}'.format(*tx_tup))
             # store the higher taxa to lookup fully later
-            add_to_higher = [(acc_gbif[hi], hi) for hi in backbone_types
-                             if hi in acc_gbif and acc_gbif[hi] != u'']
+            hier = [(acc_gbif[hi], hi) for hi in backbone_types
+                    if hi in acc_gbif and acc_gbif[hi] != u'']
 
             # return the accepted usage, the actual taxon and higher taxa
-            return [_row_to_index_tuple(acc_gbif), _row_to_index_tuple(tax_gbif),
-                    add_to_higher]
+            return tax_gbif['taxonomicStatus'], [_row_to_index_tuple(acc_gbif),
+                                                 _row_to_index_tuple(tax_gbif), hier]
 
     else:
         # Multiple hits: reduce the set of hits to give something like the preferred
@@ -449,22 +441,19 @@ def local_gbif_validate(conn, tax, rnk, backbone_types=BACKBONE_TYPES):
         tx_counts = Counter(tx_status)
 
         if 'accepted' in tx_counts.keys() and tx_counts['accepted'] == 1:
-            # only one accepted match alongside other usages
-            LOGGER.info('Match found for {} at rank {}'.format(tax, rnk))
-            # extract that hit
+            # only one accepted match alongside other usages so extract that hit
             tax_gbif = tax_gbif[tx_status.index('accepted')]
+            canon = _row_to_index_tuple(tax_gbif)
             # store the higher taxa to lookup fully later
-            add_to_higher = [(tax_gbif[hi], hi) for hi in backbone_types
-                             if hi in tax_gbif and tax_gbif[hi] != u'' and hi != rnk]
+            hier = [(tax_gbif[hi], hi) for hi in backbone_types
+                    if hi in tax_gbif and tax_gbif[hi] != u'' and hi != rnk]
             # return the accepted usage, an empty list since there isn't an unaccepted
             # usage and the list of higher taxa
-            return [_row_to_index_tuple(tax_gbif), [], add_to_higher]
+            return 'accepted', [canon, canon, hier]
 
         elif 'accepted' in tx_counts.keys() and tx_counts['accepted'] > 1:
             # more than one accepted match
-            LOGGER.error('No unique match found for {} at rank {}'.format(tax, rnk))
-            return
-
+            return 'ambiguous', None
         else:
             # Rows can now contain doubtful (no accepted usage) and then synonyms
             # (of varying kinds) and misapplied (both of which have accepted usage)
@@ -472,13 +461,10 @@ def local_gbif_validate(conn, tax, rnk, backbone_types=BACKBONE_TYPES):
                       if tx['acceptedNameUsageID'] != u''}
             if set(tx_counts.keys()) == {u'doubtful'}:
                 # only doubtful records?
-                LOGGER.error('Taxon {} is considered doubtful'.format(tax))
-                return
+                return 'doubtful', None
             elif len(tx_acc) > 1:
                 # More than one accepted usage
-                LOGGER.error('Taxon {} is not accepted and can refer to more than one '
-                             'accepted usage.'.format(tax))
-                return
+                return 'ambiguous', None
             else:
                 # A single accepted usage - pick the first row to index
                 tax_gbif = tax_gbif[0]
@@ -486,15 +472,20 @@ def local_gbif_validate(conn, tax, rnk, backbone_types=BACKBONE_TYPES):
                            'where taxonID  = {};'.format(tx_acc.pop()))
                 acc_gbif = conn.execute(acc_sql).fetchall()
                 acc_gbif = dict(acc_gbif[0])
-                tx_tup = (tax, ', '.join(set(tx_status)), acc_gbif['canonicalName'])
-                LOGGER.warn('{} is considered a {} of {}'.format(*tx_tup))
                 # store the higher taxa to lookup fully later
-                add_to_higher = [(acc_gbif[hi], hi) for hi in backbone_types
-                                 if hi in acc_gbif and acc_gbif[hi] != u'']
+                hier = [(acc_gbif[hi], hi) for hi in backbone_types
+                        if hi in acc_gbif and acc_gbif[hi] != u'']
 
-                # return the accepted usage, the actual taxon and higher taxa
-                return [_row_to_index_tuple(tax_gbif), _row_to_index_tuple(acc_gbif),
-                        add_to_higher]
+                # - find the 'best' reason for no accepted match
+                if any([st.endswith('synonym') for st in tx_counts.keys()]):
+                    tp = 'synonym'
+                elif any([st.endswith('misapplied') for st in tx_counts.keys()]):
+                    tp = 'misapplied'
+                else:
+                    tp = 'unknown'
+
+                # return the actual taxon, the accepted usage and higher taxa
+                return tp, [_row_to_index_tuple(tax_gbif), _row_to_index_tuple(acc_gbif), hier]
 
 
 """
@@ -1117,7 +1108,7 @@ class Dataset(object):
             Updates the class instance to add a list of taxon names to be used
             for matching taxa in data worksheets and a set of taxa to build a
             taxon index. The taxon index set contains tuples of:
-                (GBIF ID, Parent ID, canonical name, taxonomic rank, status)
+                (canonical name, taxonomic rank, status, GBIF ID, Parent ID)
         """
 
         # try and get the taxon worksheet
@@ -1147,10 +1138,9 @@ class Dataset(object):
                          extra={'join': dupes})
             return
 
-        # Load dictionaries of the taxa
+        # Load dictionaries of the taxa and strip out any rows that consist of nothing
+        # but empty cells
         taxa = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in tx_rows]
-
-        # strip out any rows that consist of nothing but empty cells
         taxa = [row for row in taxa if not all([is_blank(vl) for vl in row.values()])]
 
         # check number of taxa found and standardise names
@@ -1203,101 +1193,195 @@ class Dataset(object):
 
         # taxon and parent types that can be checked against gbif
         backbone_types = BACKBONE_TYPES
-        # alternative types that are allowed as taxon type, but which need a parent
         alt_types = ['morphospecies', 'functional group']
 
-        # The GBIF API returns all the information needed to add higher taxa into
-        # the index but the local DB doesn't provide higher taxon ids. For local
-        # validation, higher taxon names and rank are stored locally and then unique
-        # entries are added after checking all rows.
-        local_higher_taxa = set()
+        # Keep a dictionary of taxon index entries and parent status, keyed by (name, rank)
+        index_dict = dict()
+        parent_status = dict()
         unvalidated = set()
+
+        # Check parents first, if any
+        if 'parent name' in hdrs and 'parent type' in hdrs:
+
+            # convert parents tp (name, rank) tuples to use as dictionary keys
+            for tx in taxa:
+                # convert non None types to lower case
+                pt_type = tx.pop('parent type')
+                pt_type = None if pt_type is None else pt_type.lower()
+                tx['parent'] = (tx.pop('parent name'), pt_type)
+
+            # get unique entries to avoid repeated lookups when parents are used more than once
+            parents = {(tx['parent']) for tx in taxa}
+
+            if len(parents):
+                LOGGER.info('Checking {} parent taxa'.format(len(parents)),
+                            extra={'indent_after': 2})
+
+            for prnt in parents:
+
+                # completeness
+                if is_blank(prnt[0]) and is_blank(prnt[1]):
+                    parent_status[prnt] = 'missing'
+                    continue
+                elif is_blank(prnt[0]) ^ is_blank(prnt[1]):
+                    LOGGER.error('Incomplete parent information: {0} {1}'.format(*prnt))
+                    parent_status[prnt] = 'incomplete'
+                    continue
+                elif not is_blank(prnt[1]) and prnt[1] not in backbone_types:
+                    LOGGER.error('Parent type {} is not recognized'.format(prnt[1]))
+                    parent_status[prnt] = 'invalid'
+                    continue
+
+                if self.gbif_conn is None:
+                    status, index = web_gbif_validate(prnt[0], prnt[1], backbone_types)
+                else:
+                    status, index = local_gbif_validate(self.gbif_conn, prnt[0], prnt[1],
+                                                        backbone_types)
+
+                if index is not None:
+                    parent_status[prnt] = 'found'
+                    index_dict[prnt] = index
+                else:
+                    parent_status[prnt] = 'not found'
+
+        else:
+            # populate parent with None, warning if partial columns provided
+            for tx in taxa:
+                tx['parent'] = None
+            if ('parent name' in hdrs) ^ ('parent type' in hdrs):
+                LOGGER.error('Only one of parent name and parent type headers provided.')
+
+        # Now check main taxa
         LOGGER.info('Validating {} taxa'.format(len(taxa)),
-                    extra={'indent_after': 2})
+                    extra={'indent_before': 1, 'indent_after': 2})
 
         for idx, tx in enumerate(taxa):
 
-            # use lowercase for matching
-            if tx['taxon type'] is not None:
-                tx['taxon type'] = tx['taxon type'].lower()
-            if tx['parent type'] is not None:
-                tx['parent type'] = tx['parent type'].lower()
+            # use lowercase for taxon type but not names, because local check is case sensitive
+            tx_name = tx['taxon name']
+            tx_sci = tx['scientific name']
+            tx_type = None if tx['taxon type'] is None else tx['taxon type'].lower()
+            tx_par = tx['parent']
+            rw_num = idx + 2
+            # ger a reporting name, which is the taxon name for morphospecies and functional groups
+            rep_name = tx_name if tx_type in alt_types else tx_sci
 
-            # Sanitize the taxon dictionary contents - three cases of partial
-            # or missing information that stop further validation
-            if is_blank(tx['taxon name']) or is_blank(tx['scientific name']) \
-                    or is_blank(tx['taxon type']):
-                # - mandatory three entries cannot be blank
+            # Check the taxon dictionary for the main taxon, mandatory entries cannot be blank
+            if is_blank(tx_name) or is_blank(tx_sci) or is_blank(tx_type):
                 LOGGER.error('Row {}: blank taxon name, scientific name or '
-                             'taxon type'.format(idx + 2))
-                continue
-            elif (not is_blank(tx['parent type'])) ^ (not is_blank(tx['parent name'])):
-                # Logical XOR: incomplete parent taxon information
-                LOGGER.error('Incomplete parent taxon information provided for {taxon type}: '
-                             '{taxon name}'.format(**tx))
-                continue
-            elif tx['taxon type'] in alt_types and \
-                    (is_blank(tx['parent name']) or is_blank(tx['parent type'])):
-                # No parent taxon info is unacceptable for morphospecies and functional groups
-                LOGGER.error('Parent taxon information must be provided for {taxon type}: '
-                             '{taxon name}'.format(**tx))
-                continue
-
-            # Are the taxon and parent ranks to be validated one of the big seven
-            # that the GBIF backbone provided or a valid alternative in the case of taxon type?
-            if tx['parent type'] is None and tx['taxon type'] not in backbone_types + alt_types:
-                LOGGER.error('Taxon type {} is not recognized'.format(tx['taxon type']))
-                continue
-
-            if tx['parent type'] is not None and tx['parent type'] not in backbone_types:
-                LOGGER.error('Parent type {} is not recognized'.format(tx['parent type']))
+                             'taxon type'.format(rw_num))
                 continue
 
             # The taxon input is now sanitized of obvious problems so can be validated against
-            # the GBIF backbone database. We now have a taxon to look up or a taxon with a parent
-            # to look up. Either way, we need to add the taxon to the index, along with the
-            # taxonomic hierarchy.
+            # the GBIF backbone database. Validate _all_ backbone type entries: this is to make
+            # sure that valid taxa that have had parents provided get indexed correctly. It is
+            # only an issue when taxa are not found and also have an invalid parent
 
-            if is_blank(tx['parent type']):
-                tx_name = tx['scientific name']
-                tx_rank = tx['taxon type']
-                add_taxon = False
+            if tx_type in backbone_types and self.gbif_conn is None:
+                status, tx_found = web_gbif_validate(tx_sci, tx_type, backbone_types)
+            elif tx_type in backbone_types:
+                status, tx_found = local_gbif_validate(self.gbif_conn, tx_sci,
+                                                       tx_type, backbone_types)
             else:
-                tx_name = tx['parent name']
-                tx_rank = tx['parent type']
-                add_taxon = True
+                status, tx_found = ('non-backbone', None)
 
-            if self.gbif_conn is None:
-                new_index = web_gbif_validate(tx_name, tx_rank, backbone_types)
-                if new_index is not None:
-                    # add the canonical taxon and other ranks to the index
-                    self.taxon_index.update(new_index[0] + new_index[1])
-            else:
-                new_index = local_gbif_validate(self.gbif_conn, tx_name, tx_rank,
-                                                backbone_types)
-                if new_index is not None:
-                    self.taxon_index.update(new_index[0] + new_index[1])
-                    local_higher_taxa.update(new_index[2])
+            # Check the combinations of taxon and parent status:
+            #        | pr_FD | pr_NF | None  |
+            # tx_Alt |  O g) |  X f) |  X h) |
+            # tx_NF  |  X b) | [    X a)   ] |
+            # tx_FD  |  ? d) |  X c) |  O e) |
 
-            if add_taxon and new_index is not None:
-                # For taxa that have been validated via a parent, add a name used in the file
-                # and insert the validated parent taxon ID.
-                # For non taxon groups (alt_types), insert the taxon name, otherwise use the
-                # provided (unvalidated!) scientific name.
-                if tx['taxon type'] in alt_types:
-                    alt_tx_name = tx['taxon name']
+            # Being totally paranoid, a backbone taxon could have an valid taxon as a parent that
+            # isn't actually a parent at all, hence the question mark.
+
+            pr_bad = ('incomplete', 'not found', 'invalid')
+            pr_status = parent_status[tx['parent']]
+
+            if tx_type in backbone_types:
+                # combinations for backbone taxon types
+                if tx_found is None and pr_status != 'found':
+                    # a) bad backbone with bad or missing parent
+                    LOGGER.error('Row {}: {} not in GBIF backbone, parent'
+                                 ' is {}'.format(rw_num, rep_name, pr_status))
+                    continue
+                elif tx_found is None and pr_status == 'found':
+                    # b) bad backbone with good parent
+                    LOGGER.info('Row {}: {} not in GBIF backbone, parent '
+                                'found'.format(rw_num, rep_name))
+                    # update tx_found with the correct information
+                    tx_tuple = (tx_name, tx_type, 'user', -1, index_dict[tx_par][0][3])
+                    tx_found = [tx_tuple, tx_tuple, index_dict[tx_par][2]]
+                elif tx_found is not None and pr_status in pr_bad:
+                    # c) good backbone with bad parent
+                    LOGGER.error('Row {}: {} in GBIF backbone, but parent'
+                                 ' {}'.format(rw_num, rep_name, pr_status))
+                    continue
+                elif tx_found is not None and pr_status == 'found':
+                    # d) good backbone with good parent - are they compatible? Do all entries in
+                    # the parent hierarchy appear in the taxon hierarchy
+                    parent_hier = [anc[0] for anc in index_dict[tx_par][2]]
+                    taxon_hier = [anc[0] for anc in tx_found[2]]
+                    if not set(parent_hier).issubset(taxon_hier):
+                        LOGGER.error('Row {}: {} in GBIF backbone, but additional parent '
+                                     'information is incompatible'.format(rw_num, rep_name))
+                        continue
+                    else:
+                        # provide info on taxon status
+                        if status == 'accepted':
+                           LOGGER.info('Row {}: {} accepted in GBIF '
+                                       'backbone'.format(rw_num, rep_name))
+                        else:
+                            LOGGER.warn('Row {}: {} is considered a {} of {} in GBIF '
+                                       'backbone'.format(rw_num, rep_name, status, tx_found[1][0]))
+
+                elif tx_found is not None and pr_status == 'missing':
+                    # e) good backbone with no parent, provide info on taxon status
+                    if status == 'accepted':
+                        LOGGER.info('Row {}: {} accepted in GBIF '
+                                    'backbone'.format(rw_num, rep_name))
+                    else:
+                        LOGGER.warn('Row {}: {} is considered a {} of {} in GBIF '
+                                    'backbone'.format(rw_num, rep_name, status, tx_found[1][0]))
                 else:
-                    alt_tx_name = tx['scientific name']
-                self.taxon_index.add((-1, new_index[0][0][0], alt_tx_name,
-                                     tx['taxon type'], 'user provided'))
+                    # Think all the combinations are covered but exit with information if not
+                    raise AttributeError('Bad taxon processing')
 
-        # Look up anything added to the local higher taxon set
-        if self.gbif_conn:
+            elif pr_status != 'found':
+                # f) non backbone with bad parent info
+                LOGGER.error("Row {}: Parent taxon for {} '{}' is "
+                             "{}".format(rw_num, tx_type, rep_name, pr_status))
+                continue
+            elif pr_status == 'found':
+                # g) non backbone with good parent info
+                LOGGER.info("Row {}: Parent taxon for {} '{}' is "
+                            "valid".format(rw_num, tx_type, rep_name))
+                # update tx_found with the correct information
+                tx_tuple = (tx_name, tx_type, 'alt_type', -1, index_dict[tx_par][0][3])
+                tx_found = [tx_tuple, tx_tuple, index_dict[tx_par][2]]
+            else:
+                # Think all the combinations are covered but exit with information if not
+                raise AttributeError('Bad taxon processing')
+
+            # Index updating
+            index_dict[(tx_name, tx_type)] = tx_found
+
+        # Populate the index, unpack the index triplets:
+        canon, user, hier = zip(*index_dict.values())
+        self.taxon_index.update(canon)
+        self.taxon_index.update(user)
+
+        # unpack the hierarchy entries and get unique entries
+        hier = {anc for ind in hier for anc in ind}
+        if self.gbif_conn is not None:
+            # look up those entries if we are using local validation
             LOGGER.info('Adding higher taxa from local database',
                         extra={'indent_before': 1, 'indent_after': 2})
-            for tax, rnk in local_higher_taxa:
-                new_index = local_gbif_validate(self.gbif_conn, tax, rnk, backbone_types)
-                self.taxon_index.update(new_index[0])
+            for anc in hier:
+                status, anc = local_gbif_validate(self.gbif_conn, anc[0], anc[1], BACKBONE_TYPES)
+                self.taxon_index.add(anc[0])
+        else:
+            # otherwise add complete values from the web interface
+            self.taxon_index.update(hier)
 
         # report on unvalidated taxa
         if unvalidated:
@@ -1329,7 +1413,7 @@ class Dataset(object):
         # now start populating with data
         if meta['name'] not in self.sheet_names:
             LOGGER.error('Data worksheet {} not found'.format(meta['name']),
-                         extra = {'indent_before': 0, 'indent_after': 1})
+                         extra={'indent_before': 0, 'indent_after': 1})
             return
 
         LOGGER.info('Checking data worksheet {}'.format(meta['name']),
@@ -1391,8 +1475,8 @@ class Dataset(object):
         # Test for data with no row number
         data_end = len(row_numbers) + dwsh.field_name_row
         if data_end < dwsh.max_row:
-            allegedly_blank  = worksheet.get_squared_range(1, data_end + 1,
-                                                           dwsh.max_col, dwsh.max_row)
+            allegedly_blank = worksheet.get_squared_range(1, data_end + 1,
+                                                          dwsh.max_col, dwsh.max_row)
             not_blank = [not is_blank(cell.value) for row in allegedly_blank for cell in row]
             if any(not_blank):
                 LOGGER.error('Data extends beyond row numbering')
@@ -1465,9 +1549,11 @@ class Dataset(object):
 
         # Print out column checking header
         if is_blank(meta['field_name']):
-            LOGGER.info('Checking Column {}'.format(meta['column']))
+            LOGGER.info('Checking Column {}'.format(meta['column']),
+                        extra={'indent_before': 2, 'indent_after': 3})
         else:
-            LOGGER.info('Checking field {field_name}'.format(**meta))
+            LOGGER.info('Checking field {field_name}'.format(**meta),
+                        extra={'indent_before': 2, 'indent_after': 3})
 
         # Skip any field with no user provided metadata or data
         blank_data = [is_blank(vl) for vl in data]
@@ -1881,7 +1967,7 @@ class Dataset(object):
 
             if not reported.issubset(level_labels):
                 LOGGER.error('Categories found in data missing from description: ',
-                             extra={'join': reported - set(level_labels)})
+                             extra={'join': reported - set(level_labels), 'quote': True})
 
     def check_field_numeric(self, meta, data):
 
@@ -2021,8 +2107,13 @@ class Dataset(object):
             LOGGER.info('Provided taxa all used in datasets')
 
         if CH.counters['ERROR'] > 0:
-            LOGGER.info('FAIL: file contained {} errors'.format(CH.counters['ERROR']),
-                        extra={'indent_before': 0})
+            if CH.counters['WARNING'] > 0:
+                LOGGER.info('FAIL: file contained {} errors and {} '
+                            'warnings'.format(CH.counters['ERROR'], CH.counters['WARNING']),
+                            extra={'indent_before': 0})
+            else:
+                LOGGER.info('FAIL: file contained {} errors'.format(CH.counters['ERROR']),
+                            extra={'indent_before': 0})
         else:
             if CH.counters['WARNING'] > 0:
                 LOGGER.info('PASS: file formatted correctly but with {} '
@@ -2059,7 +2150,8 @@ Higher level functions
 """
 
 
-def check_file(fname, verbose=True, gbif_database=None, locations_json=None, validate_doi=False):
+def check_file(fname, verbose=True, gbif_database=None, locations_json=None, validate_doi=False,
+               check='sltwf'):
 
     """
     Runs the format checking across an Excel workbook.
@@ -2068,9 +2160,11 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
         fname: Path to an Excel file
         verbose: Boolean to indicate whether to print messages as the program runs?
         gbif_database: Path to a local copy of the GBIF taxonomy backbone if that is to be used
-        instead of the GBIF web API.
+          instead of the GBIF web API.
         locations_json: The path to a json file of valid location names
         validate_doi: Check any publication DOIs resolve, requiring a web connection.
+        check: String indicating which checking to run. Note that running worksheet checking
+          without loading summary taxa and locations is going to be problematic!
 
     Returns:
         A Dataset object
@@ -2080,18 +2174,23 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
     dataset = Dataset(fname, verbose=verbose, gbif_database=gbif_database)
 
     # load the metadata sheets
-    dataset.load_summary(validate_doi=validate_doi)
-    dataset.load_taxa()
-    dataset.load_locations(locations_json=locations_json)
+    if 's' in check:
+        dataset.load_summary(validate_doi=validate_doi)
+    if 't' in check:
+        dataset.load_taxa()
+    if 'l' in check:
+        dataset.load_locations(locations_json=locations_json)
 
     # check the datasets
-    if dataset.dataworksheet_summaries:
-        for ws in dataset.dataworksheet_summaries:
-            dataset.load_data_worksheet(ws)
-    else:
-        LOGGER.error('No data worksheets found')
+    if 'w' in check:
+        if dataset.dataworksheet_summaries:
+            for ws in dataset.dataworksheet_summaries:
+                dataset.load_data_worksheet(ws)
+        else:
+            LOGGER.error('No data worksheets found')
 
-    dataset.final_checks()
+    if 'f' in check:
+        dataset.final_checks()
 
     return dataset
 
@@ -2121,6 +2220,9 @@ def main():
 
     parser = argparse.ArgumentParser(description=main.__doc__)
     parser.add_argument('fname', help="Path to the Excel file to be validated.")
+    parser.add_argument('-c', '--check', default='sltwf',
+                        help='Which of the summary, locations, taxa, worksheets and '
+                             'finalisation should be checked.')
     parser.add_argument('-l', '--locations_json', default=None,
                         help='Path to a locally stored json file of valid location names')
     parser.add_argument('-g', '--gbif_database', default=None,
@@ -2133,7 +2235,8 @@ def main():
     args = parser.parse_args()
 
     check_file(fname=args.fname, verbose=True, locations_json=args.locations_json,
-               gbif_database=args.gbif_database, validate_doi=args.validate_doi)
+               gbif_database=args.gbif_database, validate_doi=args.validate_doi,
+               check=args.check)
 
 
 if __name__ == "__main__":
