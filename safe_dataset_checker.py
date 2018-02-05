@@ -575,7 +575,8 @@ class Dataset(object):
         self.taxon_names = set()
         self.taxon_names_used = set()
         self.taxon_index = set()
-
+        self.passed = FALSE
+        
         # Setup the taxonomy validation mechanism.
         if gbif_database is None:
             LOGGER.info('Using GBIF online API to validate taxonomy')
@@ -2119,9 +2120,11 @@ class Dataset(object):
                 LOGGER.info('PASS: file formatted correctly but with {} '
                             'warnings.'.format(CH.counters['WARNING']),
                             extra={'indent_before': 0})
+                self.passed = TRUE
             else:
                 LOGGER.info('PASS: file formatted correctly with no warnings',
                             extra={'indent_before': 0})
+                self.passed = TRUE
 
     def export_metadata_dict(self):
         """
