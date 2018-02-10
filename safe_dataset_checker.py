@@ -1329,11 +1329,11 @@ class Dataset(object):
                     else:
                         # provide info on taxon status
                         if status == 'accepted':
-                           LOGGER.info('Row {}: {} accepted in GBIF '
-                                       'backbone'.format(rw_num, rep_name))
+                            LOGGER.info('Row {}: {} accepted in GBIF '
+                                        'backbone'.format(rw_num, rep_name))
                         else:
                             LOGGER.warn('Row {}: {} is considered a {} of {} in GBIF '
-                                       'backbone'.format(rw_num, rep_name, status, tx_found[1][0]))
+                                        'backbone'.format(rw_num, rep_name, status, tx_found[1][0]))
 
                 elif tx_found is not None and pr_status == 'missing':
                     # e) good backbone with no parent, provide info on taxon status
