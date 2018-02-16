@@ -59,7 +59,11 @@ BACKBONE_TYPES = ['kingdom', 'phylum', 'order', 'class', 'family',
 # ii)  A formatter to provide user controlled indentation and to
 #      code levels as symbols for compactness
 # iii) A handler writing to a global log file written to a StringIO container
-# iv)  Optionally a handler also writing the log to stdout
+# iv)  Optionally a handler also writing the log to stdout can be added when
+#      a Dataset instance is created.
+
+# Note that the handlers are created when the server starts up and persist between
+# runs of the code, so Dataset.__init__() cleans them up first.
 
 
 class CounterHandler(logging.Handler):
@@ -69,9 +73,12 @@ class CounterHandler(logging.Handler):
     def __init__(self, *args, **kwargs):
         logging.Handler.__init__(self, *args, **kwargs)
         self.counters = {'DEBUG': 0, 'INFO': 0, 'WARNING': 0, 'ERROR': 0, 'CRITICAL': 0}
-
+    
     def emit(self, rec):
         self.counters[rec.levelname] += 1
+    
+    def reset(self):
+        self.counters = {'DEBUG': 0, 'INFO': 0, 'WARNING': 0, 'ERROR': 0, 'CRITICAL': 0}
 
 
 class IndentFormatter(logging.Formatter):
@@ -144,7 +151,6 @@ LOG = StringIO()
 LOG_SH = logging.StreamHandler(LOG)
 LOG_SH.setFormatter(FORMATTER)
 LOGGER.addHandler(LOG_SH)
-
 
 """
 Some static functions
@@ -542,10 +548,16 @@ class Dataset(object):
 
         self.filename = os.path.basename(filename)
 
-        # report tracking
+        # report tracking - clear out previous content in the logger. When the function runs
+        # on a webserver, the same logger instance is used for all runs, so the log contents
+        # persist unless they are tidied up.
+        CH.reset()
+        LOG.truncate(0)
+
         if verbose:
             # Add a stream handler writing to stdout, using the common formatter instance,
-            # as well as the logging to the global LOG StringIO
+            # as well as the logging to the global LOG StringIO, otherwise command line 
+            # usage doesn't see any output.
             stdout = logging.StreamHandler()
             stdout.setFormatter(FORMATTER)
             LOGGER.addHandler(stdout)
@@ -669,7 +681,7 @@ class Dataset(object):
         # load dictionary of summary information block, allowing for multiple
         # columns for fields (data compilers, dataset sheets).
         # Note that worksheet.columns can load some odd invisible empty cells:
-        # it doesn't guarantee an equal number of cells in each column. So 
+        # it doesn't guarantee an equal number of cells in each column. So
         # use the squared range.
         mxcl = worksheet.max_column
         mxrw = worksheet.max_row
@@ -2161,7 +2173,7 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
 
     Parameters:
         fname: Path to an Excel file
-        verbose: Boolean to indicate whether to print messages as the program runs?
+        verbose: Boolean to indicate whether to print messages to stdout as the program runs?
         gbif_database: Path to a local copy of the GBIF taxonomy backbone if that is to be used
           instead of the GBIF web API.
         locations_json: The path to a json file of valid location names
