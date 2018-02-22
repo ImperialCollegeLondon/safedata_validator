@@ -143,40 +143,68 @@ using the program offline.
 
 1. You will need to download a copy of the backbone taxonomy and build
 a SQLite3 database from it. This isn't particularly hard, but the
-resulting database is around 2GB, so you'll need file space! The steps
-are:
+resulting database is around 1.6GB, so you'll need file space! The
+steps are:
 
-    * You may need to download and install SQLite3.        You want the 'bundle' installer for your operating system.
+    * You may need to download and install SQLite3. You want the
+      'bundle' installer for your operating system.
+
       https://www.sqlite.org/download.html
 
-    * Download the current zipped backbone from here:
-      http://rs.gbif.org/datasets/backbone/backbone-current.zip
+    * Download the current zipped backbone from the GBIF backbone
+      archive:
 
-    * Extract the contents of the archive, which includes a tab
-    delimited file `Taxon.tsv` that needs to be loaded into an SQLite3
-    database. Move the `Taxon.tsv` file to your data checker folder and
-    then, in the command line, type the following to create this
-    new database and enter SQLite3:
+      http://rs.gbif.org/datasets/backbone/readme.html
 
-           sqlite3 backbone-current.sqlite
+      You want the `current-backbone-simple.txt.gz` file. The
+      following commands will download and extract it, but you can
+      equally do this manually.
 
-    * Once you're in the new SQLite database, enter the following commands
+           curl -O  http://rs.gbif.org/datasets/backbone/backbone-current-simple.txt.gz
+           gunzip backbone-current-simple.txt.gz
+
+    * You also need to download the SQL table definition for the file
+      from this link:
+
+           curl -O https://raw.githubusercontent.com/gbif/checklistbank/master/checklistbank-mybatis-service/src/main/resources/backbone-ddl.sql
+
+      At present, that file is missing a final semi-colon after the
+      right bracket at the bottom, so open it and change `)` to `);`.
+
+    * The file `backbone-current-simple.txt` contains the field
+      `name_published_in`. The values in this field include a lot of
+      quotes, which are tricky to parse into an SQLite database. The
+      field isn't used in this application, so the simplest thing to do
+      is to delete it.
+
+           cut -f 1-28,30 backbone-current-simple.txt > backbone-current-simple-truncate.txt
+
+      You also now have to remove the line in `backbone-ddl.sql` that
+      defines the field: ` name_published_in text,`.
+
+    * Now, you can create a new database with that table:
+
+           sqlite3 backbone-current-simple.sqlite < backbone-ddl.sql
+
+    * Now open up the new SQLite database and enter the following commands
     to import the data and then build two indices to speed up searches:
     on the canonical names of taxa and taxon ranks, and on the taxon id.
     This is a big file, so these might take several minutes to complete.
 
+           sqlite3 backbone-current-simple.sqlite
            .mode tab
-           .import backbone-current/Taxon.tsv backbone
+           .import backbone-current-simple-truncate.txt backbone
            # create covering indices
-           create index backbone_name_rank on backbone (canonicalName, taxonRank);
-           create index backbone_id on backbone (taxonID);
+           create index backbone_name_rank on backbone (canonical_name, rank);
+           create index backbone_id on backbone (id);
            .quit
 
-    * You can now delete the `Taxon.tsv` file. You should now be able
-    to use local taxonomy validation by telling `safe_dataset_checker.py`
-    about the SQLite3 database:
+    * You can now delete the `backbone-current-simple.txt` and
+    `backbone-current-simple-truncate.txt` file. You should now be
+    able to use local taxonomy validation by telling
+    `safe_dataset_checker.py` where to find the SQLite3 database:
 
-           python safe_dataset_checker.py -g backbone-current.sqlite My_Excel_File.xlsx
+           python safe_dataset_checker.py -g backbone-current-simple.sqlite My_Excel_File.xlsx
 
 
 2. The current list of valid location names and bounding boxes is
@@ -217,15 +245,14 @@ status codes:
     heterotypic synonym, proparte synonym, misapplied
 
 Misapplications and synonyms always have a suggested accepted usage,
-doubtful taxa never do (at least when I checked a local backbone DB!).
-
+doubtful taxa never do. However, doubtful taxa typically still have a
+taxonomic hierarchy and can be encountered pretty much anywhere on the
+rank walk to the root.
 
 We want three things from validation:
 
 * The status of the name provided by the user.
-
 * The accepted usage (which might be the same).
-
 * The backbone taxonomic hierarchy for the taxa, so we can index at
   higher taxonomic levels. However, this is complicated as there is
   no guarantee that taxa will always hook into the backbone at the next
