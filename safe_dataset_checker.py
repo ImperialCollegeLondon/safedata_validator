@@ -45,7 +45,7 @@ RE_EMAIL = re.compile(r'\S+@\S+\.\S+')
 RE_NAME = re.compile(r'[^,]+,[ ]?[^,]+')
 RE_WSPACE_ONLY = re.compile(r'^\s*$')
 # note that logically the next one also catches whitespace at both ends
-RE_WSPACE_AT_ENDS = re.compile(r'^\s+\w+|\w+\s+$')
+RE_WSPACE_AT_ENDS = re.compile(r'^\s+.+|.+\s+$')
 RE_DMS = re.compile(r'[°\'"dms’”]+')
 
 # Taxon levels used in GBIF taxonomy. We explicitly exclude form and variety
@@ -181,7 +181,7 @@ def is_padded(value):
         Boolean
     """
 
-    return (value is not None) and (RE_WSPACE_AT_ENDS.match(str(value)))
+    return (value is not None) and (RE_WSPACE_AT_ENDS.match(unicode(value)))
 
 
 def duplication(data):
@@ -230,20 +230,25 @@ def all_numeric(data):
     return [len(nums) == len(data), nums]
 
 
-def web_gbif_validate(tax, rnk, gbif_id=None, backbone_types=BACKBONE_TYPES):
+def web_gbif_validate(tax, rnk, gbif_id=None):
 
     """
-    Validates a taxon name and rank against the GBIF web API.
+    Validates a taxon name and rank against the GBIF web API. It uses the API endpoint
+    species/match?name=XXX&rank=YYY&strict=true
+    endpoint to
+
+
+
+    # safe to assume that the next least nested taxonomic level is the parent.
+    # So, populate GBIF ID using species/match and then use species/{id} to populate the
+    # return values
 
     Args:
-        tax: The (case insensitive) taxon name
-        rnk: The taxon rank
-        gbif_id: Optional GBIF taxon id to resolve ambiguous taxon/rank
+        tax (str, None): The (case insensitive) taxon name
+        rnk (str, None): The taxon rank
+        gbif_id (int): Optional GBIF taxon id to resolve ambiguous taxon/rank
             combinations. If gbif_id is not None, then tax and rank can be
             None and the GBIF response will be used to populate those values.
-        backbone_types: A list of higher taxon rank names to be added
-            to the index along with the target taxon. This should be
-            in rank order from root to tip.
 
     Returns:
         A dictionary with the following possible keys:
@@ -257,47 +262,9 @@ def web_gbif_validate(tax, rnk, gbif_id=None, backbone_types=BACKBONE_TYPES):
         An index tuple has the structure: (taxon ID, parent ID, name, rank, taxonomic status)
     """
 
-    def _hierarchy_walk(json, tax_levels):
-        """
-        Takes the JSON response from the species/match endpoint and converts it into a
-        dictionary, keyed by taxonomic level, of GBIF UsageKeys for the available
-        hierarchy in a response.
-
-        It robustly handles non-standard parental assignments: the hierarchy doesn't
-        necessarily always go up to the next most nested level. Analysis of the local
-        database shows that both accepted and doubtful taxa do always go up, but this
-        isn't true for synonyms.
-
-        Note that this code will not work if the taxon is a form or variety, but those
-        are not recognized by the SAFE dataset checker
-
-        Args:
-            json: The JSON response from the species/match endpoint
-            tax_levels: An ordered list (kingdom > species) list of permitted taxonomic levels
-
-        Returns:
-            A list of 2 tuples (rank, GBIF ID).
-        """
-
-        # Add a subspecies entry into the response if needed
-        if json['rank'].lower() == 'subspecies':
-            json['subspecies'] = json['canonicalName']
-            json['subspeciesKey'] = json['usageKey']
-
-        # Which backbone levels are found in this response (preserves order)
-        found = [bk for bk in tax_levels if bk in json]
-
-        # build up a list of taxon hierarchy and GBIF keys
-        ranks = []
-
-        for each_rank in found:
-            ranks.append((each_rank, json[each_rank + 'Key']))
-
-        return ranks
-
-    # Use the GBIF API to validate
     if gbif_id is None:
-        # If no ID is provided then use the species/match?name={} endpoint
+        # If no ID is provided then use the species/match?name={} endpoint to
+        # try and find an ID for the combination
         url = u"http://api.gbif.org/v1/species/match?name={}&rank={}&strict=true".format(tax, rnk)
         tax_gbif = requests.get(url)
 
@@ -307,87 +274,75 @@ def web_gbif_validate(tax, rnk, gbif_id=None, backbone_types=BACKBONE_TYPES):
 
         resp = tax_gbif.json()
 
-    else:
-        # Otherwise use the species/{id} endpoint
-        url = u"http://api.gbif.org/v1/species/{}".format(gbif_id)
-        tax_gbif = requests.get(url)
-
-        # unknown ID numbers return a 404 error
-        if tax_gbif.status_code == 404:
-            return {'status': 'unknown_id'}
-        elif tax_gbif.status_code != 200:
-            return {'status': 'validation_fail'}
-
-        resp = tax_gbif.json()
-
-        # Handle usage
-        if tax is None and rnk is None:
-            # If neither taxon and rank are provided then populate from the response
-            tax = resp['canonicalName']
-            rnk = resp['rank'].lower()
-        elif tax != resp['canonicalName'] or rnk.lower() != resp['rank'].lower():
-            # Otherwise check they are congruent with the ID
-            return {'status': 'id_mismatch'}
-
-        # Two values have different keys in the species/match endpoint
-        resp['status'] = resp['taxonomicStatus']
-        resp['usageKey'] = resp['key']
-        # Accepted usage also has a different key and is only present for synonym usages
-        resp['acceptedUsageKey'] = resp.get('acceptedKey')
-        # The page loaded, so we found the taxon!
-        resp['matchType'] = 'EXACT'
-
-    # get the status
-    if 'status' in resp:
-        tax_status = resp['status'].lower()
-    else:
-        tax_status = None
-
-    # check the response status
-    if resp['matchType'] == u'NONE':
-
-        # No match found - look for explanatory notes
-        if 'note' in resp:
-            return {'status': 'no_match', 'note': resp['note']}
+        # check the response status
+        if resp['matchType'] == u'NONE':
+            # No match found - look for explanatory notes
+            if 'note' in resp:
+                return {'status': 'no_match', 'note': resp['note']}
+            else:
+                return {'status': 'no_match'}
         else:
-            return {'status': 'no_match'}
+            gbif_id = resp['usageKey']
 
-    elif tax_status in ('accepted', 'doubtful'):
+    # Now use the species/{id} endpoint
+    url = u"http://api.gbif.org/v1/species/{}".format(gbif_id)
+    tax_gbif = requests.get(url)
 
-        # get the hierarchy
-        hier = _hierarchy_walk(resp, backbone_types)
+    # unknown ID numbers return a 404 error
+    if tax_gbif.status_code == 404:
+        return {'status': 'unknown_id'}
+    elif tax_gbif.status_code != 200:
+        return {'status': 'validation_fail'}
 
-        # build the canonical taxon index
-        parent_index = None if len(hier) == 1 else hier[-2][1]
-        canon = (resp['usageKey'], parent_index, tax, rnk, tax_status)
+    resp = tax_gbif.json()
 
-        # return the details
-        return {'status': 'found', 'canon': canon, 'hier': hier}
+    # If they were provided, check tax and rnk are compatible with the ID number
+    if ((tax is not None and tax != resp['canonicalName']) or
+            (rnk is not None and rnk.lower() != resp['rank'].lower())):
+        return {'status': 'id_mismatch'}
 
+    # Now we should have a single usage in resp so populate the return dictionaries and
+    # set the response to be used for the hierarchy.
+
+    # First, fill in the parent key if it is missing, which it is for Kingdom level taxa
+    if resp['rank'] == 'KINGDOM':
+        resp['parentKey'] = None
+
+    if resp['taxonomicStatus'].lower() in ('accepted', 'doubtful'):
+        # populate the return values
+        ret = {'status': 'found',
+               'canon': (resp['key'], resp['parentKey'], resp['canonicalName'],
+                         resp['rank'].lower(), resp['taxonomicStatus'].lower())}
+        hier_resp = resp
     else:
-        # A non-accepted match, so will have acceptedUsageKey in the species/match endpoint
-        # data, which can be used to get the accepted usage and taxonomy
-        usage_url = u"http://api.gbif.org/v1/species/{}".format(resp['acceptedUsageKey'])
+        # look up the accepted usage
+        usage_url = u"http://api.gbif.org/v1/species/{}".format(resp['acceptedKey'])
         accept = requests.get(usage_url)
+
         if accept.status_code != 200:
             return {'status': 'validation_fail'}
         else:
             acpt = accept.json()
-            hier = _hierarchy_walk(acpt, backbone_types)
 
-            # build the canonical and user taxon index entries, storing the usageKey
-            # for the user provided name and the backbone (nub) key for the accepted
-            # usage.
-            # TODO - currently using acpt['key'] as acpt['nubKey'] sometimes missing
-            #        I don't know if this is correct, question opened on GBIF
-            # https://github.com/gbif/portal-feedback/issues/1199
-            parent_index = None if len(hier) == 1 else hier[-2][1]
-            user = (resp['usageKey'], parent_index, tax, rnk, tax_status)
-            canon = (acpt['key'],  parent_index, acpt['canonicalName'],
-                     acpt['rank'].lower(), acpt['taxonomicStatus'].lower())
+        # populate the return values
+        ret = {'status': 'found',
+               'user': (resp['key'], resp['parentKey'], resp['canonicalName'],
+                        resp['rank'].lower(), resp['taxonomicStatus'].lower()),
+               'canon': (acpt['key'], acpt['parentKey'], acpt['canonicalName'],
+                         acpt['rank'].lower(), acpt['taxonomicStatus'].lower())}
 
-            # return the details
-            return {'status': 'found', 'canon': canon, 'user': user, 'hier': hier}
+        hier_resp = acpt
+
+    # Add the taxonomic hierarchy from the accepted usage
+    ret['hier'] = [(rk, hier_resp[ky])
+                   for rk, ky in [('kingdom', 'kingdomKey'), ('phylum', 'phylumKey'),
+                                  ('class', 'classKey'), ('order', 'orderKey'),
+                                  ('family', 'familyKey'), ('genus', 'genusKey'),
+                                  ('species', 'speciesKey')]
+                   if ky in hier_resp]
+
+    # return the details
+    return ret
 
 
 def local_gbif_validate(conn, tax, rnk, gbif_id=None):
@@ -396,10 +351,10 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
     Validates a taxon name and rank against a connection to a local GBIF database.
 
     Args:
-        conn: An sqlite3 connection to the backbone database
-        tax: The (case sensitive) taxon name
-        rnk: The taxon rank
-        gbif_id: Optional GBIF taxon id to resolve ambiguous taxon/rank
+        conn (sqlite3.Connection): An sqlite3 connection to the backbone database
+        tax (str, None): The (case sensitive) taxon name
+        rnk (str, None): The taxon rank
+        gbif_id (int): Optional GBIF taxon id to resolve ambiguous taxon/rank
             combinations. If gbif_id is not None, then tax and rank can be
             None and the GBIF response will be used to populate those values.
 
@@ -414,19 +369,6 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
 
         An index tuple has the structure: (taxon ID, parent ID, name, rank, taxonomic status)
     """
-
-    def _row_to_index_tuple(row):
-        """
-        Turns a row from the local GBIF database into a tuple for the taxon index
-        Args:
-            row: A row from the GBIF backbone database as a dictionary
-
-        Returns:
-            A 5 tuple: taxon ID, parent ID, name, rank, status
-        """
-
-        return (row['id'], row['parent_key'], row['canonical_name'],
-                row['rank'].lower(), row['status'].lower())
 
     # Make sure the connection is returning results as sqlite.Row objects
     if conn.row_factory != sqlite3.Row:
@@ -505,18 +447,24 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
                     # A single accepted usage - pick the first row to index
                     tax_gbif = tax_gbif[0]
 
-    # Should now have a single row for the preferred hit, so package that up
+    # Should now have a single row for the preferred hit, so package that up and set
+    # what is going to be used to build the hierarchy
     if tax_gbif['status'].lower() in ['accepted', 'doubtful']:
         ret = {'status': 'found',
-               'canon': _row_to_index_tuple(tax_gbif)}
+               'canon': (tax_gbif['id'], tax_gbif['parent_key'], tax_gbif['canonical_name'],
+                         tax_gbif['rank'].lower(), tax_gbif['status'].lower())}
         hier_row = tax_gbif
     else:
         # Look up the parent_key, which is the accepted usage key for synonyms.
         acc_sql = 'select * from backbone where id = {};'.format(tax_gbif['parent_key'])
         acc_gbif = conn.execute(acc_sql).fetchone()
+        # fill in the return. The use of the accepted taxon parent key for the user entry
+        # is deliberate: it points up the hierarchy not to the accepted taxon.
         ret = {'status': 'found',
-               'canon': _row_to_index_tuple(acc_gbif),
-               'user': _row_to_index_tuple(tax_gbif)}
+               'canon': (acc_gbif['id'], acc_gbif['parent_key'], acc_gbif['canonical_name'],
+                         acc_gbif['rank'].lower(), acc_gbif['status'].lower()),
+               'user': (tax_gbif['id'], acc_gbif['parent_key'], tax_gbif['canonical_name'],
+                        tax_gbif['rank'].lower(), tax_gbif['status'].lower())}
         hier_row = acc_gbif
 
     # Add the taxonomic hierarchy from the preferred usage
@@ -1328,17 +1276,17 @@ class Dataset(object):
         LOGGER.info('Validating {} taxa'.format(len(taxa)),
                     extra={'indent_before': 1, 'indent_after': 2})
 
-        for idx, taxon in enumerate(taxa):
+        for idx, txn in enumerate(taxa):
 
             # row index
             rw_num = idx + 2
 
             # Sanitize inputs. Only two patterns of taxon provision are valid:
             #   name + type + id and name + type
-            provided = [not is_blank(tx) for tx in taxon[1]]
+            provided = [not is_blank(tx) for tx in txn[1]]
 
             if provided not in [[True, True, False], [True, True, True]]:
-                LOGGER.error('Row {} ({}): incomplete information'.format(rw_num, taxon[0]))
+                LOGGER.error('Row {} ({}): incomplete information'.format(rw_num, txn[0]))
                 continue
 
             # The taxon input is now sanitized of obvious problems so can be validated against
@@ -1346,36 +1294,33 @@ class Dataset(object):
             # sure that valid taxa that have had parents provided get indexed correctly. It is
             # only an issue when taxa are not found and also have an invalid parent
 
-            if taxon[1][1].lower() not in backbone_types:
+            if txn[1][1].lower() not in backbone_types:
                 gbif_info = {'status': 'non-backbone'}
             elif self.gbif_conn is None:
-                gbif_info = web_gbif_validate(taxon[1][0], taxon[1][1],
-                                              taxon[1][2], backbone_types)
+                gbif_info = web_gbif_validate(txn[1][0], txn[1][1], txn[1][2])
             else:
-                gbif_info = local_gbif_validate(self.gbif_conn,
-                                                taxon[1][0], taxon[1][1],
-                                                taxon[1][2], backbone_types)
+                gbif_info = local_gbif_validate(self.gbif_conn, txn[1][0], txn[1][1], txn[1][2])
 
             # Handle immediately problematic lookup errors, leaving found and no_match
             # for cross checking against parent information
             if gbif_info['status'] == 'validation_fail':
-                LOGGER.error('Row {} ({}): validation failed'.format(rw_num, taxon[0]))
+                LOGGER.error('Row {} ({}): validation failed'.format(rw_num, txn[0]))
                 continue
             elif gbif_info['status'] == 'unknown_id':
-                LOGGER.error('Row {} ({}): GBIF ID not known'.format(rw_num, taxon[0]))
+                LOGGER.error('Row {} ({}): GBIF ID not known'.format(rw_num, txn[0]))
                 continue
             elif gbif_info['status'] == 'id_mismatch':
                 LOGGER.error('Row {} ({}): ID does not match name and '
-                             'rank'.format(rw_num, taxon[0]))
+                             'rank'.format(rw_num, txn[0]))
                 continue
             else:
                 tax_status = gbif_info['status']
 
             # Lookup the parent status and information
-            if taxon[2] == (None, None, None):
+            if txn[2] == (None, None, None):
                 par_status, parent_info = (None, None)
             else:
-                par_status, parent_info = parent_status[taxon[2]]
+                par_status, parent_info = parent_status[txn[2]]
 
             # Check the combinations of taxon and parent status. At this point
             # parents are one of found, no_match or None and taxa are one of
@@ -1398,14 +1343,14 @@ class Dataset(object):
                 # a) Good backbone with no parent, provide info on taxon status
                 if 'user' in gbif_info:
                     LOGGER.warn('Row {} ({}): considered a {} of {} in GBIF '
-                                'backbone'.format(rw_num, taxon[0], gbif_info['user'][4],
+                                'backbone'.format(rw_num, txn[0], gbif_info['user'][4],
                                                   gbif_info['canon'][2]))
                     self.taxon_index.add(gbif_info['user'] + (None, None))
                     self.taxon_index.add(gbif_info['canon'] + gbif_info['user'][2:4])
 
                 else:
                     LOGGER.info('Row {} ({}): in GBIF backbone '
-                                '({})'.format(rw_num, taxon[0], gbif_info['canon'][4]))
+                                '({})'.format(rw_num, txn[0], gbif_info['canon'][4]))
                     self.taxon_index.add(gbif_info['canon'] + (None, None))
 
                 # update hierarchy
@@ -1414,7 +1359,7 @@ class Dataset(object):
             elif tax_status == 'found' and par_status == 'invalid':
                 # b) Good backbone with bad parent
                 LOGGER.error('Row {} ({}): found but provided parent information is '
-                             'not valid.'.format(rw_num, taxon[0]))
+                             'not valid.'.format(rw_num, txn[0]))
 
             elif tax_status == 'found' and par_status == 'valid':
                 # c) Good backbone with good parent - are they compatible? Check if all
@@ -1423,11 +1368,11 @@ class Dataset(object):
                 taxon_hier = set(gbif_info['hier'])
                 if not set(parent_hier).issubset(taxon_hier):
                     LOGGER.error('Row {} ({}): found in GBIF backbone, but additional parent '
-                                 'information is incompatible'.format(rw_num, taxon[0]))
+                                 'information is incompatible'.format(rw_num, txn[0]))
                 else:
                     if 'user' in gbif_info:
                         LOGGER.warn('Row {} ({}): considered a {} of {} in GBIF '
-                                    'backbone'.format(rw_num, taxon[0], gbif_info['user'][4],
+                                    'backbone'.format(rw_num, txn[0], gbif_info['user'][4],
                                                       gbif_info['canon'][2]))
 
                         # Add user and canonical usage, including as_name and as_rank
@@ -1435,7 +1380,7 @@ class Dataset(object):
                         self.taxon_index.add(gbif_info['canon'] + gbif_info['user'][2:4])
                     else:
                         LOGGER.info('Row {} ({}): in GBIF backbone '
-                                    '({})'.format(rw_num, taxon[0], gbif_info['canon'][4]))
+                                    '({})'.format(rw_num, txn[0], gbif_info['canon'][4]))
                         self.taxon_index.add(gbif_info['canon'] + (None, None))
 
                     taxon_hierarchy.update(gbif_info['hier'])
@@ -1443,45 +1388,45 @@ class Dataset(object):
             elif tax_status == 'no_match' and par_status is None:
                 # d) Taxon is a backbone type but is not found in GBIF.
                 if 'note' in gbif_info:
-                    LOGGER.error('Row {} ({}): {}'.format(rw_num, taxon[0], gbif_info['note']))
+                    LOGGER.error('Row {} ({}): {}'.format(rw_num, txn[0], gbif_info['note']))
                 else:
                     LOGGER.error('Row {} ({}): name and rank combination '
-                                 'not found'.format(rw_num, taxon[0]))
+                                 'not found'.format(rw_num, txn[0]))
 
             elif tax_status == 'no_match' and par_status == 'invalid':
                 # d) Taxon is a backbone type not found in GBIF and the provided parent isn't valid
                 LOGGER.error('Row {} ({}): not found in GBIF and has invalid parent '
-                             'information.'.format(rw_num, taxon[0]))
+                             'information.'.format(rw_num, txn[0]))
 
             elif tax_status == 'no_match' and par_status == 'valid':
                 # e) Taxon is a backbone type that is not present in GBIF but the user has provided
                 #    a valid set of parent taxon information.
                 LOGGER.info('Row {} ({}): not found in GBIF but has valid parent '
-                            'information'.format(rw_num, taxon[0]))
+                            'information'.format(rw_num, txn[0]))
 
                 # construct a taxon index entry and add the parent hierarchy
-                self.taxon_index.add((-1, parent_info['canon'][1], taxon[1][0],
-                                      taxon[1][1].lower(), 'user', None, None))
+                self.taxon_index.add((-1, parent_info['canon'][1], txn[1][0],
+                                      txn[1][1].lower(), 'user', None, None))
                 taxon_hierarchy.update(parent_info['hier'])
 
             elif tax_status == 'non-backbone' and (par_status is None or par_status == 'invalid'):
                 # f) Taxon is a non-backbone type - must have a valid parent to be accepted.
                 LOGGER.error('Row {} ({}): taxa of type {} must have valid parent '
-                             'information.'.format(rw_num, taxon[0], taxon[1][1]))
+                             'information.'.format(rw_num, txn[0], txn[1][1]))
 
             elif tax_status == 'non-backbone' and par_status == 'valid':
                 # g) Taxon is a non backbone type with good parent info
                 LOGGER.info("Row {} ({}): {} with valid parent "
-                            "information ".format(rw_num, taxon[0], taxon[1][1]))
+                            "information ".format(rw_num, txn[0], txn[1][1]))
 
                 # construct the taxon index - use the name for alternative types,
                 # otherwise use the taxon name
-                if taxon[1][1].lower() in alt_types:
-                    taxon_entry = (-1, parent_info['canon'][1], taxon[0],
-                                   taxon[1][1].lower(), 'user', None, None)
+                if txn[1][1].lower() in alt_types:
+                    taxon_entry = (-1, parent_info['canon'][1], txn[0],
+                                   txn[1][1].lower(), 'user', None, None)
                 else:
-                    taxon_entry = (-1, parent_info['canon'][1], taxon[1][0],
-                                   taxon[1][1].lower(), 'user', None, None)
+                    taxon_entry = (-1, parent_info['canon'][1], txn[1][0],
+                                   txn[1][1].lower(), 'user', None, None)
 
                 self.taxon_index.add(taxon_entry)
                 taxon_hierarchy.update(parent_info['hier'])
@@ -1500,11 +1445,10 @@ class Dataset(object):
         taxon_hierarchy.sort(key=lambda val: backbone_types.index(val[0]))
         LOGGER.info('Indexing taxonomic hierarchy', extra={'indent_before': 1, 'indent_after': 2})
 
-        # The two versions differ in what is used to look up hierarchy. The web API
-        # has (rank, GBIF ID) and the local API has (rank, canonical name)
+        # Look up the taxonomic hierarchy
         for tx_lev, tx_id in taxon_hierarchy:
             if self.gbif_conn is not None:
-                canon = local_gbif_validate(self.gbif_conn, tx_id, tx_lev)['canon']
+                canon = local_gbif_validate(self.gbif_conn, None, None, gbif_id=tx_id)['canon']
             else:
                 canon = web_gbif_validate(None, None, gbif_id=tx_id)['canon']
 
