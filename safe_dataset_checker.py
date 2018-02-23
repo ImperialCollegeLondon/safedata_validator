@@ -390,7 +390,7 @@ def web_gbif_validate(tax, rnk, gbif_id=None, backbone_types=BACKBONE_TYPES):
             return {'status': 'found', 'canon': canon, 'user': user, 'hier': hier}
 
 
-def local_gbif_validate(conn, tax, rnk, gbif_id=None, backbone_types=BACKBONE_TYPES):
+def local_gbif_validate(conn, tax, rnk, gbif_id=None):
 
     """
     Validates a taxon name and rank against a connection to a local GBIF database.
@@ -402,9 +402,6 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None, backbone_types=BACKBONE_TY
         gbif_id: Optional GBIF taxon id to resolve ambiguous taxon/rank
             combinations. If gbif_id is not None, then tax and rank can be
             None and the GBIF response will be used to populate those values.
-        backbone_types: A list of higher taxon rank names to be added
-            to the index along with the target taxon. This should be
-            in rank order from root to tip.
 
     Returns:
         A dictionary with the following possible keys:
@@ -428,50 +425,32 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None, backbone_types=BACKBONE_TY
             A 5 tuple: taxon ID, parent ID, name, rank, status
         """
 
-        # handle kingdoms with no parents
-        if row['parentNameUsageID'] == '':
-            parent = None
-        else:
-            parent = int(row['parentNameUsageID'])
-
-        return (int(row['taxonID']), parent, row['canonicalName'],
-                row['taxonRank'], row['taxonomicStatus'])
+        return (row['id'], row['parent_key'], row['canonical_name'],
+                row['rank'].lower(), row['status'].lower())
 
     # Make sure the connection is returning results as sqlite.Row objects
     if conn.row_factory != sqlite3.Row:
         conn.row_factory = sqlite3.Row
 
+    # This if else section either runs through with a single Row assigned
+    # to tax_gbif or exits returning an error condition of some sort
     if gbif_id is not None:
         # get the record associated with the provided ID
-        tax_sql = ("select * from backbone where taxonID={}".format(gbif_id))
+        tax_sql = ("select * from backbone where id = {}".format(gbif_id))
         tax_gbif = conn.execute(tax_sql).fetchone()
 
         # check there is a result and that it is congruent with any
         # provided taxon or rank information
         if tax_gbif is None:
             return {'status': 'unknown_id'}
-        elif ((tax is not None and tax_gbif['canonicalName'] != tax) or
-              (rnk is not None and tax_gbif['taxonRank'] != rnk.lower())):
+        elif ((tax is not None and tax_gbif['canonical_name'] != tax) or
+              (rnk is not None and tax_gbif['rank'].lower() != rnk.lower())):
             return {'status': 'id_mismatch'}
 
-        #  store the names of the backbone hierarchy in the row
-        hier = [(hi, tax_gbif[hi]) for hi in backbone_types
-                if hi in tax_gbif.keys() and tax_gbif[hi] != u'']
-
-        if tax_gbif['taxonomicStatus'] in ['accepted', 'doubtful']:
-            # Accepted taxon
-            return {'status': 'found', 'canon': _row_to_index_tuple(tax_gbif), 'hier': hier}
-        else:
-            # synonym or misapplied, so find the accepted usage
-            acc_id = tax_gbif['acceptedNameUsageID']
-            acc_sql = 'select * from backbone where taxonID = {};'.format(acc_id)
-            acc_gbif = conn.execute(acc_sql).fetchone()
-            return {'status': 'found', 'canon': _row_to_index_tuple(acc_gbif),
-                    'user': _row_to_index_tuple(tax_gbif), 'hier': hier}
     else:
         # get the set of records associated with the taxon or rank
-        tax_sql = ("select * from backbone where canonicalName='{}' and "
-                   "taxonRank='{}';".format(tax, rnk.lower()))
+        tax_sql = ("select * from backbone where canonical_name ='{}' and "
+                   "rank= '{}';".format(tax, rnk.upper()))
         tax_gbif = conn.execute(tax_sql).fetchall()
 
         if len(tax_gbif) == 0:
@@ -486,7 +465,7 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None, backbone_types=BACKBONE_TY
             # of the different statuses.
 
             # First, get the taxon statuses
-            tx_status = [tx['taxonomicStatus'] for tx in tax_gbif]
+            tx_status = [tx['status'].lower() for tx in tax_gbif]
             tx_counts = Counter(tx_status)
 
             if 'accepted' in tx_counts.keys():
@@ -512,10 +491,11 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None, backbone_types=BACKBONE_TY
                             'note': 'Multiple equal matches for {}'.format(tax)}
 
             else:
-                # Rows can now contain synonyms (of varying kinds) and misapplied. Both of
-                # these types have accepted usage values, so look for a unique accepted usage.
-                tx_acc = {tx['acceptedNameUsageID'] for tx in tax_gbif
-                          if tx['acceptedNameUsageID'] != u''}
+                # Rows now contain only synonyms (of varying kinds) and misapplied. Both of
+                # these types have accepted usage values, so look for a unique accepted usage,
+                # trapping the edge case of kingdoms, which have no parent_key.
+
+                tx_acc = {tx['parent_key'] for tx in tax_gbif if tx['parent_key'] is not None}
 
                 if len(tx_acc) > 1:
                     # More than one accepted usage
@@ -525,20 +505,25 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None, backbone_types=BACKBONE_TY
                     # A single accepted usage - pick the first row to index
                     tax_gbif = tax_gbif[0]
 
-        # Should now have a single row for the preferred hit
-        # i) store the names of the backbone hierarchy in the row
-        hier = [(hi, tax_gbif[hi]) for hi in backbone_types
-                if hi in tax_gbif.keys() and tax_gbif[hi] != u'']
+    # Should now have a single row for the preferred hit
+    # i) store the keys of the backbone hierarchy in the row
+    hier = [(rk, tax_gbif[ky])
+            for rk, ky in [('kingdom', 'kingdom_key'), ('phylum', 'phylum_key'),
+                           ('class', 'class_key'), ('order', 'order_key'),
+                           ('family', 'family_key'), ('genus', 'genus_key'),
+                           ('species', 'species_key')]
+            if tax_gbif[ky] is not None]
 
-        if tax_gbif['taxonomicStatus'] in ['accepted', 'doubtful']:
-            return {'status': 'found',  'canon': _row_to_index_tuple(tax_gbif), 'hier': hier}
-        else:
-            # synonym or misapplied, so find the accepted usage
-            acc_id = tax_gbif['acceptedNameUsageID']
-            acc_sql = 'select * from backbone where taxonID = {};'.format(acc_id)
-            acc_gbif = conn.execute(acc_sql).fetchone()
-            return {'status': 'found', 'canon': _row_to_index_tuple(acc_gbif),
-                    'user': _row_to_index_tuple(tax_gbif), 'hier': hier}
+    if tax_gbif['status'].lower() in ['accepted', 'doubtful']:
+        return {'status': 'found',  'canon': _row_to_index_tuple(tax_gbif), 'hier': hier}
+    else:
+        # This is currently assuming that the parent_key is always
+        # the accepted usage for synonymous or misapplied taxa.
+        acc_id = tax_gbif['parent_key']
+        acc_sql = 'select * from backbone where id = {};'.format(acc_id)
+        acc_gbif = conn.execute(acc_sql).fetchone()
+        return {'status': 'found', 'canon': _row_to_index_tuple(acc_gbif),
+                'user': _row_to_index_tuple(tax_gbif), 'hier': hier}
 
 
 """
