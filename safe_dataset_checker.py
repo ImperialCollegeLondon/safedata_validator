@@ -1254,7 +1254,7 @@ class Dataset(object):
             if self.gbif_conn is None:
                 prnt_info = web_gbif_validate(prnt[0], prnt[1], prnt[2])
             else:
-                prnt_info = local_gbif_validate(self.gbif_conn, prnt[0], prnt[1])
+                prnt_info = local_gbif_validate(self.gbif_conn, prnt[0], prnt[1], prnt[2])
 
             # handle lookup errors
             if prnt_info['status'] == 'validation_fail':
