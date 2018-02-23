@@ -58,42 +58,38 @@ unaccepted_xtab <- xtabs(n ~ child + parent, data=unaccepted_data)
 sum(unaccepted_xtab[diag_index > 0])/sum(unaccepted_xtab)
 sum(unaccepted_xtab[diag_index > 1])/sum(unaccepted_xtab)
 
+# specifically doubtful taxa: how bad is it?
+doubtful_data <- dbGetQuery(mydb, "
+SELECT a.taxonRank AS child, 
+       b.taxonRank AS parent, 
+       count(*) AS n
+    FROM (
+        SELECT parentNameUsageID, taxonRank 
+            FROM backbone 
+            WHERE taxonomicStatus == 'doubtful') a 
+    JOIN (
+        SELECT taxonID, taxonRank 
+            FROM backbone 
+            WHERE taxonomicStatus == 'accepted') b
+    ON a.parentNameUsageID = b.taxonID
+    GROUP BY a.taxonRank, b.taxonRank;")
+
+doubtful_data$parent <- factor(doubtful_data$parent, levels = tax_hier)
+doubtful_data$child <- factor(doubtful_data$child, levels = tax_hier)
+
+doubtful_xtab <- xtabs(n ~ child + parent, data=doubtful_data)
+
+# a lot map to equal or less nested status
+diag_index <- row(doubtful_xtab) - col(doubtful_xtab)
+sum(doubtful_xtab[diag_index > 0])/sum(doubtful_xtab)
+sum(doubtful_xtab[diag_index > 1])/sum(doubtful_xtab)
+
+
+
 library(knitr)
 kable(accepted_xtab)
 kable(unaccepted_xtab)
-
-# Other queries used
-# select taxonRank, count(*) from backbone
-    # where taxonID in
-        # (select parentNameUsageID from backbone 
-            # where taxonRank = 'subspecies' 
-            # and taxonomicStatus != 'accepted'
-            # and parentNameUsageID is not null)
-    # group by taxonRank;
+kable(doubtful_xtab)
 
 
-# select taxonRank, count(*) from backbone
-    # where taxonID in
-        # (select parentNameUsageID from backbone 
-            # where taxonRank = 'species' 
-            # and taxonomicStatus != 'accepted'
-            # and parentNameUsageID is not null)
-    # group by taxonRank;
-
-
-# -- getting examples of oddly hooked in taxa
-# select * from backbone
-    # where taxonID in
-        # (select parentNameUsageID from backbone 
-            # where taxonRank = 'form' 
-            # and taxonomicStatus != 'accepted'
-            # and parentNameUsageID is not null)
-    # and taxonRank = 'variety'
-    # limit 10;
-
-# --
-# select * from backbone 
-    # where taxonRank = 'species' 
-    # and taxonomicStatus != 'accepted'
-    # and parentNameUsageID = 6410348;
 
