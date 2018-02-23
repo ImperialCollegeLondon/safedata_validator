@@ -505,25 +505,29 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
                     # A single accepted usage - pick the first row to index
                     tax_gbif = tax_gbif[0]
 
-    # Should now have a single row for the preferred hit
-    # i) store the keys of the backbone hierarchy in the row
-    hier = [(rk, tax_gbif[ky])
-            for rk, ky in [('kingdom', 'kingdom_key'), ('phylum', 'phylum_key'),
-                           ('class', 'class_key'), ('order', 'order_key'),
-                           ('family', 'family_key'), ('genus', 'genus_key'),
-                           ('species', 'species_key')]
-            if tax_gbif[ky] is not None]
-
+    # Should now have a single row for the preferred hit, so package that up
     if tax_gbif['status'].lower() in ['accepted', 'doubtful']:
-        return {'status': 'found',  'canon': _row_to_index_tuple(tax_gbif), 'hier': hier}
+        ret = {'status': 'found',
+               'canon': _row_to_index_tuple(tax_gbif)}
+        hier_row = tax_gbif
     else:
-        # This is currently assuming that the parent_key is always
-        # the accepted usage for synonymous or misapplied taxa.
-        acc_id = tax_gbif['parent_key']
-        acc_sql = 'select * from backbone where id = {};'.format(acc_id)
+        # Look up the parent_key, which is the accepted usage key for synonyms.
+        acc_sql = 'select * from backbone where id = {};'.format(tax_gbif['parent_key'])
         acc_gbif = conn.execute(acc_sql).fetchone()
-        return {'status': 'found', 'canon': _row_to_index_tuple(acc_gbif),
-                'user': _row_to_index_tuple(tax_gbif), 'hier': hier}
+        ret = {'status': 'found',
+               'canon': _row_to_index_tuple(acc_gbif),
+               'user': _row_to_index_tuple(tax_gbif)}
+        hier_row = acc_gbif
+
+    # Add the taxonomic hierarchy from the preferred usage
+    ret['hier'] = [(rk, hier_row[ky])
+                   for rk, ky in [('kingdom', 'kingdom_key'), ('phylum', 'phylum_key'),
+                                  ('class', 'class_key'), ('order', 'order_key'),
+                                  ('family', 'family_key'), ('genus', 'genus_key'),
+                                  ('species', 'species_key')]
+                   if hier_row[ky] is not None]
+
+    return ret
 
 
 """
