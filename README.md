@@ -186,15 +186,57 @@ steps are:
 
            sqlite3 backbone-current-simple.sqlite < backbone-ddl.sql
 
-    * Now open up the new SQLite database and enter the following commands
-    to import the data and then build two indices to speed up searches:
-    on the canonical names of taxa and taxon ranks, and on the taxon id.
-    This is a big file, so these might take several minutes to complete.
+    * Now open up the new SQLite database and import the data. This will
+      take a while as the file is large.
 
            sqlite3 backbone-current-simple.sqlite
            .mode tab
            .import backbone-current-simple-truncate.txt backbone
-           # create covering indices
+
+    *  The file contains a lot of `\N` values, which is a PostgreSQL
+       symbol for a null field. SQLite 3 treats these as strings, so
+       they need to be reset to `null` for each field that contains
+       them. It might seem easier to simple delete all the `\N` values
+       in the file to leave empty fields but SQLite3 then imports these
+       as empty strings, not as null.
+
+            update backbone set id = null where id = '\N';
+            update backbone set parent_key = null where parent_key = '\N';
+            update backbone set basionym_key = null where basionym_key = '\N';
+            update backbone set is_synonym = null where is_synonym = '\N';
+            update backbone set status = null where status = '\N';
+            update backbone set rank = null where rank = '\N';
+            update backbone set nom_status = null where nom_status = '\N';
+            update backbone set constituent_key = null where constituent_key = '\N';
+            update backbone set origin = null where origin = '\N';
+            update backbone set source_taxon_key = null where source_taxon_key = '\N';
+            update backbone set kingdom_key = null where kingdom_key = '\N';
+            update backbone set phylum_key = null where phylum_key = '\N';
+            update backbone set class_key = null where class_key = '\N';
+            update backbone set order_key = null where order_key = '\N';
+            update backbone set family_key = null where family_key = '\N';
+            update backbone set genus_key = null where genus_key = '\N';
+            update backbone set species_key = null where species_key = '\N';
+            update backbone set name_id = null where name_id = '\N';
+            update backbone set scientific_name = null where scientific_name = '\N';
+            update backbone set canonical_name = null where canonical_name = '\N';
+            update backbone set genus_or_above = null where genus_or_above = '\N';
+            update backbone set specific_epithet = null where specific_epithet = '\N';
+            update backbone set infra_specific_epithet = null where infra_specific_epithet = '\N';
+            update backbone set notho_type = null where notho_type = '\N';
+            update backbone set authorship = null where authorship = '\N';
+            update backbone set year = null where year = '\N';
+            update backbone set bracket_authorship = null where bracket_authorship = '\N';
+            update backbone set bracket_year = null where bracket_year = '\N';
+            update backbone set issues = null where issues = '\N';
+
+    *  Now enter these two commands to build two indices to create
+       covering indices to speed up the two kinds of searches used by
+       `safe_dataset_checker.py`: i) searches on the canonical name
+       and rank of a taxon and ii) searches on the taxon id. That is the
+       last step so then quit.
+       SQLite3 because
+
            create index backbone_name_rank on backbone (canonical_name, rank);
            create index backbone_id on backbone (id);
            .quit
