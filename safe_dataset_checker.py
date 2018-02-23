@@ -539,12 +539,20 @@ class Dataset(object):
         LOG.truncate(0)
 
         if verbose:
-            # Add a stream handler writing to stdout, using the common formatter instance,
-            # as well as the logging to the global LOG StringIO, otherwise command line 
-            # usage doesn't see any output.
-            stdout = logging.StreamHandler()
-            stdout.setFormatter(FORMATTER)
-            LOGGER.addHandler(stdout)
+            # Look to see if the logger already has a verbose handler writing to the console and
+            # add one if it doesn't. This is primarly to provide output for command line usage.
+            handler_names = [handler.get_name() for handler in LOGGER.handlers]
+            if 'console_log' not in handler_names:
+                console_log = logging.StreamHandler()
+                console_log.setFormatter(FORMATTER)
+                console_log.set_name('console_log')
+                LOGGER.addHandler(console_log)
+        elif not verbose:
+            # Remove the console_log handler if one exists
+            handler_names = [handler.get_name() for handler in LOGGER.handlers]
+            if 'console_log' in handler_names:
+                console_log_handler = LOGGER.handlers[handler_names.index('console_log')]
+                LOGGER.removeHandler(console_log_handler)
 
         LOGGER.info("Checking file '{}'".format(filename),
                     extra={'indent_before': 0, 'indent_after': 1})
