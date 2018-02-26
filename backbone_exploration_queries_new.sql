@@ -151,3 +151,46 @@ select * from backbone
     where rank = 'species'
     and status != 'accepted'
     and parent_key = 6410348;
+
+select * from (
+  SELECT
+    canonical_name,
+    class_key,
+    count(CASE WHEN rank = 'SPECIES' THEN 1 END) as sp,
+    count(CASE WHEN rank = 'SUBSPECIES' THEN 1 END) as ssp
+  FROM backbone
+    WHERE phylum_key = 44
+    GROUP BY canonical_name) as nsp
+  WHERE nsp.sp > 0 AND nsp.ssp > 0;
+
+-- looking for cases where users might want to specify a particular
+-- taxon rather than the accepted taxon that GBIF provides
+
+SELECT spp.canonical_name
+  FROM (SELECT canonical_name, status, parent_key
+    FROM backbone
+    WHERE canonical_name IN (
+      -- find birds species names with two usages
+      SELECT canonical_name FROM (
+        SELECT
+          canonical_name,
+          count(*) as n
+        FROM backbone
+          WHERE class_key = 212
+          and rank = 'SPECIES'
+          GROUP BY canonical_name) as nsp
+        WHERE nsp.n = 2)) AS spp
+  INNER JOIN (SELECT id, rank FROM backbone) ataonttas par
+  ON spp.parent_key = par.id
+  WHERE par.rank = 'SUBSPECIES';
+
+
+SELECT * FROM (
+  SELECT
+    canonical_name,
+    count(*) as n
+  FROM backbone
+    WHERE class_key = 212
+    and rank = 'SPECIES'
+    GROUP BY canonical_name) as nsp
+  WHERE nsp.n = 2;

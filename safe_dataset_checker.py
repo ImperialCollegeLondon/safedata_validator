@@ -1430,10 +1430,10 @@ class Dataset(object):
                 # construct the taxon index - use the name for alternative types,
                 # otherwise use the taxon name
                 if txn[1][1].lower() in alt_types:
-                    taxon_entry = (-1, parent_info['canon'][1], txn[0],
+                    taxon_entry = (-1, parent_info['canon'][0], txn[0],
                                    txn[1][1].lower(), 'user', None, None)
                 else:
-                    taxon_entry = (-1, parent_info['canon'][1], txn[1][0],
+                    taxon_entry = (-1, parent_info['canon'][0], txn[1][0],
                                    txn[1][1].lower(), 'user', None, None)
 
                 self.taxon_index.add(taxon_entry)
