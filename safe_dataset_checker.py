@@ -1925,6 +1925,11 @@ class Dataset(object):
             data: A list of data values, allegedly of type datetime.time
         """
 
+        # Openpyxl reads midnight (value 0) as a specific datetime value
+        # rather than a time so catch that.
+        data = [datetime.time(0,0) if d == datetime.datetime(1899, 12, 30, 0, 0) else d
+                for d in data]
+
         # Check type (excluding NA values)
         type_check = set([type(vl) for vl in data])
         if type_check != {datetime.time}:
