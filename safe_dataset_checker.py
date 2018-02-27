@@ -1927,7 +1927,7 @@ class Dataset(object):
 
         # Openpyxl reads midnight (value 0) as a specific datetime value
         # rather than a time so catch that.
-        data = [datetime.time(0,0) if d == datetime.datetime(1899, 12, 30, 0, 0) else d
+        data = [datetime.time(0, 0) if d == datetime.datetime(1899, 12, 30, 0, 0) else d
                 for d in data]
 
         # Check type (excluding NA values)
