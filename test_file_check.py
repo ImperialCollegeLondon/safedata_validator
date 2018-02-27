@@ -22,6 +22,8 @@ ds.load_locations(locations_json=loc_json)
 ds.load_taxa()
 ds.load_data_worksheet(ds.dataworksheet_summaries[0])
 ds.load_data_worksheet(ds.dataworksheet_summaries[1])
+ds.load_data_worksheet(ds.dataworksheet_summaries[2])
+
 ds.final_checks()
 
 # Checking logging modes
@@ -46,8 +48,10 @@ results = {}
 
 for pth, subdirs, files in datasets:
     if '/' in pth:
-        xlfiles = [os.path.join(pth, fl) for fl in files if fl.endswith('.xlsx')]
+        xlfiles = [os.path.join(pth, fl) for fl in files
+                   if fl.endswith('.xlsx') and not fl.startswith('~$')]
         for xlf in xlfiles:
+            print xlf
             results[xlf] = check_file(xlf, locations_json=loc_json, gbif_database=gbif_db, verbose=False)
 
 

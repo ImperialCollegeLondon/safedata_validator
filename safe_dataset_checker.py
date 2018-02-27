@@ -1910,9 +1910,10 @@ class Dataset(object):
                 LOGGER.error('Some values also contain time components')
 
         # update the field metadata and the dataset extent
-        extent = (min(data), max(data))
-        meta['range'] = extent
-        self.update_extent(extent, datetime.datetime, 'temporal_extent')
+        if len(data):
+            extent = (min(data), max(data))
+            meta['range'] = extent
+            self.update_extent(extent, datetime.datetime, 'temporal_extent')
 
     def check_field_time(self, meta, data):
 
@@ -1937,7 +1938,8 @@ class Dataset(object):
 
         # update the field metadata
         real_times = [dt for dt in data if isinstance(dt, datetime.time)]
-        meta['range'] = (min(real_times), max(real_times))
+        if len(real_times):
+            meta['range'] = (min(real_times), max(real_times))
 
     def check_field_taxa(self, data):
 
