@@ -34,8 +34,7 @@ from StringIO import StringIO
 import numbers
 import logging
 import sqlite3
-import openpyxl
-from openpyxl import utils
+import xlrd
 import requests
 import simplejson
 
@@ -198,9 +197,9 @@ def duplication(data):
     return [ky for ky, vl in Counter(data).iteritems() if vl > 1]
 
 
-def is_integer_string(txt):
+def is_numeric_string(txt):
     """
-    Checks if a string value can represent an integer.
+    Checks if a string value can represent an float.
     Args:
         txt: A string
 
@@ -208,7 +207,7 @@ def is_integer_string(txt):
         A boolean.
     """
     try:
-        int(txt)
+        float(txt)
         return True
     except ValueError:
         return False
@@ -225,7 +224,7 @@ def all_numeric(data):
         values were numbers and then a list of the genuine numeric values
     """
 
-    nums = [vl for vl in data if isinstance(vl, numbers.Number)]
+    nums = [dt for dt in data if isinstance(dt, numbers.Number)]
 
     return [len(nums) == len(data), nums]
 
@@ -525,8 +524,7 @@ class Dataset(object):
     def __init__(self, filename, verbose=True, gbif_database=None):
 
         try:
-            self.workbook = openpyxl.load_workbook(filename=filename, data_only=True,
-                                                   read_only=True)
+            self.workbook = xlrd.open_workbook(filename=filename)
         except IOError:
             raise IOError('Could not open file {}'.format(filename))
 
@@ -558,7 +556,7 @@ class Dataset(object):
                     extra={'indent_before': 0, 'indent_after': 1})
 
         # basic info
-        self.sheet_names = set(self.workbook.get_sheet_names())
+        self.sheet_names = set(self.workbook.sheet_names())
 
         # initialise data contents
         self.project_id = None
@@ -665,30 +663,19 @@ class Dataset(object):
         start_errors = CH.counters['ERROR']
 
         try:
-            worksheet = self.workbook['Summary']
-        except KeyError:
+            worksheet = self.workbook.sheet_by_name('Summary')
+        except xlrd.XLRDError:
             LOGGER.error("Summary worksheet not found, moving on.")
             return None
 
-        # load dictionary of summary information block, allowing for multiple
-        # columns for fields (data compilers, dataset sheets).
-        # Note that worksheet.columns can load some odd invisible empty cells:
-        # it doesn't guarantee an equal number of cells in each column. So
-        # use the squared range.
-        mxcl = worksheet.max_column
-        mxrw = worksheet.max_row
+        # load cell values and types - list containing lists of row contents
+        summary_values = worksheet._cell_values
+        summary_types = worksheet._cell_types
+        ncols = worksheet.ncols
 
-        # populate block of rows of cell objects
-        data = list(worksheet.get_squared_range(1, 1, mxcl, mxrw))
-
-        # transpose and get values
-        data = zip(*data)
-        cols = tuple(tuple(cell.value for cell in col) for col in data)
-
-        # convert into dictionary
-        hdrs = cols[0]
-        values = zip(*cols[1:])
-        summary = {ky: vl for ky, vl in zip(hdrs, values)}
+        # convert into dictionary using the first entry as the key
+        summary = {rw[0]: rw[1:] for rw in summary_values}
+        summary_types = {vl[0]: tp[1:] for vl, tp in zip(summary_values, summary_types)}
 
         # Check the minimal keys are expected
         required = {"SAFE Project ID", "Access status", "Title", "Description",
@@ -701,17 +688,14 @@ class Dataset(object):
         if not found.issuperset(required):
             LOGGER.warn('Missing metadata fields: ', extra={'join': required - found})
 
-        # # check for contents
-        # if any([set(x) == {None} for x in summary.values()]):
-        #     LOGGER.error('Metadata fields with no information.', 1)
-
         # CHECK PROJECT ID
+        pid = summary['SAFE Project ID'][0]
         if 'SAFE Project ID' not in summary:
             LOGGER.warn('SAFE Project ID missing')
-        elif not isinstance(summary['SAFE Project ID'][0], long):
+        elif not isinstance(pid, float) or not pid.is_integer():
             LOGGER.warn('SAFE Project ID is not an integer')
         else:
-            self.project_id = summary['SAFE Project ID'][0]
+            self.project_id = pid
 
         # CHECK DATASET TITLE
         if 'Title' not in summary:
@@ -740,18 +724,20 @@ class Dataset(object):
             if 'Embargo date' not in summary:
                 LOGGER.error('Dataset embargoed but embargo date row missing.')
             elif is_blank(summary['Embargo'][0]):
-                LOGGER.error('Dataset embargo date  is blank')
+                LOGGER.error('Dataset embargo date is blank')
             else:
                 embargo_date = summary['Embargo date'][0]
-                now = datetime.datetime.now()
-                if not isinstance(embargo_date, datetime.datetime):
+                if summary_types['Embargo date'][0] != xlrd.XL_CELL_DATE:
                     LOGGER.error('Embargo date not formatted as date.')
-                elif embargo_date < now:
-                    LOGGER.error('Embargo date is in the past.')
-                elif embargo_date > now + datetime.timedelta(days=2 * 365):
-                    LOGGER.error('Embargo date more than two years in the future.')
                 else:
-                    self.embargo_date = embargo_date.date().isoformat()
+                    now = datetime.datetime.now()
+                    embargo_date = xlrd.xldate_as_datetime(embargo_date, self.workbook.datemode)
+                    if embargo_date < now:
+                        LOGGER.error('Embargo date is in the past.')
+                    elif embargo_date > now + datetime.timedelta(days=2 * 365):
+                        LOGGER.error('Embargo date more than two years in the future.')
+                    else:
+                        self.embargo_date = embargo_date.date().isoformat()
 
         # CHECK KEYWORDS
         if 'Keywords' not in summary:
@@ -761,8 +747,9 @@ class Dataset(object):
         else:
             # drop any blanks
             self.keywords = [vl for vl in summary['Keywords'] if not is_blank(vl)]
-            if len(self.keywords) == 1 and ',' in self.keywords[0]:
-                LOGGER.error('Put keywords in separate cells, not comma delimited in one cell')
+            # look for commas
+            if any(',' in kw for kw in self.keywords[0]):
+                LOGGER.error('Put each keyword in a separate cell, do not use commas')
 
         # CHECK FOR PUBLICATION DOIs if any are provided
         if 'Publication DOI' in summary:
@@ -786,18 +773,18 @@ class Dataset(object):
         # Get the set of author fields and create blank entries for any missing fields
         # to simplify handling the error checking.
         author_keys = ['Author name', 'Author affiliation', 'Author email', 'Author ORCID']
-        authors = {k: summary[k] if k in summary else [None] * (len(cols) - 1)
+        authors = {k: summary[k] if k in summary else [None] * (len(ncols) - 1)
                    for k in author_keys}
 
-        # - switch in zenodo keys
+        # - switch in zenodo keys and set blank cells to None
         zenodo_keys = ['name', 'affiliation', 'email', 'orcid']
         for old, new in zip(author_keys, zenodo_keys):
-            authors[new] = authors[old]
+            authors[new] = [None if is_blank(dt) else dt for dt in authors[old]]
             authors.pop(old)
 
         # rotate and remove completely blank columns
         authors_list = zip(*authors.values())
-        authors_list = [x for x in authors_list if x != tuple([None] * 4)]
+        authors_list = [au for au in authors_list if not all(is_blank(vl) for vl in au)]
         # return to the original orientation
         authors = {k: v for k, v in zip(authors, zip(*authors_list))}
 
@@ -828,12 +815,12 @@ class Dataset(object):
                              extra={'join': bad_emails, 'quote': True})
 
         # iii) ORCiD (not mandatory)
-        author_orcid = [unicode(vl) for vl in authors['orcid'] if vl is not None]
-        if len(author_orcid) < len(authors['orcid']):
+        if any(is_blank(vl) for vl in authors['orcid']):
             LOGGER.warn('Missing ORCiDs, consider adding them!')
-        if author_orcid:
-            bad_orcid = [vl for vl in author_orcid if not RE_ORCID.match(vl)]
-            if bad_orcid:
+
+        bad_orcid = [vl for vl in authors['orcid'] if not is_blank(vl) and
+                     (not isinstance(vl, unicode) or not RE_ORCID.match(vl))]
+        if bad_orcid:
                 LOGGER.error('ORCID not properly formatted: ',
                              extra={'join': bad_orcid, 'quote': True})
 
@@ -842,40 +829,39 @@ class Dataset(object):
 
         # CHECK DATA WORKSHEETS
         ws_keys = ['Worksheet name', 'Worksheet title', 'Worksheet description']
-        data_worksheets = {k: summary[k] if k in summary else [None] * (len(cols) - 1)
+        data_worksheets = {k: summary[k] if k in summary else [None] * (len(ncols) - 1)
                            for k in ws_keys}
 
-        # - switch in short keys
+        # - switch in short keys and set blank cells to None
         short_ws_keys = ['name', 'title', 'description']
         for old, new in zip(ws_keys, short_ws_keys):
-            data_worksheets[new] = data_worksheets[old]
+            data_worksheets[new] = [None if is_blank(dt) else dt for dt in data_worksheets[old]]
             data_worksheets.pop(old)
 
         # rotate and remove completely blank columns
         data_worksheets_list = zip(*data_worksheets.values())
-        data_worksheets_list = [x for x in data_worksheets_list if x != tuple([None] * 3)]
+        data_worksheets_list = [ws for ws in data_worksheets_list
+                                if not all(is_blank(vl) for vl in ws)]
         # return to the original orientation
         data_worksheets = {k: v for k, v in zip(data_worksheets, zip(*data_worksheets_list))}
 
         # now check the contents
         # i) Names
-        ws_names = [vl for vl in data_worksheets['name'] if vl is not None]
-        if len(ws_names) < len(data_worksheets['name']):
+        if any(is_blank(vl) for vl in data_worksheets['name']):
             LOGGER.error('Missing worksheet names')
-        if ws_names:
-            bad_names = [vl for vl in ws_names if vl not in self.sheet_names]
-            if bad_names:
-                LOGGER.error('Worksheet names not found in workbook: ',
-                             extra={'join': bad_names, 'quote': True})
+
+        bad_names = [vl for vl in data_worksheets['name']
+                     if not is_blank(vl) and vl not in self.sheet_names]
+        if bad_names:
+            LOGGER.error('Worksheet names not found in workbook: ',
+                         extra={'join': bad_names, 'quote': True})
 
         # ii) Titles
-        blank_names = [is_blank(vl) for vl in data_worksheets['title']]
-        if any(blank_names):
+        if any(is_blank(vl) for vl in data_worksheets['title']):
             LOGGER.error('Missing worksheet title')
 
         # ii) Descriptions
-        blank_desc = [is_blank(vl) for vl in data_worksheets['description']]
-        if any(blank_desc):
+        if any(is_blank(vl) for vl in data_worksheets['description']):
             LOGGER.error('Missing worksheet description')
 
         # and finally store a list of dictionaries of data worksheet summary details
@@ -916,8 +902,8 @@ class Dataset(object):
         start_errors = CH.counters['ERROR']
 
         try:
-            locs_wb = self.workbook['Locations']
-        except KeyError:
+            locs_wb = self.workbook.sheet_by_name('Locations')
+        except xlrd.XLRDError:
             # No locations is pretty implausible, but still persevere as if
             # they aren't going to be required
             LOGGER.warn("No locations worksheet found - moving on")
@@ -949,7 +935,7 @@ class Dataset(object):
             aliases = {}
 
         # ITERATE OVER THE WORKSHEET ROWS
-        loc_rows = locs_wb.rows
+        loc_rows = locs_wb.get_rows()
 
         # Get the field headers:
         # Duplicated headers are a problem because the values in the locations dictionaries get
@@ -971,11 +957,14 @@ class Dataset(object):
         locs = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in loc_rows]
 
         # strip out any rows that consist of nothing but empty cells
-        locs = [row for row in locs if not all([is_blank(vl) for vl in row.values()])]
+        locs = [row for row in locs if not all(is_blank(vl) for vl in row.values())]
 
-        # Location name cleaning - get names as strings
+        # Location name cleaning - convert floats to unicode via int to handle fractal point numbers
         for rw in locs:
-            rw['Location name'] = unicode(rw['Location name'])
+            if isinstance(rw['Location name'], unicode):
+                pass
+            elif isinstance(rw['Location name'], float):
+                rw['Location name'] = unicode(int(rw['Location name']))
 
         # check for rogue whitespace
         ws_padded = [rw['Location name'] for rw in locs if is_padded(rw['Location name'])]
@@ -1134,8 +1123,8 @@ class Dataset(object):
         start_errors = CH.counters['ERROR']
 
         try:
-            sheet = self.workbook['Taxa']
-        except KeyError:
+            sheet = self.workbook.sheet_by_name('Taxa')
+        except xlrd.XLRDError:
             # This might mean that the study doesn't have any taxa, so return an empty
             # set. If the datasets then contain taxonomic names, it'll fail gracefully.
             LOGGER.warn("No taxa worksheet found - assuming no taxa in data for now!")
@@ -1143,7 +1132,7 @@ class Dataset(object):
 
         # A) SANITIZE INPUTS
         # get and check the headers
-        tx_rows = sheet.rows
+        tx_rows = sheet.get_rows()
         hdrs = [cl.value for cl in tx_rows.next()]
 
         # duplicated headers are a problem in that it will cause values in the taxon
@@ -1187,13 +1176,11 @@ class Dataset(object):
             return
         else:
             # Validate the names used within the data
-            taxon_names = [(tx['name'], is_blank(tx['name'])) for tx in taxa]
-
             # Any missing names?
-            if any(zip(*taxon_names)[1]):
+            if any(is_blank(tx['name']) for tx in taxa):
                 LOGGER.error('Blank entries in name column')
 
-            taxon_names = [tx[0] for tx in taxon_names if not tx[1]]
+            taxon_names = [tx['name'] for tx in taxa if not is_blank(tx['name'])]
 
             # Any duplication in cleaned names
             dupes = duplication(taxon_names)
@@ -1211,10 +1198,15 @@ class Dataset(object):
 
             # Standardize the taxon representation into a three tuple:
             # (name, (taxon name, taxon type, taxon id), (parent name, parent type, parent id))
-            # The dict.get() method automatically fills in None for missing keys.
+            # The dict.get() method automatically fills in None for missing keys, but still need
+            # to be wary of blank entries
             taxa = [(tx['name'],
-                     (tx.get('taxon name'), tx.get('taxon type'), tx.get('taxon id')),
-                     (tx.get('parent name'), tx.get('parent type'), tx.get('parent id')))
+                     (None if is_blank(tx.get('taxon name')) else tx.get('taxon name'),
+                      None if is_blank(tx.get('taxon type')) else tx.get('taxon type'),
+                      None if is_blank(tx.get('taxon id')) else tx.get('taxon id')),
+                     (None if is_blank(tx.get('parent name')) else tx.get('parent name'),
+                      None if is_blank(tx.get('parent type')) else tx.get('parent type'),
+                      None if is_blank(tx.get('parent id')) else tx.get('parent id')))
                     for tx in taxa]
 
         # B) VALIDATE TAXONOMY
@@ -1232,7 +1224,7 @@ class Dataset(object):
 
         # Check parents first, populating a dictionary keyed on unique parent tuple to
         # record the status of checked parents along with parent gbif information if valid
-        parents = set([tx[2] for tx in taxa if tx[2] != (None, None, None)])
+        parents = set([tx[2] for tx in taxa if not all(is_blank(vl) for vl in tx[2])])
         parent_status = dict()
 
         if len(parents):
@@ -1244,7 +1236,7 @@ class Dataset(object):
             # Sanitize inputs. Only two patterns of taxon provision are valid:
             #   name + type + id and name + type
             provided = [not is_blank(p) for p in prnt]
-            prnt_string = ', '.join([str(p) for p in prnt if p is not None])
+            prnt_string = ', '.join([str(pi) for pi, pr in zip(prnt, provided) if pr])
 
             # initialise the status with invalid and no information
             parent_status[prnt] = ('invalid', None)
@@ -1500,81 +1492,70 @@ class Dataset(object):
         start_errors = CH.counters['ERROR']
 
         # get the worksheet and data dimensions
-        worksheet = self.workbook[dwsh.name]
-        dwsh.max_col = worksheet.max_column
-        dwsh.max_row = worksheet.max_row
+        worksheet = self.workbook.sheet_by_name(dwsh.name)
+        dwsh.max_col = worksheet.ncols
+        dwsh.max_row = worksheet.nrows
 
         # trap completely empty worksheets
-        if dwsh.max_row == 1:
+        if dwsh.max_row == 0:
             LOGGER.error('Worksheet is empty')
             return
 
-        # get the metadata field names
-        # - first search at most the first 10 rows for the 'field_name' descriptor
-        #   which shows the end of the metadata and the start of the data
-        descriptors = [worksheet.cell(column=1, row=rw).value
-                       for rw in range(1, min(10, dwsh.max_row) + 1)]
-        if 'field_name' in descriptors:
-            dwsh.field_name_row = descriptors.index('field_name') + 1
-            dwsh.descriptors = descriptors[:dwsh.field_name_row]
+        # get the metadata field names and row numbers - automatically finding
+        # the bounds of a worksheet is unreliable so mandatory row numbering is
+        # used to make it explicit
+        first_column = worksheet.col_values(0)
+        first_column_types = worksheet.col_types(0)
+
+        # separate the row descriptors from the row_numbers
+        if 'field_name' in first_column:
+            dwsh.field_name_row = first_column.index('field_name') + 1
+            dwsh.descriptors = first_column[:dwsh.field_name_row]
+            row_numbers = first_column[dwsh.field_name_row:]
+            row_types = first_column_types[dwsh.field_name_row:]
         else:
             LOGGER.error('Cannot parse data: field_name row not found')
             return
 
-        # Neither of the row and col maxima are particularly reliable as Excel can hang on to
-        # cell references for previously used cells. We can ignore blank columns easily but
-        # we do need to know where to actually stop for finding blank data in rows.
-        # So, we explicitly check the row numbers, making them a mandatory part of the setup.
-
-        # - get the values
-        row_number_cells = worksheet.get_squared_range(1, dwsh.field_name_row + 1, 1, dwsh.max_row)
-        row_numbers = [cl[0].value for cl in row_number_cells]
-
-        # - trim blank or whitespace values from the end
+        # Check for expected row numbering
+        # - make a special case for terminal blanks, which might just have
+        #   whitespace junk in cells or have been hung on to by Excel.
+        n_terminal_blanks = 0
         while is_blank(row_numbers[-1]):
-            row_numbers.pop()
+            row_numbers.pop(-1)
+            n_terminal_blanks += 1
 
-        # now check the row numbers are numbers and if they are
-        # do they start at one and go up by one
-        if not all([isinstance(vl, numbers.Number) for vl in row_numbers]):
-            LOGGER.error('Non-numeric data found in row numbering')
-        else:
-            if row_numbers[0] != 1:
-                LOGGER.error('Row numbering does not start at 1')
+        # See if terminal blanks are actually empty
+        if n_terminal_blanks:
+            row_types = row_types[: -n_terminal_blanks]
+            for check_row in range(dwsh.max_row - 1, (dwsh.max_row - 1) - n_terminal_blanks, -1):
+                if all(is_blank(val) for val in worksheet.row_values(check_row)):
+                    dwsh.max_row -= 1
+                else:
+                    LOGGER.error('Un-numbered rows at end of worksheet contain data')
+                    break
 
-            one_increment = [(vl1 - vl2) == 1 for vl1, vl2 in
-                             zip(row_numbers[1:], row_numbers[:-1])]
-            if not all(one_increment):
-                LOGGER.error('Row numbering does not consistently increment by 1')
-
-        # Test for data with no row number
-        data_end = len(row_numbers) + dwsh.field_name_row
-        if data_end < dwsh.max_row:
-            allegedly_blank = worksheet.get_squared_range(1, data_end + 1,
-                                                          dwsh.max_col, dwsh.max_row)
-            not_blank = [not is_blank(cell.value) for row in allegedly_blank for cell in row]
-            if any(not_blank):
-                LOGGER.error('Data extends beyond row numbering')
+        # Check what is left
+        if set(row_types) == {xlrd.XL_CELL_NUMBER}:
+            ideal = [float(i) for i in range(1, len(row_numbers) + 1)]
+            if row_numbers != ideal:
+                # All numbers but not the right ones
+                LOGGER.error("Row numbers not consecutive or do not start with 1")
 
         # report on detected size
-        dwsh.max_row = data_end
-        dwsh.n_data_row = len(row_numbers)
+        dwsh.n_data_row = dwsh.max_row - dwsh.field_name_row
         LOGGER.info('Worksheet contains {} rows and {} columns'.format(dwsh.max_row, dwsh.max_col),
                     extra={'indent_after': 2})
 
-        # get the rows of metadata
-        metadata = worksheet.get_squared_range(2, 1, dwsh.max_col, dwsh.field_name_row)
-        # extract data
-        metadata = [[cell.value for cell in row] for row in metadata]
-        # turn into columns for each field
-        metadata = zip(*metadata)
-        # and hence dictionaries for each field
+        # extract dictionaries of metadata per field, setting blank entries to None
+        metadata = [[None if is_blank(val) else val
+                     for val in worksheet.col_values(cl, 0, dwsh.field_name_row)]
+                    for cl in range(1, dwsh.max_col)]
         metadata = [dict(zip(dwsh.descriptors, fld)) for fld in metadata]
 
-        # insert column index and letter
+        # insert column index
         for idx, fld in enumerate(metadata):
-            fld[u'col_idx'] = idx + 2
-            fld[u'column'] = utils.get_column_letter(idx + 2)
+            fld[u'col_idx'] = idx + 1
 
         # check field names unique (drop None). This doesn't cause as many problems
         # as duplications in Taxa and Locations, which expect certain fields, so warn
@@ -1591,9 +1572,7 @@ class Dataset(object):
         for meta in metadata:
 
             # read the values and check them against the metadata
-            data = worksheet.get_squared_range(meta['col_idx'], dwsh.field_name_row + 1,
-                                               meta['col_idx'], dwsh.max_row)
-            data = [cl[0].value for cl in data]
+            data = worksheet.col(meta['col_idx'], dwsh.field_name_row + 1, dwsh.max_row)
             self.check_field(dwsh, meta, data)
 
         # add the new DataWorksheet into the Dataset
@@ -1624,14 +1603,14 @@ class Dataset(object):
 
         # Print out column checking header
         if is_blank(meta['field_name']):
-            LOGGER.info('Checking Column {}'.format(meta['column']),
+            LOGGER.info('Checking Column {}'.format(xlrd.colname(meta['col_idx'])),
                         extra={'indent_before': 2, 'indent_after': 3})
         else:
             LOGGER.info('Checking field {field_name}'.format(**meta),
                         extra={'indent_before': 2, 'indent_after': 3})
 
         # Skip any field with no user provided metadata or data
-        blank_data = [is_blank(vl) for vl in data]
+        blank_data = [is_blank(cl.value) for cl in data]
         blank_meta = [is_blank(vl) for ky, vl in meta.iteritems()
                       if ky not in ['col_idx', 'column']]
         if all(blank_data) and all(blank_meta):
@@ -1654,7 +1633,7 @@ class Dataset(object):
         if meta['field_type'] != 'Comments':
 
             # Only NA is acceptable
-            na_vals = [vl == u'NA' for vl in data]
+            na_vals = [dt.value == u'NA' for dt in data]
             if any(na_vals):
                 LOGGER.warn('{} / {} values missing'.format(sum(na_vals), len(na_vals)))
 
@@ -1673,7 +1652,7 @@ class Dataset(object):
         elif meta['field_type'] == 'Datetime':
             self.check_field_datetime(meta, data, which='datetime')
         elif meta['field_type'] == 'Time':
-            self.check_field_time(meta, data)
+            self.check_field_datetime(meta, data, which='time')
         elif meta['field_type'] == 'Taxa':
             self.check_field_taxa(data)
         elif meta['field_type'] == 'Location':
@@ -1693,8 +1672,12 @@ class Dataset(object):
         elif meta['field_type'] == 'Numeric Interaction':
             self.check_field_interaction(meta, data, dwsh.taxa_fields, which='numeric')
         elif meta['field_type'] == 'Latitude':
+            # check field geo expects values in data not xlrd.Cell
+            data = [dt.value for dt in data]
             self.check_field_geo(meta, data, which='latitude')
         elif meta['field_type'] == 'Longitude':
+            # check field geo expects values in data not xlrd.Cell
+            data = [dt.value for dt in data]
             self.check_field_geo(meta, data, which='longitude')
         elif meta['field_type'] in ['Replicate', 'ID']:
             # We've looked for missing data, no other constraints.
@@ -1892,54 +1875,45 @@ class Dataset(object):
         """
 
         # Check type (excluding NA values)
-        bad = [dt for dt in data if not isinstance(dt, (datetime.datetime, datetime.time))]
+        bad = [dt.value for dt in data if dt.ctype != xlrd.XL_CELL_DATE]
         if len(bad):
+            bad = set(unicode(vl) for vl in bad)
             LOGGER.error('Data in field not formatted as date. Note that text can look'
                          '_exactly_ like a date: ', extra={'join': bad})
 
-        is_time = [isinstance(dt, datetime.time) for dt in data]
-        if any(is_time):
-            LOGGER.warn('Some values _only_  contain time components')
+        # Get date values
+        data = [dt.value for dt in data if dt.ctype == xlrd.XL_CELL_DATE]
 
-        data = [dt for dt in data if isinstance(dt, datetime.datetime)]
-
-        # Check no time component in actual dates
+        # For date and time options, check decimal components
         if which == 'date':
-            no_time = [vl.time() == datetime.time(0, 0) for vl in data]
-            if not all(no_time):
+            contains_time = [dt % 1 > 0 for dt in data]
+            if any(contains_time):
                 LOGGER.error('Some values also contain time components')
 
-        # update the field metadata and the dataset extent
+        if which == 'time':
+            contains_date = [1 <= dt for dt in data]
+            if any(contains_date):
+                LOGGER.error('Some values also contain date components')
+
+        # get the extent as datetimes
         if len(data):
-            extent = (min(data), max(data))
-            meta['range'] = extent
-            self.update_extent(extent, datetime.datetime, 'temporal_extent')
+            extent = (xlrd.xldate_as_datetime(min(data), self.workbook.datemode),
+                      xlrd.xldate_as_datetime(max(data), self.workbook.datemode))
+        else:
+            extent = None
 
-    def check_field_time(self, meta, data):
-
-        """
-        Checks for data consistency in time fields and reports to the
-        Messages instance.
-
-        Args:
-            meta: The field metadata, to be updated with the range
-            data: A list of data values, allegedly of type datetime.time
-        """
-
-        # Openpyxl reads midnight (value 0) as a specific datetime value
-        # rather than a time so catch that.
-        data = [datetime.time(0, 0) if d == datetime.datetime(1899, 12, 30, 0, 0) else d
-                for d in data]
-
-        # Check type (excluding NA values)
-        type_check = set([type(vl) for vl in data])
-        if type_check != {datetime.time}:
-            LOGGER.error('Non-time formatted data found.')
-
-        # update the field metadata
-        real_times = [dt for dt in data if isinstance(dt, datetime.time)]
-        if len(real_times):
-            meta['range'] = (min(real_times), max(real_times))
+        if which in ['date', 'datetime']:
+            # Check date and datetime contain actual dates and update extent
+            if any(0.0 <= dt < 1.0 for dt in data):
+                LOGGER.warn('Some values _only_  contain time components')
+            if extent is not None:
+                meta['range'] = extent
+                self.update_extent(extent, datetime.datetime, 'temporal_extent')
+        elif which == 'time':
+            # reduce extents to time
+            if extent is not None:
+                extent = (vl.time() for vl in extent)
+                meta['range'] = extent
 
     def check_field_taxa(self, data):
 
@@ -1951,7 +1925,7 @@ class Dataset(object):
             data: A list of data values, allegedly taxon names
         """
 
-        found = set(data)
+        found = set(dt.value for dt in data)
         if self.taxon_names == set():
             LOGGER.error('No taxa loaded', 2)
         if not found.issubset(self.taxon_names):
@@ -1971,8 +1945,9 @@ class Dataset(object):
             data: A list of data values, allegedly taxon names
         """
 
-        # location names should be strings
-        data = [unicode(dt) for dt in data]
+        # location names should be strings but we allow integer point numbers
+        data = [unicode(int(dt.value)) if dt.ctype == xlrd.XL_CELL_NUMBER
+                else unicode(dt.value) for dt in data]
 
         # check if locations are all provided
         found = set(data)
@@ -1980,7 +1955,7 @@ class Dataset(object):
             LOGGER.error('No locations loaded')
         elif not found.issubset(self.locations):
             LOGGER.error('Includes locations missing from Locations worksheet:',
-                         extra={'join': found - self.taxon_names, 'quote': True})
+                         extra={'join': found - self.locations, 'quote': True})
 
         # add the locations to the set of locations used
         self.locations_used.update(found)
@@ -2002,8 +1977,9 @@ class Dataset(object):
 
         # Can still check values are numeric, whatever happens above.
         # We're not going to insist on integers here - could be mean counts.
-        all_nums, nums = all_numeric(data)
-        if not all_nums:
+        nums = [dt.value for dt in data if dt.ctype == xlrd.XL_CELL_NUMBER]
+
+        if len(nums) < len(data):
             LOGGER.error('Field contains non-numeric data')
 
         # update the field metadata
@@ -2036,20 +2012,30 @@ class Dataset(object):
             if len(set(level_labels)) < len(level_labels):
                 LOGGER.error('Repeated level labels')
 
-            # - check for integer level names
-            integer_codes = [is_integer_string(vl) for vl in level_labels]
+            # - check for numeric level names: integers would be more common
+            #   but don't let floats sneak through either!
+            integer_codes = [is_numeric_string(vl) for vl in level_labels]
             if any(integer_codes):
-                LOGGER.error('Integer level names not permitted')
+                LOGGER.error('Numeric level names not permitted')
 
             # Now look for consistency: get the unique values reported in the
-            # data, convert to unicode to handle checking of integer labels and
+            # data, convert to unicode to handle checking of numeric labels and
             # then check the reported levels are a subset of the descriptors.
+            # XLRD reads all numbers as floats, so coerce floats back to int
             reported = set(data)
-            reported = {unicode(lv) for lv in reported}
+            reported = {lv.value for lv in reported}
+            found = set()
+            for lv in reported:
+                if isinstance(lv, float) and lv.is_integer() and unicode(int(lv)) in level_labels:
+                    found.add(lv)
+                elif isinstance(lv, float) and unicode(lv) in level_labels:
+                    found.add(lv)
+                elif unicode(lv) in level_labels:
+                    found.add(lv)
 
-            if not reported.issubset(level_labels):
+            if found != reported:
                 LOGGER.error('Categories found in data missing from description: ',
-                             extra={'join': reported - set(level_labels), 'quote': True})
+                             extra={'join': reported - found, 'quote': True})
 
     def check_field_numeric(self, meta, data):
 
@@ -2067,8 +2053,9 @@ class Dataset(object):
 
         # Regardless of the outcome of the meta checks, can still check the
         # data is all numeric, as it claims to be.
-        all_nums, nums = all_numeric(data)
-        if not all_nums:
+        nums = [dt.value for dt in data if dt.ctype == xlrd.XL_CELL_NUMBER]
+
+        if len(nums) < len(data):
             LOGGER.error('Field contains non-numeric data')
 
         # update the field metadata
@@ -2133,10 +2120,12 @@ class Dataset(object):
         """
 
         # Are the values represented as decimal degrees - numeric.
-        all_nums, nums = all_numeric(data)
-        if not all_nums:
+        nums = [dt for dt in data if isinstance(dt, float)]
+
+        if len(nums) < len(data):
+            LOGGER.error('Field contains non-numeric data')
             LOGGER.error('Non numeric data found')
-            if any([RE_DMS.search(unicode(vl)) for vl in data]):
+            if any([RE_DMS.search(unicode(dt)) for dt in data]):
                 LOGGER.warn('Possible degrees minutes and seconds formatting? Use decimal degrees')
 
         # Check the locations
