@@ -1198,6 +1198,7 @@ class Dataset(object):
 
             # Standardize the taxon representation into a three tuple:
             # (name, (taxon name, taxon type, taxon id), (parent name, parent type, parent id))
+
             # The dict.get() method automatically fills in None for missing keys, but still need
             # to be wary of blank entries
             taxa = [(tx['name'],
@@ -1250,6 +1251,15 @@ class Dataset(object):
                 LOGGER.error('{}: type is not recognized'.format(prnt_string))
                 continue
 
+            # Check ID is an integer (xlrd will load as float)
+            if prnt[2] is None:
+                pass
+            elif isinstance(prnt[2], float) and prnt[2].is_integer():
+                prnt = (prnt[0], prnt[1], int(prnt[2]))
+            else:
+                LOGGER.error('{}: GBIF ID is not an integer.'.format(prnt_string))
+                continue
+
             # Now validate against GBIF
             if self.gbif_conn is None:
                 prnt_info = web_gbif_validate(prnt[0], prnt[1], prnt[2])
@@ -1276,17 +1286,17 @@ class Dataset(object):
         LOGGER.info('Validating {} taxa'.format(len(taxa)),
                     extra={'indent_before': 1, 'indent_after': 2})
 
-        for idx, txn in enumerate(taxa):
+        for idx, (nm, tx, pr) in enumerate(taxa):
 
             # row index
             rw_num = idx + 2
 
             # Sanitize inputs. Only two patterns of taxon provision are valid:
             #   name + type + id and name + type
-            provided = [not is_blank(tx) for tx in txn[1]]
+            provided = [not is_blank(vl) for vl in tx]
 
             if provided not in [[True, True, False], [True, True, True]]:
-                LOGGER.error('Row {} ({}): incomplete information'.format(rw_num, txn[0]))
+                LOGGER.error('Row {} ({}): incomplete information'.format(rw_num, nm))
                 continue
 
             # The taxon input is now sanitized of obvious problems so can be validated against
@@ -1294,33 +1304,42 @@ class Dataset(object):
             # sure that valid taxa that have had parents provided get indexed correctly. It is
             # only an issue when taxa are not found and also have an invalid parent
 
-            if txn[1][1].lower() not in backbone_types:
+            # Check ID is an integer (xlrd will load as float)
+            if tx[2] is None:
+                pass
+            elif isinstance(tx[2], float) and tx[2].is_integer():
+                tx = (tx[0], tx[1], int(tx[2]))
+            else:
+                LOGGER.error('Row {} ({}): GBIF ID is not an integer.'.format(rw_num, nm))
+                continue
+
+            if tx[1].lower() not in backbone_types:
                 gbif_info = {'status': 'non-backbone'}
             elif self.gbif_conn is None:
-                gbif_info = web_gbif_validate(txn[1][0], txn[1][1], txn[1][2])
+                gbif_info = web_gbif_validate(*tx)
             else:
-                gbif_info = local_gbif_validate(self.gbif_conn, txn[1][0], txn[1][1], txn[1][2])
+                gbif_info = local_gbif_validate(self.gbif_conn, *tx)
 
             # Handle immediately problematic lookup errors, leaving found and no_match
             # for cross checking against parent information
             if gbif_info['status'] == 'validation_fail':
-                LOGGER.error('Row {} ({}): validation failed'.format(rw_num, txn[0]))
+                LOGGER.error('Row {} ({}): validation failed'.format(rw_num, nm))
                 continue
             elif gbif_info['status'] == 'unknown_id':
-                LOGGER.error('Row {} ({}): GBIF ID not known'.format(rw_num, txn[0]))
+                LOGGER.error('Row {} ({}): GBIF ID not known'.format(rw_num, nm))
                 continue
             elif gbif_info['status'] == 'id_mismatch':
                 LOGGER.error('Row {} ({}): ID does not match name and '
-                             'rank'.format(rw_num, txn[0]))
+                             'rank'.format(rw_num, nm))
                 continue
             else:
                 tax_status = gbif_info['status']
 
             # Lookup the parent status and information
-            if txn[2] == (None, None, None):
+            if pr == (None, None, None):
                 par_status, parent_info = (None, None)
             else:
-                par_status, parent_info = parent_status[txn[2]]
+                par_status, parent_info = parent_status[pr]
 
             # Check the combinations of taxon and parent status. At this point
             # parents are one of found, no_match or None and taxa are one of
@@ -1343,14 +1362,14 @@ class Dataset(object):
                 # a) Good backbone with no parent, provide info on taxon status
                 if 'user' in gbif_info:
                     LOGGER.warn('Row {} ({}): considered a {} of {} in GBIF '
-                                'backbone'.format(rw_num, txn[0], gbif_info['user'][4],
+                                'backbone'.format(rw_num, nm, gbif_info['user'][4],
                                                   gbif_info['canon'][2]))
                     self.taxon_index.add(gbif_info['user'] + (None, None))
                     self.taxon_index.add(gbif_info['canon'] + gbif_info['user'][2:4])
 
                 else:
                     LOGGER.info('Row {} ({}): in GBIF backbone '
-                                '({})'.format(rw_num, txn[0], gbif_info['canon'][4]))
+                                '({})'.format(rw_num, nm, gbif_info['canon'][4]))
                     self.taxon_index.add(gbif_info['canon'] + (None, None))
 
                 # update hierarchy
@@ -1359,7 +1378,7 @@ class Dataset(object):
             elif tax_status == 'found' and par_status == 'invalid':
                 # b) Good backbone with bad parent
                 LOGGER.error('Row {} ({}): found but provided parent information is '
-                             'not valid.'.format(rw_num, txn[0]))
+                             'not valid.'.format(rw_num, nm))
 
             elif tax_status == 'found' and par_status == 'valid':
                 # c) Good backbone with good parent - are they compatible? Check if all
@@ -1368,11 +1387,11 @@ class Dataset(object):
                 taxon_hier = set(gbif_info['hier'])
                 if not set(parent_hier).issubset(taxon_hier):
                     LOGGER.error('Row {} ({}): found in GBIF backbone, but additional parent '
-                                 'information is incompatible'.format(rw_num, txn[0]))
+                                 'information is incompatible'.format(rw_num, nm))
                 else:
                     if 'user' in gbif_info:
                         LOGGER.warn('Row {} ({}): considered a {} of {} in GBIF '
-                                    'backbone'.format(rw_num, txn[0], gbif_info['user'][4],
+                                    'backbone'.format(rw_num, nm, gbif_info['user'][4],
                                                       gbif_info['canon'][2]))
 
                         # Add user and canonical usage, including as_name and as_rank
@@ -1380,7 +1399,7 @@ class Dataset(object):
                         self.taxon_index.add(gbif_info['canon'] + gbif_info['user'][2:4])
                     else:
                         LOGGER.info('Row {} ({}): in GBIF backbone '
-                                    '({})'.format(rw_num, txn[0], gbif_info['canon'][4]))
+                                    '({})'.format(rw_num, nm, gbif_info['canon'][4]))
                         self.taxon_index.add(gbif_info['canon'] + (None, None))
 
                     taxon_hierarchy.update(gbif_info['hier'])
@@ -1388,45 +1407,45 @@ class Dataset(object):
             elif tax_status == 'no_match' and par_status is None:
                 # d) Taxon is a backbone type but is not found in GBIF.
                 if 'note' in gbif_info:
-                    LOGGER.error('Row {} ({}): {}'.format(rw_num, txn[0], gbif_info['note']))
+                    LOGGER.error('Row {} ({}): {}'.format(rw_num, nm, gbif_info['note']))
                 else:
                     LOGGER.error('Row {} ({}): name and rank combination '
-                                 'not found'.format(rw_num, txn[0]))
+                                 'not found'.format(rw_num, nm))
 
             elif tax_status == 'no_match' and par_status == 'invalid':
                 # d) Taxon is a backbone type not found in GBIF and the provided parent isn't valid
                 LOGGER.error('Row {} ({}): not found in GBIF and has invalid parent '
-                             'information.'.format(rw_num, txn[0]))
+                             'information.'.format(rw_num, nm))
 
             elif tax_status == 'no_match' and par_status == 'valid':
                 # e) Taxon is a backbone type that is not present in GBIF but the user has provided
                 #    a valid set of parent taxon information.
                 LOGGER.info('Row {} ({}): not found in GBIF but has valid parent '
-                            'information'.format(rw_num, txn[0]))
+                            'information'.format(rw_num, nm))
 
                 # construct a taxon index entry and add the parent hierarchy
-                self.taxon_index.add((-1, parent_info['canon'][1], txn[1][0],
-                                      txn[1][1].lower(), 'user', None, None))
+                self.taxon_index.add((-1, parent_info['canon'][1], tx[0],
+                                      tx[1].lower(), 'user', None, None))
                 taxon_hierarchy.update(parent_info['hier'])
 
             elif tax_status == 'non-backbone' and (par_status is None or par_status == 'invalid'):
                 # f) Taxon is a non-backbone type - must have a valid parent to be accepted.
                 LOGGER.error('Row {} ({}): taxa of type {} must have valid parent '
-                             'information.'.format(rw_num, txn[0], txn[1][1]))
+                             'information.'.format(rw_num, nm, tx[1]))
 
             elif tax_status == 'non-backbone' and par_status == 'valid':
                 # g) Taxon is a non backbone type with good parent info
                 LOGGER.info("Row {} ({}): {} with valid parent "
-                            "information ".format(rw_num, txn[0], txn[1][1]))
+                            "information ".format(rw_num, nm, tx[1]))
 
                 # construct the taxon index - use the name for alternative types,
                 # otherwise use the taxon name
-                if txn[1][1].lower() in alt_types:
-                    taxon_entry = (-1, parent_info['canon'][0], txn[0],
-                                   txn[1][1].lower(), 'user', None, None)
+                if tx[1].lower() in alt_types:
+                    taxon_entry = (-1, parent_info['canon'][0], nm,
+                                   tx[1].lower(), 'user', None, None)
                 else:
-                    taxon_entry = (-1, parent_info['canon'][0], txn[1][0],
-                                   txn[1][1].lower(), 'user', None, None)
+                    taxon_entry = (-1, parent_info['canon'][0], nm,
+                                   tx[1].lower(), 'user', None, None)
 
                 self.taxon_index.add(taxon_entry)
                 taxon_hierarchy.update(parent_info['hier'])
