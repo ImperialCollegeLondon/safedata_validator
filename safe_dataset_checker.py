@@ -1912,7 +1912,7 @@ class Dataset(object):
         elif which == 'time':
             # reduce extents to time
             if extent is not None:
-                extent = (vl.time() for vl in extent)
+                extent = tuple(vl.time() for vl in extent)
                 meta['range'] = extent
 
     def check_field_taxa(self, data):

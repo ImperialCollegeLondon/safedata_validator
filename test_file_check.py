@@ -23,7 +23,6 @@ ds.load_taxa()
 ds.load_data_worksheet(ds.dataworksheet_summaries[0])
 ds.load_data_worksheet(ds.dataworksheet_summaries[1])
 ds.load_data_worksheet(ds.dataworksheet_summaries[2])
-
 ds.final_checks()
 
 # Checking logging modes
