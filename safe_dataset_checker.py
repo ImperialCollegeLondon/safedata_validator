@@ -790,47 +790,51 @@ class Dataset(object):
         # rotate and remove completely blank columns
         authors_list = zip(*authors.values())
         authors_list = [au for au in authors_list if not all(is_blank(vl) for vl in au)]
-        # return to the original orientation
-        authors = {k: v for k, v in zip(authors, zip(*authors_list))}
 
-        # now check the contents
-        # i) Names
-        author_names = [unicode(vl) for vl in authors['name'] if vl is not None]
-        if len(author_names) < len(authors['name']):
-            LOGGER.error('Missing author names')
-        if author_names:
-            bad_names = [vl for vl in author_names if not RE_NAME.match(vl)]
-            if bad_names:
-                LOGGER.error('Author name not formatted as last_name, first_names: ',
-                             extra={'join': bad_names, 'quote': True})
+        if not authors_list:
+            LOGGER.error('No author details provided')
+        else:
+            # return to the original orientation
+            authors = {k: v for k, v in zip(authors, zip(*authors_list))}
 
-        # ii) Affiliations (no regex checking)
-        blank_affil = [is_blank(vl) for vl in authors['affiliation']]
-        if any(blank_affil):
-            LOGGER.warn('Missing affiliations - please provide if available')
+            # now check the contents
+            # i) Names
+            author_names = [unicode(vl) for vl in authors['name'] if vl is not None]
+            if len(author_names) < len(authors['name']):
+                LOGGER.error('Missing author names')
+            if author_names:
+                bad_names = [vl for vl in author_names if not RE_NAME.match(vl)]
+                if bad_names:
+                    LOGGER.error('Author name not formatted as last_name, first_names: ',
+                                 extra={'join': bad_names, 'quote': True})
 
-        # iii) Email
-        author_emails = [unicode(vl) for vl in authors['email'] if vl is not None]
-        if len(author_emails) < len(authors['email']):
-            LOGGER.warn('Missing author emails - please provide if available')
-        if author_emails:
-            bad_emails = [vl for vl in author_emails if not RE_EMAIL.match(vl)]
-            if bad_emails:
-                LOGGER.error('Email not properly formatted: ',
-                             extra={'join': bad_emails, 'quote': True})
+            # ii) Affiliations (no regex checking)
+            blank_affil = [is_blank(vl) for vl in authors['affiliation']]
+            if any(blank_affil):
+                LOGGER.warn('Missing affiliations - please provide if available')
 
-        # iii) ORCiD (not mandatory)
-        if any(is_blank(vl) for vl in authors['orcid']):
-            LOGGER.warn('Missing ORCiDs, consider adding them!')
+            # iii) Email
+            author_emails = [unicode(vl) for vl in authors['email'] if vl is not None]
+            if len(author_emails) < len(authors['email']):
+                LOGGER.warn('Missing author emails - please provide if available')
+            if author_emails:
+                bad_emails = [vl for vl in author_emails if not RE_EMAIL.match(vl)]
+                if bad_emails:
+                    LOGGER.error('Email not properly formatted: ',
+                                 extra={'join': bad_emails, 'quote': True})
 
-        bad_orcid = [vl for vl in authors['orcid'] if not is_blank(vl) and
-                     (not isinstance(vl, unicode) or not RE_ORCID.match(vl))]
-        if bad_orcid:
-                LOGGER.error('ORCID not properly formatted: ',
-                             extra={'join': bad_orcid, 'quote': True})
+            # iii) ORCiD (not mandatory)
+            if any(is_blank(vl) for vl in authors['orcid']):
+                LOGGER.warn('Missing ORCiDs, consider adding them!')
 
-        # and finally store as a dictionary per author
-        self.authors = [dict(zip(authors.keys(), vals)) for vals in zip(*authors.values())]
+            bad_orcid = [vl for vl in authors['orcid'] if not is_blank(vl) and
+                         (not isinstance(vl, unicode) or not RE_ORCID.match(vl))]
+            if bad_orcid:
+                    LOGGER.error('ORCID not properly formatted: ',
+                                 extra={'join': bad_orcid, 'quote': True})
+
+            # and finally store as a dictionary per author
+            self.authors = [dict(zip(authors.keys(), vals)) for vals in zip(*authors.values())]
 
         # CHECK DATA WORKSHEETS
         ws_keys = ['Worksheet name', 'Worksheet title', 'Worksheet description']
@@ -847,31 +851,35 @@ class Dataset(object):
         data_worksheets_list = zip(*data_worksheets.values())
         data_worksheets_list = [ws for ws in data_worksheets_list
                                 if not all(is_blank(vl) for vl in ws)]
-        # return to the original orientation
-        data_worksheets = {k: v for k, v in zip(data_worksheets, zip(*data_worksheets_list))}
 
-        # now check the contents
-        # i) Names
-        if any(is_blank(vl) for vl in data_worksheets['name']):
-            LOGGER.error('Missing worksheet names')
+        if not data_worksheets_list:
+            LOGGER.error("No worksheet details provided")
+        else:
+            # return to the original orientation
+            data_worksheets = {k: v for k, v in zip(data_worksheets, zip(*data_worksheets_list))}
 
-        bad_names = [vl for vl in data_worksheets['name']
-                     if not is_blank(vl) and vl not in self.sheet_names]
-        if bad_names:
-            LOGGER.error('Worksheet names not found in workbook: ',
-                         extra={'join': bad_names, 'quote': True})
+            # now check the contents
+            # i) Names
+            if any(is_blank(vl) for vl in data_worksheets['name']):
+                LOGGER.error('Missing worksheet names')
 
-        # ii) Titles
-        if any(is_blank(vl) for vl in data_worksheets['title']):
-            LOGGER.error('Missing worksheet title')
+            bad_names = [vl for vl in data_worksheets['name']
+                         if not is_blank(vl) and vl not in self.sheet_names]
+            if bad_names:
+                LOGGER.error('Worksheet names not found in workbook: ',
+                             extra={'join': bad_names, 'quote': True})
 
-        # ii) Descriptions
-        if any(is_blank(vl) for vl in data_worksheets['description']):
-            LOGGER.error('Missing worksheet description')
+            # ii) Titles
+            if any(is_blank(vl) for vl in data_worksheets['title']):
+                LOGGER.error('Missing worksheet title')
 
-        # and finally store a list of dictionaries of data worksheet summary details
-        self.dataworksheet_summaries = [dict(zip(data_worksheets.keys(), vals))
-                                        for vals in zip(*data_worksheets.values())]
+            # ii) Descriptions
+            if any(is_blank(vl) for vl in data_worksheets['description']):
+                LOGGER.error('Missing worksheet description')
+
+            # and finally store a list of dictionaries of data worksheet summary details
+            self.dataworksheet_summaries = [dict(zip(data_worksheets.keys(), vals))
+                                            for vals in zip(*data_worksheets.values())]
 
         # check for extra undocumented spreadsheets
         if 'Worksheet name' in summary:
