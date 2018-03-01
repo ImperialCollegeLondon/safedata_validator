@@ -646,7 +646,7 @@ class Dataset(object):
             setattr(self, which, (min(extent[0]), max(extent[1])))
 
     # Main methods to populate class attributes
-    def load_summary(self, validate_doi=False):
+    def load_summary(self, validate_doi=False, project_id=None):
 
         """
         Checks the information in the summary worksheet and looks for the metadata and
@@ -691,11 +691,16 @@ class Dataset(object):
         # CHECK PROJECT ID
         pid = summary['SAFE Project ID'][0]
         if 'SAFE Project ID' not in summary:
-            LOGGER.warn('SAFE Project ID missing')
+            LOGGER.error('SAFE Project ID missing')
         elif not isinstance(pid, float) or not pid.is_integer():
-            LOGGER.warn('SAFE Project ID is not an integer')
+            LOGGER.error('SAFE Project ID is not an integer')
         else:
-            self.project_id = pid
+            pid = int(pid)
+            if project_id is not None and pid != project_id:
+                LOGGER.error('SAFE Project ID in file ({}) does not match '
+                             'provided project id ({})'.format(pid, project_id))
+            else:
+                self.project_id = pid
 
         # CHECK DATASET TITLE
         if 'Title' not in summary:
@@ -2243,7 +2248,7 @@ Higher level functions
 
 
 def check_file(fname, verbose=True, gbif_database=None, locations_json=None, validate_doi=False,
-               check='sltwf'):
+               check='sltwf', project_id=None):
 
     """
     Runs the format checking across an Excel workbook.
@@ -2267,7 +2272,7 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
 
     # load the metadata sheets
     if 's' in check:
-        dataset.load_summary(validate_doi=validate_doi)
+        dataset.load_summary(validate_doi=validate_doi, project_id=project_id)
     if 't' in check:
         dataset.load_taxa()
     if 'l' in check:
@@ -2315,6 +2320,9 @@ def main():
     parser.add_argument('-c', '--check', default='sltwf',
                         help='Which of the summary, locations, taxa, worksheets and '
                              'finalisation should be checked.')
+    parser.add_argument('-p', '--project_id', default=None, type=int,
+                        help='If provided, check that the project ID within the file '
+                             'matches this integer')
     parser.add_argument('-l', '--locations_json', default=None,
                         help='Path to a locally stored json file of valid location names')
     parser.add_argument('-g', '--gbif_database', default=None,
@@ -2328,7 +2336,7 @@ def main():
 
     check_file(fname=args.fname, verbose=True, locations_json=args.locations_json,
                gbif_database=args.gbif_database, validate_doi=args.validate_doi,
-               check=args.check)
+               check=args.check, project_id=args.project_id)
 
 
 if __name__ == "__main__":
