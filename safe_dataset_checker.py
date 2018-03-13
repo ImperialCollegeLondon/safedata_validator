@@ -1416,10 +1416,10 @@ class Dataset(object):
             # that isn't actually a parent of the child taxon - hence the question mark
             # in the table.
 
-            #         | None  | pr_inv | pr_val |
-            # tx_fnd  |  O a) |  X b)  |  ? c)  |
-            # tx_nom  | [    X d)    ] |  O e)  |
-            # tx_nnb  | [    X f)    ] |  O g)  |
+            #                | None  | pr_inv | pr_val |
+            # tx_found       |  O a) |  X b)  |  ? c)  |
+            # tx_nomatch     | [    X d)    ] |  O e)  |
+            # tx_nonbackbone | [    X f)    ] |  O g)  |
 
             if tax_status == 'found' and par_status is None:
                 # a) Good backbone with no parent, provide info on taxon status
@@ -1487,7 +1487,7 @@ class Dataset(object):
                             'information'.format(rw_num, nm))
 
                 # construct a taxon index entry and add the parent hierarchy
-                self.taxon_index.add((-1, parent_info['canon'][1], tx[0],
+                self.taxon_index.add((-1, parent_info['canon'][0], tx[0],
                                       tx[1].lower(), 'user', None, None))
                 taxon_hierarchy.update(parent_info['hier'])
 
