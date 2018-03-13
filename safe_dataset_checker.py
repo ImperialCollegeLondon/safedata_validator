@@ -656,6 +656,7 @@ class Dataset(object):
 
         Args:
             validate_doi: Check any publication DOIs, requiring a web connection.
+            project_id: If provided, the integer value expected in the Project ID field.
         """
 
         # try and get the summary worksheet
@@ -773,6 +774,55 @@ class Dataset(object):
                             LOGGER.error('DOI not found: {}'.format(doi))
 
             self.publication_doi = pub_doi
+
+        # CHECK EXTENTS - there are six fields to provide temporal and geographic
+        # extents for the data. These two extents are a mandatory component of Gemini
+        # Metadata so need to be provided if the worksheets and locations don't
+        # populate the extents.
+
+        # Temporal extents
+        date_fields = ['Start Date', 'End Date']
+        date_fields_found = set(date_fields).intersection(summary)
+
+        if len(date_fields_found) == 1:
+            LOGGER.error('Only one of start and end date provided')
+        elif date_fields_found == set(date_fields):
+            # check date formats
+            date_field_types = set([summary_types[fld][0] for fld in date_fields])
+            if date_field_types != {xlrd.XL_CELL_DATE}:
+                LOGGER.error('Start and end dates not formatted as dates')
+            else:
+                date_vals = [summary[fld][0] for fld in date_fields]
+                if date_vals[0] < 1 or date_vals[1] < 1:
+                    LOGGER.error('Time not date values found in start and/or end date')
+                elif date_vals[0] > date_vals[1]:
+                    LOGGER.error('Start date is after end date')
+                else:
+                    date_vals = (xlrd.xldate_as_datetime(date_vals[0], self.workbook.datemode),
+                                 xlrd.xldate_as_datetime(date_vals[1], self.workbook.datemode))
+                    self.update_extent(date_vals, datetime.datetime, 'temporal_extent')
+
+        # Geographic extents
+        geo_fields = ['West', 'East', 'South', 'North']
+        geo_fields_found = set(geo_fields).intersection(summary)
+
+        if len(geo_fields_found) > 0 and len(geo_fields_found) < 4:
+            LOGGER.error('Some but not all geographic extent fields found: ',
+                         extra={'join': geo_fields_found})
+        elif geo_fields_found == set(geo_fields):
+            # check formats
+            geo_field_types = set([summary_types[fld][0] for fld in geo_fields])
+            if geo_field_types != {xlrd.XL_CELL_NUMBER}:
+                LOGGER.error('Not all geographic extents are numeric')
+            else:
+                geo_vals = tuple([summary[fld][0] for fld in geo_fields])
+                valid = self.validate_geo_extent(geo_vals[:2], 'longitude')
+                if valid:
+                    self.update_extent(geo_vals[:2], float, 'longitudinal_extent')
+
+                valid = self.validate_geo_extent(geo_vals[2:], 'latitude')
+                if valid:
+                    self.update_extent(geo_vals[2:], float, 'latitudinal_extent')
 
         # CHECK AUTHORS
         # Get the set of author fields and create blank entries for any missing fields
@@ -1892,6 +1942,32 @@ class Dataset(object):
 
         return zip(*parts)
 
+    @staticmethod
+    def validate_geo_extent(extent, which):
+
+        if which == 'latitude':
+            bnds = [-90, -4, 8, 90]
+        elif which == 'longitude':
+            bnds = [-180, 108, 120, 180]
+
+        if extent[0] > extent[1]:
+            LOGGER.error('{0}: lower bound greater than upper bound'.format(which.capitalize()))
+            return False
+
+        out_of_bounds = extent[0] < bnds[0] or extent[1] > bnds[3]
+        out_of_borneo = bnds[0] <= extent[0] < bnds[1] or bnds[2] < extent[1] <= bnds[3]
+
+        if out_of_bounds:
+            LOGGER.error('{0} values not in valid range[{1[0]}, {1[3]}]: '
+                         '{2}'.format(which.capitalize(), bnds, extent))
+            return False
+        elif out_of_borneo:
+            LOGGER.warn('{0} values not in Borneo [{1[1]}, {1[2]}]: '
+                        '{2}'.format(which.capitalize(), bnds, extent))
+            return True
+        else:
+            return True
+
     def check_field_datetime(self, meta, data, which='datetime'):
 
         """
@@ -2156,7 +2232,6 @@ class Dataset(object):
 
         if len(nums) < len(data):
             LOGGER.error('Field contains non-numeric data')
-            LOGGER.error('Non numeric data found')
             if any([RE_DMS.search(unicode(dt)) for dt in data]):
                 LOGGER.warn('Possible degrees minutes and seconds formatting? Use decimal degrees')
 
@@ -2165,27 +2240,15 @@ class Dataset(object):
             min_geo = float(min(nums))
             max_geo = float(max(nums))
             extent = (min_geo, max_geo)
+            valid = self.validate_geo_extent(extent, which)
 
-            if which == 'latitude':
-                bnds = [-90, -4, 8, 90]
-            elif which == 'longitude':
-                bnds = [-180, 108, 120, 180]
-
-            out_of_bounds = min_geo < bnds[0] or max_geo > bnds[3]
-            out_of_borneo = bnds[0] <= min_geo < bnds[1] or bnds[2] < max_geo <= bnds[3]
-
-            if out_of_bounds:
-                LOGGER.error('{0} values not in valid range[{1[0]}, {1[3]}]: '
-                             '{2}'.format(which.capitalize(), bnds, extent))
-            elif out_of_borneo:
-                LOGGER.warn('{0} values not in Borneo [{1[1]}, {1[2]}]: '
-                            '{2}'.format(which.capitalize(), bnds, extent))
-
-            # update the field metadata and the dataset extent
-            meta['range'] = extent
-            # Look up the extent name to update and then update it
-            which_extent = {'latitude': 'latitudinal_extent', 'longitude': 'longitudinal_extent'}
-            self.update_extent(extent, float, which_extent[which])
+            if valid:
+                # update the field metadata and the dataset extent
+                meta['range'] = extent
+                # Look up the extent name to update and then update it
+                which_extent = {'latitude': 'latitudinal_extent',
+                                'longitude': 'longitudinal_extent'}
+                self.update_extent(extent, float, which_extent[which])
 
     def final_checks(self):
         """
@@ -2208,6 +2271,15 @@ class Dataset(object):
                          extra={'join': self.taxon_names - self.taxon_names_used})
         else:
             LOGGER.info('Provided taxa all used in datasets')
+
+        LOGGER.info('Checking temporal and geographic extents',
+                    extra={'indent_before': 0, 'indent_after': 1})
+        if self.temporal_extent is None:
+            LOGGER.error('Temporal extent not set from data, please add start and '
+                         'end dates to summary worksheet')
+        if self.latitudinal_extent is None or self.longitudinal_extent is None:
+            LOGGER.error('Geographic extent not set from data, please add south, north '
+                         'east and west bounds to summary worksheet')
 
         if CH.counters['ERROR'] > 0:
             if CH.counters['WARNING'] > 0:
