@@ -1342,8 +1342,17 @@ class Dataset(object):
                 else:
                     LOGGER.error('{}: name and rank combination not found'.format(prnt_string))
             else:
-                LOGGER.info('{}: taxon found'.format(prnt_string))
                 parent_status[prnt] = ('valid', prnt_info)
+                # add parent into taxon index
+                if 'user' in prnt_info:
+                    LOGGER.warn('{}: parent considered a {} of {} in GBIF '
+                                'backbone'.format(prnt_string, prnt_info['user'][4],
+                                                  prnt_info['canon'][2]))
+                    self.taxon_index.add(prnt_info['user'] + (None, None))
+                    self.taxon_index.add(prnt_info['canon'] + prnt_info['user'][2:4])
+                else:
+                    LOGGER.info('{}: parent found'.format(prnt_string))
+                    self.taxon_index.add(prnt_info['canon'] + (None, None))
 
         # Now check main taxa
         LOGGER.info('Validating {} taxa'.format(len(taxa)),
