@@ -725,7 +725,7 @@ class Dataset(object):
         elif summary['Access status'][0] not in ['Open', 'Embargo']:
             LOGGER.error('Access status must be Open or Embargo '
                          'not {}'.format(summary['Access status'][0]))
-        elif summary['Access status'] == 'Embargo':
+        elif summary['Access status'][0] == 'Embargo':
             self.access = 'Embargo'
             if 'Embargo date' not in summary:
                 LOGGER.error('Dataset embargoed but embargo date row missing.')
