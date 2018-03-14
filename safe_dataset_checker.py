@@ -729,7 +729,7 @@ class Dataset(object):
             self.access = 'Embargo'
             if 'Embargo date' not in summary:
                 LOGGER.error('Dataset embargoed but embargo date row missing.')
-            elif is_blank(summary['Embargo'][0]):
+            elif is_blank(summary['Embargo date'][0]):
                 LOGGER.error('Dataset embargo date is blank')
             else:
                 embargo_date = summary['Embargo date'][0]
