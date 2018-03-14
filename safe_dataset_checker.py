@@ -2099,8 +2099,9 @@ class Dataset(object):
         if len(nums) < len(data):
             LOGGER.error('Field contains non-numeric data')
 
-        # update the field metadata
-        meta['range'] = (min(nums), max(nums))
+        # update the field metadata if there is any data.
+        if len(nums):
+            meta['range'] = (min(nums), max(nums))
 
     def check_field_categorical(self, meta, data):
 
@@ -2175,8 +2176,9 @@ class Dataset(object):
         if len(nums) < len(data):
             LOGGER.error('Field contains non-numeric data')
 
-        # update the field metadata
-        meta['range'] = (min(nums), max(nums))
+        # update the field metadata if there is any data
+        if len(nums):
+            meta['range'] = (min(nums), max(nums))
 
     def check_field_trait(self, meta, data, taxa_fields, which='categorical'):
 
