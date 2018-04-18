@@ -1555,7 +1555,7 @@ class Dataset(object):
             LOGGER.info('{} taxa loaded correctly'.format(len(self.taxon_names)),
                         extra={'indent_before': 1})
 
-    def load_data_worksheet(self, meta):
+    def load_data_worksheet(self, sheet_meta):
 
         """
         A method to load and check the formatting and content of a
@@ -1563,23 +1563,23 @@ class Dataset(object):
         in the dataset object into a DataWorksheet object.
 
         Args:
-            meta: A reference to the metadata dictionary for this
+            sheet_meta: A reference to the metadata dictionary for this
             worksheet in the datasets attribute, containing the
             worksheet name, title and description from the summary.
         """
 
         # now start populating with data
-        if meta['name'] not in self.sheet_names:
-            LOGGER.error('Data worksheet {} not found'.format(meta['name']),
+        if sheet_meta['name'] not in self.sheet_names:
+            LOGGER.error('Data worksheet {} not found'.format(sheet_meta['name']),
                          extra={'indent_before': 0, 'indent_after': 1})
             return
 
-        LOGGER.info('Checking data worksheet {}'.format(meta['name']),
+        LOGGER.info('Checking data worksheet {}'.format(sheet_meta['name']),
                     extra={'indent_before': 0, 'indent_after': 1})
 
         # Create a dataworksheet to store details: basically
         # just a dictionary with dot notation and defaults.
-        dwsh = DataWorksheet(meta)
+        dwsh = DataWorksheet(sheet_meta)
         start_errors = CH.counters['ERROR']
 
         # get the worksheet and data dimensions
@@ -1663,7 +1663,7 @@ class Dataset(object):
         for meta in metadata:
 
             # read the values and check them against the metadata
-            data = worksheet.col(meta['col_idx'], dwsh.field_name_row + 1, dwsh.max_row)
+            data = worksheet.col(meta['col_idx'], dwsh.field_name_row, dwsh.max_row)
             self.check_field(dwsh, meta, data)
 
         # add the new DataWorksheet into the Dataset
