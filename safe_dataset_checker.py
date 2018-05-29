@@ -180,7 +180,7 @@ def is_padded(value):
         Boolean
     """
 
-    return (value is not None) and (RE_WSPACE_AT_ENDS.match(unicode(value)))
+    return (value is not None) and bool(RE_WSPACE_AT_ENDS.match(unicode(value)))
 
 
 def duplication(data):
@@ -1697,8 +1697,17 @@ class Dataset(object):
             LOGGER.info('Checking Column {}'.format(xlrd.colname(meta['col_idx'])),
                         extra={'indent_before': 2, 'indent_after': 3})
         else:
-            LOGGER.info('Checking field {field_name}'.format(**meta),
+            # sanitize and check field name - aiming for ascii compliant with no padding
+            fld_name = meta['field_name']
+            fld_name_ascii = fld_name.encode('ascii', 'ignore')
+
+            LOGGER.info('Checking field {}'.format(fld_name_ascii ),
                         extra={'indent_before': 2, 'indent_after': 3})
+
+            if is_padded(fld_name):
+                LOGGER.error('Field name contains white space padding')
+            if len(fld_name) > len(fld_name_ascii):
+                LOGGER.error('Field name contains non ASCII characters')
 
         # Skip any field with no user provided metadata or data
         blank_data = [is_blank(cl.value) for cl in data]
