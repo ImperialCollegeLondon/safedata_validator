@@ -43,6 +43,8 @@ RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}')
 RE_EMAIL = re.compile(r'\S+@\S+\.\S+')
 RE_NAME = re.compile(r'[^,]+,[ ]?[^,]+')
 RE_WSPACE_ONLY = re.compile(r'^\s*$')
+RE_CONTAINS_WSPACE = re.compile(r'\s')
+
 # note that logically the next one also catches whitespace at both ends
 RE_WSPACE_AT_ENDS = re.compile(r'^\s+.+|.+\s+$')
 RE_DMS = re.compile(r'[°\'"dms’”]+')
@@ -887,12 +889,12 @@ class Dataset(object):
             self.authors = [dict(zip(authors.keys(), vals)) for vals in zip(*authors.values())]
 
         # CHECK DATA WORKSHEETS
-        ws_keys = ['Worksheet name', 'Worksheet title', 'Worksheet description']
+        ws_keys = ['Worksheet name', 'Worksheet title', 'Worksheet description', 'External file']
         data_worksheets = {k: summary[k] if k in summary else [None] * (len(ncols) - 1)
                            for k in ws_keys}
 
         # - switch in short keys and set blank cells to None
-        short_ws_keys = ['name', 'title', 'description']
+        short_ws_keys = ['name', 'title', 'description', 'external']
         for old, new in zip(ws_keys, short_ws_keys):
             data_worksheets[new] = [None if is_blank(dt) else dt for dt in data_worksheets[old]]
             data_worksheets.pop(old)
@@ -908,22 +910,35 @@ class Dataset(object):
             # return to the original orientation
             data_worksheets = {k: v for k, v in zip(data_worksheets, zip(*data_worksheets_list))}
 
-            # now check the contents
-            # i) Names
+            # Now check the contents
+            # i) First look for and validate any external file references
+            external_found = [not is_blank(vl) for vl in data_worksheets['external']]
+            external_files = set([vl for vl, found
+                                  in zip(data_worksheets['external'], external_found) if found])
+
+            if external_files:
+                if any([re.search('\s', vl) for vl in external_files]):
+                    LOGGER.error('External file names contain whitespace')
+                else:
+                    self.external_files = external_files
+
+            # ii) Names - must be provided even for externals
             if any(is_blank(vl) for vl in data_worksheets['name']):
                 LOGGER.error('Missing worksheet names')
 
-            bad_names = [vl for vl in data_worksheets['name']
-                         if not is_blank(vl) and vl not in self.sheet_names]
+            # iii) Look for names (skipping blanks and summaries with external files)
+            #      Note that external files may have worksheets but that isn't validated here
+            bad_names = [vl for vl, ext in zip(data_worksheets['name'], external_found)
+                         if not is_blank(vl) and not ext and vl not in self.sheet_names]
             if bad_names:
                 LOGGER.error('Worksheet names not found in workbook: ',
                              extra={'join': bad_names, 'quote': True})
 
-            # ii) Titles
+            # iii) Titles
             if any(is_blank(vl) for vl in data_worksheets['title']):
                 LOGGER.error('Missing worksheet title')
 
-            # ii) Descriptions
+            # iv) Descriptions
             if any(is_blank(vl) for vl in data_worksheets['description']):
                 LOGGER.error('Missing worksheet description')
 
@@ -1565,11 +1580,17 @@ class Dataset(object):
         Args:
             sheet_meta: A reference to the metadata dictionary for this
             worksheet in the datasets attribute, containing the
-            worksheet name, title and description from the summary.
+            worksheet name, title and description from the summary and
+            the name of any external file to be associated with this.
         """
 
-        # now start populating with data
-        if sheet_meta['name'] not in self.sheet_names:
+        # Handle the various options for external files:
+        if sheet_meta['name'] not in self.sheet_names and not is_blank(sheet_meta['external']):
+            LOGGER.info('Data worksheet {name} recognized as placeholder for '
+                        'external file {external}'.format(**sheet_meta),
+                         extra={'indent_before': 0, 'indent_after': 1})
+            return
+        elif sheet_meta['name'] not in self.sheet_names:
             LOGGER.error('Data worksheet {} not found'.format(sheet_meta['name']),
                          extra={'indent_before': 0, 'indent_after': 1})
             return
@@ -1608,34 +1629,44 @@ class Dataset(object):
             LOGGER.error('Cannot parse data: field_name row not found')
             return
 
-        # Check for expected row numbering
-        # - make a special case for terminal blanks, which might just have
-        #   whitespace junk in cells or have been hung on to by Excel.
-        n_terminal_blanks = 0
-        while is_blank(row_numbers[-1]):
-            row_numbers.pop(-1)
-            n_terminal_blanks += 1
+        # table descriptions for external files have no data, just headers, but otherwise
+        # check the row numbering makes sense
+        if len(row_numbers) > 0:
+            # Check for expected row numbering
+            # - make a special case for terminal blanks, which might just have
+            #   whitespace junk in cells or have been hung on to by Excel.
+            n_terminal_blanks = 0
+            while is_blank(row_numbers[-1]):
+                row_numbers.pop(-1)
+                n_terminal_blanks += 1
 
-        # See if terminal blanks are actually empty
-        if n_terminal_blanks:
-            row_types = row_types[: -n_terminal_blanks]
-            for check_row in range(dwsh.max_row - 1, (dwsh.max_row - 1) - n_terminal_blanks, -1):
-                if all(is_blank(val) for val in worksheet.row_values(check_row)):
-                    dwsh.max_row -= 1
-                else:
-                    LOGGER.error('Un-numbered rows at end of worksheet contain data')
-                    break
+            # See if terminal blanks are actually empty
+            if n_terminal_blanks:
+                row_types = row_types[: -n_terminal_blanks]
+                for check_row in range(dwsh.max_row - 1, (dwsh.max_row - 1) - n_terminal_blanks, -1):
+                    if all(is_blank(val) for val in worksheet.row_values(check_row)):
+                        dwsh.max_row -= 1
+                    else:
+                        LOGGER.error('Un-numbered rows at end of worksheet contain data')
+                        break
 
-        # Check what is left
-        if set(row_types) == {xlrd.XL_CELL_NUMBER}:
-            ideal = [float(i) for i in range(1, len(row_numbers) + 1)]
-            if row_numbers != ideal:
-                # All numbers but not the right ones
-                LOGGER.error("Row numbers not consecutive or do not start with 1")
+            # Check what is left
+            if set(row_types) == {xlrd.XL_CELL_NUMBER}:
+                ideal = [float(i) for i in range(1, len(row_numbers) + 1)]
+                if row_numbers != ideal:
+                    # All numbers but not the right ones
+                    LOGGER.error("Row numbers not consecutive or do not start with 1")
+
+        elif is_blank(sheet_meta['external']):
+            LOGGER.error('No data found below field descriptors.')
+        else:
+            LOGGER.info('Data table description associated with '
+                        'external file {external}'.format(**sheet_meta))
 
         # report on detected size
         dwsh.n_data_row = dwsh.max_row - dwsh.field_name_row
-        LOGGER.info('Worksheet contains {} rows and {} columns'.format(dwsh.max_row, dwsh.max_col),
+        LOGGER.info('Worksheet contains {n_d} descriptors, {o.n_data_row} data rows and '
+                    '{n_f} fields'.format(o=dwsh, n_d=len(dwsh.descriptors), n_f=dwsh.max_col - 1),
                     extra={'indent_after': 2})
 
         # extract dictionaries of metadata per field, setting blank entries to None

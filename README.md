@@ -465,5 +465,6 @@ Rare edge cases include taxon names with two equally approved usages:
 for example, the genus _Morus_ is an accepted usage for both mulberries
 and gannets. This kind of problem is described in the JSON `"note"`
 field and provided to the user. In these rare cases, an accepted
-usage would require a parent taxon to discriminate between them.
+usage would require a GBIF taxon ID to be provided to discriminate
+between them.
 
