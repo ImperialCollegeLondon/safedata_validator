@@ -579,6 +579,7 @@ class Dataset(object):
         self.taxon_names = set()
         self.taxon_names_used = set()
         self.taxon_index = set()
+        self.external_files = None
         self.passed = False
         
         # Setup the taxonomy validation mechanism.
@@ -1588,7 +1589,7 @@ class Dataset(object):
         if sheet_meta['name'] not in self.sheet_names and not is_blank(sheet_meta['external']):
             LOGGER.info('Data worksheet {name} recognized as placeholder for '
                         'external file {external}'.format(**sheet_meta),
-                         extra={'indent_before': 0, 'indent_after': 1})
+                        extra={'indent_before': 0, 'indent_after': 1})
             return
         elif sheet_meta['name'] not in self.sheet_names:
             LOGGER.error('Data worksheet {} not found'.format(sheet_meta['name']),
@@ -1643,7 +1644,8 @@ class Dataset(object):
             # See if terminal blanks are actually empty
             if n_terminal_blanks:
                 row_types = row_types[: -n_terminal_blanks]
-                for check_row in range(dwsh.max_row - 1, (dwsh.max_row - 1) - n_terminal_blanks, -1):
+                row_range = range(dwsh.max_row - 1, (dwsh.max_row - 1) - n_terminal_blanks, - 1)
+                for check_row in row_range:
                     if all(is_blank(val) for val in worksheet.row_values(check_row)):
                         dwsh.max_row -= 1
                     else:
@@ -1732,7 +1734,7 @@ class Dataset(object):
             fld_name = meta['field_name']
             fld_name_ascii = fld_name.encode('ascii', 'ignore')
 
-            LOGGER.info('Checking field {}'.format(fld_name_ascii ),
+            LOGGER.info('Checking field {}'.format(fld_name_ascii),
                         extra={'indent_before': 2, 'indent_after': 3})
 
             if is_padded(fld_name):
@@ -2393,6 +2395,8 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
         validate_doi: Check any publication DOIs resolve, requiring a web connection.
         check: String indicating which checking to run. Note that running worksheet checking
           without loading summary taxa and locations is going to be problematic!
+        project_id: Optional integer value to be checked against the project number included in
+          the summary worksheet.
 
     Returns:
         A Dataset object
