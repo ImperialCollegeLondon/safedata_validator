@@ -725,8 +725,8 @@ class Dataset(object):
         # CHECK ACCESS STATUS AND EMBARGO DETAILS
         if 'Access status' not in summary:
             LOGGER.error('Access status missing')
-        elif summary['Access status'][0] not in ['Open', 'Embargo']:
-            LOGGER.error('Access status must be Open or Embargo '
+        elif summary['Access status'][0] not in ['Open', 'Embargo', 'Closed']:
+            LOGGER.error('Access status must be Open, Embargo or Closed'
                          'not {}'.format(summary['Access status'][0]))
         elif summary['Access status'][0] == 'Embargo':
             self.access = 'Embargo'
