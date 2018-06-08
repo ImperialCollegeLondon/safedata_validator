@@ -920,8 +920,8 @@ class Dataset(object):
             if external_files:
                 if any([re.search('\s', vl) for vl in external_files]):
                     LOGGER.error('External file names contain whitespace')
-                else:
-                    self.external_files = external_files
+
+                self.external_files = external_files
 
             # ii) Names - must be provided even for externals
             if any(is_blank(vl) for vl in data_worksheets['name']):
@@ -2365,7 +2365,7 @@ class Dataset(object):
         # get the required components
         component_keys = ['access', 'authors', 'description', 'embargo_date', 'filename',
                           'keywords', 'latitudinal_extent', 'longitudinal_extent',
-                          'project_id', 'temporal_extent', 'title']
+                          'project_id', 'temporal_extent', 'title', 'external_files']
 
         components = {ky: vl for ky, vl in self.__dict__.iteritems() if ky in component_keys}
 
