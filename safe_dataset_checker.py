@@ -891,7 +891,7 @@ class Dataset(object):
 
         # CHECK DATA WORKSHEETS
         ws_keys = ['Worksheet name', 'Worksheet title', 'Worksheet description', 'External file']
-        data_worksheets = {k: summary[k] if k in summary else [None] * (len(ncols) - 1)
+        data_worksheets = {k: summary[k] if k in summary else [None] * (ncols - 1)
                            for k in ws_keys}
 
         # - switch in short keys and set blank cells to None
