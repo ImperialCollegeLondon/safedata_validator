@@ -508,6 +508,7 @@ class DataWorksheet(object):
         self.taxa_fields = None
         self.field_name_row = None
         self.fields = []
+        self.external = None
 
 
 class Dataset(object):
@@ -1585,11 +1586,21 @@ class Dataset(object):
             the name of any external file to be associated with this.
         """
 
-        # Handle the various options for external files:
-        if sheet_meta['name'] not in self.sheet_names and not is_blank(sheet_meta['external']):
-            LOGGER.info('Data worksheet {name} recognized as placeholder for '
+        # Create a dataworksheet to store details: basically
+        # just a dictionary with dot notation and defaults.
+        dwsh = DataWorksheet(sheet_meta)
+        start_errors = CH.counters['ERROR']
+
+        # For sheet meta with an external file, add in the external file name
+        if not is_blank(sheet_meta['external']):
+            dwsh.external = sheet_meta['external']
+
+        # Now match to sheet names
+        if sheet_meta['name'] not in self.sheet_names and dwsh.external is not None:
+            LOGGER.info('Worksheet summary {name} recognized as placeholder for '
                         'external file {external}'.format(**sheet_meta),
                         extra={'indent_before': 0, 'indent_after': 1})
+            self.dataworksheets.append(dwsh)
             return
         elif sheet_meta['name'] not in self.sheet_names:
             LOGGER.error('Data worksheet {} not found'.format(sheet_meta['name']),
@@ -1598,11 +1609,6 @@ class Dataset(object):
 
         LOGGER.info('Checking data worksheet {}'.format(sheet_meta['name']),
                     extra={'indent_before': 0, 'indent_after': 1})
-
-        # Create a dataworksheet to store details: basically
-        # just a dictionary with dot notation and defaults.
-        dwsh = DataWorksheet(sheet_meta)
-        start_errors = CH.counters['ERROR']
 
         # get the worksheet and data dimensions
         worksheet = self.workbook.sheet_by_name(dwsh.name)
