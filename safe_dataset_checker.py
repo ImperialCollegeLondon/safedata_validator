@@ -938,7 +938,10 @@ class Dataset(object):
                                 if not all(is_blank(vl) for vl in ws)]
 
         if not data_worksheets_list:
-            LOGGER.error("No worksheet details provided")
+            if self.external_files:
+                LOGGER.info("Only external file descriptions provided")
+            else:
+                LOGGER.error("No data worksheets or external files provided - no data.")
         else:
             # return to the original orientation
             data_worksheets = {k: v for k, v in zip(data_worksheets, zip(*data_worksheets_list))}
