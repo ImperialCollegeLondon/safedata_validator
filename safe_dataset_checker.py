@@ -580,7 +580,7 @@ class Dataset(object):
         self.taxon_names = set()
         self.taxon_names_used = set()
         self.taxon_index = set()
-        self.external_files = None
+        self.external_files = {}
         self.passed = False
         
         # Setup the taxonomy validation mechanism.
@@ -890,8 +890,39 @@ class Dataset(object):
             # and finally store as a dictionary per author
             self.authors = [dict(zip(authors.keys(), vals)) for vals in zip(*authors.values())]
 
+        # LOOK FOR EXTERNAL FILES - small datasets will usually be contained
+        # entirely in a single Excel file, but where formatting or size issues
+        # require external files, then names and descriptions are included in
+        # the summary information
+
+        ex_files = {'External file', 'External file description'}
+        if found.issuperset(ex_files):
+            # both descriptors found, so strip completely blank columns
+            external_files = zip(summary['External file'], summary['External file description'])
+            external_files = [x for x in external_files if not (is_blank(x[0]) and is_blank(x[1]))]
+
+            # Report how many found and then look for problems
+            LOGGER.info('Found information on {} external files: '.format(len(external_files)),
+                        extra={'join': [exf[0] for exf in external_files]})
+
+            # check for incomplete entries
+            if any([is_blank(x[0]) or is_blank(x[1]) for x in external_files]):
+                LOGGER.error('Provide file names and descriptions for all external files')
+
+            # check for names with whitespace
+            external_files = {k: v for k, v in external_files}
+            if any([RE_CONTAINS_WSPACE.search(exf) for exf in external_files.keys()]):
+                LOGGER.error('External file names must not contain whitespace')
+
+            self.external_files = external_files
+
+        elif found.intersection(ex_files):
+            # one but not both
+            LOGGER.error('Both file names and descriptions must be provided for external files')
+
         # CHECK DATA WORKSHEETS
-        ws_keys = ['Worksheet name', 'Worksheet title', 'Worksheet description', 'External file']
+        ws_keys = ['Worksheet name', 'Worksheet title',
+                   'Worksheet description', 'Worksheet external file']
         data_worksheets = {k: summary[k] if k in summary else [None] * (ncols - 1)
                            for k in ws_keys}
 
@@ -914,24 +945,17 @@ class Dataset(object):
 
             # Now check the contents
             # i) First look for and validate any external file references
-            external_found = [not is_blank(vl) for vl in data_worksheets['external']]
-            external_files = set([vl for vl, found
-                                  in zip(data_worksheets['external'], external_found) if found])
+            external_tables = {vl for vl in data_worksheets['external'] if vl is not None}
+            if not external_tables.issubset(self.external_files.keys()):
+                LOGGER.error('Data table descriptions refer to unreported external files.')
 
-            if external_files:
-                if any([re.search('\s', vl) for vl in external_files]):
-                    LOGGER.error('External file names contain whitespace')
-
-                self.external_files = external_files
-
-            # ii) Names - must be provided even for externals
+            # ii) Worksheet names
             if any(is_blank(vl) for vl in data_worksheets['name']):
                 LOGGER.error('Missing worksheet names')
 
             # iii) Look for names (skipping blanks and summaries with external files)
             #      Note that external files may have worksheets but that isn't validated here
-            bad_names = [vl for vl, ext in zip(data_worksheets['name'], external_found)
-                         if not is_blank(vl) and not ext and vl not in self.sheet_names]
+            bad_names = [vl for vl in data_worksheets['name']if vl not in self.sheet_names]
             if bad_names:
                 LOGGER.error('Worksheet names not found in workbook: ',
                              extra={'join': bad_names, 'quote': True})
