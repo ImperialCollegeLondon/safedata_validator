@@ -907,7 +907,7 @@ class Dataset(object):
 
             # check for incomplete entries
             if any([is_blank(x[0]) or is_blank(x[1]) for x in external_files]):
-                LOGGER.error('Provide file names and descriptions for all external files')
+                LOGGER.error('Provide both file names and descriptions for all external files')
 
             # check for names with whitespace
             external_files = {k: v for k, v in external_files}
@@ -917,8 +917,12 @@ class Dataset(object):
             self.external_files = external_files
 
         elif found.intersection(ex_files):
-            # one but not both
-            LOGGER.error('Both file names and descriptions must be provided for external files')
+            # one but not both found - only an error if they aren't blank
+            external_row = list(found.intersection(ex_files))
+            external_row_vals = [x for x in summary[external_row[0]] if not is_blank(x)]
+            if external_row_vals:
+                LOGGER.error('Both External file and External file description summary rows '
+                             'must be provided when including external files')
 
         # CHECK DATA WORKSHEETS
         ws_keys = ['Worksheet name', 'Worksheet title',
