@@ -2348,19 +2348,25 @@ class Dataset(object):
         """
         LOGGER.info('Checking provided locations and taxa all used in data worksheets',
                     extra={'indent_before': 0, 'indent_after': 1})
-        # check locations
-        if self.locations_used != self.locations:
+
+        # check locations - can't validate when there are external files which
+        # might use any unused ones.
+        if self.locations_used == self.locations:
+            LOGGER.info('Provided locations all used in datasets')
+        elif self.external_files:
+            LOGGER.warn('Location list cannot validated when external data files are used')
+        else:
             LOGGER.error('Provided locations not used: ',
                          extra={'join': self.locations - self.locations_used})
-        else:
-            LOGGER.info('Provided locations all used in datasets')
 
         # check taxa
-        if self.taxon_names_used != self.taxon_names:
+        if self.taxon_names_used == self.taxon_names:
+            LOGGER.info('Provided taxa all used in datasets')
+        elif self.external_files:
+            LOGGER.warn('Taxon list cannot validated when external data files are used')
+        else:
             LOGGER.error('Provided taxa  not used: ',
                          extra={'join': self.taxon_names - self.taxon_names_used})
-        else:
-            LOGGER.info('Provided taxa all used in datasets')
 
         LOGGER.info('Checking temporal and geographic extents',
                     extra={'indent_before': 0, 'indent_after': 1})

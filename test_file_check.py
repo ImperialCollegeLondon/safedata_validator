@@ -6,7 +6,7 @@ from safe_dataset_checker import *
 loc_json = 'SAFE_locations.json'
 gbif_db = 'backbone-current-simple.sqlite'
 fname = 'Test_format_good.xlsx'
-fname = '/Users/dorme/Downloads/template_Fayle_BaitCards.xlsx'
+fname = '/Users/dorme/Downloads/Pillay_R_et_al_Dryobalanops_lanceolata_AllData.xlsx'
 
 # part by part
 ds = Dataset(fname, gbif_database=gbif_db)
