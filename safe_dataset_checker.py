@@ -198,6 +198,19 @@ def duplication(data):
 
     return [ky for ky, vl in Counter(data).iteritems() if vl > 1]
 
+def to_lowercase(str_vals):
+    """
+    Converts a list of string values to lowercase, handling empty strings and None
+    via the is_blank function.
+
+    Args:
+        str_vals: A list of string values
+
+    Returns:
+        A list of lower-case string values, including None for blank entries.
+    """
+
+    return [v.lower() if not is_blank(v) else None for v in str_vals]
 
 def is_numeric_string(txt):
     """
@@ -1059,8 +1072,11 @@ class Dataset(object):
                          extra={'join': dupes})
             return
 
+        # Lowercase the headers
+        hdrs = to_lowercase(hdrs)
+
         # Check location names are available
-        if 'Location name' not in hdrs:
+        if 'location name' not in hdrs:
             LOGGER.error('Location name column not found')
             return
 
@@ -1072,22 +1088,22 @@ class Dataset(object):
 
         # Location name cleaning - convert floats to unicode via int to handle fractal point numbers
         for rw in locs:
-            if isinstance(rw['Location name'], unicode):
+            if isinstance(rw['location name'], unicode):
                 pass
-            elif isinstance(rw['Location name'], float):
-                rw['Location name'] = unicode(int(rw['Location name']))
+            elif isinstance(rw['location name'], float):
+                rw['location name'] = unicode(int(rw['location name']))
 
         # check for rogue whitespace
-        ws_padded = [rw['Location name'] for rw in locs if is_padded(rw['Location name'])]
+        ws_padded = [rw['location name'] for rw in locs if is_padded(rw['location name'])]
         if ws_padded:
             LOGGER.error('Locations names with whitespace padding: ',
                          extra={'join': ws_padded, 'quote': True})
             # clean whitespace padding
             for row in locs:
-                row['Location name'] = row['Location name'].strip()
+                row['location name'] = row['location name'].strip()
 
         # look for duplicates
-        dupes = duplication([rw['Location name'] for rw in locs])
+        dupes = duplication([rw['location name'] for rw in locs])
         if dupes:
             LOGGER.error('Duplicated location names: ',
                          extra={'join': dupes, 'quote': True})
@@ -1098,18 +1114,25 @@ class Dataset(object):
         existing_loc_names = set(valid_locations.keys() + aliases.keys())
 
         # Split up old and new if there are there any new ones?
-        if 'New' in hdrs:
+        if 'new' in hdrs:
 
             # Check the New column is just yes, no
-            is_new = {rw['New'] for rw in locs}
-            valid_new = {'yes', 'no', 'Yes', 'No'}
+            is_new = to_lowercase([rw['new'] for rw in locs])
+            is_new = set(is_new)
+
+            # look for blanks
+            if any([val is None for val in is_new]):
+                LOGGER.error('New locations field contains blank rows.')
+
+            # check only yes or no entries
+            valid_new = {'yes', 'no'}
             if not is_new.issubset(valid_new):
-                LOGGER.error('New field contains values other than Yes and No: ',
+                LOGGER.error('New field contains values other than yes and no: ',
                              extra={'join': is_new - valid_new, 'quote': True})
 
             # extract the new and old locations
-            new_locs = [rw for rw in locs if rw['New'].lower() == 'yes']
-            locs = [rw for rw in locs if rw['New'].lower() == 'no']
+            new_locs = [rw for rw in locs if rw['new'].lower() == 'yes']
+            locs = [rw for rw in locs if rw['new'].lower() == 'no']
         else:
             new_locs = None
 
@@ -1120,8 +1143,8 @@ class Dataset(object):
             # check Lat Long and Type, which automatically updates the extents.
             # Unlike a data worksheet field, here we don't have any metadata or want
             # to keep it, so field checker gets passed an empty dictionary, which is discarded.
-            if 'Latitude' in hdrs:
-                lats = [vl['Latitude'] for vl in new_locs if vl['Latitude'] != u'NA']
+            if 'latitude' in hdrs:
+                lats = [vl['latitude'] for vl in new_locs if vl['latitude'] != u'NA']
                 non_blank_lats = [vl for vl in lats if not is_blank(vl)]
                 if len(non_blank_lats) < len(lats):
                     LOGGER.error('Blank latitude values for new locations: use NA.')
@@ -1129,8 +1152,8 @@ class Dataset(object):
             else:
                 LOGGER.error('New locations reported but Latitude field missing')
 
-            if 'Longitude' in hdrs:
-                longs = [vl['Longitude'] for vl in new_locs if vl['Longitude'] != u'NA']
+            if 'longitude' in hdrs:
+                longs = [vl['longitude'] for vl in new_locs if vl['longitude'] != u'NA']
                 non_blank_longs = [vl for vl in longs if not is_blank(vl)]
                 if len(non_blank_longs) < len(longs):
                     LOGGER.error('Blank longitude values for new locations: use NA.')
@@ -1138,24 +1161,33 @@ class Dataset(object):
             else:
                 LOGGER.error('New locations reported but Longitude field missing')
 
-            if 'Type' in hdrs:
-                geo_types = {vl['Type'] for vl in new_locs}
-                bad_geo_types = geo_types - {'POINT', 'LINESTRING', 'POLYGON'}
+            if 'type' in hdrs:
+
+                # get lowercase types
+                geo_types = set(to_lowercase([vl['type'] for vl in new_locs]))
+
+                # Handle blanks
+                if None in geo_types:
+                    LOGGER.error('Types for new locations contains blank entries.')
+                    geo_types -= {None}
+
+                # Handle unknown geo types
+                bad_geo_types = geo_types - {'point', 'linestring', 'polygon'}
                 if bad_geo_types:
                     LOGGER.error('Unknown location types: ',
                                  extra={'join': bad_geo_types, 'quote': True})
             else:
                 LOGGER.error('New locations reported but Type field missing')
 
-            duplicates_existing = [rw['Location name'] for rw in new_locs
-                                   if rw['Location name'] in existing_loc_names]
+            duplicates_existing = [rw['location name'] for rw in new_locs
+                                   if rw['location name'] in existing_loc_names]
 
             if duplicates_existing:
                 LOGGER.error('New location names duplicate existing names and aliases: ',
                              extra={'join': duplicates_existing})
 
             # new location names
-            new_loc_names = {rw['Location name'] for rw in new_locs}
+            new_loc_names = {rw['location name'] for rw in new_locs}
         else:
             new_loc_names = set()
 
@@ -1164,7 +1196,7 @@ class Dataset(object):
             LOGGER.info('{} existing locations reported'.format(len(locs)))
 
             # check names exist
-            loc_names = {rw['Location name'] for rw in locs}
+            loc_names = {rw['location name'] for rw in locs}
             unknown = loc_names - existing_loc_names
             if unknown:
                 LOGGER.error('Unknown locations found: ',
@@ -2355,7 +2387,7 @@ class Dataset(object):
             if self.locations_used == self.locations:
                 LOGGER.info('Provided locations all used in datasets')
             elif self.external_files:
-                LOGGER.warn('Location list cannot validated when external data files are used')
+                LOGGER.warn('Location list cannot be validated when external data files are used')
             else:
                 LOGGER.error('Provided locations not used: ',
                              extra={'join': self.locations - self.locations_used})
@@ -2365,7 +2397,7 @@ class Dataset(object):
             if self.taxon_names_used == self.taxon_names:
                 LOGGER.info('Provided taxa all used in datasets')
             elif self.external_files:
-                LOGGER.warn('Taxon list cannot validated when external data files are used')
+                LOGGER.warn('Taxon list cannot be validated when external data files are used')
             else:
                 LOGGER.error('Provided taxa  not used: ',
                              extra={'join': self.taxon_names - self.taxon_names_used})
