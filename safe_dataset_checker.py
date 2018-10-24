@@ -1276,7 +1276,7 @@ class Dataset(object):
         # A) SANITIZE INPUTS
         # get and check the headers
         tx_rows = sheet.get_rows()
-        hdrs = [cl.value for cl in tx_rows.next()]
+        hdrs = to_lowercase([cl.value for cl in tx_rows.next()])
 
         # duplicated headers are a problem in that it will cause values in the taxon
         # dictionaries to be overwritten. Depending on what gets overwritten, this can
@@ -1298,10 +1298,7 @@ class Dataset(object):
             return
         else:
             # Remove values keyed to None (blank columns),
-            # convert keys to lower case and update the list of headers
             _ = [tx.pop(None) for tx in taxa if None in tx]
-            taxa = [{ky.lower(): vl for ky, vl in tx.iteritems()} for tx in taxa]
-            hdrs = taxa[0].keys()
 
         # clean the contents of whitespace padding
         for idx, tx in enumerate(taxa):
@@ -1830,9 +1827,17 @@ class Dataset(object):
         if is_blank(meta['description']):
             LOGGER.error('Description is missing')
 
+        # Test explicitly lower cased field type  values to avoid annoying users
+        field_type = to_lowercase([meta['field_type']])[0]
+
+        # check for padding in field type
+        if is_padded(field_type):
+            LOGGER.error('Field type contains white space padding')
+            field_type = field_type.strip()
+
         # filter out missing and blank data, except for comments fields, where
         # blanks are not an error
-        if meta['field_type'] != 'Comments':
+        if field_type != 'comments':
 
             # Only NA is acceptable
             na_vals = [dt.value == u'NA' for dt in data]
@@ -1849,44 +1854,44 @@ class Dataset(object):
             data = [dt for dt, nb in zip(data, na_or_blank) if not nb]
 
         # run consistency checks where needed and trap unknown field types
-        if meta['field_type'] == 'Date':
+        if field_type == 'date':
             self.check_field_datetime(meta, data, which='date')
-        elif meta['field_type'] == 'Datetime':
+        elif field_type == 'datetime':
             self.check_field_datetime(meta, data, which='datetime')
-        elif meta['field_type'] == 'Time':
+        elif field_type == 'time':
             self.check_field_datetime(meta, data, which='time')
-        elif meta['field_type'] == 'Taxa':
+        elif field_type == 'taxa':
             self.check_field_taxa(data)
-        elif meta['field_type'] == 'Location':
+        elif field_type == 'location':
             self.check_field_locations(data)
-        elif meta['field_type'] in ['Categorical', 'Ordered Categorical']:
+        elif field_type in ['categorical', 'ordered categorical']:
             self.check_field_categorical(meta, data)
-        elif meta['field_type'] == 'Numeric':
+        elif field_type == 'numeric':
             self.check_field_numeric(meta, data)
-        elif meta['field_type'] == 'Abundance':
+        elif field_type == 'abundance':
             self.check_field_abundance(meta, data, dwsh.taxa_fields)
-        elif meta['field_type'] in ['Categorical Trait', 'Ordered Categorical Trait']:
+        elif field_type in ['categorical trait', 'ordered categorical trait']:
             self.check_field_trait(meta, data, dwsh.taxa_fields, which='categorical')
-        elif meta['field_type'] == 'Numeric Trait':
+        elif field_type == 'numeric trait':
             self.check_field_trait(meta, data, dwsh.taxa_fields, which='numeric')
-        elif meta['field_type'] in ['Categorical Interaction', 'Ordered Categorical Interaction']:
+        elif field_type in ['categorical interaction', 'ordered categorical interaction']:
             self.check_field_interaction(meta, data, dwsh.taxa_fields, which='categorical')
-        elif meta['field_type'] == 'Numeric Interaction':
+        elif field_type == 'numeric interaction':
             self.check_field_interaction(meta, data, dwsh.taxa_fields, which='numeric')
-        elif meta['field_type'] == 'Latitude':
+        elif field_type == 'latitude':
             # check field geo expects values in data not xlrd.Cell
             data = [dt.value for dt in data]
             self.check_field_geo(meta, data, which='latitude')
-        elif meta['field_type'] == 'Longitude':
+        elif field_type == 'longitude':
             # check field geo expects values in data not xlrd.Cell
             data = [dt.value for dt in data]
             self.check_field_geo(meta, data, which='longitude')
-        elif meta['field_type'] in ['Replicate', 'ID']:
+        elif field_type in ['replicate', 'id']:
             # We've looked for missing data, no other constraints.
             pass
-        elif meta['field_type'] == 'Comments':
+        elif field_type == 'comments':
             pass
-        elif meta['field_type'] is None:
+        elif field_type is None:
             LOGGER.error('Field type is empty')
         else:
             LOGGER.error('Unknown field type {field_type}'.format(**meta))
