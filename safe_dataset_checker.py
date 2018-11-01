@@ -44,6 +44,7 @@ RE_EMAIL = re.compile(r'\S+@\S+\.\S+')
 RE_NAME = re.compile(r'[^,]+,[ ]?[^,]+')
 RE_WSPACE_ONLY = re.compile(r'^\s*$')
 RE_CONTAINS_WSPACE = re.compile(r'\s')
+RE_DOI = DOI = re.compile('https?://(dx.)?doi.org')
 
 # note that logically the next one also catches whitespace at both ends
 RE_WSPACE_AT_ENDS = re.compile(r'^\s+.+|.+\s+$')
@@ -778,7 +779,7 @@ class Dataset(object):
         if 'Publication DOI' in summary:
             pub_doi = [vl for vl in summary['Publication DOI'] if not is_blank(vl)]
             # check formatting - basically make sure they have a proxy URL
-            doi_is_url = [vl.startswith('https://doi.org/') for vl in pub_doi]
+            doi_is_url = [RE_DOI.match(vl) is not None for vl in pub_doi]
             if not all(doi_is_url):
                 LOGGER.error('Please provide publication DOIs as a URL: https://doi.org/...')
 
@@ -914,20 +915,21 @@ class Dataset(object):
             external_files = zip(summary['External file'], summary['External file description'])
             external_files = [x for x in external_files if not (is_blank(x[0]) and is_blank(x[1]))]
 
-            # Report how many found and then look for problems
-            LOGGER.info('Found information on {} external files: '.format(len(external_files)),
-                        extra={'join': [exf[0] for exf in external_files]})
+            if external_files:
+                # Report how many found and then look for problems
+                LOGGER.info('Found information on {} external files: '.format(len(external_files)),
+                            extra={'join': [exf[0] for exf in external_files]})
 
-            # check for incomplete entries
-            if any([is_blank(x[0]) or is_blank(x[1]) for x in external_files]):
-                LOGGER.error('Provide both file names and descriptions for all external files')
+                # check for incomplete entries
+                if any([is_blank(x[0]) or is_blank(x[1]) for x in external_files]):
+                    LOGGER.error('Provide both file names and descriptions for all external files')
 
-            # check for names with whitespace
-            external_files = {k: v for k, v in external_files}
-            if any([RE_CONTAINS_WSPACE.search(exf) for exf in external_files.keys()]):
-                LOGGER.error('External file names must not contain whitespace')
+                # check for names with whitespace
+                external_files = {k: v for k, v in external_files}
+                if any([RE_CONTAINS_WSPACE.search(exf) for exf in external_files.keys()]):
+                    LOGGER.error('External file names must not contain whitespace')
 
-            self.external_files = external_files
+                self.external_files = external_files
 
         elif found.intersection(ex_files):
             # one but not both found - only an error if they aren't blank
@@ -943,58 +945,69 @@ class Dataset(object):
         data_worksheets = {k: summary[k] if k in summary else [None] * (ncols - 1)
                            for k in ws_keys}
 
-        # - switch in short keys and set blank cells to None
+        # - Switch in short keys and set blank cells to None
         short_ws_keys = ['name', 'title', 'description', 'external']
         for old, new in zip(ws_keys, short_ws_keys):
             data_worksheets[new] = [None if is_blank(dt) else dt for dt in data_worksheets[old]]
             data_worksheets.pop(old)
 
-        # rotate and remove completely blank columns
-        data_worksheets_list = zip(*data_worksheets.values())
-        data_worksheets_list = [ws for ws in data_worksheets_list
-                                if not all(is_blank(vl) for vl in ws)]
+        # - Switch from rows of values to columns of records
+        data_worksheets = [dict(zip(data_worksheets.keys(), vals))
+                           for vals in zip(*data_worksheets.values())]
 
-        if not data_worksheets_list:
+        # - Remove completely blank records
+        data_worksheets = [ws for ws in data_worksheets
+                           if not all(is_blank(vl) for vl in ws.values())]
+
+        # Catch inclusion of locations
+        sheets =  [ws['name'] for ws in data_worksheets]
+        if 'Locations' in sheets:
+            LOGGER.error('Do not include Locations metadata sheet in Data worksheet details')
+            _ = data_worksheets.pop(sheets.index('Locations'))
+
+        sheets =  [ws['name'] for ws in data_worksheets]
+        if 'Taxa' in sheets:
+            LOGGER.error('Do not include Taxa metadata sheet in Data worksheet details')
+            _ = data_worksheets.pop(sheets.index('Taxa'))
+
+        if not data_worksheets:
             if self.external_files:
                 LOGGER.info("Only external file descriptions provided")
             else:
                 LOGGER.error("No data worksheets or external files provided - no data.")
         else:
-            # return to the original orientation
-            data_worksheets = {k: v for k, v in zip(data_worksheets, zip(*data_worksheets_list))}
-
             # Now check the contents
             # i) First look for and validate any external file references
-            external_tables = {vl for vl in data_worksheets['external'] if vl is not None}
+            external_tables = {vl for vl in data_worksheets if vl['external'] is not None}
             if not external_tables.issubset(self.external_files.keys()):
                 LOGGER.error('Data table descriptions refer to unreported external files.')
 
             # ii) Worksheet names
-            if any(is_blank(vl) for vl in data_worksheets['name']):
+            if any(is_blank(vl['name']) for vl in data_worksheets):
                 LOGGER.error('Missing worksheet names')
 
             # iii) Look for names (skipping blanks and summaries with external files)
             #      Note that external files may have worksheets but that isn't validated here
-            bad_names = [vl for vl in data_worksheets['name']if vl not in self.sheet_names]
+            bad_names = [vl for vl in data_worksheets if vl['name'] not in self.sheet_names]
             if bad_names:
                 LOGGER.error('Worksheet names not found in workbook: ',
                              extra={'join': bad_names, 'quote': True})
 
             # iii) Titles
-            if any(is_blank(vl) for vl in data_worksheets['title']):
+            if any(is_blank(vl['title']) for vl in data_worksheets):
                 LOGGER.error('Missing worksheet title')
 
             # iv) Descriptions
-            if any(is_blank(vl) for vl in data_worksheets['description']):
+            if any(is_blank(vl['description']) for vl in data_worksheets):
                 LOGGER.error('Missing worksheet description')
 
             # and finally store a list of dictionaries of data worksheet summary details
-            self.dataworksheet_summaries = [dict(zip(data_worksheets.keys(), vals))
-                                            for vals in zip(*data_worksheets.values())]
+            self.dataworksheet_summaries = data_worksheets
 
         # check for extra undocumented spreadsheets
         if 'Worksheet name' in summary:
-            expected_sheets = set(data_worksheets['name']) | {'Summary', 'Taxa', 'Locations'}
+            sheets = set([ws['name'] for ws in data_worksheets])
+            expected_sheets = sheets | {'Summary', 'Taxa', 'Locations'}
             if not self.sheet_names.issubset(expected_sheets):
                 LOGGER.error('Undocumented sheets found in  workbook: ',
                              extra={'join': self.sheet_names - expected_sheets, 'quote': True})
@@ -1828,19 +1841,23 @@ class Dataset(object):
             LOGGER.error('Description is missing')
 
         # Test explicitly lower cased field type  values to avoid annoying users
+        # look for strip white space
         field_type = to_lowercase([meta['field_type']])[0]
 
         # check for padding in field type
         if is_padded(field_type):
-            LOGGER.error('Field type contains white space padding')
+            LOGGER.error('Field type contains white space padding: ',
+                         extra={'join': [field_type], 'quote':True})
             field_type = field_type.strip()
 
         # filter out missing and blank data, except for comments fields, where
-        # blanks are not an error
+        # blanks are not an error. Also check for Excel formula errors
         if field_type != 'comments':
 
-            # Only NA is acceptable
+            # Look for NAs and Excel errors
             na_vals = [dt.value == u'NA' for dt in data]
+            xl_error = [dt.ctype == xlrd.XL_CELL_ERROR for dt in data]
+
             if any(na_vals):
                 LOGGER.warn('{} / {} values missing'.format(sum(na_vals), len(na_vals)))
 
@@ -1849,9 +1866,12 @@ class Dataset(object):
                 LOGGER.error('{} cells are blank or contain only whitespace '
                              'text'.format(sum(blank_data)))
 
-            # Return the values that aren't NA, blank or whitespace only
-            na_or_blank = [any(tst) for tst in zip(na_vals, blank_data)]
-            data = [dt for dt, nb in zip(data, na_or_blank) if not nb]
+            if any(xl_error):
+                LOGGER.error('{} cells contain Excel # error codes'.format(sum(xl_error)))
+
+            # Return the values that aren't NA, blank, whitespace or errors
+            drop = [any(tests) for tests in zip(na_vals, blank_data, xl_error)]
+            data = [dt for dt, nb in zip(data, drop) if not nb]
 
         # run consistency checks where needed and trap unknown field types
         if field_type == 'date':
@@ -2252,6 +2272,10 @@ class Dataset(object):
             if any(integer_codes):
                 LOGGER.error('Numeric level names not permitted')
 
+            # Remove white space around the labels: simple spacing in the text
+            # makes it easier to read and insisting on no space is unnecessary
+            level_labels = [vl.strip() for vl in level_labels]
+
             # Now look for consistency: get the unique values reported in the
             # data, convert to unicode to handle checking of numeric labels and
             # then check the reported levels are a subset of the descriptors.
@@ -2268,7 +2292,7 @@ class Dataset(object):
                     found.add(lv)
 
             if found != reported:
-                LOGGER.error('Categories found in data missing from description: ',
+                LOGGER.error('Categories found in data missing from levels descriptor row: ',
                              extra={'join': reported - found, 'quote': True})
 
     def check_field_numeric(self, meta, data):
@@ -2286,15 +2310,29 @@ class Dataset(object):
         self._check_meta(meta, 'method')
 
         # Regardless of the outcome of the meta checks, can still check the
-        # data is all numeric, as it claims to be.
-        nums = [dt.value for dt in data if dt.ctype == xlrd.XL_CELL_NUMBER]
+        # data is all numeric, as it claims to be. Keep dates separate because
+        # they are a pain to find if included as their numeric storage value
+        good, bad, ugly = [], [], []
+        for dt in data:
+            if dt.ctype == xlrd.XL_CELL_NUMBER:
+                good.append(dt.value)
+            elif dt.ctype == xlrd.XL_CELL_DATE:
+                ugly.append(dt.value)
+            else:
+                bad.append(dt.value)
 
-        if len(nums) < len(data):
-            LOGGER.error('Field contains non-numeric data')
+        if bad:
+            LOGGER.error('Field contains non-numeric data: ',
+                         extra={'join': set(bad), 'quote': True})
+
+        if ugly:
+            ugly = [xlrd.xldate_as_datetime(ug, self.workbook.datemode).isoformat() for ug in ugly]
+            LOGGER.error('Field contains date/time formatted data - format will differ from '
+                         'from the values shown: ', extra={'join': ugly})
 
         # update the field metadata if there is any data
-        if len(nums):
-            meta['range'] = (min(nums), max(nums))
+        if len(good):
+            meta['range'] = (min(good), max(good))
 
     def check_field_trait(self, meta, data, taxa_fields, which='categorical'):
 
