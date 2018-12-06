@@ -44,7 +44,8 @@ RE_EMAIL = re.compile(r'\S+@\S+\.\S+')
 RE_NAME = re.compile(r'[^,]+,[ ]?[^,]+')
 RE_WSPACE_ONLY = re.compile(r'^\s*$')
 RE_CONTAINS_WSPACE = re.compile(r'\s')
-RE_DOI = DOI = re.compile('https?://(dx.)?doi.org')
+RE_CONTAINS_PUNC = re.compile(r'[,;:]')
+RE_DOI = DOI = re.compile('https?://(dx.)?doi.org/')
 
 # note that logically the next one also catches whitespace at both ends
 RE_WSPACE_AT_ENDS = re.compile(r'^\s+.+|.+\s+$')
@@ -199,6 +200,7 @@ def duplication(data):
 
     return [ky for ky, vl in Counter(data).iteritems() if vl > 1]
 
+
 def to_lowercase(str_vals):
     """
     Converts a list of string values to lowercase, handling empty strings and None
@@ -212,6 +214,7 @@ def to_lowercase(str_vals):
     """
 
     return [v.lower() if not is_blank(v) else None for v in str_vals]
+
 
 def is_numeric_string(txt):
     """
@@ -595,6 +598,7 @@ class Dataset(object):
         self.taxon_names_used = set()
         self.taxon_index = set()
         self.external_files = {}
+        self.funders = []
         self.passed = False
         
         # Setup the taxonomy validation mechanism.
@@ -678,7 +682,8 @@ class Dataset(object):
         """
 
         # try and get the summary worksheet
-        LOGGER.info("Checking Summary worksheet", extra={'indent_f': 0, 'indent_l': 'r'})
+        LOGGER.info("Checking Summary worksheet",
+                    extra={'indent_before': 0, 'indent_after': 1})
         start_errors = CH.counters['ERROR']
 
         try:
@@ -687,337 +692,428 @@ class Dataset(object):
             LOGGER.error("Summary worksheet not found, moving on.")
             return None
 
-        # load cell values and types - list containing lists of row contents
-        summary_values = worksheet._cell_values
-        summary_types = worksheet._cell_types
+        # load worksheet rows
+        rows = list(worksheet.get_rows())
         ncols = worksheet.ncols
 
-        # convert into dictionary using the first entry as the key
-        summary = {rw[0]: rw[1:] for rw in summary_values}
-        summary_types = {vl[0]: tp[1:] for vl, tp in zip(summary_values, summary_types)}
+        # convert into dictionary using the lower cased first entry as the key
+        if {rw[0].ctype for rw in rows} != {xlrd.XL_CELL_TEXT}:
+            LOGGER.error('Summary metadata fields column contains non text values')
 
+        summary = {unicode(rw[0].value).lower(): rw[1:] for rw in rows}
+
+        # Now define sets of metadata that may be present: each row has a field name
+        # that appears in the summary sheet, may or may not be mandatory and may or may not
+        # have an internal field name, used in the code or in Zenodo. Note that blocks
+        # of rows can be mandatory or not, defined later, but rows may be mandatory within
+        # those blocks
+        
+        # - fields with single values
+        singleton_fields = [('safe project id', True, 'pid'),
+                            ('access status', True, 'access'),
+                            ('embargo date', False, 'embargo'),
+                            ('title', True, None),
+                            ('description', True, None)]
+
+        # - fields in blocks and or multiple values
+        keyword_fields = [('keywords', True, None)]
+        doi_fields = [('publication doi', True, None)]
+        date_fields = [('start date', True, None),
+                       ('end date', True, None)]
+        geo_fields = [('west', True, None),
+                      ('east', True, None),
+                      ('south', True, None),
+                      ('north', True, None)]
+        author_fields = [('author name', True, 'name'),
+                         ('author affiliation', False, 'affiliation'),
+                         ('author email', False, 'email'),
+                         ('author orcid', False, 'orcid')]
+        funding_fields = [('funding body', True, 'body'),
+                          ('funding type', True, 'type'),
+                          ('funding reference', False, 'ref'),
+                          ('funding link', False, 'url')]
+        external_file_fields = [('external file', True, 'file'),
+                                ('external file description', True, 'description')]
+        worksheet_fields = [('worksheet name', True, 'name'),
+                            ('worksheet title', True, 'title'),
+                            ('worksheet description', True, 'description'),
+                            ('worksheet external file', False, 'external')]
+        
         # Check the minimal keys are expected
-        required = {"SAFE Project ID", "Access status", "Title", "Description",
-                    "Author name", "Author email", "Author affiliation", "Author ORCID",
-                    "Worksheet name", "Worksheet title", "Worksheet description", 'Keywords'}
+        required = {"safe project id", "access status", "title", "description",
+                    "author name", "author email", "author affiliation",
+                    "worksheet name", "worksheet title", "worksheet description", 'keywords'}
 
         found = set(summary.keys())
 
-        # don't bail here - try and get as far as possible
         if not found.issuperset(required):
-            LOGGER.warn('Missing metadata fields: ', extra={'join': required - found})
+            LOGGER.error('Missing mandatory metadata fields: ', extra={'join': required - found})
 
-        # CHECK PROJECT ID
-        pid = summary['SAFE Project ID'][0]
-        if 'SAFE Project ID' not in summary:
-            LOGGER.error('SAFE Project ID missing')
-        elif not isinstance(pid, float) or not pid.is_integer():
-            LOGGER.error('SAFE Project ID is not an integer')
-        else:
-            pid = int(pid)
-            if project_id is not None and pid != project_id:
-                LOGGER.error('SAFE Project ID in file ({}) does not match '
-                             'provided project id ({})'.format(pid, project_id))
+        # Check only valid keys are found
+        valid_fields = {entry[0] for entry in singleton_fields + date_fields + geo_fields +
+                        author_fields + funding_fields + external_file_fields +
+                        worksheet_fields + doi_fields + keyword_fields}
+
+        if found - valid_fields:
+            LOGGER.error('Unknown metadata fields: ', extra={'join': found - valid_fields})
+
+        # Function to read sets of rows
+        def read_block(title, fields, mandatory=True):
+            """
+            Internal function, expecting to run in environment of load_summary.
+            Takes a block of rows (mandatory or optional) and returns a list
+            of dictionary records, containing xlrd.Cell information so that
+            block specific validation can check cells types.
+
+            Args:
+                title (str): The block title, used for reporting
+                fields (list): A list of 3 tuples describing the fields
+                mandatory: Is this block mandatory
+            Returns:
+                None or a list of records.
+            """
+
+            mandatory_fields = [f[0] for f in fields if f[1]]
+            optional_fields = [f[0] for f in fields if not f[1]]
+            field_map = [(f[0], f[2]) for f in fields]
+
+            # Extract the block of fields, filling in missing fields
+            if optional_fields:
+                fields = mandatory_fields + optional_fields
             else:
-                self.project_id = pid
+                fields = mandatory_fields
 
-        # CHECK DATASET TITLE
-        if 'Title' not in summary:
-            LOGGER.error('Dataset title row missing')
-        elif is_blank(summary['Title'][0]):
-            LOGGER.error('Dataset title is blank')
-        else:
-            self.title = summary['Title'][0]
+            block = {k: summary[k] if k in summary else [None] * (ncols - 1) for k in fields}
 
-        # CHECK DATASET DESCRIPTION
-        if 'Description' not in summary:
-            LOGGER.error('Dataset description row missing')
-        elif is_blank(summary['Description'][0]):
-            LOGGER.error('Dataset description is blank')
-        else:
-            self.description = summary['Description'][0]
+            # Set empty cells to None - ignore the cell type 'empty' here and
+            # test the cell value directly to catch pure whitespace content
+            for k in block.keys():
+                block[k] = [None if dt is None or is_blank(dt.value) else dt for dt in block[k]]
 
-        # CHECK ACCESS STATUS AND EMBARGO DETAILS
-        if 'Access status' not in summary:
-            LOGGER.error('Access status missing')
-        elif summary['Access status'][0] not in ['Open', 'Embargo', 'Closed']:
-            LOGGER.error('Access status must be Open, Embargo or Closed'
-                         'not {}'.format(summary['Access status'][0]))
-        elif summary['Access status'][0] == 'Embargo':
-            self.access = 'Embargo'
-            if 'Embargo date' not in summary:
-                LOGGER.error('Dataset embargoed but embargo date row missing.')
-            elif is_blank(summary['Embargo date'][0]):
-                LOGGER.error('Dataset embargo date is blank')
+            # Pivot to dictionary of records
+            block = [dict(zip(block.keys(), vals)) for vals in zip(*block.values())]
+
+            # Drop empty records
+            block = [bl for bl in block if any(bl.values())]
+
+            # Reporting
+            if not block:
+                if mandatory:
+                    LOGGER.error('No {} metadata found'.format(title))
+                    return None
             else:
-                embargo_date = summary['Embargo date'][0]
-                if summary_types['Embargo date'][0] != xlrd.XL_CELL_DATE:
-                    LOGGER.error('Embargo date not formatted as date.')
+                LOGGER.info('Metadata for {} found: {} records'.format(title, len(block)),
+                            extra={'indent_before': 1, 'indent_after': 2})
+
+                # report on block fields
+                for fld in mandatory_fields:
+                    fld_values = [rec[fld] for rec in block]
+                    if not all(fld_values):
+                        LOGGER.error('Missing metadata in mandatory field {}'.format(fld))
+
+                # remap names if provided
+                to_rename = (mp for mp in field_map if mp[1] is not None)
+                for (old, new) in to_rename:
+                    for rec in block:
+                        rec[new] = rec[old]
+                        rec.pop(old)
+
+                return block
+
+        def strip_ctypes(block):
+            """
+            Converts the xlrd.Cell data in a block to pure values in place
+            Args:
+                block: A list of dictionary records
+
+            Returns:
+                None
+            """
+
+            for bl in block:
+                bl.update(dict(zip(bl.keys(),[None if b is None else b.value for b in bl.values()])))
+
+        # Now check singleton rows
+        singletons = read_block('Core fields', singleton_fields)
+        if len(singletons) > 1:
+            LOGGER.error('Multiple values found in core field rows')
+
+        singletons = singletons[0]
+
+        # Project ID specific validation
+        pid = singletons['pid']
+
+        # check the value is an integer
+        if pid is not None:
+            if ((pid.ctype != xlrd.XL_CELL_NUMBER) or not pid.value.is_integer()):
+                LOGGER.error('SAFE Project ID is not an integer')
+            else:
+                pid = int(pid.value)
+
+                if project_id is not None and pid != project_id:
+                    LOGGER.error('SAFE Project ID in file ({}) does not match '
+                                 'provided project id ({})'.format(pid, project_id))
                 else:
-                    now = datetime.datetime.now()
-                    embargo_date = xlrd.xldate_as_datetime(embargo_date, self.workbook.datemode)
-                    if embargo_date < now:
-                        LOGGER.error('Embargo date is in the past.')
-                    elif embargo_date > now + datetime.timedelta(days=2 * 365):
-                        LOGGER.error('Embargo date more than two years in the future.')
-                    else:
-                        self.embargo_date = embargo_date.date().isoformat()
+                    self.project_id = pid
+
+        # Title validation
+        if singletons['title'] is not None:
+            if is_blank(singletons['title'].value):
+                 LOGGER.error('Dataset title is blank')
+            else:
+                 self.title = singletons['title'].value
+
+        # Description validation
+        if singletons['description'] is not None:
+            if is_blank(singletons['description'].value):
+                 LOGGER.error('Dataset description is blank')
+            else:
+                 self.description = singletons['description'].value
+
+        # Access status and embargo validation
+        if singletons['access'] is not None:
+            access = singletons['access'].value
+            if singletons['access'].ctype != xlrd.XL_CELL_TEXT:
+                LOGGER.error('Access status not a text value: {}'.format(access))
+            else:
+                if access.lower() not in ['open', 'embargo', 'closed']:
+                    LOGGER.error('Access status must be Open, Embargo or Closed '
+                                  'not {}'.format(access))
+                else:
+                    self.access = access.lower()
+                    if access.lower == 'embargo':
+
+                        embargo = singletons['embargo'].value
+                        if singletons['embargo'].ctype != xlrd.XL_CELL_DATE:
+                            LOGGER.error('Embargo date not a date value: {}'.format(embargo))
+                        else:
+                            embargo = xlrd.xldate_as_datetime(embargo, self.workbook.datemode)
+                            now = datetime.datetime.now()
+
+                            if embargo < now:
+                                LOGGER.error('Embargo date is in the past.')
+                            elif embargo > now + datetime.timedelta(days=2 * 365):
+                                LOGGER.error('Embargo date more than two years in the future.')
+                            else:
+                                self.embargo_date = embargo.date().isoformat()
 
         # CHECK KEYWORDS
-        if 'Keywords' not in summary:
-            LOGGER.error('Dataset keywords row missing')
-        elif all([is_blank(kywd) for kywd in summary['Keywords']]):
-            LOGGER.error('No keywords provided')
-        else:
-            # drop any blanks
-            self.keywords = [vl for vl in summary['Keywords'] if not is_blank(vl)]
-            # look for commas
-            if any(',' in kw for kw in self.keywords[0]):
-                LOGGER.error('Put each keyword in a separate cell, do not use commas')
+        keywords = read_block('Keywords', keyword_fields)
 
-        # CHECK FOR PUBLICATION DOIs if any are provided
-        if 'Publication DOI' in summary:
-            pub_doi = [vl for vl in summary['Publication DOI'] if not is_blank(vl)]
-            # check formatting - basically make sure they have a proxy URL
-            doi_is_url = [RE_DOI.match(vl) is not None for vl in pub_doi]
+        # data validation for keywords
+        if keywords:
+            keywords = [entry['keywords'] for entry in keywords]
+            if {k.ctype for k in keywords} != {xlrd.XL_CELL_TEXT}:
+                LOGGER.error('Keywords contain non-text values')
+
+            # look for commas
+            keywords = [entry.value for entry in keywords]
+            if any(RE_CONTAINS_PUNC.search(kw) for kw in keywords):
+                LOGGER.error('Put each keyword in a separate cell, do not separate '
+                             'keywords using commas or semi-colons')
+
+            self.keywords = keywords
+
+        # CHECK FOR PUBLICATION DOIs
+        pub_doi = read_block('DOI', doi_fields, mandatory=False)
+
+        # data validation for DOIs
+        if pub_doi:
+            pub_doi = [entry['publication doi'] for entry in pub_doi]
+            if {k.ctype for k in pub_doi} != {xlrd.XL_CELL_TEXT}:
+                LOGGER.error('Publication DOIs contain non-text values')
+
+            # look for commas
+            pub_doi = [entry.value for entry in pub_doi]
+            doi_is_url = [RE_DOI.match(vl) for vl in pub_doi]
             if not all(doi_is_url):
                 LOGGER.error('Please provide publication DOIs as a URL: https://doi.org/...')
 
             if validate_doi:
                 for doi, is_doi in zip(pub_doi, doi_is_url):
                     if is_doi:
-                        api_call = 'https://doi.org/api/handles/{}'.format(doi[16:])
+                        api_call = 'https://doi.org/api/handles/{}'.format(doi[is_doi.end():])
                         r = requests.get(api_call)
                         if r.json()['responseCode'] != 1:
                             LOGGER.error('DOI not found: {}'.format(doi))
 
-            self.publication_doi = pub_doi
+        self.publication_doi = pub_doi
+
+        # PROCESS BLOCKS OF CELLS
+        # Load the AUTHORS block
+        authors = read_block('Authors', author_fields)
+
+        # Author specific validation
+        if authors:
+            # simplify to cell values not xlrd.Cells
+            strip_ctypes(authors)
+
+            # badly formatted names
+            bad_names = [rec['name'] for rec in authors if not RE_NAME.match(rec['name'])]
+            if bad_names:
+                LOGGER.error('Author name not formatted as last_name, first_names: ',
+                             extra={'join': bad_names, 'quote': True})
+            
+            # badly formatted emails
+            bad_emails = [rec['email'] for rec in authors
+                          if not is_blank(rec['orcid']) and not RE_EMAIL.match(rec['email'])]
+            if bad_emails:
+                LOGGER.error('Email not properly formatted: ',
+                             extra={'join': bad_emails, 'quote': True})
+            
+            # badly formatted orcids
+            bad_orcid = [rec['orcid'] for rec in authors
+                         if not is_blank(rec['orcid']) and
+                         (not isinstance(rec['orcid'], unicode) or
+                          not RE_ORCID.match(rec['orcid']))]
+            if bad_orcid:
+                    LOGGER.error('ORCID not properly formatted: ',
+                                 extra={'join': bad_orcid, 'quote': True})
+
+        self.authors = authors
+
+        # LOAD EXTERNAL FILES - small datasets will usually be contained
+        # entirely in a single Excel file, but where formatting or size issues
+        # require external files, then names and descriptions are included in
+        # the summary information
+
+        external_files = read_block('External Files', external_file_fields, False)
+
+        # external file specific validation
+        if external_files:
+            # simplify to cell values not xlrd.Cells
+            strip_ctypes(external_files)
+
+            bad_names = [RE_CONTAINS_WSPACE.search(exf['file']) for exf in self.external_files]
+            if any(bad_names):
+                LOGGER.error('External file names must not contain whitespace: ',
+                             extra={'join': bad_names, 'quote': True})
+
+        self.external_files = external_files
+
+        # Load the WORKSHEETS block
+        dataworksheet_summaries = read_block('Worksheets', worksheet_fields)
+
+        # Worksheet specific validation
+        if dataworksheet_summaries:
+            # simplify to cell values not xlrd.Cells
+            strip_ctypes(dataworksheet_summaries)
+
+            # - catch inclusion of Taxa and Locations in data worksheets
+            cited_sheets = [ws['name'] for ws in dataworksheet_summaries]
+
+            if ('Locations' in cited_sheets) or ('Taxa' in cited_sheets):
+                LOGGER.error('Do not include Taxa or Locations metadata sheets in '
+                             'Data worksheet details')
+
+                dataworksheet_summaries = [ws for ws in dataworksheet_summaries
+                                           if ws['name'] not in ('Locations','Taxa')]
+
+        # Check possibly modified set of summaries
+        if not dataworksheet_summaries:
+            if self.external_files:
+                LOGGER.info("Only external file descriptions provided")
+            else:
+                LOGGER.error("No data worksheets or external files provided - no data.")
+        else:
+            cited_sheets = {ws['name'] for ws in dataworksheet_summaries}
+            # names not in list of sheets
+            bad_names = cited_sheets - self.sheet_names
+            if bad_names:
+                LOGGER.error('Worksheet names not found in workbook: ',
+                             extra={'join': bad_names, 'quote': True})
+            # existing sheets without description
+            extra_names = self.sheet_names - {'Summary', 'Taxa', 'Locations'} - cited_sheets
+            if extra_names:
+                LOGGER.error('Undocumented sheets found in workbook: ',
+                             extra={'join': extra_names, 'quote': True})
+            # bad external files
+            external_in_sheet = {ws['external'] for ws in dataworksheet_summaries
+                                 if ws['external'] is not None}
+            if self.external_files:
+                external_names = {ex['file'] for ex in self.external_files}
+            else:
+                external_names = set()
+
+            bad_externals = external_in_sheet - external_names
+            if bad_externals:
+                LOGGER.error('Worksheet descriptions refer to unreported external files.',
+                             extra={'join': bad_externals, 'quote': True})
+
+        self.dataworksheet_summaries = dataworksheet_summaries
+
+        # LOOK FOR FUNDING DETAILS - users provide a funding body and a description
+        # of the funding type and then optionally a reference number and a URL
+
+        funders = read_block('Funding Bodies', funding_fields, mandatory=False)
+        if funders:
+            strip_ctypes(funders)
+        self.funders = funders
 
         # CHECK EXTENTS - there are six fields to provide temporal and geographic
         # extents for the data. These two extents are a mandatory component of Gemini
         # Metadata so need to be provided if the worksheets and locations don't
         # populate the extents.
 
-        # Temporal extents
-        date_fields = ['Start Date', 'End Date']
-        date_fields_found = set(date_fields).intersection(summary)
+        temp_extent = read_block('Date Extents', date_fields, mandatory=False)
 
-        if len(date_fields_found) == 1:
-            LOGGER.error('Only one of start and end date provided')
-        elif date_fields_found == set(date_fields):
-            # check date formats
-            date_field_types = set([summary_types[fld][0] for fld in date_fields])
-            if date_field_types != {xlrd.XL_CELL_DATE}:
-                LOGGER.error('Start and end dates not formatted as dates')
-            else:
-                date_vals = [summary[fld][0] for fld in date_fields]
-                if date_vals[0] < 1 or date_vals[1] < 1:
+        # temporal extent validation and updating
+        if temp_extent:
+            if len(temp_extent) > 1:
+                LOGGER.error('Multiple values found in date extent rows.')
+
+            dates = temp_extent[0]
+
+            date_field_types = {None if val is None else val.ctype for val in dates.values()}
+
+            if not date_field_types.issubset({xlrd.XL_CELL_DATE, None}):
+                LOGGER.error('Start and/or end dates not formatted as dates')
+            elif all(dates.values()):
+                date_vals = (xlrd.xldate_as_datetime(dates['start date'].value,
+                                                     self.workbook.datemode),
+                             xlrd.xldate_as_datetime(dates['end date'].value,
+                                                     self.workbook.datemode))
+                epoch_start = xlrd.xldate_as_datetime(1, self.workbook.datemode)
+                if date_vals[0] < epoch_start or date_vals[1] < epoch_start:
                     LOGGER.error('Time not date values found in start and/or end date')
                 elif date_vals[0] > date_vals[1]:
                     LOGGER.error('Start date is after end date')
                 else:
-                    date_vals = (xlrd.xldate_as_datetime(date_vals[0], self.workbook.datemode),
-                                 xlrd.xldate_as_datetime(date_vals[1], self.workbook.datemode))
                     self.update_extent(date_vals, datetime.datetime, 'temporal_extent')
 
+
         # Geographic extents
-        geo_fields = ['West', 'East', 'South', 'North']
-        geo_fields_found = set(geo_fields).intersection(summary)
+        geo_extent = read_block('Geographic Extents', geo_fields, mandatory=False)
 
-        if len(geo_fields_found) > 0 and len(geo_fields_found) < 4:
-            LOGGER.error('Some but not all geographic extent fields found: ',
-                         extra={'join': geo_fields_found})
-        elif geo_fields_found == set(geo_fields):
-            # check formats
-            geo_field_types = set([summary_types[fld][0] for fld in geo_fields])
-            if geo_field_types != {xlrd.XL_CELL_NUMBER}:
-                LOGGER.error('Not all geographic extents are numeric')
-            else:
-                geo_vals = tuple([summary[fld][0] for fld in geo_fields])
-                valid = self.validate_geo_extent(geo_vals[:2], 'longitude')
+        if geo_extent:
+            if len(geo_extent) > 1:
+                LOGGER.error('Multiple values found in geographic extent rows.')
+
+            bbox = geo_extent[0]
+
+            bbox_field_types = {None if val is None else val.ctype for val in bbox.values()}
+
+            if not bbox_field_types.issubset({xlrd.XL_CELL_NUMBER, None}):
+                LOGGER.error('Geographic extents not numeric')
+            elif all(bbox.values()):
+
+                strip_ctypes(geo_extent)
+                valid = self.validate_geo_extent((bbox['west'], bbox['east']), 'longitude')
                 if valid:
-                    self.update_extent(geo_vals[:2], float, 'longitudinal_extent')
+                   self.update_extent((bbox['west'], bbox['east']), float, 'longitudinal_extent')
 
-                valid = self.validate_geo_extent(geo_vals[2:], 'latitude')
+                valid = self.validate_geo_extent((bbox['south'], bbox['north']), 'latitude')
                 if valid:
-                    self.update_extent(geo_vals[2:], float, 'latitudinal_extent')
-
-        # CHECK AUTHORS
-        # Get the set of author fields and create blank entries for any missing fields
-        # to simplify handling the error checking.
-        author_keys = ['Author name', 'Author affiliation', 'Author email', 'Author ORCID']
-        authors = {k: summary[k] if k in summary else [None] * (len(ncols) - 1)
-                   for k in author_keys}
-
-        # - switch in zenodo keys and set blank cells to None
-        zenodo_keys = ['name', 'affiliation', 'email', 'orcid']
-        for old, new in zip(author_keys, zenodo_keys):
-            authors[new] = [None if is_blank(dt) else dt for dt in authors[old]]
-            authors.pop(old)
-
-        # rotate and remove completely blank columns
-        authors_list = zip(*authors.values())
-        authors_list = [au for au in authors_list if not all(is_blank(vl) for vl in au)]
-
-        if not authors_list:
-            LOGGER.error('No author details provided')
-        else:
-            # return to the original orientation
-            authors = {k: v for k, v in zip(authors, zip(*authors_list))}
-
-            # now check the contents
-            # i) Names
-            author_names = [unicode(vl) for vl in authors['name'] if vl is not None]
-            if len(author_names) < len(authors['name']):
-                LOGGER.error('Missing author names')
-            if author_names:
-                bad_names = [vl for vl in author_names if not RE_NAME.match(vl)]
-                if bad_names:
-                    LOGGER.error('Author name not formatted as last_name, first_names: ',
-                                 extra={'join': bad_names, 'quote': True})
-
-            # ii) Affiliations (no regex checking)
-            blank_affil = [is_blank(vl) for vl in authors['affiliation']]
-            if any(blank_affil):
-                LOGGER.warn('Missing affiliations - please provide if available')
-
-            # iii) Email
-            author_emails = [unicode(vl) for vl in authors['email'] if vl is not None]
-            if len(author_emails) < len(authors['email']):
-                LOGGER.warn('Missing author emails - please provide if available')
-            if author_emails:
-                bad_emails = [vl for vl in author_emails if not RE_EMAIL.match(vl)]
-                if bad_emails:
-                    LOGGER.error('Email not properly formatted: ',
-                                 extra={'join': bad_emails, 'quote': True})
-
-            # iii) ORCiD (not mandatory)
-            if any(is_blank(vl) for vl in authors['orcid']):
-                LOGGER.warn('Missing ORCiDs, consider adding them!')
-
-            bad_orcid = [vl for vl in authors['orcid'] if not is_blank(vl) and
-                         (not isinstance(vl, unicode) or not RE_ORCID.match(vl))]
-            if bad_orcid:
-                    LOGGER.error('ORCID not properly formatted: ',
-                                 extra={'join': bad_orcid, 'quote': True})
-
-            # and finally store as a dictionary per author
-            self.authors = [dict(zip(authors.keys(), vals)) for vals in zip(*authors.values())]
-
-        # LOOK FOR EXTERNAL FILES - small datasets will usually be contained
-        # entirely in a single Excel file, but where formatting or size issues
-        # require external files, then names and descriptions are included in
-        # the summary information
-
-        ex_files = {'External file', 'External file description'}
-        if found.issuperset(ex_files):
-            # both descriptors found, so strip completely blank columns
-            external_files = zip(summary['External file'], summary['External file description'])
-            external_files = [x for x in external_files if not (is_blank(x[0]) and is_blank(x[1]))]
-
-            if external_files:
-                # Report how many found and then look for problems
-                LOGGER.info('Found information on {} external files: '.format(len(external_files)),
-                            extra={'join': [exf[0] for exf in external_files]})
-
-                # check for incomplete entries
-                if any([is_blank(x[0]) or is_blank(x[1]) for x in external_files]):
-                    LOGGER.error('Provide both file names and descriptions for all external files')
-
-                # check for names with whitespace
-                external_files = {k: v for k, v in external_files}
-                if any([RE_CONTAINS_WSPACE.search(exf) for exf in external_files.keys()]):
-                    LOGGER.error('External file names must not contain whitespace')
-
-                self.external_files = external_files
-
-        elif found.intersection(ex_files):
-            # one but not both found - only an error if they aren't blank
-            external_row = list(found.intersection(ex_files))
-            external_row_vals = [x for x in summary[external_row[0]] if not is_blank(x)]
-            if external_row_vals:
-                LOGGER.error('Both External file and External file description summary rows '
-                             'must be provided when including external files')
-
-        # CHECK DATA WORKSHEETS
-        ws_keys = ['Worksheet name', 'Worksheet title',
-                   'Worksheet description', 'Worksheet external file']
-        data_worksheets = {k: summary[k] if k in summary else [None] * (ncols - 1)
-                           for k in ws_keys}
-
-        # - Switch in short keys and set blank cells to None
-        short_ws_keys = ['name', 'title', 'description', 'external']
-        for old, new in zip(ws_keys, short_ws_keys):
-            data_worksheets[new] = [None if is_blank(dt) else dt for dt in data_worksheets[old]]
-            data_worksheets.pop(old)
-
-        # - Switch from rows of values to columns of records
-        data_worksheets = [dict(zip(data_worksheets.keys(), vals))
-                           for vals in zip(*data_worksheets.values())]
-
-        # - Remove completely blank records
-        data_worksheets = [ws for ws in data_worksheets
-                           if not all(is_blank(vl) for vl in ws.values())]
-
-        # Catch inclusion of locations
-        sheets =  [ws['name'] for ws in data_worksheets]
-        if 'Locations' in sheets:
-            LOGGER.error('Do not include Locations metadata sheet in Data worksheet details')
-            _ = data_worksheets.pop(sheets.index('Locations'))
-
-        sheets =  [ws['name'] for ws in data_worksheets]
-        if 'Taxa' in sheets:
-            LOGGER.error('Do not include Taxa metadata sheet in Data worksheet details')
-            _ = data_worksheets.pop(sheets.index('Taxa'))
-
-        if not data_worksheets:
-            if self.external_files:
-                LOGGER.info("Only external file descriptions provided")
-            else:
-                LOGGER.error("No data worksheets or external files provided - no data.")
-        else:
-            # Now check the contents
-            # i) First look for and validate any external file references
-            external_tables = {vl for vl in data_worksheets if vl['external'] is not None}
-            if not external_tables.issubset(self.external_files.keys()):
-                LOGGER.error('Data table descriptions refer to unreported external files.')
-
-            # ii) Worksheet names
-            if any(is_blank(vl['name']) for vl in data_worksheets):
-                LOGGER.error('Missing worksheet names')
-
-            # iii) Look for names (skipping blanks and summaries with external files)
-            #      Note that external files may have worksheets but that isn't validated here
-            bad_names = [vl for vl in data_worksheets if vl['name'] not in self.sheet_names]
-            if bad_names:
-                LOGGER.error('Worksheet names not found in workbook: ',
-                             extra={'join': bad_names, 'quote': True})
-
-            # iii) Titles
-            if any(is_blank(vl['title']) for vl in data_worksheets):
-                LOGGER.error('Missing worksheet title')
-
-            # iv) Descriptions
-            if any(is_blank(vl['description']) for vl in data_worksheets):
-                LOGGER.error('Missing worksheet description')
-
-            # and finally store a list of dictionaries of data worksheet summary details
-            self.dataworksheet_summaries = data_worksheets
-
-        # check for extra undocumented spreadsheets
-        if 'Worksheet name' in summary:
-            sheets = set([ws['name'] for ws in data_worksheets])
-            expected_sheets = sheets | {'Summary', 'Taxa', 'Locations'}
-            if not self.sheet_names.issubset(expected_sheets):
-                LOGGER.error('Undocumented sheets found in  workbook: ',
-                             extra={'join': self.sheet_names - expected_sheets, 'quote': True})
+                    self.update_extent((bbox['south'], bbox['north']), float, 'latitudinal_extent')
 
         # summary of processing
         n_errors = CH.counters['ERROR'] - start_errors
         if n_errors > 0:
-            LOGGER.info('Summary contains {} errors'.format(n_errors))
+            LOGGER.info('Summary contains {} errors'.format(n_errors),
+                        extra={'indent_before': 1, 'indent_after': 0})
         else:
-            LOGGER.info('Summary formatted correctly')
+            LOGGER.info('Summary formatted correctly',
+                        extra={'indent_before': 1, 'indent_after': 0})
 
     def load_locations(self, locations_json=None):
 
@@ -1847,7 +1943,7 @@ class Dataset(object):
         # check for padding in field type
         if is_padded(field_type):
             LOGGER.error('Field type contains white space padding: ',
-                         extra={'join': [field_type], 'quote':True})
+                         extra={'join': [field_type], 'quote': True})
             field_type = field_type.strip()
 
         # filter out missing and blank data, except for comments fields, where
@@ -2131,8 +2227,8 @@ class Dataset(object):
         bad = [dt.value for dt in data if dt.ctype != xlrd.XL_CELL_DATE]
         if len(bad):
             bad = set(unicode(vl) for vl in bad)
-            LOGGER.error('Data in field not formatted as date. Note that text can look'
-                         '_exactly_ like a date: ', extra={'join': bad})
+            LOGGER.error('Field contains data formatted as text or numbers. Note that '
+                         'text can look _exactly_ like a date or time: ', extra={'join': bad})
 
         # Get date values
         data = [dt.value for dt in data if dt.ctype == xlrd.XL_CELL_DATE]
@@ -2484,8 +2580,8 @@ class Dataset(object):
 
         # get the required components
         component_keys = ['access', 'authors', 'description', 'embargo_date', 'filename',
-                          'keywords', 'latitudinal_extent', 'longitudinal_extent',
-                          'project_id', 'temporal_extent', 'title', 'external_files']
+                          'keywords', 'latitudinal_extent', 'longitudinal_extent', 'funders',
+                          'project_id', 'temporal_extent', 'title', 'external_files',]
 
         components = {ky: vl for ky, vl in self.__dict__.iteritems() if ky in component_keys}
 
