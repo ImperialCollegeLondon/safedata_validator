@@ -597,7 +597,7 @@ class Dataset(object):
         self.taxon_names = set()
         self.taxon_names_used = set()
         self.taxon_index = set()
-        self.external_files = {}
+        self.external_files = []
         self.funders = []
         self.passed = False
         
