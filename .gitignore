@@ -10,3 +10,16 @@ SAFE_import_files*
 # Mac DS files
 .DS_Store
 
+# compiled python
+*.pyc
+
+# notes folders
+local_notes
+
+# build and dist
+build
+dist
+
+# Do not include the local copy of the taxon database
+local_db/backbone-current-simple.sqlite
+local_db/taxdump.tar.gz
