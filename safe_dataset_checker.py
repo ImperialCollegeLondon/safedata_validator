@@ -711,7 +711,7 @@ class Dataset(object):
         # - fields with single values
         singleton_fields = [('safe project id', True, 'pid'),
                             ('access status', True, 'access'),
-                            ('embargo date', False, 'embargo'),
+                            ('embargo date', False, 'embargo_date'),
                             ('title', True, None),
                             ('description', True, None)]
 
@@ -875,27 +875,33 @@ class Dataset(object):
             access = singletons['access'].value
             if singletons['access'].ctype != xlrd.XL_CELL_TEXT:
                 LOGGER.error('Access status not a text value: {}'.format(access))
+            elif access.lower() not in ['open', 'embargo', 'closed']:
+                LOGGER.error('Access status must be Open, Embargo or Closed '
+                              'not {}'.format(access))
             else:
-                if access.lower() not in ['open', 'embargo', 'closed']:
-                    LOGGER.error('Access status must be Open, Embargo or Closed '
-                                  'not {}'.format(access))
-                else:
-                    self.access = access.lower()
-                    if access.lower == 'embargo':
+                self.access = access.lower()
 
-                        embargo = singletons['embargo'].value
-                        if singletons['embargo'].ctype != xlrd.XL_CELL_DATE:
-                            LOGGER.error('Embargo date not a date value: {}'.format(embargo))
+                if self.access == 'embargo' and singletons['embargo_date'] is None:
+                    LOGGER.error('Dataset embargoed but no embargo date provided')
+                elif self.access == 'embargo':
+                    embargo_date = singletons['embargo_date'].value
+                    if singletons['embargo_date'].ctype != xlrd.XL_CELL_DATE:
+                        LOGGER.error('Embargo date not a date value: {}'.format(embargo_date))
+                    else:
+                        embargo_date = xlrd.xldate_as_datetime(embargo_date, self.workbook.datemode)
+                        now = datetime.datetime.now()
+
+                        if embargo_date < now:
+                            LOGGER.error('Embargo date is in the past.')
+                        elif embargo_date > now + datetime.timedelta(days=2 * 365):
+                            LOGGER.error('Embargo date more than two years in the future.')
                         else:
-                            embargo = xlrd.xldate_as_datetime(embargo, self.workbook.datemode)
-                            now = datetime.datetime.now()
-
-                            if embargo < now:
-                                LOGGER.error('Embargo date is in the past.')
-                            elif embargo > now + datetime.timedelta(days=2 * 365):
-                                LOGGER.error('Embargo date more than two years in the future.')
-                            else:
-                                self.embargo_date = embargo.date().isoformat()
+                            self.embargo_date = embargo_date.date().isoformat()
+                            LOGGER.info('Dataset access: embargoed until {}'.format(self.embargo_date),
+                                        extra={'indent_before': 1, 'indent_after': 0})
+                else:
+                    LOGGER.info('Dataset access: {}'.format(self.access),
+                                extra={'indent_before': 1, 'indent_after': 0})
 
         # CHECK KEYWORDS
         keywords = read_block('Keywords', keyword_fields)
