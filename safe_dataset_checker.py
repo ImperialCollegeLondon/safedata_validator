@@ -593,6 +593,7 @@ class Dataset(object):
         self.latitudinal_extent = None
         self.longitudinal_extent = None
         self.locations = set()
+        self.location_index = set()
         self.locations_used = set()
         self.taxon_names = set()
         self.taxon_names_used = set()
@@ -1338,6 +1339,22 @@ class Dataset(object):
 
         # combine locations into set
         self.locations = loc_names | new_loc_names
+
+        # create tuples to populate a location index
+        # TODO - import WKT format for general GIS location description and to populate
+        # the index with a WKT representation of the location.
+        # from shapely import wkt
+        # geom = wkt.loads('Polygon((12 12,12 14,14 12, 14 14,12 12))')
+        # geom.is_valid
+
+        index = [(row['location name'], False, None, None, None)
+                 for row in locs]
+        new_index = [(row['location name'], True, row['type'],
+                      None if row['latitude'] == u'NA' else row['latitude'],
+                      None if row['longitude'] == u'NA' else row['longitude'])
+                     for row in new_locs]
+
+        self.location_index = index + new_index
 
         # summary of processing
         n_errors = CH.counters['ERROR'] - start_errors
