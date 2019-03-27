@@ -31,6 +31,8 @@ import argparse
 import re
 from collections import Counter
 from StringIO import StringIO
+from shapely import wkt
+from shapely.errors import WKTReadingError
 import numbers
 import logging
 import sqlite3
@@ -1256,27 +1258,8 @@ class Dataset(object):
         if new_locs:
             LOGGER.info('{} new locations reported'.format(len(new_locs)))
 
-            # check Lat Long and Type, which automatically updates the extents.
-            # Unlike a data worksheet field, here we don't have any metadata or want
-            # to keep it, so field checker gets passed an empty dictionary, which is discarded.
-            if 'latitude' in hdrs:
-                lats = [vl['latitude'] for vl in new_locs if vl['latitude'] != u'NA']
-                non_blank_lats = [vl for vl in lats if not is_blank(vl)]
-                if len(non_blank_lats) < len(lats):
-                    LOGGER.error('Blank latitude values for new locations: use NA.')
-                self.check_field_geo({}, non_blank_lats, which='latitude')
-            else:
-                LOGGER.error('New locations reported but Latitude field missing')
-
-            if 'longitude' in hdrs:
-                longs = [vl['longitude'] for vl in new_locs if vl['longitude'] != u'NA']
-                non_blank_longs = [vl for vl in longs if not is_blank(vl)]
-                if len(non_blank_longs) < len(longs):
-                    LOGGER.error('Blank longitude values for new locations: use NA.')
-                self.check_field_geo({}, non_blank_longs, which='longitude')
-            else:
-                LOGGER.error('New locations reported but Longitude field missing')
-
+            # Type is required - used to indicate the kind of location in the absence
+            # of any actual geodata
             if 'type' in hdrs:
 
                 # get lowercase types
@@ -1295,12 +1278,81 @@ class Dataset(object):
             else:
                 LOGGER.error('New locations reported but Type field missing')
 
+            # Look for duplicate names
             duplicates_existing = [rw['location name'] for rw in new_locs
                                    if rw['location name'] in existing_loc_names]
 
             if duplicates_existing:
                 LOGGER.error('New location names duplicate existing names and aliases: ',
                              extra={'join': duplicates_existing})
+
+            # Look for geographic data (even if it is just the explicit statement
+            # that none is available using NA)
+
+            if not (('latitude' in hdrs and 'longitude' in hdrs) or 'wkt' in hdrs):
+                LOGGER.error('New locations reported: you must provide Lat/Long or WKT')
+            else:
+
+                # Check Lat Long and WKT using check_field_geo to validate the values,
+                # since this method automatically updates the dataset extents.
+
+                if 'latitude' in hdrs and 'longitude' in hdrs:
+
+                    LOGGER.info('Validating lat / long data', extra={'indent_before': 1, 'indent_after': 2})
+
+                    lats = [vl['latitude'] for vl in new_locs if vl['latitude'] != u'NA']
+                    non_blank_lats = [vl for vl in lats if not is_blank(vl)]
+                    if len(non_blank_lats) < len(lats):
+                        LOGGER.error('Blank latitude values for new locations: use NA.')
+                    self.check_field_geo({}, non_blank_lats, which='latitude')
+
+                    longs = [vl['longitude'] for vl in new_locs if vl['longitude'] != u'NA']
+                    non_blank_longs = [vl for vl in longs if not is_blank(vl)]
+                    if len(non_blank_longs) < len(longs):
+                        LOGGER.error('Blank longitude values for new locations: use NA.')
+                    self.check_field_geo({}, non_blank_longs, which='longitude')
+
+                if 'wkt' in hdrs:
+
+                    LOGGER.info('Validating WKT data', extra={'indent_before': 1, 'indent_after': 2})
+
+                    bad_wkt = []
+                    blank_wkt = 0
+                    non_blank_longs = []
+                    non_blank_lats = []
+
+                    for this_new_loc in new_locs:
+
+                        # Check for blank, NA or something that might be WKT
+                        if is_blank(this_new_loc['wkt']):
+                            blank_wkt += 1
+                        elif this_new_loc['wkt'] == u'NA':
+                            pass
+                        else:
+                            # Run the potential WKT through the parser
+                            try:
+                                this_new_geom = wkt.loads(this_new_loc['wkt'])
+                            except WKTReadingError:
+                                bad_wkt.append(this_new_loc['location name'])
+                            else:
+                                # Is it a valid 2D geom
+                                if not this_new_geom.is_valid or this_new_geom.has_z:
+                                    bad_wkt.append(this_new_loc['location name'])
+                                # Store the extents to check for sensible coordinates
+                                bnds = this_new_geom.bounds
+                                non_blank_longs.extend([bnds[0], bnds[2]])
+                                non_blank_lats.extend([bnds[1], bnds[3]])
+
+                    self.check_field_geo({}, non_blank_longs, which='longitude')
+                    self.check_field_geo({}, non_blank_lats, which='latitude')
+
+                    if bad_wkt:
+                        LOGGER.error('WKT information badly formatted, not geometrically valid or 3D: ',
+                                     extra={'join': bad_wkt, 'quote': True})
+
+                    if blank_wkt:
+                        LOGGER.error('WKT field contains blanks for new locations, use NA')
+
 
             # new location names
             new_loc_names = {rw['location name'] for rw in new_locs}
@@ -1309,7 +1361,7 @@ class Dataset(object):
 
         # Process existing locations if there are any
         if locs:
-            LOGGER.info('{} existing locations reported'.format(len(locs)))
+            LOGGER.info('{} existing locations reported'.format(len(locs)), extra={'indent_before': 1})
 
             # check names exist
             loc_names = {rw['location name'] for rw in locs}
@@ -1340,19 +1392,30 @@ class Dataset(object):
         # combine locations into set
         self.locations = loc_names | new_loc_names
 
-        # create tuples to populate a location index
-        # TODO - import WKT format for general GIS location description and to populate
-        # the index with a WKT representation of the location.
-        # from shapely import wkt
-        # geom = wkt.loads('Polygon((12 12,12 14,14 12, 14 14,12 12))')
-        # geom.is_valid
+        # Create tuples to populate a location index. These have the format (name, new, type, WKT).
+        # The WKT can not align completely with the type because the lat lon format only provides
+        # a single point, which we represent as a Point() WKT. So you could get Linestring, Point().
+        # This is historical - type should have been point, transect, area and is really just a
+        # description of what the location is. Then lat/long or WKT can be missing but if present
+        # give a point location or a more complex geometry.
 
-        index = [(row['location name'], False, None, None, None)
+        index = [(row['location name'], False, None, None)
                  for row in locs]
-        new_index = [(row['location name'], True, row['type'],
-                      None if row['latitude'] == u'NA' else row['latitude'],
-                      None if row['longitude'] == u'NA' else row['longitude'])
-                     for row in new_locs]
+
+        new_index = []
+
+        for this_new_loc in new_locs:
+            new_entry = [this_new_loc['location name'], True, this_new_loc['type']]
+
+            if 'wkt' in this_new_loc and this_new_loc['wkt'] != u'NA':
+                new_entry.append(this_new_loc['wkt'])
+            elif ('latitude' in hdrs and 'longitude' in hdrs) and \
+                 ((this_new_loc['latitude'] != u'NA') and (this_new_loc['longitude'] != u'NA')):
+                new_entry.append(u'Point({longitude} {latitude})'.format(**this_new_loc))
+            else:
+                new_entry.append(None)
+
+            new_index.append(new_entry)
 
         self.location_index = index + new_index
 

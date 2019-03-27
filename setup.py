@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="safe_dataset_checker",
-    version="0.0.1",
+    version="0.0.2",
     author="David Orme",
     author_email="d.orme@imperial.ac.uk",
     description="A small example package",
