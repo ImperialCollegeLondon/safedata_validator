@@ -41,7 +41,7 @@ import requests
 import simplejson
 
 # define some regular expressions used to check validity
-RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}')
+RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]')
 RE_EMAIL = re.compile(r'\S+@\S+\.\S+')
 RE_NAME = re.compile(r'[^,]+,[ ]?[^,]+')
 RE_WSPACE_ONLY = re.compile(r'^\s*$')
