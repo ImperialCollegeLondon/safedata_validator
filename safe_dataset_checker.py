@@ -742,6 +742,9 @@ class Dataset(object):
                             ('worksheet title', True, 'title'),
                             ('worksheet description', True, 'description'),
                             ('worksheet external file', False, 'external')]
+        permit_fields = [('permit type', True, 'type'),
+                         ('permit authority', True, 'authority'),
+                         ('permit number', True, 'number')]
         
         # Check the minimal keys are expected
         required = {"safe project id", "access status", "title", "description",
@@ -756,7 +759,7 @@ class Dataset(object):
         # Check only valid keys are found
         valid_fields = {entry[0] for entry in singleton_fields + date_fields + geo_fields +
                         author_fields + funding_fields + external_file_fields +
-                        worksheet_fields + doi_fields + keyword_fields}
+                        worksheet_fields + doi_fields + keyword_fields + permit_fields}
 
         if found - valid_fields:
             LOGGER.error('Unknown metadata fields: ', extra={'join': found - valid_fields})
@@ -1059,6 +1062,20 @@ class Dataset(object):
         if funders:
             strip_ctypes(funders)
         self.funders = funders
+
+        # LOOK FOR PERMIT DETAILS - users provide a permit authority, number and permit type
+
+        permits = read_block('Permits', permit_fields, mandatory=False)
+        if permits:
+            strip_ctypes(permits)
+            # validate permit types
+            permit_types = {pm['type'].lower() for pm in permits}
+            valid_permit_types = {'research', 'export', 'xxx'}
+            if not permit_types.issubset(valid_permit_types):
+                LOGGER.error('Unknown permit types: ',
+                             extra={'join': permit_types - valid_permit_types})
+
+        self.permits = permits
 
         # CHECK EXTENTS - there are six fields to provide temporal and geographic
         # extents for the data. These two extents are a mandatory component of Gemini
