@@ -1,4 +1,11 @@
 site_name: SAFE Dataset Checker
+repo_url: https://github.com/ImperialCollegeLondon/safe_dataset_checker/
 theme: readthedocs
 markdown_extensions:
   - admonition
+nav:
+    - 'Overview': 'index.md'
+    - 'Data formatting': 'format.md'
+    - 'Installing safe_dataset_checker': 'install.md'
+    - 'Using safe_dataset_checker': 'usage.md'
+    - 'GBIF validation notes': 'gbif_validation.md'
