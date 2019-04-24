@@ -1,0 +1,4 @@
+site_name: SAFE Dataset Checker
+theme: readthedocs
+markdown_extensions:
+  - admonition

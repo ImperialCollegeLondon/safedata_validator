@@ -61,13 +61,14 @@ the typical install location) `C:\Python27` and `C:\Python27\scripts`.
 
 1. The `safe_dataset_checker` program mostly uses commands from the
 Python Standard Library - a set of code packages that are installed
-with Python - but does use three extra packages that can be installed
+with Python - but does use four extra packages that can be installed
 using the `pip` package installer. At the command line, type:
 
-        pip install openpyxl requests simplejson
+        pip install openpyxl requests simplejson shapely
 
   Those packages allow Python to: read Excel files, get validation data
-over the internet and handle JSON formatted data.
+over the internet, handle JSON formatted data and validate WKT formatted 
+GIS vector data.
 
 1. Now create a folder to keep your data checking code in and download
 the `safe_file_checker.py` file into it:
