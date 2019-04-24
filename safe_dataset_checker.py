@@ -27,6 +27,7 @@ ii) Locations are validated against a list of valid locations. By default, this
 from __future__ import print_function
 import os
 import datetime
+from dateutil import parser
 import argparse
 import re
 from collections import Counter
@@ -2301,7 +2302,8 @@ class Dataset(object):
         Checks for data consistency in date and datetime fields. Excel
         doesn't distinguish, both are loaded as datetime.datetime objects
         so we check that the values are compatible with the user provided
-        field type.
+        field type. Also handle datetimes provided as strings in common
+        ISO formats
 
         Args:
             meta: The field metadata, to be updated with the range
@@ -2309,46 +2311,76 @@ class Dataset(object):
             which: The datetime type to be checked for.
         """
 
-        # Check type (excluding NA values)
-        bad = [dt.value for dt in data if dt.ctype != xlrd.XL_CELL_DATE]
-        if len(bad):
-            bad = set(unicode(vl) for vl in bad)
-            LOGGER.error('Field contains data formatted as text or numbers. Note that '
-                         'text can look _exactly_ like a date or time: ', extra={'join': bad})
+        # Check types and allow all xlrd.XL_CELL_DATE or all xlrd.XL_CELL_STRING
+        # but not a mix
+        cell_types = {dt.ctype for dt in data}
+        data = [dt.value for dt in data]
 
-        # Get date values
-        data = [dt.value for dt in data if dt.ctype == xlrd.XL_CELL_DATE]
+        if cell_types == {xlrd.XL_CELL_DATE}:
 
-        # For date and time options, check decimal components
-        if which == 'date':
-            contains_time = [dt % 1 > 0 for dt in data]
-            if any(contains_time):
-                LOGGER.error('Some values also contain time components')
+            # For date and time options, check decimal components
+            if which == 'date':
+                contains_time = [dt % 1 > 0 for dt in data]
+                if any(contains_time):
+                    LOGGER.error('Some values also contain time components')
 
-        if which == 'time':
-            contains_date = [1 <= dt for dt in data]
-            if any(contains_date):
-                LOGGER.error('Some values also contain date components')
+            elif which == 'time':
+                contains_date = [1 <= dt for dt in data]
+                if any(contains_date):
+                    LOGGER.error('Some values also contain date components')
 
-        # get the extent as datetimes
-        if len(data):
-            extent = (xlrd.xldate_as_datetime(min(data), self.workbook.datemode),
-                      xlrd.xldate_as_datetime(max(data), self.workbook.datemode))
+            # For date containing options, check for actual dates and get extents
+            if which in ['date', 'datetime']:
+                if any(0.0 <= dt < 1.0 for dt in data):
+                    LOGGER.error('Some values _only_  contain time components')
+
+            # get extents
+            if len(data):
+                extent = (xlrd.xldate_as_datetime(min(data), self.workbook.datemode),
+                          xlrd.xldate_as_datetime(max(data), self.workbook.datemode))
+
+                if which == 'time':
+                    extent = tuple(vl.time() for vl in extent)
+            else:
+                extent = None
+
+        elif cell_types == {xlrd.XL_CELL_TEXT}:
+
+            # try and parse the data into datetime.datetime or datetime.time objects
+            if which in ['date', 'datetime']:
+
+                try:
+                    data = [parser.isoparse(dt) for dt in data]
+                except ValueError:
+                    LOGGER.error('Could not parse date/datetime values stored as text.')
+
+            elif which == 'time':
+
+                try:
+                    data = [parser.isoparser().parse_isotime(dt) for dt in data]
+                except ValueError:
+                    LOGGER.error('Could not parse time values stored as text.')
+
+            if len(data):
+                extent = (min(data), max(data))
+                # intentionally scrub out timezones - Excel dates don't have them and can't
+                # compare datetimes with mixed tzinfo status
+                extent = tuple(dt.replace(tzinfo=None) for dt in extent)
+            else:
+                extent = None
+
         else:
+            LOGGER.error('Field contains data with mixed formatting. Use either Excel date formats or '
+                         'ISO formatted text. Note that text can look _exactly_ like an Excel date or '
+                         'time cell, you may need to copy the column and format as numbers to spot errors.')
+
             extent = None
 
-        if which in ['date', 'datetime']:
-            # Check date and datetime contain actual dates and update extent
-            if any(0.0 <= dt < 1.0 for dt in data):
-                LOGGER.warn('Some values _only_  contain time components')
-            if extent is not None:
-                meta['range'] = extent
+        # range and extent setting
+        if extent is not None:
+            meta['range'] = extent
+            if which in ['date', 'datetime']:
                 self.update_extent(extent, datetime.datetime, 'temporal_extent')
-        elif which == 'time':
-            # reduce extents to time
-            if extent is not None:
-                extent = tuple(vl.time() for vl in extent)
-                meta['range'] = extent
 
     def check_field_taxa(self, data):
 
