@@ -1882,18 +1882,28 @@ class Dataset(object):
         first_column = worksheet.col_values(0)
         first_column_types = worksheet.col_types(0)
 
-        # separate the row descriptors from the row_numbers
-        if 'field_name' in first_column:
-            dwsh.field_name_row = first_column.index('field_name') + 1
-            dwsh.descriptors = first_column[:dwsh.field_name_row]
-            row_numbers = first_column[dwsh.field_name_row:]
-            row_types = first_column_types[dwsh.field_name_row:]
-        else:
+        # The types should be a sequence [xlrd.XL_CELL_TEXT, ..., xlrd.XL_CELL_NUMBER, ..., ? Blank cells]
+        first_number_index = first_column_types.index(xlrd.XL_CELL_NUMBER)
+
+        dwsh.descriptors = first_column[:first_number_index]
+        row_numbers = first_column[first_number_index:]
+        row_types = first_column_types[first_number_index:]
+
+        # Handle descriptor parsing errors
+        if len(dwsh.descriptors) == 0:
+            LOGGER.error('Cannot parse data: no descriptors found')
+            return
+        elif 'field_name' not in dwsh.descriptors:
             LOGGER.error('Cannot parse data: field_name row not found')
             return
+        elif 'field_name' != dwsh.descriptors[-1]:
+            LOGGER.error('Cannot parse data: field_name row is not the last descriptor')
+            return
+        else:
+            dwsh.field_name_row = first_number_index
 
-        # table descriptions for external files have no data, just headers, but otherwise
-        # check the row numbering makes sense
+        # check the row numbering makes sense, allowing for special case where
+        # table descriptions for external files have no data, just headers
         if len(row_numbers) > 0:
             # Check for expected row numbering
             # - make a special case for terminal blanks, which might just have
@@ -1965,7 +1975,7 @@ class Dataset(object):
         self.dataworksheets.append(dwsh)
 
         # reporting
-        n_errors = start_errors - CH.counters['ERROR']
+        n_errors = CH.counters['ERROR'] - start_errors
         if n_errors > 0:
             LOGGER.info('Dataframe contains {} errors'.format(n_errors),
                         extra={'indent_before': 1})
