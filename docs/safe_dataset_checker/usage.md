@@ -1,5 +1,16 @@
 # Using the SAFE Dataset Checker
 
+The `safe_dataset_checker` repository contains a Python module to validate submitted files and report on
+any problems. The code validates:
+
+  1. The data submission formatting of the file.
+  1. All taxonomic names against the GBIF taxonomy database.
+  1. All location names against the SAFE Gazetteer.
+
+Datasets can be submitted by registered researchers at the [SAFE
+website](https://safeproject.net/datasets/submit_dataset) which will automatically use this code to check
+that the file is formatted correctly. However, you can also download and run it yourself!
+
 The program usage instructions are:
 
     usage: safe_dataset_checker.py [-h] [-l LOCATIONS_JSON]

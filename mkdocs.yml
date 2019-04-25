@@ -1,11 +1,22 @@
-site_name: SAFE Dataset Checker
+site_name: Data at the SAFE Project
 repo_url: https://github.com/ImperialCollegeLondon/safe_dataset_checker/
 theme: readthedocs
 markdown_extensions:
   - admonition
+extra_css:
+    - custom.css
 nav:
-    - 'Overview': 'index.md'
-    - 'Data formatting': 'format.md'
-    - 'Installing safe_dataset_checker': 'install.md'
-    - 'Using safe_dataset_checker': 'usage.md'
-    - 'GBIF validation notes': 'gbif_validation.md'
+  - 'Introduction': 'index.md'
+  - 'Data availability': 'availability.md'
+  - 'Data format overview': 'data_format/overview.md'
+  - 'Excel format details':
+    - 'Summary worksheet': 'data_format/summary.md'
+    - 'Taxa worksheet': 'data_format/taxa.md'
+    - 'Locations worksheet': 'data_format/locations.md'
+    - 'Data worksheets': 'data_format/data.md'
+  - 'Other file formats': 'data_format/other_formats.md'
+  - 'Data format FAQs': 'faqs.md'
+  - 'The safe_dataset_checker package':
+    - 'Usage': 'safe_dataset_checker/usage.md'
+    - 'Installation': 'safe_dataset_checker/install.md'
+    - 'GBIF validation notes': 'safe_dataset_checker/gbif_validation.md'

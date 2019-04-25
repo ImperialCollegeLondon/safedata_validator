@@ -31,6 +31,8 @@ The following steps should allow you to run the checks yourself before submittin
 
     In Windows, you will need to change `python` to `python.exe` here and in commands below that start `python`. You should see the usage  instructions.
 
+Note that you can also install `safe_dataset_checker` as a package, which will allow you to use the functions and classes in the package within your own code.
+
 ## Local GBIF database
 
 If you want to run the checker offline then you will need to download a copy of the backbone taxonomy and build a SQLite3 database from it. Using a local database is also much faster than using the GBIF API online. This isn't particularly hard, but the resulting database is around 1.6GB, so you'll need file space! The steps are:
