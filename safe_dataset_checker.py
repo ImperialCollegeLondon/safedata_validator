@@ -706,50 +706,57 @@ class Dataset(object):
 
         summary = {unicode(rw[0].value).lower(): rw[1:] for rw in rows}
 
-        # Now define sets of metadata that may be present: each row has a field name
-        # that appears in the summary sheet, may or may not be mandatory and may or may not
-        # have an internal field name, used in the code or in Zenodo. Note that blocks
-        # of rows can be mandatory or not, defined later, but rows may be mandatory within
-        # those blocks
-        
-        # - fields with single values
-        singleton_fields = [('safe project id', True, 'pid'),
-                            ('access status', True, 'access'),
-                            ('embargo date', False, 'embargo_date'),
-                            ('title', True, None),
-                            ('description', True, None)]
+        # Now define the metadata that may be present. The dictionary entries are
+        # 3-tuples with the first entry describing blocks of fields, the second
+        # setting if that block is mandatory and the third giving a block title for
+        # the logger. Each entry in a block description provides the field name that
+        # appears in the summary sheet, if that field is mandatory within the set and
+        # an internal field name, if needed in the code or by Zenodo.
 
-        # - fields in blocks and or multiple values
-        keyword_fields = [('keywords', True, None)]
-        doi_fields = [('publication doi', True, None)]
-        date_fields = [('start date', True, None),
-                       ('end date', True, None)]
-        geo_fields = [('west', True, None),
-                      ('east', True, None),
-                      ('south', True, None),
-                      ('north', True, None)]
-        author_fields = [('author name', True, 'name'),
-                         ('author affiliation', False, 'affiliation'),
-                         ('author email', False, 'email'),
-                         ('author orcid', False, 'orcid')]
-        funding_fields = [('funding body', True, 'body'),
-                          ('funding type', True, 'type'),
-                          ('funding reference', False, 'ref'),
-                          ('funding link', False, 'url')]
-        external_file_fields = [('external file', True, 'file'),
-                                ('external file description', True, 'description')]
-        worksheet_fields = [('worksheet name', True, 'name'),
-                            ('worksheet title', True, 'title'),
-                            ('worksheet description', True, 'description'),
-                            ('worksheet external file', False, 'external')]
-        permit_fields = [('permit type', True, 'type'),
-                         ('permit authority', True, 'authority'),
-                         ('permit number', True, 'number')]
-        
-        # Check the minimal keys are expected
-        required = {"safe project id", "access status", "title", "description",
-                    "author name", "author email", "author affiliation",
-                    "worksheet name", "worksheet title", "worksheet description", 'keywords'}
+        fields = dict(core=([('safe project id', True, 'pid'),
+                             ('access status', True, 'access'),
+                             ('embargo date', False, 'embargo_date'),
+                             ('title', True, None),
+                             ('description', True, None)],
+                            True, 'Core fields'),
+                      keywords=([('keywords', True, None)],
+                                True, 'Keywords'),
+                      doi=([('publication doi', True, None)],
+                           True, 'DOI'),
+                      date=([('start date', True, None),
+                             ('end date', True, None)],
+                            False, 'Date Extents'),
+                      geo=([('west', True, None),
+                            ('east', True, None),
+                            ('south', True, None),
+                            ('north', True, None)],
+                           False, 'Geographic Extents'),
+                      authors=([('author name', True, 'name'),
+                                ('author affiliation', False, 'affiliation'),
+                                ('author email', False, 'email'),
+                                ('author orcid', False, 'orcid')],
+                               True, 'Authors'),
+                      funding=([('funding body', True, 'body'),
+                                ('funding type', True, 'type'),
+                                ('funding reference', False, 'ref'),
+                                ('funding link', False, 'url')],
+                               False, 'Funding Bodies'),
+                      external=([('external file', True, 'file'),
+                                 ('external file description', True, 'description')],
+                                False, 'External Files'),
+                      worksheet=([('worksheet name', True, 'name'),
+                                  ('worksheet title', True, 'title'),
+                                  ('worksheet description', True, 'description'),
+                                  ('worksheet external file', False, 'external')],
+                                 True, 'Worksheets'),
+                      permits=([('permit type', True, 'type'),
+                                ('permit authority', True, 'authority'),
+                                ('permit number', True, 'number')],
+                               False, 'Permits'))
+
+        # Check the minimal keys are expected - mandatory fields in mandatory blocks
+        required_blocks = (blk[0] for blk in fields.values() if blk[1])
+        required = {fld[0] for blk in required_blocks for fld in blk if fld[1]}
 
         found = set(summary.keys())
 
@@ -757,15 +764,14 @@ class Dataset(object):
             LOGGER.error('Missing mandatory metadata fields: ', extra={'join': required - found})
 
         # Check only valid keys are found
-        valid_fields = {entry[0] for entry in singleton_fields + date_fields + geo_fields +
-                        author_fields + funding_fields + external_file_fields +
-                        worksheet_fields + doi_fields + keyword_fields + permit_fields}
+        valid_blocks = (blk[0] for blk in fields.values())
+        valid_fields = {fld[0] for blk in valid_blocks for fld in blk}
 
         if found - valid_fields:
             LOGGER.error('Unknown metadata fields: ', extra={'join': found - valid_fields})
 
-        # Function to read sets of rows
-        def read_block(title, fields, mandatory=True):
+        # Function to read blocks of rows
+        def read_block(block):
             """
             Internal function, expecting to run in environment of load_summary.
             Takes a block of rows (mandatory or optional) and returns a list
@@ -773,12 +779,14 @@ class Dataset(object):
             block specific validation can check cells types.
 
             Args:
-                title (str): The block title, used for reporting
-                fields (list): A list of 3 tuples describing the fields
-                mandatory: Is this block mandatory
+                block (3 tuple): An entry from the fields dict giving the fields
+                    within the block, whether the block is mandatory and the display
+                    title
             Returns:
                 None or a list of records.
             """
+
+            fields, mandatory, title = block
 
             mandatory_fields = [f[0] for f in fields if f[1]]
             optional_fields = [f[0] for f in fields if not f[1]]
@@ -841,7 +849,7 @@ class Dataset(object):
                 bl.update(dict(zip(bl.keys(),[None if b is None else b.value for b in bl.values()])))
 
         # Now check singleton rows
-        singletons = read_block('Core fields', singleton_fields)
+        singletons = read_block(fields['core'])
         if len(singletons) > 1:
             LOGGER.error('Multiple values found in core field rows')
 
@@ -911,7 +919,7 @@ class Dataset(object):
                                 extra={'indent_before': 1, 'indent_after': 0})
 
         # CHECK KEYWORDS
-        keywords = read_block('Keywords', keyword_fields)
+        keywords = read_block(fields['keywords'])
 
         # data validation for keywords
         if keywords:
@@ -928,7 +936,7 @@ class Dataset(object):
             self.keywords = keywords
 
         # CHECK FOR PUBLICATION DOIs
-        pub_doi = read_block('DOI', doi_fields, mandatory=False)
+        pub_doi = read_block(fields['doi'])
 
         # data validation for DOIs
         if pub_doi:
@@ -954,7 +962,7 @@ class Dataset(object):
 
         # PROCESS BLOCKS OF CELLS
         # Load the AUTHORS block
-        authors = read_block('Authors', author_fields)
+        authors = read_block(fields['authors'])
 
         # Author specific validation
         if authors:
@@ -990,7 +998,7 @@ class Dataset(object):
         # require external files, then names and descriptions are included in
         # the summary information
 
-        external_files = read_block('External Files', external_file_fields, False)
+        external_files = read_block(fields['external'])
 
         # external file specific validation
         if external_files:
@@ -1005,7 +1013,7 @@ class Dataset(object):
         self.external_files = external_files
 
         # Load the WORKSHEETS block
-        dataworksheet_summaries = read_block('Worksheets', worksheet_fields)
+        dataworksheet_summaries = read_block(fields['worksheet'])
 
         # Worksheet specific validation
         if dataworksheet_summaries:
@@ -1058,19 +1066,19 @@ class Dataset(object):
         # LOOK FOR FUNDING DETAILS - users provide a funding body and a description
         # of the funding type and then optionally a reference number and a URL
 
-        funders = read_block('Funding Bodies', funding_fields, mandatory=False)
+        funders = read_block(fields['funding'])
         if funders:
             strip_ctypes(funders)
         self.funders = funders
 
         # LOOK FOR PERMIT DETAILS - users provide a permit authority, number and permit type
 
-        permits = read_block('Permits', permit_fields, mandatory=False)
+        permits = read_block(fields['permits'])
         if permits:
             strip_ctypes(permits)
             # validate permit types
             permit_types = {pm['type'].lower() for pm in permits}
-            valid_permit_types = {'research', 'export', 'xxx'}
+            valid_permit_types = {'research', 'export', 'ethics'}
             if not permit_types.issubset(valid_permit_types):
                 LOGGER.error('Unknown permit types: ',
                              extra={'join': permit_types - valid_permit_types})
@@ -1082,7 +1090,7 @@ class Dataset(object):
         # Metadata so need to be provided if the worksheets and locations don't
         # populate the extents.
 
-        temp_extent = read_block('Date Extents', date_fields, mandatory=False)
+        temp_extent = read_block(fields['date'])
 
         # temporal extent validation and updating
         if temp_extent:
@@ -1110,7 +1118,7 @@ class Dataset(object):
 
 
         # Geographic extents
-        geo_extent = read_block('Geographic Extents', geo_fields, mandatory=False)
+        geo_extent = read_block(fields['geo'])
 
         if geo_extent:
             if len(geo_extent) > 1:
@@ -1289,7 +1297,8 @@ class Dataset(object):
                     geo_types -= {None}
 
                 # Handle unknown geo types
-                bad_geo_types = geo_types - {'point', 'linestring', 'polygon'}
+                valid_geotypes = {'point', 'linestring', 'polygon', 'transect', 'area'}
+                bad_geo_types = geo_types - valid_geotypes
                 if bad_geo_types:
                     LOGGER.error('Unknown location types: ',
                                  extra={'join': bad_geo_types, 'quote': True})
