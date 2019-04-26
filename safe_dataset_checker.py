@@ -60,6 +60,7 @@ RE_DMS = re.compile(r'[°\'"dms’”]+')
 BACKBONE_TYPES = ['kingdom', 'phylum', 'order', 'class', 'family',
                   'genus', 'species', 'subspecies']
 
+
 # Logger setup - setup the standard logger to provide
 # i)   A handler providing a counter of the number of calls to each log level
 # ii)  A formatter to provide user controlled indentation and to
@@ -77,13 +78,14 @@ class CounterHandler(logging.Handler):
     """
     Handler instance that maintains a count of calls at each log level
     """
+
     def __init__(self, *args, **kwargs):
         logging.Handler.__init__(self, *args, **kwargs)
         self.counters = {'DEBUG': 0, 'INFO': 0, 'WARNING': 0, 'ERROR': 0, 'CRITICAL': 0}
-    
+
     def emit(self, rec):
         self.counters[rec.levelname] += 1
-    
+
     def reset(self):
         self.counters = {'DEBUG': 0, 'INFO': 0, 'WARNING': 0, 'ERROR': 0, 'CRITICAL': 0}
 
@@ -252,7 +254,6 @@ def all_numeric(data):
 
 
 def web_gbif_validate(tax, rnk, gbif_id=None):
-
     """
     Validates a taxon name and rank against the GBIF web API. It uses the API endpoint
     species/match?name=XXX&rank=YYY&strict=true
@@ -367,7 +368,6 @@ def web_gbif_validate(tax, rnk, gbif_id=None):
 
 
 def local_gbif_validate(conn, tax, rnk, gbif_id=None):
-
     """
     Validates a taxon name and rank against a connection to a local GBIF database.
 
@@ -505,7 +505,6 @@ Two classes to handle datasets and the data worksheets they contain
 
 
 class DataWorksheet(object):
-
     """
     This is just a container for the metadata on a data worksheet.
     It basically only exists to set defaults on a data worksheet and
@@ -517,7 +516,6 @@ class DataWorksheet(object):
     """
 
     def __init__(self, meta):
-
         # set defaults
         self.name = meta['name']
         self.description = meta['description']
@@ -532,7 +530,6 @@ class DataWorksheet(object):
 
 
 class Dataset(object):
-
     """
     This class provides methods to load and store the metadata associated
     with a dataset stored in a SAFE project formatted Excel file.
@@ -604,7 +601,7 @@ class Dataset(object):
         self.external_files = []
         self.funders = []
         self.passed = False
-        
+
         # Setup the taxonomy validation mechanism.
         if gbif_database is None:
             LOGGER.info('Using GBIF online API to validate taxonomy')
@@ -722,7 +719,7 @@ class Dataset(object):
                       keywords=([('keywords', True, None)],
                                 True, 'Keywords'),
                       doi=([('publication doi', True, None)],
-                           True, 'DOI'),
+                           False, 'DOI'),
                       date=([('start date', True, None),
                              ('end date', True, None)],
                             False, 'Date Extents'),
@@ -846,7 +843,7 @@ class Dataset(object):
             """
 
             for bl in block:
-                bl.update(dict(zip(bl.keys(),[None if b is None else b.value for b in bl.values()])))
+                bl.update(dict(zip(bl.keys(), [None if b is None else b.value for b in bl.values()])))
 
         # Now check singleton rows
         singletons = read_block(fields['core'])
@@ -874,16 +871,16 @@ class Dataset(object):
         # Title validation
         if singletons['title'] is not None:
             if is_blank(singletons['title'].value):
-                 LOGGER.error('Dataset title is blank')
+                LOGGER.error('Dataset title is blank')
             else:
-                 self.title = singletons['title'].value
+                self.title = singletons['title'].value
 
         # Description validation
         if singletons['description'] is not None:
             if is_blank(singletons['description'].value):
-                 LOGGER.error('Dataset description is blank')
+                LOGGER.error('Dataset description is blank')
             else:
-                 self.description = singletons['description'].value
+                self.description = singletons['description'].value
 
         # Access status and embargo validation
         if singletons['access'] is not None:
@@ -892,7 +889,7 @@ class Dataset(object):
                 LOGGER.error('Access status not a text value: {}'.format(access))
             elif access.lower() not in ['open', 'embargo', 'closed']:
                 LOGGER.error('Access status must be Open, Embargo or Closed '
-                              'not {}'.format(access))
+                             'not {}'.format(access))
             else:
                 self.access = access.lower()
 
@@ -974,22 +971,22 @@ class Dataset(object):
             if bad_names:
                 LOGGER.error('Author name not formatted as last_name, first_names: ',
                              extra={'join': bad_names, 'quote': True})
-            
+
             # badly formatted emails
             bad_emails = [rec['email'] for rec in authors
                           if not is_blank(rec['orcid']) and not RE_EMAIL.match(rec['email'])]
             if bad_emails:
                 LOGGER.error('Email not properly formatted: ',
                              extra={'join': bad_emails, 'quote': True})
-            
+
             # badly formatted orcids
             bad_orcid = [rec['orcid'] for rec in authors
                          if not is_blank(rec['orcid']) and
                          (not isinstance(rec['orcid'], unicode) or
                           not RE_ORCID.match(rec['orcid']))]
             if bad_orcid:
-                    LOGGER.error('ORCID not properly formatted: ',
-                                 extra={'join': bad_orcid, 'quote': True})
+                LOGGER.error('ORCID not properly formatted: ',
+                             extra={'join': bad_orcid, 'quote': True})
 
         self.authors = authors
 
@@ -1028,7 +1025,7 @@ class Dataset(object):
                              'Data worksheet details')
 
                 dataworksheet_summaries = [ws for ws in dataworksheet_summaries
-                                           if ws['name'] not in ('Locations','Taxa')]
+                                           if ws['name'] not in ('Locations', 'Taxa')]
 
         # Check possibly modified set of summaries
         if not dataworksheet_summaries:
@@ -1116,7 +1113,6 @@ class Dataset(object):
                 else:
                     self.update_extent(date_vals, datetime.datetime, 'temporal_extent')
 
-
         # Geographic extents
         geo_extent = read_block(fields['geo'])
 
@@ -1135,7 +1131,7 @@ class Dataset(object):
                 strip_ctypes(geo_extent)
                 valid = self.validate_geo_extent((bbox['west'], bbox['east']), 'longitude')
                 if valid:
-                   self.update_extent((bbox['west'], bbox['east']), float, 'longitudinal_extent')
+                    self.update_extent((bbox['west'], bbox['east']), float, 'longitudinal_extent')
 
                 valid = self.validate_geo_extent((bbox['south'], bbox['north']), 'latitude')
                 if valid:
@@ -1380,7 +1376,6 @@ class Dataset(object):
                     if blank_wkt:
                         LOGGER.error('WKT field contains blanks for new locations, use NA')
 
-
             # new location names
             new_loc_names = {rw['location name'] for rw in new_locs}
         else:
@@ -1437,7 +1432,7 @@ class Dataset(object):
             if 'wkt' in this_new_loc and this_new_loc['wkt'] != u'NA':
                 new_entry.append(this_new_loc['wkt'])
             elif ('latitude' in hdrs and 'longitude' in hdrs) and \
-                 ((this_new_loc['latitude'] != u'NA') and (this_new_loc['longitude'] != u'NA')):
+                    ((this_new_loc['latitude'] != u'NA') and (this_new_loc['longitude'] != u'NA')):
                 new_entry.append(u'Point({longitude} {latitude})'.format(**this_new_loc))
             else:
                 new_entry.append(None)
@@ -1992,7 +1987,6 @@ class Dataset(object):
 
         # check the data in each field against the metadata
         for meta in metadata:
-
             # read the values and check them against the metadata
             data = worksheet.col(meta['col_idx'], dwsh.field_name_row, dwsh.max_row)
             self.check_field(dwsh, meta, data)
@@ -2125,6 +2119,9 @@ class Dataset(object):
             # check field geo expects values in data not xlrd.Cell
             data = [dt.value for dt in data]
             self.check_field_geo(meta, data, which='longitude')
+        elif field_type == 'file':
+            data = [dt.value for dt in data]
+            self.check_field_file(meta, data)
         elif field_type in ['replicate', 'id']:
             # We've looked for missing data, no other constraints.
             pass
@@ -2665,6 +2662,29 @@ class Dataset(object):
                                 'longitude': 'longitudinal_extent'}
                 self.update_extent(extent, float, which_extent[which])
 
+    def check_field_file(self, meta, data):
+        """
+        Checks file fields. The data values need to match to an external file
+        or can be contained within an archive file provided in the 'file_container'
+        descriptor.
+
+        Args:
+            meta: A dictionary of metadata descriptors for the field
+            data: A list of data values
+        """
+
+        external_names = {ex['file'] for ex in self.external_files}
+
+        if 'file_container' in meta and meta['file_container'] is not None:
+            if meta['file_container'] not in external_names:
+                LOGGER.error(
+                    "Field file_container value not found in external files: {}".format(meta['file_container']))
+        else:
+            missing_files = set(data) - external_names
+            if missing_files:
+                LOGGER.error("Field contains files not listed in external files: ",
+                             extra={'join': missing_files})
+
     def final_checks(self):
         """
         A method to run final checks:
@@ -2735,7 +2755,7 @@ class Dataset(object):
         # get the required components
         component_keys = ['access', 'authors', 'description', 'embargo_date', 'filename',
                           'keywords', 'latitudinal_extent', 'longitudinal_extent', 'funders',
-                          'project_id', 'temporal_extent', 'title', 'external_files',]
+                          'project_id', 'temporal_extent', 'title', 'external_files', ]
 
         components = {ky: vl for ky, vl in self.__dict__.iteritems() if ky in component_keys}
 
@@ -2752,7 +2772,6 @@ Higher level functions
 
 def check_file(fname, verbose=True, gbif_database=None, locations_json=None, validate_doi=False,
                check='sltwf', project_id=None):
-
     """
     Runs the format checking across an Excel workbook.
 
@@ -2798,7 +2817,6 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
 
 
 def main():
-
     """
     This program validates an Excel file formatted as a SAFE dataset. As it runs, it outputs
     a report that highlights any problems with the formatting.
