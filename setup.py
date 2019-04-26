@@ -2,10 +2,10 @@ import setuptools
 
 setuptools.setup(
     name="safe_dataset_checker",
-    version="0.0.2",
+    version="1.0.0",
     author="David Orme",
     author_email="d.orme@imperial.ac.uk",
-    description="A small example package",
+    description="Code used to validate data files in the SAFE data submission format.",
     long_description="# TODO",
     long_description_content_type="text/markdown",
     url="https://github.com/imperial_college_london/safe_dataset_checker",
