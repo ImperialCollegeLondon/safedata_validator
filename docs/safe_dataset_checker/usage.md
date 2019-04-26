@@ -1,6 +1,6 @@
 # Using the SAFE Dataset Checker
 
-The `safe_dataset_checker` repository contains a Python module to validate submitted files and report on
+The SAFE dataset checking code is a publicly available Python package available [here](https://github.com/ImperialCollegeLondon/safe_dataset_checker). The  `safe_dataset_checker` repository contains a Python module to validate submitted files and report on
 any problems. The code validates:
 
   1. The data submission formatting of the file.
@@ -68,4 +68,4 @@ services to validate the dataset but you cannot validate DOIs when using the pro
 
     python safe_dataset_checker.py -g backbone-current.sqlite -l SAFE_locations.json My_Excel_File.xlsx
 
-Details on obtaining those two files are provided [here]().
+Details on obtaining those two files are provided [here](install.md).
