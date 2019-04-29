@@ -23,7 +23,7 @@ You can see published datasets at the  [SAFE Project Zenodo community](https://z
 !!! Warning
 
     You **must not** publish your dataset directly to Zenodo. This skips the validation step and means
-    that the datasets are not linked together under our [curation account](availability.md).
+    that the datasets are not linked together under our [curation account](availability.md#data-curation).
 
 
 

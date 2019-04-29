@@ -129,6 +129,7 @@ This block allows you to provide DOIs for publications using the data here. You 
 per cell in the row. Please format the DOI as a URL using `https://doi.org/` before the DOI, so
 `https://doi.org/10.1098/rstb.2011.0049` not `DOI:10.1098/rstb.2011.0049`. We do also accept
 `http://doi.org/`, `http://dx.doi.org/` and `https://dx.doi.org/` as the root of the URL.
+
 |  |  |  |  |
 |--------------------|-----------------------------------|---|---|
 | Publication DOI       | https://doi.org/10.1098/rstb.2011.0049 |  | |

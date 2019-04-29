@@ -14,8 +14,8 @@ we will **always** pass the request on to you.
 
 For details on setting the access status, see [here](data_format/summary.md#access-status).
 
-# Data administration
+# Data curation
 
-All of the data submitted through SAFE is published through a single administrative Zenodo account (`the_safe_project`). This central account is purely used for data curation so that we can always access datafiles, update records and act as a final point of contact for data. This helps us ensure the long-term availability and maintenance of the SAFE data repository.
+All of the data submitted through SAFE is published through a single  Zenodo account (`the_safe_project`). This central account is purely used for data curation so that we can always access datafiles, update records and act as a final point of contact for data. This helps us ensure the long-term availability and maintenance of the SAFE data repository.
 
 This is entirely separate from the authorship and ownership of the data: the citation for the data will always be to the original set of authors provided in the metadata. We will never make embargoed data available and we will always consult data authors about issues arising with their datasets.
