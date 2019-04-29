@@ -1,3 +1,28 @@
+
+<style>
+/* removing table headers and fixing cell widths so everything lines up. */
+thead {
+  display: none;
+}
+
+table {
+  table-layout: fixed;
+}
+
+tbody tr td {
+  width: 14em;
+  min-width: 14em;
+  max-width: 14em;
+}
+
+tbody tr td:first-child {
+  width: 12em;
+  min-width: 12em;
+  max-width: 12em;
+}
+
+</style>
+
 # The Summary worksheet
 
 This worksheet contains a simple set of rows describing the dataset and identifying the
