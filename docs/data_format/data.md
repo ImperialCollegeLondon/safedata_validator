@@ -38,6 +38,11 @@ missing. We know this is picky but it can be absolutely vital: for example, does
 in an abundance matrix mean that the species wasn't seen (so the cell should be zero) or that
 the trap for that species fell over and you don't know if it was recorded (so it should be NA).
 
+# Formula
+
+You must not submit datasets with formula calculations - obviously, feel free to use calculations 
+when working with the data but please copy and paste 'As Values' before submitting the dataset.
+
 # Row numbers 
 
 You **must** number the rows in your data worksheet. The row numbers must start at 1 in the
