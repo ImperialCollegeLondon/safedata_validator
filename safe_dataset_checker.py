@@ -2379,28 +2379,32 @@ class Dataset(object):
 
         elif cell_types == {xlrd.XL_CELL_TEXT}:
 
-            # try and parse the data into datetime.datetime or datetime.time objects
-            if which in ['date', 'datetime']:
-
+            # internal function to check dates
+            def parse_datetime(dt, which='date'):
                 try:
-                    data = [parser.isoparse(dt) for dt in data]
+                    if which == 'time':
+                        dt = parser.isoparser().parse_isotime(dt)
+                    else:
+                        dt = parser.isoparse(dt)
+
+                    return dt, True
                 except ValueError:
-                    LOGGER.error('Could not parse date/datetime values stored as text.')
+                    return dt, False
 
-            elif which == 'time':
+            parsed_data = [parse_datetime(dt, which) for dt in data]
+            good_data = set((dt[0] for dt in parsed_data if dt[1]))
+            bad_data = set((dt[0] for dt in parsed_data if not dt[1]))
 
-                try:
-                    data = [parser.isoparser().parse_isotime(dt) for dt in data]
-                except ValueError:
-                    LOGGER.error('Could not parse time values stored as text.')
-
-            if len(data):
-                extent = (min(data), max(data))
+            if len(good_data):
+                extent = (min(good_data), max(good_data))
                 # intentionally scrub out timezones - Excel dates don't have them and can't
                 # compare datetimes with mixed tzinfo status
                 extent = tuple(dt.replace(tzinfo=None) for dt in extent)
             else:
                 extent = None
+
+            if len(bad_data):
+                LOGGER.error('Problem in parsing date/time strings: ', extra={'join': bad_data})
 
         else:
             LOGGER.error('Field contains data with mixed formatting. Use either Excel date formats or '
