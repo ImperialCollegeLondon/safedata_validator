@@ -679,7 +679,10 @@ class Dataset(object):
 
         Args:
             validate_doi: Check any publication DOIs, requiring a web connection.
-            project_id: If provided, the integer value expected in the Project ID field.
+            project_id: If provided, a list of integer values that are permitted in
+                the Project ID field (usually one for a new dataset but more if a 
+                published dataset is associated with multiple projects and any of 
+                those ids would be valid).
         """
 
         # try and get the summary worksheet
@@ -862,9 +865,10 @@ class Dataset(object):
             else:
                 pid = int(pid.value)
 
-                if project_id is not None and pid != project_id:
-                    LOGGER.error('SAFE Project ID in file ({}) does not match '
-                                 'provided project id ({})'.format(pid, project_id))
+                if project_id is not None and pid not in project_id:
+                    pid_str = ', '.join([str(p) for p in project_id])
+                    LOGGER.error('SAFE Project ID in file ({}) does not match any '
+                                 'provided project ids ({})'.format(pid, pid_str))
                 else:
                     self.project_id = pid
 
@@ -2847,9 +2851,10 @@ def main():
     parser.add_argument('-c', '--check', default='sltwf',
                         help='Which of the summary, locations, taxa, worksheets and '
                              'finalisation should be checked.')
-    parser.add_argument('-p', '--project_id', default=None, type=int,
+    parser.add_argument('-p', '--project_id', default=None, type=int, action='append',
                         help='If provided, check that the project ID within the file '
-                             'matches this integer')
+                             'matches this integer. Multiple values can be provided '
+                             'to generate a set of valid IDs.')
     parser.add_argument('-l', '--locations_json', default=None,
                         help='Path to a locally stored json file of valid location names')
     parser.add_argument('-g', '--gbif_database', default=None,
