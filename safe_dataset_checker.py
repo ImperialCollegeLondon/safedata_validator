@@ -1907,12 +1907,19 @@ class Dataset(object):
         first_column = worksheet.col_values(0)
         first_column_types = worksheet.col_types(0)
 
-        # The types should be a sequence [xlrd.XL_CELL_TEXT, ..., xlrd.XL_CELL_NUMBER, ..., ? Blank cells]
-        first_number_index = first_column_types.index(xlrd.XL_CELL_NUMBER)
+        # The types should be a sequence [xlrd.XL_CELL_TEXT, ..., ? xlrd.XL_CELL_NUMBER, ..., ? Blank cells]
+        # The cell number values can be missing in the case of external tables, but blank cells might
+        # still exist in this case, so look for the last string in column A
+        last_descriptor_index = 0
+        for col_a_type in first_column_types:
+            if col_a_type == xlrd.XL_CELL_TEXT:
+                last_descriptor_index += 1
+            else:
+                break
 
-        dwsh.descriptors = first_column[:first_number_index]
-        row_numbers = first_column[first_number_index:]
-        row_types = first_column_types[first_number_index:]
+        dwsh.descriptors = first_column[:last_descriptor_index]
+        row_numbers = first_column[last_descriptor_index:]
+        row_types = first_column_types[last_descriptor_index:]
 
         # Handle descriptor parsing errors
         if len(dwsh.descriptors) == 0:
@@ -1925,7 +1932,7 @@ class Dataset(object):
             LOGGER.error('Cannot parse data: field_name row is not the last descriptor')
             return
         else:
-            dwsh.field_name_row = first_number_index
+            dwsh.field_name_row = last_descriptor_index
 
         # check the row numbering makes sense, allowing for special case where
         # table descriptions for external files have no data, just headers
