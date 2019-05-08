@@ -679,16 +679,29 @@ class Dataset(object):
 
         Args:
             validate_doi: Check any publication DOIs, requiring a web connection.
-            project_id: If provided, a list of integer values that are permitted in
-                the Project ID field (usually one for a new dataset but more if a 
-                published dataset is associated with multiple projects and any of 
-                those ids would be valid).
+            project_id: If provided, an integer or list of integer values that are
+                permitted in the Project ID field (usually one for a new dataset
+                but more if a published dataset is associated with multiple projects
+                and any of those ids would be valid).
         """
 
         # try and get the summary worksheet
         LOGGER.info("Checking Summary worksheet",
                     extra={'indent_before': 0, 'indent_after': 1})
         start_errors = CH.counters['ERROR']
+
+        # validate project_id is one of None, an integer or a list of integers
+        if project_id is None:
+            pass
+        elif isinstance(project_id, int):
+            project_id = [project_id]
+        elif isinstance(project_id, list):
+            if not all([isinstance(pid, int) for pid in project_id]):
+                LOGGER.error("Invalid value in list of project_ids.")
+                project_id = None
+        else:
+            LOGGER.error("Provided project id must be an integer or list of integers")
+            project_id = None
 
         try:
             worksheet = self.workbook.sheet_by_name('Summary')
