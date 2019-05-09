@@ -693,10 +693,10 @@ class Dataset(object):
         # validate project_id is one of None, an integer or a list of integers
         if project_id is None:
             pass
-        elif isinstance(project_id, int):
+        elif isinstance(project_id, (int, long)):
             project_id = [project_id]
         elif isinstance(project_id, list):
-            if not all([isinstance(pid, int) for pid in project_id]):
+            if not all([isinstance(pid, (int, long)) for pid in project_id]):
                 LOGGER.error("Invalid value in list of project_ids.")
                 project_id = None
         else:
