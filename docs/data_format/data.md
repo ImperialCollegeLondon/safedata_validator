@@ -14,6 +14,8 @@ which **cannot be blank**.
 * **field_type**: This has to be one of the following values indicating the field type (see the options below).
 * **description**: a short description of the field .
 * **field_name**: the name of the variable. The name format should be suitable for loading into an analysis package and should not contain spaces: use an underscore (`_`) to put gaps in names. It definitely must not have white space at the start or end and it should only use standard ASCII characters. This descriptor **must always be the last descriptor row**, immediately above the data, so that it can be used as field headers when loading data from the file for analysis.
+    
+    If possible, please avoid numeric field names or field names starting with a number (e.g. `1` or `2day`). Using names like this is not an error but can be an issue in some analysis packages. 
 
 There are also some **additional field descriptors**, which are mandatory for some data types
 (see the descriptions of the data types below). The options are:

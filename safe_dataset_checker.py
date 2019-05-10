@@ -2045,9 +2045,15 @@ class Dataset(object):
         if is_blank(meta['field_name']):
             LOGGER.info('Checking Column {}'.format(xlrd.colname(meta['col_idx'])),
                         extra={'indent_before': 2, 'indent_after': 3})
+            LOGGER.error('Field name is blank')
         else:
             # sanitize and check field name - aiming for ascii compliant with no padding
             fld_name = meta['field_name']
+
+            if not isinstance(fld_name, (str, unicode)):
+                fld_name = str(fld_name)
+                LOGGER.warn('Field name is not formatted as a text cell')
+
             fld_name_ascii = fld_name.encode('ascii', 'ignore')
 
             LOGGER.info('Checking field {}'.format(fld_name_ascii),
@@ -2070,9 +2076,6 @@ class Dataset(object):
             return
 
         # try and figure out what else is available
-        if is_blank(meta['field_name']):
-            LOGGER.error('Field name is blank')
-
         # check the description
         if is_blank(meta['description']):
             LOGGER.error('Description is missing')
