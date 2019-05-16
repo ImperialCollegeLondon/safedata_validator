@@ -26,12 +26,12 @@ usage!) but the GBIF backbone has very good taxonomic coverage and is well curat
 
 The table format looks like this:
 
-| Name | Taxon name | Taxon type | Taxon ID | Parent name | Parent type | Parent ID |
-|---|---|---|---|---|---|---|
-| Crematogaster borneensis | Crematogaster borneensis | Species |   |   |   |   |
-| Dolichoderus sp. | Dolichoderus | Genus |   |   |   |   |
-| Gannets	   | Morus | Genus | 2480962 |   |   |   |
-| Morphospecies 1 | NA | Morphospecies |   | Formicidae | Family |   |
+| Name | Taxon name | Taxon type | Taxon ID | Parent name | Parent type | Parent ID | Comments |
+|---|---|---|---|---|---|---|---|
+| Crematogaster borneensis | Crematogaster borneensis | Species |   |   |   |   |   |
+| Dolichoderus sp. | Dolichoderus | Genus |   |   |   |   |   |
+| Gannets	   | Morus | Genus | 2480962 |   |   |   |   |
+| Morphospecies 1 | NA | Morphospecies |   | Formicidae | Family |   |   |
 
 The table must contain column headers in the **first row** of the worksheet. The headers must
 include:
@@ -61,12 +61,27 @@ taxon names.
 The Parent columns only need to be filled in for taxa falling in one of the following
 groups.
 
+## Comments
+
+The comments field is entirely optional - if you have a fairly standard set of taxa with no
+ serious issues then you can leave it out entirely or it can be empty. If you do have particular
+ notes that you want to make - strong disagreements with GBIF taxonomy, new species notes and the 
+ like - then these can be very useful for future researchers trying to place taxa. 
+
 # New and unrecognized taxa
 
 If a taxon is new or not recognized by GBIF (and you're sure you're right!) then provide a
 parent name and type to allow us to hook the taxon into the index. For example //Pongo
 tapanuliensis// is not currently recognised as a species, so providing //Pongo// as a parent
 name of type 'genus' allows us to place the new taxon.
+
+Note that you should still provide the name and taxonomic level as usual, and the parent information will allow us to place that taxon in the tree:
+
+| | | | | | | |
+|---|---|---|---|---|---|---|
+| New_ant_1 | Crematogaster nameitaftermymum | Species |   |  Crematogaster | Genus   |   |
+
+
 
 # Morphospecies and Functional groups
 

@@ -1537,7 +1537,7 @@ class Dataset(object):
         # clean the contents of whitespace padding
         for idx, tx in enumerate(taxa):
             for ky, vl in tx.iteritems():
-                if is_padded(vl):
+                if ky.lower() != 'comments' and is_padded(vl):
                     LOGGER.error('Whitespace padding for {} in row {}:'
                                  ' {}'.format(ky, idx + 2, repr(vl)))
                     tx[ky] = vl.strip()
