@@ -71,16 +71,21 @@ The comments field is entirely optional - if you have a fairly standard set of t
 # New and unrecognized taxa
 
 If a taxon is new or not recognized by GBIF (and you're sure you're right!) then provide a
-parent name and type to allow us to hook the taxon into the index. For example //Pongo
-tapanuliensis// is not currently recognised as a species, so providing //Pongo// as a parent
+parent name and type to allow us to hook the taxon into the index. For example, before _Pongo
+tapanuliensis_ was recognised as a species, you would need to provide _Pongo_ as a parent
 name of type 'genus' allows us to place the new taxon.
 
-Note that you should still provide the name and taxonomic level as usual, and the parent information will allow us to place that taxon in the tree:
+Note that you should still provide the name and taxonomic level as usual, and the parent 
+information will allow us to place that taxon in the tree. A comment is useful in these cases
+but not mandatory.
 
-| | | | | | | |
-|---|---|---|---|---|---|---|
-| New_ant_1 | Crematogaster nameitaftermymum | Species |   |  Crematogaster | Genus   |   |
+| Name | Taxon name | Taxon type | Taxon ID | Parent name | Parent type | Parent ID | Comments |
+|---|---|---|---|---|---|---|---|
+| lost_orang | Pongo tapanuliensis| Species |   |  Pongo| Genus   |   |  New species |
 
+You would then get a message in the file validation report saying:
+
+    - Row 1 (lost_orang): not found in GBIF but has valid parent information
 
 
 # Morphospecies and Functional groups
