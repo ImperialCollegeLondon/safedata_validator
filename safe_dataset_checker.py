@@ -991,7 +991,7 @@ class Dataset(object):
 
             # badly formatted emails
             bad_emails = [rec['email'] for rec in authors
-                          if not is_blank(rec['orcid']) and not RE_EMAIL.match(rec['email'])]
+                          if not is_blank(rec['email']) and not RE_EMAIL.match(rec['email'])]
             if bad_emails:
                 LOGGER.error('Email not properly formatted: ',
                              extra={'join': bad_emails, 'quote': True})

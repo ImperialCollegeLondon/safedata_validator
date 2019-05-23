@@ -29,7 +29,7 @@ separate words.
 
 ## Spreadsheet Template and Examples
 
-Click on this link to download the {{ :working_at_safe:template.xlsx |spreadsheet template }}
+Click on this link to download the [spreadsheet template](https://github.com/ImperialCollegeLondon/safe_dataset_checker/blob/master/test_files/Template.xlsx?raw=true)
 containing the required worksheets, labels and headers.
 
 You can also look at existing published datasets to see how the format is used:
