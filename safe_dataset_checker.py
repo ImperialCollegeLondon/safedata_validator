@@ -1291,7 +1291,7 @@ class Dataset(object):
             new_locs = [rw for rw in locs if rw['new'].lower() == 'yes']
             locs = [rw for rw in locs if rw['new'].lower() == 'no']
         else:
-            new_locs = None
+            new_locs = []
 
         # Process new locations if there are any
         if new_locs:
