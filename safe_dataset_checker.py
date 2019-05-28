@@ -34,6 +34,7 @@ from collections import Counter
 from StringIO import StringIO
 from shapely import wkt
 from shapely.errors import WKTReadingError
+from itertools import groupby
 import numbers
 import logging
 import sqlite3
@@ -1920,47 +1921,52 @@ class Dataset(object):
         first_column = worksheet.col_values(0)
         first_column_types = worksheet.col_types(0)
 
-        # The types should be a sequence [xlrd.XL_CELL_TEXT, ..., ? xlrd.XL_CELL_NUMBER, ..., ? Blank cells]
-        # The cell number values can be missing in the case of external tables, but blank cells might
-        # still exist in this case, so look for the last string in column A
-        last_descriptor_index = 0
-        for col_a_type in first_column_types:
-            if col_a_type == xlrd.XL_CELL_TEXT:
-                last_descriptor_index += 1
-            else:
-                break
+        # Get the sequence of column types
+        first_column_rle = [(v, len(list(g))) for v, g in groupby(first_column_types, None)]
+        first_column_type_seq = [v[0] for v in first_column_rle]
 
-        dwsh.descriptors = first_column[:last_descriptor_index]
-        row_numbers = first_column[last_descriptor_index:]
-        row_types = first_column_types[last_descriptor_index:]
-
-        # Handle descriptor parsing errors
-        if len(dwsh.descriptors) == 0:
-            LOGGER.error('Cannot parse data: no descriptors found')
-            return
-        elif 'field_name' not in dwsh.descriptors:
-            LOGGER.error('Cannot parse data: field_name row not found')
-            return
-        elif 'field_name' != dwsh.descriptors[-1]:
-            LOGGER.error('Cannot parse data: field_name row is not the last descriptor')
+        # Forbid anything except a narrow set of type sequences: descriptor only, descriptors + row numbers,
+        # descriptors + blanks and descriptors + row numbers + blanks. Be a bit more forgiving about terminal
+        # blanks and do some checking there, but otherwise: strings, then integers.
+        if first_column_type_seq not in ([xlrd.XL_CELL_TEXT],
+                                         [xlrd.XL_CELL_TEXT, xlrd.XL_CELL_NUMBER],
+                                         [xlrd.XL_CELL_TEXT, xlrd.XL_CELL_EMPTY],
+                                         [xlrd.XL_CELL_TEXT, xlrd.XL_CELL_NUMBER, xlrd.XL_CELL_BLANK]):
+            LOGGER.error('Cannot parse data: Column A must contain a set of of field descriptors and then row numbers')
             return
         else:
-            dwsh.field_name_row = last_descriptor_index
+            # handle descriptor parsing
+            dwsh.descriptors = first_column[:first_column_rle[0][1]]
+            if 'field_name' not in dwsh.descriptors:
+                LOGGER.error('Cannot parse data: field_name row not found')
+                return
+            elif 'field_name' != dwsh.descriptors[-1]:
+                LOGGER.error('Cannot parse data: field_name row is not the last descriptor')
+                return
+            else:
+                dwsh.field_name_row = first_column_rle[0][1]
 
-        # check the row numbering makes sense, allowing for special case where
-        # table descriptions for external files have no data, just headers
-        if len(row_numbers) > 0:
-            # Check for expected row numbering
-            # - make a special case for terminal blanks, which might just have
-            #   whitespace junk in cells or have been hung on to by Excel.
-            n_terminal_blanks = 0
-            while is_blank(row_numbers[-1]):
-                row_numbers.pop(-1)
-                n_terminal_blanks += 1
+            # Check if there is anything below the descriptors
+            if len(first_column_rle) == 1:
+                if is_blank(sheet_meta['external']):
+                    LOGGER.error('No data found below field descriptors.')
+                else:
+                    LOGGER.info('Data table description associated with '
+                                'external file {external}'.format(**sheet_meta))
 
-            # See if terminal blanks are actually empty
-            if n_terminal_blanks:
-                row_types = row_types[: -n_terminal_blanks]
+            elif len(first_column_rle) == 2:
+
+                if first_column_rle[1][0] == xlrd.XL_CELL_NUMBER:
+                    # If there are numbers, check they are continuous
+                    row_numbers = first_column[first_column_rle[0][1]:]
+                    ideal = [float(i) for i in range(1, len(row_numbers) + 1)]
+                    if row_numbers != ideal:
+                        LOGGER.error("Row numbers not consecutive or do not start with 1")
+                else:
+                    LOGGER.error("Row numbers missing below field descriptors")
+
+            elif len(first_column_rle) == 3:
+                n_terminal_blanks = dwsh.max_row - first_column_rle[0][1] - first_column_rle[1][1]
                 row_range = range(dwsh.max_row - 1, (dwsh.max_row - 1) - n_terminal_blanks, - 1)
                 for check_row in row_range:
                     if all(is_blank(val) for val in worksheet.row_values(check_row)):
@@ -1968,19 +1974,6 @@ class Dataset(object):
                     else:
                         LOGGER.error('Un-numbered rows at end of worksheet contain data')
                         break
-
-            # Check what is left
-            if set(row_types) == {xlrd.XL_CELL_NUMBER}:
-                ideal = [float(i) for i in range(1, len(row_numbers) + 1)]
-                if row_numbers != ideal:
-                    # All numbers but not the right ones
-                    LOGGER.error("Row numbers not consecutive or do not start with 1")
-
-        elif is_blank(sheet_meta['external']):
-            LOGGER.error('No data found below field descriptors.')
-        else:
-            LOGGER.info('Data table description associated with '
-                        'external file {external}'.format(**sheet_meta))
 
         # report on detected size
         dwsh.n_data_row = dwsh.max_row - dwsh.field_name_row
