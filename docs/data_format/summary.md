@@ -78,7 +78,8 @@ isn't possible: if you're uploading data collected by past students who you've l
 with, then you might not have these details for **any** author.
 
 Author names **must be** formatted as "last name, first name": "Orme, C David L" not "C David L
-Orme".
+Orme". Please provide just the numeric part of the ORCIDs, as shown below, not the full URL 
+(http://orcid.org/0000-0002-7005-1394).
 
 |  |  |  |  |
 |--------------------|-----------------------------------|---|---|

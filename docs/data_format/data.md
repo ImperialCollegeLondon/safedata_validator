@@ -74,6 +74,7 @@ the available types are:
  * **Categorical Interaction**: for categorical data on interactions between taxa. 
  * **Numeric Interaction**: for numeric data on interactions between taxa.
  * **File**: for references to external files in data tables.
+ * **Comments**: for general comments about data.
 
 ## Date, Datetime and Time
 
