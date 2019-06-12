@@ -1092,7 +1092,7 @@ class Dataset(object):
         if permits:
             strip_ctypes(permits)
             # validate permit types
-            permit_types = {pm['type'].lower() for pm in permits}
+            permit_types = {pm['type'].lower() for pm in permits if pm['type'] is not None}
             valid_permit_types = {'research', 'export', 'ethics'}
             if not permit_types.issubset(valid_permit_types):
                 LOGGER.error('Unknown permit types: ',
