@@ -1924,7 +1924,6 @@ class Dataset(object):
         # Get the sequence of column types
         first_column_rle = [(v, len(list(g))) for v, g in groupby(first_column_types, None)]
         first_column_type_seq = [v[0] for v in first_column_rle]
-        print(first_column_type_seq)
 
         # Forbid anything except a narrow set of type sequences: descriptor only, descriptors + row numbers,
         # descriptors + blanks and descriptors + row numbers + blanks. Be a bit more forgiving about terminal
