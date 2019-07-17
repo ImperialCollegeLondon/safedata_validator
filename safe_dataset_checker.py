@@ -277,12 +277,12 @@ def web_gbif_validate(tax, rnk, gbif_id=None):
         A dictionary with the following possible keys:
             'status': the outcome of the lookup with one of the following values:
                 found, no_match, validation_fail, unknown_id, id_mismatch
-            'user': an index tuple of the user provided information for synonymous usages
-            'canon': an index tuple of the canonical information
+            'user': an index list of the user provided information for synonymous usages
+            'canon': an index list of the canonical information
             'hier': a list of 2-tuples of rank and GBIF ID for the taxonomic hierarchy
             'note': a string of any extra information provided by the search
 
-        An index tuple has the structure: (taxon ID, parent ID, name, rank, taxonomic status)
+        An index listhas the structure: (taxon ID, parent ID, name, rank, taxonomic status)
     """
 
     if gbif_id is None:
@@ -334,8 +334,8 @@ def web_gbif_validate(tax, rnk, gbif_id=None):
     if resp['taxonomicStatus'].lower() in ('accepted', 'doubtful'):
         # populate the return values
         ret = {'status': 'found',
-               'canon': (resp['key'], resp['parentKey'], resp['canonicalName'],
-                         resp['rank'].lower(), resp['taxonomicStatus'].lower())}
+               'canon': [resp['key'], resp['parentKey'], resp['canonicalName'],
+                         resp['rank'].lower(), resp['taxonomicStatus'].lower()]}
         hier_resp = resp
     else:
         # look up the accepted usage
@@ -349,14 +349,15 @@ def web_gbif_validate(tax, rnk, gbif_id=None):
 
         # populate the return values
         ret = {'status': 'found',
-               'user': (resp['key'], resp['parentKey'], resp['canonicalName'],
-                        resp['rank'].lower(), resp['taxonomicStatus'].lower()),
-               'canon': (acpt['key'], acpt['parentKey'], acpt['canonicalName'],
-                         acpt['rank'].lower(), acpt['taxonomicStatus'].lower())}
+               'user': [resp['key'], resp['parentKey'], resp['canonicalName'],
+                        resp['rank'].lower(), resp['taxonomicStatus'].lower()],
+               'canon': [acpt['key'], acpt['parentKey'], acpt['canonicalName'],
+                         acpt['rank'].lower(), acpt['taxonomicStatus'].lower()]}
 
         hier_resp = acpt
 
-    # Add the taxonomic hierarchy from the accepted usage
+    # Add the taxonomic hierarchy from the accepted usage - these are tuples
+    # to be used to extend a set for the taxonomic hierarchy
     ret['hier'] = [(rk, hier_resp[ky])
                    for rk, ky in [('kingdom', 'kingdomKey'), ('phylum', 'phylumKey'),
                                   ('class', 'classKey'), ('order', 'orderKey'),
@@ -384,12 +385,12 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
         A dictionary with the following possible keys:
             'status': the outcome of the lookup with one of the following values:
                 found, no_match, validation_fail, unknown_id, id_mismatch
-            'user': an index tuple of the user provided information for synonymous usages
-            'canon': an index tuple of the canonical information
+            'user': an index list of the user provided information for synonymous usages
+            'canon': an index list of the canonical information
             'hier': a list of 2-tuples of rank and GBIF ID for the taxonomic hierarchy
             'note': a string of any extra information provided by the search
 
-        An index tuple has the structure: (taxon ID, parent ID, name, rank, taxonomic status)
+        An index list has the structure: (taxon ID, parent ID, name, rank, taxonomic status)
     """
 
     # Make sure the connection is returning results as sqlite.Row objects
@@ -473,8 +474,8 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
     # what is going to be used to build the hierarchy
     if tax_gbif['status'].lower() in ['accepted', 'doubtful']:
         ret = {'status': 'found',
-               'canon': (tax_gbif['id'], tax_gbif['parent_key'], tax_gbif['canonical_name'],
-                         tax_gbif['rank'].lower(), tax_gbif['status'].lower())}
+               'canon': [tax_gbif['id'], tax_gbif['parent_key'], tax_gbif['canonical_name'],
+                         tax_gbif['rank'].lower(), tax_gbif['status'].lower()]}
         hier_row = tax_gbif
     else:
         # Look up the parent_key, which is the accepted usage key for synonyms.
@@ -483,10 +484,10 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
         # fill in the return. The use of the accepted taxon parent key for the user entry
         # is deliberate: it points up the hierarchy not to the accepted taxon.
         ret = {'status': 'found',
-               'canon': (acc_gbif['id'], acc_gbif['parent_key'], acc_gbif['canonical_name'],
-                         acc_gbif['rank'].lower(), acc_gbif['status'].lower()),
-               'user': (tax_gbif['id'], acc_gbif['parent_key'], tax_gbif['canonical_name'],
-                        tax_gbif['rank'].lower(), tax_gbif['status'].lower())}
+               'canon': [acc_gbif['id'], acc_gbif['parent_key'], acc_gbif['canonical_name'],
+                         acc_gbif['rank'].lower(), acc_gbif['status'].lower()],
+               'user': [tax_gbif['id'], acc_gbif['parent_key'], tax_gbif['canonical_name'],
+                        tax_gbif['rank'].lower(), tax_gbif['status'].lower()]}
         hier_row = acc_gbif
 
     # Add the taxonomic hierarchy from the preferred usage
@@ -598,7 +599,7 @@ class Dataset(object):
         self.locations_used = set()
         self.taxon_names = set()
         self.taxon_names_used = set()
-        self.taxon_index = set()
+        self.taxon_index = []
         self.external_files = []
         self.funders = []
         self.passed = False
@@ -905,8 +906,8 @@ class Dataset(object):
             access = singletons['access'].value
             if singletons['access'].ctype != xlrd.XL_CELL_TEXT:
                 LOGGER.error('Access status not a text value: {}'.format(access))
-            elif access.lower() not in ['open', 'embargo', 'closed']:
-                LOGGER.error('Access status must be Open, Embargo or Closed '
+            elif access.lower() not in ['open', 'embargo', 'restricted']:
+                LOGGER.error('Access status must be Open, Embargo or Restricted '
                              'not {}'.format(access))
             else:
                 self.access = access.lower()
@@ -1478,18 +1479,28 @@ class Dataset(object):
                 names used as a validation list for taxon names used in data worksheets.
             ii) the taxon_index attribute of the dataset, which contains a set
                 of tuples recording the full hierarchy of the taxa in the dataset
-                for use in dataset searching. Each tuple consists of:
+                for use in dataset searching, so including not just the named taxa,
+                but all higher taxa needed to complete the backbone.
 
-                (gbif_id, gbif_parent_id, canonical_name, taxonomic_rank, status, as_name, as_rank)
+                Each tuple consists of:
 
-            The taxon_index is doing dual-duty here:
+                (worksheet_name (str),
+                 gbif_id (int),
+                 gbif_parent_id (int),
+                 canonical_name (str),
+                 taxonomic_rank (str),
+                 status (str))
 
-            a) It is used to populate the taxonomic coverage section of the dataset
-               description. In this case, synonymous entries are dropped and the as_name
-               and as_rank are used to qualify the accepted name.
-            b) It is used as the rows for a dataset_taxon table to index the taxonomic
-               coverage of datasets. The as_name and as_rank are not intended to be
-               included in this table.
+                Where a taxon is not accepted or doubtful on GBIF, two entries are
+                inserted for the taxon, one under the canon name and one under the
+                provided name. They will share the same worksheet name and so can be paired
+                back up for description generation. The worksheet name for parent taxa and
+                deeper taxonomic hierarchy is set to None.
+
+            The index is then used:
+            a) to generate the taxonomic coverage section of the dataset description, and
+            b) as the rows of the dataset_taxa table to index the taxonomic coverage
+               of datasets.
 
         Returns:
             Updates the taxon_names and taxon_index attributes of the class instance.
@@ -1590,10 +1601,8 @@ class Dataset(object):
         # that are available to validate in the backbone. See README.md for details of
         # the validation process
 
-        # taxon and parent types that can be checked against gbif and a set of
-        # alternative types that will not have a taxon name
+        # taxon and parent types that can be checked against gbif
         backbone_types = BACKBONE_TYPES
-        alt_types = ['morphospecies', 'functional group']
 
         # Keep a set of taxonomic hierarchy entries to validate after taxon processing
         taxon_hierarchy = set()
@@ -1655,16 +1664,11 @@ class Dataset(object):
                     LOGGER.error('{}: name and rank combination not found'.format(prnt_string))
             else:
                 parent_status[prnt] = ('valid', prnt_info)
-                # add parent into taxon index
+
                 if 'user' in prnt_info:
                     LOGGER.warn('{}: parent considered a {} of {} in GBIF '
                                 'backbone'.format(prnt_string, prnt_info['user'][4],
                                                   prnt_info['canon'][2]))
-                    self.taxon_index.add(prnt_info['user'] + (None, None))
-                    self.taxon_index.add(prnt_info['canon'] + prnt_info['user'][2:4])
-                else:
-                    LOGGER.info('{}: parent found'.format(prnt_string))
-                    self.taxon_index.add(prnt_info['canon'] + (None, None))
 
         # Now check main taxa
         LOGGER.info('Validating {} taxa'.format(len(taxa)),
@@ -1748,13 +1752,13 @@ class Dataset(object):
                     LOGGER.warn('Row {} ({}): considered a {} of {} in GBIF '
                                 'backbone'.format(rw_num, nm, gbif_info['user'][4],
                                                   gbif_info['canon'][2]))
-                    self.taxon_index.add(gbif_info['user'] + (None, None))
-                    self.taxon_index.add(gbif_info['canon'] + gbif_info['user'][2:4])
+                    self.taxon_index.append([nm] + gbif_info['user'])
+                    self.taxon_index.append([nm] + gbif_info['canon'])
 
                 else:
                     LOGGER.info('Row {} ({}): in GBIF backbone '
                                 '({})'.format(rw_num, nm, gbif_info['canon'][4]))
-                    self.taxon_index.add(gbif_info['canon'] + (None, None))
+                    self.taxon_index.append([nm] + gbif_info['canon'])
 
                 # update hierarchy
                 taxon_hierarchy.update(gbif_info['hier'])
@@ -1779,12 +1783,12 @@ class Dataset(object):
                                                       gbif_info['canon'][2]))
 
                         # Add user and canonical usage, including as_name and as_rank
-                        self.taxon_index.add(gbif_info['user'] + (None, None))
-                        self.taxon_index.add(gbif_info['canon'] + gbif_info['user'][2:4])
+                        self.taxon_index.append([nm] + gbif_info['user'])
+                        self.taxon_index.append([nm] + gbif_info['canon'])
                     else:
                         LOGGER.info('Row {} ({}): in GBIF backbone '
                                     '({})'.format(rw_num, nm, gbif_info['canon'][4]))
-                        self.taxon_index.add(gbif_info['canon'] + (None, None))
+                        self.taxon_index.append([nm] + gbif_info['canon'])
 
                     taxon_hierarchy.update(gbif_info['hier'])
 
@@ -1808,8 +1812,7 @@ class Dataset(object):
                             'information'.format(rw_num, nm))
 
                 # construct a taxon index entry and add the parent hierarchy
-                self.taxon_index.add((-1, parent_info['canon'][0], tx[0],
-                                      tx[1].lower(), 'user', None, None))
+                self.taxon_index.append([nm, -1, parent_info['canon'][0], tx[0], tx[1].lower(), 'user'])
                 taxon_hierarchy.update(parent_info['hier'])
 
             elif tax_status == 'non-backbone' and (par_status is None or par_status == 'invalid'):
@@ -1822,25 +1825,29 @@ class Dataset(object):
                 LOGGER.info("Row {} ({}): {} with valid parent "
                             "information ".format(rw_num, nm, tx[1]))
 
-                # construct the taxon index - use the name for alternative types,
-                # otherwise use the taxon name
-                if tx[1].lower() in alt_types:
-                    taxon_entry = (-1, parent_info['canon'][0], nm,
-                                   tx[1].lower(), 'user', None, None)
-                else:
-                    taxon_entry = (-1, parent_info['canon'][0], nm,
-                                   tx[1].lower(), 'user', None, None)
-
-                self.taxon_index.add(taxon_entry)
+                self.taxon_index.append([nm, -1, parent_info['canon'][0], nm, tx[1].lower(), 'user'])
                 taxon_hierarchy.update(parent_info['hier'])
 
             else:
                 # Think all the combinations are covered but exit with information if not
                 raise AttributeError('Bad taxon processing')
 
+        # Now insert parents that haven't already appeared as a taxon row
+        indexed = [tx[1] for tx in self.taxon_index]
+
+        # add parent into taxon index
+        for key, (valid, prnt_info) in parent_status.iteritems():
+            if prnt_info['canon'][0] not in indexed:
+                if 'user' in prnt_info:
+                    self.taxon_index.append([None] + prnt_info['user'])
+                    self.taxon_index.append([None] + prnt_info['canon'])
+                else:
+                    LOGGER.info('{}: parent found'.format(prnt_string))
+                    self.taxon_index.append([None] + prnt_info['canon'])
+
         # Look up the unique taxon hierarchy entries
-        # - drop taxa already in the index
-        indexed = [tx[0] for tx in self.taxon_index]
+        # - drop taxa with a GBIF ID already in the index
+        indexed = [tx[1] for tx in self.taxon_index]
         taxon_hierarchy = {tx for tx in taxon_hierarchy if tx[1] not in indexed}
 
         # - sort into ascending taxonomic order
@@ -1855,7 +1862,7 @@ class Dataset(object):
             else:
                 canon = web_gbif_validate(None, None, gbif_id=tx_id)['canon']
 
-            self.taxon_index.add(canon + (None, None))
+            self.taxon_index.append([None] + canon)
             LOGGER.info('Added {}'.format(canon[2]))
 
         # summary of processing
