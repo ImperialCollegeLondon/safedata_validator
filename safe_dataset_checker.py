@@ -1478,18 +1478,18 @@ class Dataset(object):
             i)  the taxon_names attribute of the dataset, which is just a set of
                 names used as a validation list for taxon names used in data worksheets.
             ii) the taxon_index attribute of the dataset, which contains a set
-                of tuples recording the full hierarchy of the taxa in the dataset
+                of lists recording the full hierarchy of the taxa in the dataset
                 for use in dataset searching, so including not just the named taxa,
                 but all higher taxa needed to complete the backbone.
 
-                Each tuple consists of:
+                Each list consists of:
 
-                (worksheet_name (str),
+                [worksheet_name (str),
                  gbif_id (int),
                  gbif_parent_id (int),
                  canonical_name (str),
                  taxonomic_rank (str),
-                 status (str))
+                 status (str)]
 
                 Where a taxon is not accepted or doubtful on GBIF, two entries are
                 inserted for the taxon, one under the canon name and one under the
@@ -2006,8 +2006,12 @@ class Dataset(object):
         if dupes:
             LOGGER.error('Field names duplicated: ', extra={'join': dupes})
 
+        # lowercase the field types
+        for fld in metadata:
+            fld['field_type'] = fld['field_type'].lower()
+
         # get taxa field names for cross checking observation and trait data
-        dwsh.taxa_fields = [fld['field_name'] for fld in metadata if fld['field_type'] == 'Taxa']
+        dwsh.taxa_fields = [fld['field_name'] for fld in metadata if fld['field_type'] == 'taxa']
 
         # check the data in each field against the metadata
         for meta in metadata:
@@ -2080,9 +2084,9 @@ class Dataset(object):
         if is_blank(meta['description']):
             LOGGER.error('Description is missing')
 
-        # Test explicitly lower cased field type  values to avoid annoying users
+        # Test explicitly lower cased field type values to avoid annoying users
         # look for strip white space
-        field_type = to_lowercase([meta['field_type']])[0]
+        field_type = meta['field_type']
 
         # check for padding in field type
         if is_padded(field_type):
