@@ -125,6 +125,9 @@ Columns of this type contain taxon names showing the taxon from which other data
 recorded. All of the values in the row must appear in the Taxon Names column in the Taxa
 worksheet.
 
+You don't need to complete any other descriptors. In particular, there is no need to provide a list
+of accepted values: the entries are validated against the Taxa worksheet. This is different from Categorical variables, where a list of category levels is required (see below)
+
 ## Replicate and ID
 
 Both Replicate and ID fields could contain almost any values. Replicates are typically

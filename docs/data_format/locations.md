@@ -60,6 +60,12 @@ Locations worksheet:
 
 Note that these extra columns can be left empty for known locations as in the example above, but for new locations, please explicitly enter NA in these fields. 
 
+# Location aliases and extending the Gazetteer
+
+In addition to the canonical location names, we also support a set of **location aliases**. Although we prefer the canonical names to be used, aliases can be used instead: an example is that "463" is accepted as an alias for the sampling point "OG3_463".
+
+The list of aliases also allows us to adopt new locations into the Gazetteer. If you have sampled at new  locations that seem likely to be the focus of other research projects then they may be added to the Gazetteer so that other researchers can use them as known locations. We can then use the location aliases to record that 'New' locations in a published dataset have been adopted: for example that the new location "river23" in dataset 123 is the same as the Gazetteer entry "RIVER23".
+
 # GIS data
 
 We prefer GIS information as Latitude and Longitude or WKT because we can use it to add to the spatial index of the datasets, but you can also submit GIS files as [external data files](other_formats.md) alongside your Excel data. You can even include metadata about vector data attribute tables as part of the Excel file.
