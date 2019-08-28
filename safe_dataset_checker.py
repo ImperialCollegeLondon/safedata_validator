@@ -588,6 +588,7 @@ class Dataset(object):
         self.dataworksheet_summaries = []
         self.access = 'Open'
         self.embargo_date = None
+        self.access_conditions = None
         self.publication_doi = []
         self.dataworksheets = []
         self.keywords = []
@@ -2801,9 +2802,10 @@ class Dataset(object):
         """
 
         # get the required components
-        component_keys = ['access', 'authors', 'description', 'embargo_date', 'filename',
-                          'keywords', 'latitudinal_extent', 'longitudinal_extent', 'funders',
-                          'project_id', 'temporal_extent', 'title', 'external_files', 'permits']
+        component_keys = ['access', 'authors', 'description', 'embargo_date', 'access_conditions',
+                          'filename', 'keywords', 'latitudinal_extent', 'longitudinal_extent', 
+                          'funders', 'project_id', 'temporal_extent', 'title', 'external_files', 
+                          'permits']
 
         components = {ky: vl for ky, vl in self.__dict__.iteritems() if ky in component_keys}
 
