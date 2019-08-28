@@ -41,16 +41,25 @@ Some blocks allow multiple records (e.g. authors and data worksheets) with sets 
 !!! Warning "Mandatory block"
 
     **Embargo date** is only required if the **Access status** value is 'Embargo'. 
-	The other fields are mandatory,
+	**Access conditions** is only required if the **Access status** value is 'Restricted'.
+	The other fields are mandatory.
 
 This block provides a set of core details for the dataset. You can only provide a single value for each field.
 
- * **SAFE Project ID**: This is the project number from the SAFE project website. When you upload your dataset, you will also be asked to choose a project for your dataset: these two numbers must match. Note that you can only upload data to a project of which you are a member.
-* **Title**: This should be a short informative title for the dataset: it will be used as the public title for the dataset so make sure it is clear and grammatical! 
-* **Description**: This will be the public description of the dataset. Note that you can have paragraphs of text within a single cell in Excel, so please do provide a reasonable summary. You will need to use Alt + Enter (or Alt + Shift + Enter on a Mac) to insert a carriage return.
-* **Access status**<a name="access-status"></a>: You must enter an Access Status of either  `Open` or `Embargo`. Open data will be publicly available from the moment it is published. We would prefer as much data as possible to be open access but we understand that you may want to embargo.
-* **Embargo date**: If you choose an embargoed access status then you must also enter the date when the embargo will end. This must be an Excel date formatted value and you cannot embargo data for more than two years. 
-
+* **SAFE Project ID**: This is the project number from the SAFE project website. When you upload your dataset, you 
+  will also be asked to choose a project for your dataset: these two numbers must match. Note that you can only 
+  upload data to a project of which you are a member.
+* **Title**: This should be a short informative title for the dataset: it will be used as the public title for the 
+  dataset so make sure it is clear and grammatical! 
+* **Description**: This will be the public description of the dataset. Note that you can have paragraphs of text
+  within a single cell in Excel, so please do provide a reasonable summary. You will need to use Alt + Enter (or
+  Alt + Shift + Enter on a Mac) to insert a carriage return.
+* **Access status**<a name="access-status"></a>: You must enter an Access Status of  `Open`, `Embargo` or `Restricted`. 
+  We prefer as much data as possible to be open access: see the [statement on data availability](../availability.md). 
+* **Embargo date**: If you choose embargoed access status then you must also enter the date when the embargo will 
+  end. This must be an Excel date formatted value and you cannot embargo data for more than two years. 
+* **Access conditions**: If you choose restricted access status then you must also provide text describing the 
+  access conditions.  
 
 |  |  |  |  |
 |--------------------|-----------------------------------|---|---|
@@ -59,6 +68,7 @@ This block provides a set of core details for the dataset. You can only provide 
 | Description           | This is an example dataset.  | | |
 | Access status        | Embargo | | |
 | Embargo date          | 03/09/18 | | |
+| Access conditions | (see above)| | |
 
 # The author block
 

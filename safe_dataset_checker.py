@@ -731,6 +731,7 @@ class Dataset(object):
         fields = dict(core=([('safe project id', True, 'pid'),
                              ('access status', True, 'access'),
                              ('embargo date', False, 'embargo_date'),
+                             ('access conditions', False, 'access_conditions'),
                              ('title', True, None),
                              ('description', True, None)],
                             True, 'Core fields'),
@@ -912,24 +913,36 @@ class Dataset(object):
             else:
                 self.access = access.lower()
 
-                if self.access == 'embargo' and singletons['embargo_date'] is None:
-                    LOGGER.error('Dataset embargoed but no embargo date provided')
-                elif self.access == 'embargo':
-                    embargo_date = singletons['embargo_date'].value
-                    if singletons['embargo_date'].ctype != xlrd.XL_CELL_DATE:
-                        LOGGER.error('Embargo date not a date value: {}'.format(embargo_date))
+                if self.access == 'embargo':
+                    if singletons['embargo_date'] is None:
+                        LOGGER.error('Dataset embargoed but no embargo date provided')
                     else:
-                        embargo_date = xlrd.xldate_as_datetime(embargo_date, self.workbook.datemode)
-                        now = datetime.datetime.now()
-
-                        if embargo_date < now:
-                            LOGGER.error('Embargo date is in the past.')
-                        elif embargo_date > now + datetime.timedelta(days=2 * 365):
-                            LOGGER.error('Embargo date more than two years in the future.')
+                        embargo_date = singletons['embargo_date'].value
+                        if singletons['embargo_date'].ctype != xlrd.XL_CELL_DATE:
+                            LOGGER.error('Embargo date not a date value: {}'.format(embargo_date))
                         else:
-                            self.embargo_date = embargo_date.date().isoformat()
-                            LOGGER.info('Dataset access: embargoed until {}'.format(self.embargo_date),
-                                        extra={'indent_before': 1, 'indent_after': 0})
+                            embargo_date = xlrd.xldate_as_datetime(embargo_date, self.workbook.datemode)
+                            now = datetime.datetime.now()
+
+                            if embargo_date < now:
+                                LOGGER.error('Embargo date is in the past.')
+                            elif embargo_date > now + datetime.timedelta(days=2 * 365):
+                                LOGGER.error('Embargo date more than two years in the future.')
+                            else:
+                                self.embargo_date = embargo_date.date().isoformat()
+                                LOGGER.info('Dataset access: embargoed until {}'.format(self.embargo_date),
+                                            extra={'indent_before': 1, 'indent_after': 0})
+                elif self.access == 'restricted':
+                    if singletons['access_conditions'] is None:
+                        LOGGER.error('Dataset restricted but no access conditions specified')
+                    else:
+                        access_conditions = singletons['access_conditions'].value
+                        if singletons['access_conditions'].ctype != xlrd.XL_CELL_TEXT:
+                            LOGGER.error('Access conditions are not text: {}'.format(access_conditions))
+                        else:
+                            self.access_conditions = access_conditions
+                            LOGGER.info('Dataset access: restricted with conditions {}'.format(self.access_conditions),
+                                            extra={'indent_before': 1, 'indent_after': 0})
                 else:
                     LOGGER.info('Dataset access: {}'.format(self.access),
                                 extra={'indent_before': 1, 'indent_after': 0})
