@@ -104,6 +104,10 @@ class IndentFormatter(logging.Formatter):
           depth of the formatter.
     """
 
+
+    # TODO - Remove the indent_before/after mechanism and use FORMATTER.depth directly,
+    #        which is a much cleaner and more adaptable route to the same endpoint.
+
     def __init__(self, fmt=None, datefmt=None):
         logging.Formatter.__init__(self, fmt, datefmt)
         self.depth = 0
@@ -765,7 +769,7 @@ class Dataset(object):
                                   ('worksheet title', True, 'title'),
                                   ('worksheet description', True, 'description'),
                                   ('worksheet external file', False, 'external')],
-                                 True, 'Worksheets'),
+                                 False, 'Worksheets'),
                       permits=([('permit type', True, 'type'),
                                 ('permit authority', True, 'authority'),
                                 ('permit number', True, 'number')],
@@ -829,13 +833,15 @@ class Dataset(object):
             block = [bl for bl in block if any(bl.values())]
 
             # Reporting
+            depth = FORMATTER.depth
+
             if not block:
                 if mandatory:
                     LOGGER.error('No {} metadata found'.format(title))
                     return None
             else:
                 LOGGER.info('Metadata for {} found: {} records'.format(title, len(block)),
-                            extra={'indent_before': 1, 'indent_after': 2})
+                            extra={'indent_before': depth, 'indent_after': depth + 1})
 
                 # report on block fields
                 for fld in mandatory_fields:
@@ -1023,76 +1029,6 @@ class Dataset(object):
 
         self.authors = authors
 
-        # LOAD EXTERNAL FILES - small datasets will usually be contained
-        # entirely in a single Excel file, but where formatting or size issues
-        # require external files, then names and descriptions are included in
-        # the summary information
-
-        external_files = read_block(fields['external'])
-
-        # external file specific validation
-        if external_files:
-            # simplify to cell values not xlrd.Cells
-            strip_ctypes(external_files)
-
-            bad_names = [RE_CONTAINS_WSPACE.search(exf['file']) for exf in self.external_files]
-            if any(bad_names):
-                LOGGER.error('External file names must not contain whitespace: ',
-                             extra={'join': bad_names, 'quote': True})
-
-        self.external_files = external_files
-
-        # Load the WORKSHEETS block
-        dataworksheet_summaries = read_block(fields['worksheet'])
-
-        # Worksheet specific validation
-        if dataworksheet_summaries:
-            # simplify to cell values not xlrd.Cells
-            strip_ctypes(dataworksheet_summaries)
-
-            # - catch inclusion of Taxa and Locations in data worksheets
-            cited_sheets = [ws['name'] for ws in dataworksheet_summaries]
-
-            if ('Locations' in cited_sheets) or ('Taxa' in cited_sheets):
-                LOGGER.error('Do not include Taxa or Locations metadata sheets in '
-                             'Data worksheet details')
-
-                dataworksheet_summaries = [ws for ws in dataworksheet_summaries
-                                           if ws['name'] not in ('Locations', 'Taxa')]
-
-        # Check possibly modified set of summaries
-        if not dataworksheet_summaries:
-            if self.external_files:
-                LOGGER.info("Only external file descriptions provided")
-            else:
-                LOGGER.error("No data worksheets or external files provided - no data.")
-        else:
-            cited_sheets = {ws['name'] for ws in dataworksheet_summaries}
-            # names not in list of sheets
-            bad_names = cited_sheets - self.sheet_names
-            if bad_names:
-                LOGGER.error('Worksheet names not found in workbook: ',
-                             extra={'join': bad_names, 'quote': True})
-            # existing sheets without description
-            extra_names = self.sheet_names - {'Summary', 'Taxa', 'Locations'} - cited_sheets
-            if extra_names:
-                LOGGER.error('Undocumented sheets found in workbook: ',
-                             extra={'join': extra_names, 'quote': True})
-            # bad external files
-            external_in_sheet = {ws['external'] for ws in dataworksheet_summaries
-                                 if ws['external'] is not None}
-            if self.external_files:
-                external_names = {ex['file'] for ex in self.external_files}
-            else:
-                external_names = set()
-
-            bad_externals = external_in_sheet - external_names
-            if bad_externals:
-                LOGGER.error('Worksheet descriptions refer to unreported external files.',
-                             extra={'join': bad_externals, 'quote': True})
-
-        self.dataworksheet_summaries = dataworksheet_summaries
-
         # LOOK FOR FUNDING DETAILS - users provide a funding body and a description
         # of the funding type and then optionally a reference number and a URL
 
@@ -1169,6 +1105,82 @@ class Dataset(object):
                 valid = self.validate_geo_extent((bbox['south'], bbox['north']), 'latitude')
                 if valid:
                     self.update_extent((bbox['south'], bbox['north']), float, 'latitudinal_extent')
+
+        # Finally, check the information on data content
+        LOGGER.info('Checking data: worksheets and external files',
+                    extra={'indent_before': 1})
+
+        # LOAD EXTERNAL FILES - small datasets will usually be contained
+        # entirely in a single Excel file, but where formatting or size issues
+        # require external files, then names and descriptions are included in
+        # the summary information
+
+        external_files = read_block(fields['external'])
+
+        # external file specific validation
+        if external_files:
+            # simplify to cell values not xlrd.Cells
+            strip_ctypes(external_files)
+
+            bad_names = [RE_CONTAINS_WSPACE.search(exf['file']) for exf in self.external_files]
+            if any(bad_names):
+                LOGGER.error('External file names must not contain whitespace: ',
+                             extra={'join': bad_names, 'quote': True})
+
+        self.external_files = external_files
+
+        # Load the WORKSHEETS block
+        dataworksheet_summaries = read_block(fields['worksheet'])
+
+        # Strip out faulty inclusion of Taxa and Location worksheets in data worksheets
+        if dataworksheet_summaries:
+            # simplify to cell values not xlrd.Cells
+            strip_ctypes(dataworksheet_summaries)
+
+            # - catch inclusion of Taxa and Locations in data worksheets
+            cited_sheets = [ws['name'] for ws in dataworksheet_summaries]
+
+            if ('Locations' in cited_sheets) or ('Taxa' in cited_sheets):
+                LOGGER.error('Do not include Taxa or Locations metadata sheets in '
+                             'Data worksheet details')
+
+                dataworksheet_summaries = [ws for ws in dataworksheet_summaries
+                                           if ws['name'] not in ('Locations', 'Taxa')]
+
+        # Look to see what data is available - must be one or both of data worksheets
+        # or external files and validate worksheets if present.
+
+        if not dataworksheet_summaries:
+            if self.external_files:
+                LOGGER.info("Only external file descriptions provided")
+            else:
+                LOGGER.error("No data worksheets or external files provided - no data.")
+        else:
+            cited_sheets = {ws['name'] for ws in dataworksheet_summaries}
+            # names not in list of sheets
+            bad_names = cited_sheets - self.sheet_names
+            if bad_names:
+                LOGGER.error('Worksheet names not found in workbook: ',
+                             extra={'join': bad_names, 'quote': True})
+            # existing sheets without description
+            extra_names = self.sheet_names - {'Summary', 'Taxa', 'Locations'} - cited_sheets
+            if extra_names:
+                LOGGER.error('Undocumented sheets found in workbook: ',
+                             extra={'join': extra_names, 'quote': True})
+            # bad external files
+            external_in_sheet = {ws['external'] for ws in dataworksheet_summaries
+                                 if ws['external'] is not None}
+            if self.external_files:
+                external_names = {ex['file'] for ex in self.external_files}
+            else:
+                external_names = set()
+
+            bad_externals = external_in_sheet - external_names
+            if bad_externals:
+                LOGGER.error('Worksheet descriptions refer to unreported external files.',
+                             extra={'join': bad_externals, 'quote': True})
+
+        self.dataworksheet_summaries = dataworksheet_summaries
 
         # summary of processing
         n_errors = CH.counters['ERROR'] - start_errors
@@ -2857,8 +2869,6 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
         if dataset.dataworksheet_summaries:
             for ws in dataset.dataworksheet_summaries:
                 dataset.load_data_worksheet(ws)
-        else:
-            LOGGER.error('No data worksheets found')
 
     if 'f' in check:
         dataset.final_checks()
