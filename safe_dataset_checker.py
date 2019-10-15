@@ -975,7 +975,7 @@ class Dataset(object):
         pub_doi = read_block(fields['doi'])
 
         # data validation for DOIs
-        if pub_doi:
+        if pub_doi is not None:
             pub_doi = [entry['publication doi'] for entry in pub_doi]
             if {k.ctype for k in pub_doi} != {xlrd.XL_CELL_TEXT}:
                 LOGGER.error('Publication DOIs contain non-text values')
@@ -1001,7 +1001,7 @@ class Dataset(object):
         authors = read_block(fields['authors'])
 
         # Author specific validation
-        if authors:
+        if authors is not None:
             # simplify to cell values not xlrd.Cells
             strip_ctypes(authors)
 
@@ -1033,14 +1033,14 @@ class Dataset(object):
         # of the funding type and then optionally a reference number and a URL
 
         funders = read_block(fields['funding'])
-        if funders:
+        if funders is not None:
             strip_ctypes(funders)
         self.funders = funders
 
         # LOOK FOR PERMIT DETAILS - users provide a permit authority, number and permit type
 
         permits = read_block(fields['permits'])
-        if permits:
+        if permits is not None:
             strip_ctypes(permits)
             # validate permit types
             permit_types = {pm['type'].lower() for pm in permits if pm['type'] is not None}
@@ -1059,7 +1059,7 @@ class Dataset(object):
         temp_extent = read_block(fields['date'])
 
         # temporal extent validation and updating
-        if temp_extent:
+        if temp_extent is not None:
             if len(temp_extent) > 1:
                 LOGGER.error('Multiple values found in date extent rows.')
 
@@ -1085,7 +1085,7 @@ class Dataset(object):
         # Geographic extents
         geo_extent = read_block(fields['geo'])
 
-        if geo_extent:
+        if geo_extent is not None:
             if len(geo_extent) > 1:
                 LOGGER.error('Multiple values found in geographic extent rows.')
 
@@ -1118,7 +1118,7 @@ class Dataset(object):
         external_files = read_block(fields['external'])
 
         # external file specific validation
-        if external_files:
+        if external_files is not None:
             # simplify to cell values not xlrd.Cells
             strip_ctypes(external_files)
 
@@ -1133,7 +1133,7 @@ class Dataset(object):
         dataworksheet_summaries = read_block(fields['worksheet'])
 
         # Strip out faulty inclusion of Taxa and Location worksheets in data worksheets
-        if dataworksheet_summaries:
+        if dataworksheet_summaries is not None:
             # simplify to cell values not xlrd.Cells
             strip_ctypes(dataworksheet_summaries)
 
@@ -1147,30 +1147,28 @@ class Dataset(object):
                 dataworksheet_summaries = [ws for ws in dataworksheet_summaries
                                            if ws['name'] not in ('Locations', 'Taxa')]
 
+                dataworksheet_summaries = None if not dataworksheet_summaries else dataworksheet_summaries
+
         # Look to see what data is available - must be one or both of data worksheets
         # or external files and validate worksheets if present.
+        cited_sheets = set()
 
-        if not dataworksheet_summaries:
-            if self.external_files:
-                LOGGER.info("Only external file descriptions provided")
-            else:
-                LOGGER.error("No data worksheets or external files provided - no data.")
-        else:
+        if dataworksheet_summaries is None and external_files is None:
+            LOGGER.error("No data worksheets or external files provided - no data.")
+        elif dataworksheet_summaries is None:
+            LOGGER.info("Only external file descriptions provided")
+        elif dataworksheet_summaries is not None:
+            # Check sheet names
             cited_sheets = {ws['name'] for ws in dataworksheet_summaries}
             # names not in list of sheets
             bad_names = cited_sheets - self.sheet_names
             if bad_names:
                 LOGGER.error('Worksheet names not found in workbook: ',
                              extra={'join': bad_names, 'quote': True})
-            # existing sheets without description
-            extra_names = self.sheet_names - {'Summary', 'Taxa', 'Locations'} - cited_sheets
-            if extra_names:
-                LOGGER.error('Undocumented sheets found in workbook: ',
-                             extra={'join': extra_names, 'quote': True})
             # bad external files
             external_in_sheet = {ws['external'] for ws in dataworksheet_summaries
                                  if ws['external'] is not None}
-            if self.external_files:
+            if self.external_files is not None:
                 external_names = {ex['file'] for ex in self.external_files}
             else:
                 external_names = set()
@@ -1179,6 +1177,12 @@ class Dataset(object):
             if bad_externals:
                 LOGGER.error('Worksheet descriptions refer to unreported external files.',
                              extra={'join': bad_externals, 'quote': True})
+
+        # Check for existing sheets without description
+        extra_names = self.sheet_names - {'Summary', 'Taxa', 'Locations'} - cited_sheets
+        if extra_names:
+            LOGGER.error('Undocumented sheets found in workbook: ',
+                         extra={'join': extra_names, 'quote': True})
 
         self.dataworksheet_summaries = dataworksheet_summaries
 
