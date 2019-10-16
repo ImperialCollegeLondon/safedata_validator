@@ -2410,7 +2410,10 @@ class Dataset(object):
         cell_types = {dt.ctype for dt in data}
         data = [dt.value for dt in data]
 
-        if cell_types == {xlrd.XL_CELL_DATE}:
+        if not data:
+            # Data is empty - external file description
+            extent = None
+        elif cell_types == {xlrd.XL_CELL_DATE}:
 
             # For date and time options, check decimal components
             if which == 'date':
