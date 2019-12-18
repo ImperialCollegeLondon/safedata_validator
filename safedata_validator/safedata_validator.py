@@ -406,7 +406,7 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
     # to tax_gbif or exits returning an error condition of some sort
     if gbif_id is not None:
         # get the record associated with the provided ID
-        tax_sql = ("select * from backbone where id = {}".format(gbif_id))
+        tax_sql = (u"select * from backbone where id = {}".format(gbif_id))
         tax_gbif = conn.execute(tax_sql).fetchone()
 
         # check there is a result and that it is congruent with any
@@ -419,8 +419,8 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
 
     else:
         # get the set of records associated with the taxon or rank
-        tax_sql = ("select * from backbone where canonical_name ='{}' and "
-                   "rank= '{}';".format(tax, rnk.upper()))
+        tax_sql = (u"select * from backbone where canonical_name ='{}' and "
+                    "rank= '{}';".format(tax, rnk.upper()))
         tax_gbif = conn.execute(tax_sql).fetchall()
 
         if len(tax_gbif) == 0:
