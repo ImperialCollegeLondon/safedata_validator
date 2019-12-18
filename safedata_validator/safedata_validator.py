@@ -825,7 +825,7 @@ class Dataset(object):
         if {rw[0].ctype for rw in rows} != {xlrd.XL_CELL_TEXT}:
             LOGGER.error('Summary metadata fields column contains non text values')
 
-        summary = {unicode(rw[0].value).lower(): rw[1:] for rw in rows}
+        summary = {rw[0].value.lower(): rw[1:] for rw in rows}
 
         # Now define the metadata that may be present. The dictionary entries are
         # 3-tuples with the first entry describing blocks of fields, the second
