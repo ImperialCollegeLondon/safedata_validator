@@ -25,22 +25,25 @@ ii) Locations are validated against a list of valid locations. By default, this
 """
 
 from __future__ import print_function
-import os
-import datetime
-from dateutil import parser
 import argparse
-import re
 from collections import Counter
-from StringIO import StringIO
-from shapely import wkt
-from shapely.errors import WKTReadingError
+import datetime
 from itertools import groupby
-import numbers
 import logging
+import numbers
+import os
+import re
+from StringIO import StringIO
 import sqlite3
-import xlrd
+import textwrap
+
+import appdirs
+from dateutil import parser
 import requests
 import simplejson
+from shapely import wkt
+from shapely.errors import WKTReadingError
+import xlrd
 
 # define some regular expressions used to check validity
 RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]')
@@ -103,7 +106,6 @@ class IndentFormatter(logging.Formatter):
         - 'indent_before' or 'indent_after': two options to set the indent
           depth of the formatter.
     """
-
 
     # TODO - Remove the indent_before/after mechanism and use FORMATTER.depth directly,
     #        which is a much cleaner and more adaptable route to the same endpoint.
@@ -169,7 +171,6 @@ LOGGER.addHandler(LOG_SH)
 """
 Some static functions
 """
-
 
 def is_blank(value):
     """
@@ -505,6 +506,45 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
     return ret
 
 
+def load_config():
+    """Load safedata_validator config
+
+    The following safedata_validator variables are configurable:
+    - locations: A path to a locally stored locations data file or the URL of a web service
+         that provides the same data.
+    - gbif_database: A path to an local SQLite copy of the GBIF backbone database.
+    """
+
+    # Paths to user and site configs
+    user_config_dir = appdirs.user_config_dir('safedata_validator')
+    user_config_file = os.path.join(user_config_dir, 'safedata_validator.json')
+    site_config_dir = appdirs.site_config_dir('safedata_validator')
+    site_config_file = os.path.join(site_config_dir, 'safedata_validator.json')
+
+    # Try and load the user and site configs in that order
+    if os.path.exists(user_config_file) and os.path.isfile(user_config_file):
+        try:
+            with open(user_config_file, 'r') as json:
+                config = simplejson.load(json)
+
+            LOGGER.info('Loaded local user config')
+        except IOError:
+            LOGGER.error('Found local user config but could not load.')
+    elif os.path.exists(site_config_file) and os.path.isfile(site_config_file):
+        try:
+            with open(site_config_file, 'r') as json:
+                config = simplejson.load(json)
+
+            LOGGER.info('Loaded local site config')
+        except IOError:
+            LOGGER.error('Found local site config but could not load.')
+    else:
+        config = {}
+        LOGGER.info('No local config found.')
+
+    return config
+
+
 """
 Two classes to handle datasets and the data worksheets they contain
 """
@@ -544,19 +584,15 @@ class Dataset(object):
         filename: The Excel file from which to read the Dataset
         verbose: Should the reporting print to the screen during runtime
         gbif_database: A local path to an sqlite database containing the GBIF database
-        to be used instead of the web API.
+            to be used instead of the web API.
+        locations: Either a path to a JSON file containing a valid set of location
+            names or URL to a web service providing this data.
     """
 
-    def __init__(self, filename, verbose=True, gbif_database=None):
 
-        try:
-            self.workbook = xlrd.open_workbook(filename=filename)
-        except IOError:
-            raise IOError('Could not open file {}'.format(filename))
+    def __init__(self, filename, verbose=True, gbif_database=None, locations=None):
 
-        self.filename = os.path.basename(filename)
-
-        # report tracking - clear out previous content in the logger. When the function runs
+        # A) REPORT TRACKING - clear out previous content in the logger. When the function runs
         # on a webserver, the same logger instance is used for all runs, so the log contents
         # persist unless they are tidied up.
         CH.reset()
@@ -577,6 +613,104 @@ class Dataset(object):
             if 'console_log' in handler_names:
                 console_log_handler = LOGGER.handlers[handler_names.index('console_log')]
                 LOGGER.removeHandler(console_log_handler)
+
+        # B) CONFIGURATION: Try and load a configuration file
+        LOGGER.info("Configuring",
+                    extra={'indent_before': 0, 'indent_after': 1})
+
+        config = load_config()
+
+        # Configure GBIF
+        # - If gbif_database isn't provided to __init__ or in the config then use the
+        #   online API. Otherwise try and use the provided file, preferring the __init__
+        #   value over the config value
+        if gbif_database is None and 'gbif_database' not in config:
+            LOGGER.info('Using GBIF online API to validate taxonomy')
+            self.use_local_gbif = False
+            self.gbif_conn = None
+        else:
+
+            if gbif_database is None:
+                gbif_database = config['gbif_database']
+
+            LOGGER.info('Validating local GBIF database: ' + gbif_database)
+
+            # Does the provided path exist and is it a functional SQLite database with a backbone
+            # table? Because sqlite3 can connect to any existing path, use a query attempt to
+            # reveal exceptions
+            if not os.path.exists(gbif_database):
+                LOGGER.critical('Local GBIF database not found')
+                raise IOError('Local GBIF database not found')
+
+            try:
+                conn = sqlite3.connect(gbif_database)
+                _ = conn.execute('select count(*) from backbone;')
+            except sqlite3.OperationalError:
+                LOGGER.critical('Local GBIF database does not contain the backbone table')
+                raise IOError('Local GBIF database does not contain the backbone table')
+            except sqlite3.DatabaseError:
+                LOGGER.critical('Local SQLite database not valid')
+                raise IOError('Local SQLite database not valid')
+            else:
+                self.use_local_gbif = True
+                self.gbif_conn = conn
+                self.gbif_conn.row_factory = sqlite3.Row
+
+        # Configure locations
+        # - Use locations from the __init__ if provided, otherwise use the config.
+        if locations is not None or 'locations' in config:
+
+            if locations is None:
+                locations = config['locations']
+
+            LOGGER.info('Validating locations resource: ' + locations)
+
+            # Simplistic test for URL vs file
+            if locations.startswith('http'):
+                try:
+                    loc_get = requests.get(locations)
+                except requests.exceptions.RequestException as e:
+                    msg = 'URL error: ' + str(e)
+                    LOGGER.critical(msg)
+                    raise RuntimeError(msg)
+
+                if loc_get.status_code != 200:
+                    msg = 'Could not obtain locations: {reason} ({status_code})'.format(**loc_get)
+
+                    LOGGER.critical('Failed ')
+                    raise IOError('Could not download locations. Use a local json file.')
+                else:
+                    loc_payload = loc_get.json()
+            else:
+                # try and load the file
+                if not os.path.exists(locations) and not os.path.isfile(locations):
+                    LOGGER.critical('Local locations file not found')
+                    raise IOError('Local locations file not found')
+
+                try:
+                    loc_payload = simplejson.load(file(locations))
+                except simplejson.errors.JSONDecodeError:
+                    LOGGER.critical('Local locations file not JSON encoded.')
+                    raise IOError('Local locations file not JSON encoded.')
+        else:
+            LOGGER.critical('No locations data resource provided')
+            raise RuntimeError('No locations data resource provided')
+
+        # process the locations payload
+        if 'locations' in loc_payload and 'aliases' in loc_payload:
+            self.valid_locations = loc_payload['locations']
+            self.aliases = loc_payload['aliases']
+        else:
+            LOGGER.critical('Locations data malformed')
+            raise RuntimeError('Locations data malformed')
+
+        # Start handling the file to be validated
+        try:
+            self.workbook = xlrd.open_workbook(filename=filename)
+        except IOError:
+            raise IOError('Could not open file {}'.format(filename))
+
+        self.filename = os.path.basename(filename)
 
         LOGGER.info("Checking file '{}'".format(filename),
                     extra={'indent_before': 0, 'indent_after': 1})
@@ -608,39 +742,6 @@ class Dataset(object):
         self.external_files = []
         self.funders = []
         self.passed = False
-
-        # Setup the taxonomy validation mechanism.
-        if gbif_database is None:
-            LOGGER.info('Using GBIF online API to validate taxonomy')
-            self.use_local_gbif = False
-            self.gbif_conn = None
-        else:
-            # If a GBIF file is provided, does the file exist?
-            if not os.path.exists(gbif_database):
-                LOGGER.info('Local GBIF database not found, defaulting to online API')
-                self.use_local_gbif = False
-                self.gbif_conn = None
-
-            # And does the file behave like i) a sqlite database ii) containing a table 'backbone'
-            try:
-                # can connect sqlite to any existing path, but only attempts to query it
-                # throw up exceptions
-                conn = sqlite3.connect(gbif_database)
-                _ = conn.execute('select count(*) from backbone;')
-            except sqlite3.OperationalError:
-                LOGGER.info('Local GBIF database does not contain the backbone table, defaulting '
-                            'to online API')
-                self.use_local_gbif = False
-                self.gbif_conn = None
-            except sqlite3.DatabaseError:
-                LOGGER.info('Local SQLite database not valid, defaulting to online API')
-                self.use_local_gbif = False
-                self.gbif_conn = None
-            else:
-                LOGGER.info('Using local GBIF database to validate taxonomy')
-                self.use_local_gbif = True
-                self.gbif_conn = conn
-                self.gbif_conn.row_factory = sqlite3.Row
 
     @staticmethod
     def report():
@@ -1195,16 +1296,14 @@ class Dataset(object):
             LOGGER.info('Summary formatted correctly',
                         extra={'indent_before': 1, 'indent_after': 0})
 
-    def load_locations(self, locations_json=None):
+    def load_locations(self):
 
         """
         Attempts to load and check the contents of the Locations worksheet and
-        compile the geographic extent of the locations used.
+        compile the geographic extent of the locations used. The values in the
+        data file are validated against the locations data loaded when the Dataset
+        was initialised.
 
-        Args:
-            locations_json: A path to a JSON file containing a valid set of location names.
-                With the default value of None, the function tries to get this from
-                a SAFE project website service.
         Returns:
             Populates the locations field of the Dataset object
         """
@@ -1221,31 +1320,6 @@ class Dataset(object):
             # they aren't going to be required
             LOGGER.warn("No locations worksheet found - moving on")
             return
-
-        # GET THE GAZETTEER VALIDATION INFORMATION
-        loc_payload = None
-        if locations_json is None:
-            # If no file is provided then try and get locations from the website service
-            loc_get = requests.get('https://www.safeproject.net/call/json/get_locations_bbox')
-            if loc_get.status_code != 200:
-                LOGGER.error('Could not download locations. Use a local json file.')
-            else:
-                loc_payload = loc_get.json()
-        else:
-            # try and load the file
-            try:
-                loc_payload = simplejson.load(file(locations_json))
-            except IOError:
-                LOGGER.error('Could not load location names from file.')
-
-        # process the payload
-        if loc_payload is not None:
-            valid_locations = loc_payload['locations']
-            aliases = loc_payload['aliases']
-        else:
-            # create empty dictionaries to continue with validation
-            valid_locations = {}
-            aliases = {}
 
         # ITERATE OVER THE WORKSHEET ROWS
         loc_rows = locs_wb.get_rows()
@@ -1300,7 +1374,7 @@ class Dataset(object):
         # VALIDATE LOCATIONS
         # Get existing location names and aliases -new location names must not appear
         # in it and existing locations must.
-        existing_loc_names = set(valid_locations.keys() + aliases.keys())
+        existing_loc_names = set(self.valid_locations.keys() + self.aliases.keys())
 
         # Split up old and new if there are there any new ones?
         if 'new' in hdrs:
@@ -1442,17 +1516,17 @@ class Dataset(object):
                              extra={'join': unknown, 'quote': True})
 
             # are aliases being used?
-            aliased = loc_names & set(aliases.keys())
+            aliased = loc_names & set(self.aliases.keys())
             if aliased:
                 LOGGER.warn('Locations aliases used. Maybe change to primary location names: ',
                             extra={'join': aliased})
 
             # Get the bounding box of known locations and aliased locations
-            bbox_keys = (loc_names - (unknown | aliased)) | {aliases[ky] for ky in aliased}
+            bbox_keys = (loc_names - (unknown | aliased)) | {self.aliases[ky] for ky in aliased}
 
             # get the extents of known unaliased locations
             if bbox_keys:
-                bbox = [vl for ky, vl in valid_locations.iteritems() if ky in bbox_keys]
+                bbox = [vl for ky, vl in self.valid_locations.iteritems() if ky in bbox_keys]
                 bbox = zip(*bbox)
                 self.update_extent((min(bbox[0]), max(bbox[1])), float, 'longitudinal_extent')
                 self.update_extent((min(bbox[2]), max(bbox[3])), float, 'latitudinal_extent')
@@ -2822,8 +2896,8 @@ class Dataset(object):
 
         # get the required components
         component_keys = ['access', 'authors', 'description', 'embargo_date', 'access_conditions',
-                          'filename', 'keywords', 'latitudinal_extent', 'longitudinal_extent', 
-                          'funders', 'project_id', 'temporal_extent', 'title', 'external_files', 
+                          'filename', 'keywords', 'latitudinal_extent', 'longitudinal_extent',
+                          'funders', 'project_id', 'temporal_extent', 'title', 'external_files',
                           'permits']
 
         components = {ky: vl for ky, vl in self.__dict__.iteritems() if ky in component_keys}
@@ -2839,7 +2913,7 @@ Higher level functions
 """
 
 
-def check_file(fname, verbose=True, gbif_database=None, locations_json=None, validate_doi=False,
+def check_file(fname, verbose=True, gbif_database=None, locations=None, validate_doi=False,
                check='sltwf', project_id=None):
     """
     Runs the format checking across an Excel workbook.
@@ -2849,7 +2923,8 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
         verbose: Boolean to indicate whether to print messages to stdout as the program runs?
         gbif_database: Path to a local copy of the GBIF taxonomy backbone if that is to be used
           instead of the GBIF web API.
-        locations_json: The path to a json file of valid location names
+        locations: A path to a locally stored locations data file or the URL of a web service
+          that provides the same data.
         validate_doi: Check any publication DOIs resolve, requiring a web connection.
         check: String indicating which checking to run. Note that running worksheet checking
           without loading summary taxa and locations is going to be problematic!
@@ -2861,7 +2936,7 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
     """
 
     # initialise the dataset object
-    dataset = Dataset(fname, verbose=verbose, gbif_database=gbif_database)
+    dataset = Dataset(fname, verbose=verbose, gbif_database=gbif_database, locations=locations)
 
     # load the metadata sheets
     if 's' in check:
@@ -2869,7 +2944,7 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
     if 't' in check:
         dataset.load_taxa()
     if 'l' in check:
-        dataset.load_locations(locations_json=locations_json)
+        dataset.load_locations()
 
     # check the datasets
     if 'w' in check:
@@ -2883,7 +2958,7 @@ def check_file(fname, verbose=True, gbif_database=None, locations_json=None, val
     return dataset
 
 
-def main():
+def _safedata_validator_cli():
     """
     This program validates an Excel file formatted as a SAFE dataset. As it runs, it outputs
     a report that highlights any problems with the formatting.
@@ -2905,7 +2980,10 @@ def main():
     the database. This requires a web connection and cannot be performed offline.
     """
 
-    parser = argparse.ArgumentParser(description=main.__doc__)
+    desc = textwrap.dedent(_safedata_validator_cli.__doc__)
+    fmt = argparse.RawDescriptionHelpFormatter
+    parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
+
     parser.add_argument('fname', help="Path to the Excel file to be validated.")
     parser.add_argument('-c', '--check', default='sltwf',
                         help='Which of the summary, locations, taxa, worksheets and '
@@ -2914,8 +2992,9 @@ def main():
                         help='If provided, check that the project ID within the file '
                              'matches this integer. Multiple values can be provided '
                              'to generate a set of valid IDs.')
-    parser.add_argument('-l', '--locations_json', default=None,
-                        help='Path to a locally stored json file of valid location names')
+    parser.add_argument('-l', '--locations', default=None,
+                        help='A path to a locally stored locations data file or the URL '
+                             'of a web service that provides the same data.')
     parser.add_argument('-g', '--gbif_database', default=None,
                         help=('The path to a local sqlite database containing the GBIF '
                               'taxonomy backbone.'))
@@ -2925,10 +3004,6 @@ def main():
 
     args = parser.parse_args()
 
-    check_file(fname=args.fname, verbose=True, locations_json=args.locations_json,
+    check_file(fname=args.fname, verbose=True, locations=args.locations,
                gbif_database=args.gbif_database, validate_doi=args.validate_doi,
                check=args.check, project_id=args.project_id)
-
-
-if __name__ == "__main__":
-    main()

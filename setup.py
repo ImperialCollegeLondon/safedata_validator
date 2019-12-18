@@ -1,16 +1,23 @@
 import setuptools
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setuptools.setup(
-    name="safe_dataset_checker",
-    version="1.1.0",
+    name="safedata_validator",
+    version="1.2.0",
     author="David Orme",
     author_email="d.orme@imperial.ac.uk",
-    description="Code used to validate data files in the SAFE data submission format.",
-    long_description="# TODO",
+    description="Validator for data files in the SAFE data submission format.",
+    long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/imperial_college_london/safe_dataset_checker",
-    #packages=setuptools.find_packages(),
-    py_modules=['safe_dataset_checker'],
+    url="https://github.com/imperial_college_london/safedata_validator",
+    packages=['safedata_validator'],
+    entry_points = {
+            'console_scripts':
+             ['safedata_validate=safedata_validator:_safedata_validator_cli']
+    },
+    license='MIT',
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
