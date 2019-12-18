@@ -1,4 +1,6 @@
-# The safe_dataset_checker repository
+# The safedata_validator package
+
+This package provides methods to validate XLSX files containing SAFE data formatted data and metada.
 
 See the main documentation:
-  [https://safe_dataset_checker.readthedocs.io](https://safe_dataset_checker.readthedocs.io)
+  [https://safedata_validator.readthedocs.io](https://safedata_validator.readthedocs.io)

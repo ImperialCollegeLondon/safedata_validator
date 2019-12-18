@@ -1,19 +1,18 @@
 # Using the SAFE Dataset Checker
 
-The SAFE dataset checking code is a publicly available Python package available [here](https://github.com/ImperialCollegeLondon/safe_dataset_checker). The  `safe_dataset_checker` repository contains a Python module to validate submitted files and report on
-any problems. The code validates:
+The SAFE dataset validation code is an open source Python package. The code is maintained  [here](https://github.com/ImperialCollegeLondon/safedata_validator) but is easier to install using  [PyPI](https://pypi.org/project/safedata-validator). 
+
+The  `safedata_validator` package contains a Python module to validate submitted files and report on any problems. The code validates:
 
   1. The data submission formatting of the file.
   1. All taxonomic names against the GBIF taxonomy database.
   1. All location names against the SAFE Gazetteer.
 
-Datasets can be submitted by registered researchers at the [SAFE
-website](https://safeproject.net/datasets/submit_dataset) which will automatically use this code to check
-that the file is formatted correctly. However, you can also download and run it yourself!
+Datasets can be submitted by registered researchers at the [SAFE website](https://safeproject.net/datasets/submit_dataset) which will automatically use this code to check that the file is formatted correctly. However, you can also install and run it yourself!
 
 The program usage instructions are:
 
-    usage: safe_dataset_checker.py [-h] [-l LOCATIONS_JSON]
+    usage: safedata_validator.py [-h] [-l LOCATIONS_JSON]
                                    [--gbif_database GBIF_DATABASE]
                                    [--validate_doi]
                                    fname
@@ -55,7 +54,7 @@ The program usage instructions are:
 
 In most cases, it is used simply like this:
 
-    python safe_dataset_checker.py path/to/My_Excel_File.xlsx
+    python safedata_validator.py path/to/My_Excel_File.xlsx
 
 Note that, by default, the program **uses a web connection** to:
 
@@ -63,9 +62,11 @@ Note that, by default, the program **uses a web connection** to:
 2. validate taxon names via the API to the [GBIF backbone taxonomy](https://www.gbif.org/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c), and
 3. check any DOIs provided in the metadata. 
 
-However, you can also set the program up for offline use: this is also much faster than using the online
-services to validate the dataset but you cannot validate DOIs when using the program offline. To use the program offline, you need to provide paths to a local copy of the GBIF database and a local copy of the SAFE gazetteer.
+However, you can also set the program up for offline use: this is also much faster than using the
+online services to validate the dataset but you cannot validate DOIs when using the program
+offline. To use the program offline, you need to provide paths to a local copy of the GBIF database
+and a local copy of the SAFE gazetteer.
 
-    python safe_dataset_checker.py -g backbone-current.sqlite -l SAFE_locations.json My_Excel_File.xlsx
+    python safedata_validator.py -g backbone-current.sqlite -l SAFE_locations.json My_Excel_File.xlsx
 
 Details on obtaining those two files are provided [here](install.md).

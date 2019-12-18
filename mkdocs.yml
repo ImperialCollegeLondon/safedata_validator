@@ -1,5 +1,5 @@
 site_name: Data at the SAFE Project
-repo_url: https://github.com/ImperialCollegeLondon/safe_dataset_checker/
+repo_url: https://github.com/ImperialCollegeLondon/safedata_validator/
 theme: readthedocs
 markdown_extensions:
   - admonition
@@ -16,7 +16,7 @@ nav:
     - 'Data worksheets': 'data_format/data.md'
   - 'Other file formats': 'data_format/other_formats.md'
   - 'Data format FAQs': 'faqs.md'
-  - 'The safe_dataset_checker package':
-    - 'Usage': 'safe_dataset_checker/usage.md'
-    - 'Installation': 'safe_dataset_checker/install.md'
-    - 'GBIF validation notes': 'safe_dataset_checker/gbif_validation.md'
+  - 'The safedata_validator package':
+    - 'Usage': 'safedata_validator/usage.md'
+    - 'Installation': 'safedata_validator/install.md'
+    - 'GBIF validation notes': 'safedata_validator/gbif_validation.md'
