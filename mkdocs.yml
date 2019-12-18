@@ -19,5 +19,5 @@ nav:
   - 'The safedata_validator package':
     - 'Usage': 'safedata_validator/usage.md'
     - 'Installation': 'safedata_validator/install.md'
-    - 'Building local GBIF': 'safedata_validator/build_local_gbif.md'	
+    - 'Building local GBIF': 'safedata_validator/build_local_gbif.md'
     - 'GBIF validation notes': 'safedata_validator/gbif_validation.md'
