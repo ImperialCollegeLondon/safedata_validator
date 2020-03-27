@@ -52,7 +52,7 @@ RE_NAME = re.compile(r'[^,]+,[ ]?[^,]+')
 RE_WSPACE_ONLY = re.compile(r'^\s*$')
 RE_CONTAINS_WSPACE = re.compile(r'\s')
 RE_CONTAINS_PUNC = re.compile(r'[,;:]')
-RE_DOI = DOI = re.compile('https?://(dx.)?doi.org/')
+RE_DOI = re.compile('https?://(dx.)?doi.org/')
 
 # note that logically the next one also catches whitespace at both ends
 RE_WSPACE_AT_ENDS = re.compile(r'^\s+.+|.+\s+$')
@@ -2836,25 +2836,27 @@ class Dataset(object):
         LOGGER.info('Checking provided locations and taxa all used in data worksheets',
                     extra={'indent_before': 0, 'indent_after': 1})
 
-        # check locations - can't validate when there are external files which
-        # might use any unused ones.
+        # check locations and taxa
+        # - Can't validate when there are external files which might use any unused ones.
+        # - If the sets are not the same, then the worksheet reports will catch undocumented ones
+        #   so here only look for ones that are provided but not used in the data.
         if self.locations:
-            if self.locations_used == self.locations:
-                LOGGER.info('Provided locations all used in datasets')
-            elif self.external_files:
+            if self.external_files:
                 LOGGER.warn('Location list cannot be validated when external data files are used')
-            else:
+            elif self.locations_used == self.locations:
+                LOGGER.info('Provided locations all used in datasets')
+            elif self.locations_used == (self.locations & self.locations_used):
                 LOGGER.error('Provided locations not used: ',
                              extra={'join': self.locations - self.locations_used})
 
         # check taxa
         if self.taxon_names:
-            if self.taxon_names_used == self.taxon_names:
-                LOGGER.info('Provided taxa all used in datasets')
-            elif self.external_files:
+            if self.external_files:
                 LOGGER.warn('Taxon list cannot be validated when external data files are used')
-            else:
-                LOGGER.error('Provided taxa  not used: ',
+            elif self.taxon_names_used == self.taxon_names:
+                LOGGER.info('Provided taxa all used in datasets')
+            elif self.taxon_names_used == (self.taxon_names & self.taxon_names_used):
+                LOGGER.error('Provided taxa not used: ',
                              extra={'join': self.taxon_names - self.taxon_names_used})
 
         LOGGER.info('Checking temporal and geographic extents',
