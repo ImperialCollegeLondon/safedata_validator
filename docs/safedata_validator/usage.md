@@ -57,7 +57,7 @@ The `safedata_validator` package requires external data resources to validate bo
 
 For example, the SAFE Project  website provides an API endpoint returning location data. Using this API and the default online GBIF validation, the following command will validate `MyData.xlsx`:  
 
-    safedata_validate MyData.xlsx -l https://www.safeproject.net/API/validator_locations
+    safedata_validate MyData.xlsx -l https://www.safeproject.net/api/validator_locations
 
 This is considerably easier for most users but it can be rather slow and requires an internet connection. If you are want to improve the speed of `safedata_validator` for frequent use  or need to be able to use it offline, then you can provide local copies of the data resources. Note that you cannot validate DOIs without an internet connection, but this is optional.
 
@@ -92,7 +92,7 @@ For example, this file would set up `safedata_validate` to run online:
 
 ```json
 {
-        "locations": "https://www.safeproject.net/API/validator_locations"
+        "locations": "https://www.safeproject.net/api/validator_locations"
 }
 ```
 
