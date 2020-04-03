@@ -115,7 +115,7 @@ If you do provide command line arguments, they will override anything set in the
 
 To avoid having to provide a path to the configuration file, `safedata_validator` looks in specific locations for configuration files. Conventions for config file locations differ across operating systems and we use the conventions used by the `appdirs` package.
 
-In addition, `safedata_validator` will look for both user and site configuration files. Site configurations allow a data manager to set up a specific machine with data resources for all users. If both are present, the user configuration is used. The configuration file must be called `config.json` and the user and site config folders are:
+In addition, `safedata_validator` will look for both user and site configuration files. Site configurations allow a data manager to set up a specific machine with data resources for all users. If both are present, the user configuration is used. The configuration file must be called `safedata_validator.json` and the user and site config folders are:
 
 On Mac OS X:
 
@@ -133,6 +133,6 @@ C:\\Users\\username\\AppData\\Local\\safedata_validator\\safedata_validator
 On Linux:
 
 ```sh
-/home/trentm/.config/safedata_validator
+/home/username/.config/safedata_validator
 /etc/xdg/safedata_validator
 ```
