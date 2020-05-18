@@ -520,7 +520,8 @@ def load_config():
     user_config_file = os.path.join(user_config_dir, 'safedata_validator.json')
     site_config_dir = appdirs.site_config_dir('safedata_validator')
     site_config_file = os.path.join(site_config_dir, 'safedata_validator.json')
-
+    LOGGER.info('Checking for configs in {} and {}'.format(user_config_file, site_config_file))
+    
     # Try and load the user and site configs in that order
     if os.path.exists(user_config_file) and os.path.isfile(user_config_file):
         try:
