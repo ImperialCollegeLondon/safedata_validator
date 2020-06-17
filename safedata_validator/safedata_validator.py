@@ -2815,7 +2815,11 @@ class Dataset(object):
             meta: A dictionary of metadata descriptors for the field
             data: A list of data values
         """
-
+        
+        if self.external_files is None:
+            LOGGER.error('No external files listed in Summary')
+            return
+        
         external_names = {ex['file'] for ex in self.external_files}
 
         if 'file_container' in meta and meta['file_container'] is not None:
