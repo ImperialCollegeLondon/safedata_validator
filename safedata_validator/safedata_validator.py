@@ -2099,10 +2099,10 @@ class Dataset(object):
                     for cl in range(1, dwsh.max_col)]
         metadata = [dict(zip(dwsh.descriptors, fld)) for fld in metadata]
 
-        # insert column index
+        # Insert column index
         for idx, fld in enumerate(metadata):
             fld[u'col_idx'] = idx + 1
-
+        
         # check field names unique (drop None). This doesn't cause as many problems
         # as duplications in Taxa and Locations, which expect certain fields, so warn
         # and continue.
@@ -2113,7 +2113,7 @@ class Dataset(object):
 
         # lowercase the field types
         for fld in metadata:
-            fld['field_type'] = fld['field_type'].lower()
+            fld['field_type'] = None if fld['field_type'] is None else fld['field_type'].lower()
 
         # get taxa field names for cross checking observation and trait data
         dwsh.taxa_fields = [fld['field_name'] for fld in metadata if fld['field_type'] == 'taxa']
@@ -2150,19 +2150,30 @@ class Dataset(object):
             data: A list of values
         """
 
-        # Print out column checking header
-        if is_blank(meta['field_name']):
+        # Skip any field with no user provided metadata or data
+        blank_data = [is_blank(cl.value) for cl in data]
+        blank_meta = [is_blank(vl) for ky, vl in meta.iteritems()
+                      if ky not in ['col_idx', 'column']]
+        name_is_string = isinstance(meta['field_name'], (str, unicode))
+        
+        if is_blank(meta['field_name']) or not name_is_string:
             LOGGER.info('Checking Column {}'.format(xlrd.colname(meta['col_idx'])),
                         extra={'indent_before': 2, 'indent_after': 3})
-            LOGGER.error('Field name is blank')
+            
+            if all(blank_data) and all(blank_meta):
+                LOGGER.info('Blank column loaded - safe to ignore')
+                return
+            elif all(blank_meta):
+                LOGGER.error('Field contains no descriptor information but does contain values')
+                return
+            elif not name_is_string:
+                LOGGER.warn('Field name is not formatted as a text cell')
+            else:
+                LOGGER.error('Field name is blank')
         else:
             # sanitize and check field name - aiming for ascii compliant with no padding
             fld_name = meta['field_name']
-
-            if not isinstance(fld_name, (str, unicode)):
-                fld_name = str(fld_name)
-                LOGGER.warn('Field name is not formatted as a text cell')
-
+            
             fld_name_ascii = fld_name.encode('ascii', 'ignore')
 
             LOGGER.info('Checking field {}'.format(fld_name_ascii),
@@ -2170,19 +2181,10 @@ class Dataset(object):
 
             if is_padded(fld_name):
                 LOGGER.error('Field name contains white space padding')
+
             if len(fld_name) > len(fld_name_ascii):
                 LOGGER.error('Field name contains non ASCII characters')
 
-        # Skip any field with no user provided metadata or data
-        blank_data = [is_blank(cl.value) for cl in data]
-        blank_meta = [is_blank(vl) for ky, vl in meta.iteritems()
-                      if ky not in ['col_idx', 'column']]
-        if all(blank_data) and all(blank_meta):
-            LOGGER.info('Blank column loaded - safe to ignore')
-            return
-        elif all(blank_meta):
-            LOGGER.error('Field contains no descriptor information but does contain values')
-            return
 
         # try and figure out what else is available
         # check the description
