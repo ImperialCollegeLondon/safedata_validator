@@ -1942,7 +1942,7 @@ class Dataset(object):
 
         # add parent into taxon index
         for key, (valid, prnt_info) in parent_status.iteritems():
-            if prnt_info['canon'][0] not in indexed:
+            if prnt_info is not None and prnt_info['canon'][0] not in indexed:
                 if 'user' in prnt_info:
                     self.taxon_index.append([None] + prnt_info['user'])
                     self.taxon_index.append([None] + prnt_info['canon'])
