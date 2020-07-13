@@ -287,7 +287,7 @@ def web_gbif_validate(tax, rnk, gbif_id=None):
             'hier': a list of 2-tuples of rank and GBIF ID for the taxonomic hierarchy
             'note': a string of any extra information provided by the search
 
-        An index listhas the structure: (taxon ID, parent ID, name, rank, taxonomic status)
+        An index list has the structure: (taxon ID, parent ID, name, rank, taxonomic status)
     """
 
     if gbif_id is None:
@@ -828,8 +828,12 @@ class Dataset(object):
 
         summary = {rw[0].value.lower(): rw[1:] for rw in rows}
 
-        # Now define the metadata that may be present. The dictionary entries are
-        # 3-tuples with the first entry describing blocks of fields, the second
+        # Now define the metadata that may be present. These are defined in blocks
+        # of related rows described in 4-tuples:
+        #  0: a list of the rows in the block
+        #  1: is the block mandatory (bool)
+        #  2: the title of the block for the logger
+        #  3: should there be only one record (bool)
         # setting if that block is mandatory and the third giving a block title for
         # the logger. Each entry in a block description provides the field name that
         # appears in the summary sheet, if that field is mandatory within the set and
@@ -841,41 +845,41 @@ class Dataset(object):
                              ('access conditions', False, 'access_conditions'),
                              ('title', True, None),
                              ('description', True, None)],
-                            True, 'Core fields'),
+                            True, 'Core fields', True),
                       keywords=([('keywords', True, None)],
-                                True, 'Keywords'),
+                                True, 'Keywords', False),
                       doi=([('publication doi', True, None)],
-                           False, 'DOI'),
+                           False, 'DOI', False),
                       date=([('start date', True, None),
                              ('end date', True, None)],
-                            False, 'Date Extents'),
+                            False, 'Date Extents', True),
                       geo=([('west', True, None),
                             ('east', True, None),
                             ('south', True, None),
                             ('north', True, None)],
-                           False, 'Geographic Extents'),
+                           False, 'Geographic Extents', True),
                       authors=([('author name', True, 'name'),
                                 ('author affiliation', False, 'affiliation'),
                                 ('author email', False, 'email'),
                                 ('author orcid', False, 'orcid')],
-                               True, 'Authors'),
+                               True, 'Authors', False),
                       funding=([('funding body', True, 'body'),
                                 ('funding type', True, 'type'),
                                 ('funding reference', False, 'ref'),
                                 ('funding link', False, 'url')],
-                               False, 'Funding Bodies'),
+                               False, 'Funding Bodies', False),
                       external=([('external file', True, 'file'),
                                  ('external file description', True, 'description')],
-                                False, 'External Files'),
+                                False, 'External Files', False),
                       worksheet=([('worksheet name', True, 'name'),
                                   ('worksheet title', True, 'title'),
                                   ('worksheet description', True, 'description'),
                                   ('worksheet external file', False, 'external')],
-                                 False, 'Worksheets'),
+                                 False, 'Worksheets', False),
                       permits=([('permit type', True, 'type'),
                                 ('permit authority', True, 'authority'),
                                 ('permit number', True, 'number')],
-                               False, 'Permits'))
+                               False, 'Permits', False))
 
         # Check the minimal keys are expected - mandatory fields in mandatory blocks
         required_blocks = (blk[0] for blk in fields.values() if blk[1])
@@ -909,7 +913,7 @@ class Dataset(object):
                 None or a list of records.
             """
 
-            fields, mandatory, title = block
+            fields, mandatory, title, multi = block
 
             mandatory_fields = [f[0] for f in fields if f[1]]
             optional_fields = [f[0] for f in fields if not f[1]]
@@ -945,6 +949,9 @@ class Dataset(object):
                 LOGGER.info('Metadata for {} found: {} records'.format(title, len(block)),
                             extra={'indent_before': depth, 'indent_after': depth + 1})
 
+                if len(block) > 1 and not multi:
+                    LOGGER.error('Only a single record should be present')
+
                 # report on block fields
                 for fld in mandatory_fields:
                     fld_values = [rec[fld] for rec in block]
@@ -975,9 +982,6 @@ class Dataset(object):
 
         # Now check singleton rows
         singletons = read_block(fields['core'])
-        if len(singletons) > 1:
-            LOGGER.error('Multiple values found in core field rows')
-
         singletons = singletons[0]
 
         # Project ID specific validation
@@ -1162,8 +1166,6 @@ class Dataset(object):
 
         # temporal extent validation and updating
         if temp_extent is not None:
-            if len(temp_extent) > 1:
-                LOGGER.error('Multiple values found in date extent rows.')
 
             dates = temp_extent[0]
 
@@ -1188,8 +1190,6 @@ class Dataset(object):
         geo_extent = read_block(fields['geo'])
 
         if geo_extent is not None:
-            if len(geo_extent) > 1:
-                LOGGER.error('Multiple values found in geographic extent rows.')
 
             bbox = geo_extent[0]
 
@@ -2548,9 +2548,11 @@ class Dataset(object):
                 LOGGER.error('Problem in parsing date/time strings: ', extra={'join': bad_data})
 
         else:
+            first_text = next(idx for idx, val in enumerate(data) if val.ctype == xlrd.XL_CELL_TEXT)
             LOGGER.error('Field contains data with mixed formatting. Use either Excel date formats or '
                          'ISO formatted text. Note that text can look _exactly_ like an Excel date or '
-                         'time cell, you may need to copy the column and format as numbers to spot errors.')
+                         'time cell, you may need to copy the column and format as numbers to spot '
+                         'errors. First cell with text content at ' + str(first_text))
 
             extent = None
 
