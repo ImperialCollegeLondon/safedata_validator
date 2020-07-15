@@ -305,12 +305,14 @@ def web_gbif_validate(tax, rnk, gbif_id=None, gbif_ignore=None):
         resp = tax_gbif.json()
 
         # check the response status
-        if resp['matchType'] == u'NONE' or resp['usageKey'] == gbif_ignore:
+        if resp['matchType'] == u'NONE':
             # No match found - look for explanatory notes
             if 'note' in resp:
                 return {'status': 'no_match', 'note': resp['note']}
             else:
                 return {'status': 'no_match'}
+        elif resp['usageKey'] == gbif_ignore:
+            return {'status': 'ignored'}
         else:
             gbif_id = resp['usageKey']
 
@@ -479,8 +481,7 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None, gbif_ignore=None):
     
     # Check if this is being ignored
     if tax_gbif['id'] == gbif_ignore:
-        return {'status': 'no_match',
-                'note': 'Match ignored'}
+        return {'status': 'ignored'}
     
     # Should now have a single row for the preferred hit, so package that up and set
     # what is going to be used to build the hierarchy
@@ -1703,7 +1704,7 @@ class Dataset(object):
                      (None if is_blank(tx.get('taxon name')) else tx.get('taxon name'),
                       None if is_blank(tx.get('taxon type')) else tx.get('taxon type'),
                       None if is_blank(tx.get('taxon id')) else tx.get('taxon id'),
-                      None if is_blank(tx.get('taxon ignore')) else tx.get('taxon ignore')),
+                      None if is_blank(tx.get('ignore id')) else tx.get('ignore id')),
                      (None if is_blank(tx.get('parent name')) else tx.get('parent name'),
                       None if is_blank(tx.get('parent type')) else tx.get('parent type'),
                       None if is_blank(tx.get('parent id')) else tx.get('parent id')))
@@ -1810,18 +1811,19 @@ class Dataset(object):
             # only an issue when taxa are not found and also have an invalid parent
 
             # Check ID and ignore are integers (xlrd will load as float)
-            if tx[2] is not None and isinstance(tx[2], float) and tx[2].is_integer():
-                tx = (tx[0], tx[1], int(tx[2]), tx[3])
-            else:
-                LOGGER.error('Row {} ({}): GBIF ID is not an integer.'.format(rw_num, nm))
-                continue
+            if tx[2] is not None:
+                if isinstance(tx[2], float) and tx[2].is_integer():
+                    tx = (tx[0], tx[1], int(tx[2]), tx[3])
+                else:
+                    LOGGER.error('Row {} ({}): GBIF ID is not an integer.'.format(rw_num, nm))
+                    continue
             
-            if tx[3] is not None and isinstance(tx[3], float) and tx[3].is_integer():
-                tx = (tx[0], tx[1], tx[2], int(tx[3]))
-            else:
-                LOGGER.error('Row {} ({}): GBIF Ignore is not an integer.'.format(rw_num, nm))
-                continue
-            
+            if tx[3] is not None:
+                if isinstance(tx[3], float) and tx[3].is_integer():
+                    tx = (tx[0], tx[1], tx[2], int(tx[3]))
+                else:
+                    LOGGER.error('Row {} ({}): GBIF Ignore is not an integer.'.format(rw_num, nm))
+                    continue
 
             if tx[1].lower() not in backbone_types:
                 gbif_info = {'status': 'non-backbone'}
@@ -1914,6 +1916,12 @@ class Dataset(object):
 
                     taxon_hierarchy.update(gbif_info['hier'])
 
+            elif tax_status == 'ignored' and par_status is None:
+                LOGGER.error('Row {} ({}): GBIF match ignored and no parent information '
+                             'provided'.format(rw_num, nm))
+            elif tax_status == 'ignored' and par_status == 'invalid':
+                LOGGER.error('Row {} ({}): GBIF match ignored and parent information '
+                             'invalid'.format(rw_num, nm))
             elif tax_status == 'no_match' and par_status is None:
                 # d) Taxon is a backbone type but is not found in GBIF.
                 if 'note' in gbif_info:
@@ -1927,10 +1935,10 @@ class Dataset(object):
                 LOGGER.error('Row {} ({}): not found in GBIF and has invalid parent '
                              'information.'.format(rw_num, nm))
 
-            elif tax_status == 'no_match' and par_status == 'valid':
+            elif tax_status in ('no_match', 'ignored') and par_status == 'valid':
                 # e) Taxon is a backbone type that is not present in GBIF but the user has provided
                 #    a valid set of parent taxon information.
-                LOGGER.info('Row {} ({}): not found in GBIF but has valid parent '
+                LOGGER.info('Row {} ({}): not found or ignored in GBIF but has valid parent '
                             'information'.format(rw_num, nm))
 
                 # construct a taxon index entry and add the parent hierarchy
