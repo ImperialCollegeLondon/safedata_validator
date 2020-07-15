@@ -18,7 +18,7 @@ The following steps should allow you to install `safedata_validator`:
 
 4. The `safedata_validator` package requires some extra Python packages that may need to be installed. You can install of the required packages and `safedata_validator` itself using the `pip` package installer. At the command line, type:
 
-        pip install --user openpyxl requests simplejson shapely appdirs dateutil safedata_validator
+        pip install --user openpyxl requests simplejson shapely appdirs python-dateutil safedata_validator
 
     The additional packages allow Python to: read Excel files, get validation data over the internet, handle JSON formatted data, validate WKT formatted  GIS vector data, handle configuration file locations and parse dates more easily. If you want to install `safedata_validator` for all users on a computer, you will need to remove `--user`.
 

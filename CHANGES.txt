@@ -3,3 +3,8 @@ Added logging of config locations to load_config for troubleshooting configs.
 
 1.2.5
 Fixed bug with files field type when no external files provided.
+
+1.2.6
+Fixed:
+    Logic bug with blank field descriptors, tidied code flow
+    Logic bug with invalid parent taxa in indexing 

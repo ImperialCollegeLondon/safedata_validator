@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="safedata_validator",
-    version="1.2.5",
+    version="1.2.6",
     author="David Orme",
     author_email="d.orme@imperial.ac.uk",
     description="Validator for data files in the SAFE data submission format.",
@@ -19,7 +19,7 @@ setuptools.setup(
     },
     license='MIT',
     classifiers=[
-        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 2",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
