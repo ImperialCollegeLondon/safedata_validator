@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="safedata_validator",
-    version="1.2.6",
+    version="1.2.6-9000",
     author="David Orme",
     author_email="d.orme@imperial.ac.uk",
     description="Validator for data files in the SAFE data submission format.",

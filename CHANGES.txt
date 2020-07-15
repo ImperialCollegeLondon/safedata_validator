@@ -8,3 +8,6 @@ Fixed bug with files field type when no external files provided.
 Fixed:
     Logic bug with blank field descriptors, tidied code flow
     Logic bug with invalid parent taxa in indexing 
+
+1.2.7
+Restructured checking for singleton summary fields to give clearer sequence of error messages.

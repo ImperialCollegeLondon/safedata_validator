@@ -913,7 +913,7 @@ class Dataset(object):
                 None or a list of records.
             """
 
-            fields, mandatory, title, multi = block
+            fields, mandatory, title, only_one = block
 
             mandatory_fields = [f[0] for f in fields if f[1]]
             optional_fields = [f[0] for f in fields if not f[1]]
@@ -949,7 +949,7 @@ class Dataset(object):
                 LOGGER.info('Metadata for {} found: {} records'.format(title, len(block)),
                             extra={'indent_before': depth, 'indent_after': depth + 1})
 
-                if len(block) > 1 and not multi:
+                if len(block) > 1 and only_one:
                     LOGGER.error('Only a single record should be present')
 
                 # report on block fields
