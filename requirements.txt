@@ -1,0 +1,6 @@
+openpyxl
+requests
+simplejson
+shapely
+appdirs
+python-dateutil
