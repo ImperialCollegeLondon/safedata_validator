@@ -261,7 +261,7 @@ def all_numeric(data):
     return [len(nums) == len(data), nums]
 
 
-def web_gbif_validate(tax, rnk, gbif_id=None):
+def web_gbif_validate(tax, rnk, gbif_id=None, gbif_ignore=None):
     """
     Validates a taxon name and rank against the GBIF web API. It uses the API endpoint
     species/match?name=XXX&rank=YYY&strict=true
@@ -305,7 +305,7 @@ def web_gbif_validate(tax, rnk, gbif_id=None):
         resp = tax_gbif.json()
 
         # check the response status
-        if resp['matchType'] == u'NONE':
+        if resp['matchType'] == u'NONE' or resp['usageKey'] == gbif_ignore:
             # No match found - look for explanatory notes
             if 'note' in resp:
                 return {'status': 'no_match', 'note': resp['note']}
@@ -376,7 +376,7 @@ def web_gbif_validate(tax, rnk, gbif_id=None):
     return ret
 
 
-def local_gbif_validate(conn, tax, rnk, gbif_id=None):
+def local_gbif_validate(conn, tax, rnk, gbif_id=None, gbif_ignore=None):
     """
     Validates a taxon name and rank against a connection to a local GBIF database.
 
@@ -476,7 +476,12 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
                 else:
                     # A single accepted usage - pick the first row to index
                     tax_gbif = tax_gbif[0]
-
+    
+    # Check if this is being ignored
+    if tax_gbif['id'] == gbif_ignore:
+        return {'status': 'no_match',
+                'note': 'Match ignored'}
+    
     # Should now have a single row for the preferred hit, so package that up and set
     # what is going to be used to build the hierarchy
     if tax_gbif['status'].lower() in ['accepted', 'doubtful']:
@@ -1697,7 +1702,8 @@ class Dataset(object):
             taxa = [(tx['name'],
                      (None if is_blank(tx.get('taxon name')) else tx.get('taxon name'),
                       None if is_blank(tx.get('taxon type')) else tx.get('taxon type'),
-                      None if is_blank(tx.get('taxon id')) else tx.get('taxon id')),
+                      None if is_blank(tx.get('taxon id')) else tx.get('taxon id'),
+                      None if is_blank(tx.get('taxon ignore')) else tx.get('taxon ignore')),
                      (None if is_blank(tx.get('parent name')) else tx.get('parent name'),
                       None if is_blank(tx.get('parent type')) else tx.get('parent type'),
                       None if is_blank(tx.get('parent id')) else tx.get('parent id')))
@@ -1786,11 +1792,15 @@ class Dataset(object):
             # row index
             rw_num = idx + 2
 
-            # Sanitize inputs. Only two patterns of taxon provision are valid:
-            #   name + type + id and name + type
+            # Sanitize inputs. Three patterns of taxon provision are valid:
+            #   name + type + id - ignore
+            #   name + type - id - ignore
+            #   name + type - id + ignore
             provided = [not is_blank(vl) for vl in tx]
 
-            if provided not in [[True, True, False], [True, True, True]]:
+            if provided not in [[True, True, True, False],
+                                [True, True, False, False],
+                                [True, True, False, True]]:
                 LOGGER.error('Row {} ({}): incomplete information'.format(rw_num, nm))
                 continue
 
@@ -1799,14 +1809,19 @@ class Dataset(object):
             # sure that valid taxa that have had parents provided get indexed correctly. It is
             # only an issue when taxa are not found and also have an invalid parent
 
-            # Check ID is an integer (xlrd will load as float)
-            if tx[2] is None:
-                pass
-            elif isinstance(tx[2], float) and tx[2].is_integer():
-                tx = (tx[0], tx[1], int(tx[2]))
+            # Check ID and ignore are integers (xlrd will load as float)
+            if tx[2] is not None and isinstance(tx[2], float) and tx[2].is_integer():
+                tx = (tx[0], tx[1], int(tx[2]), tx[3])
             else:
                 LOGGER.error('Row {} ({}): GBIF ID is not an integer.'.format(rw_num, nm))
                 continue
+            
+            if tx[3] is not None and isinstance(tx[3], float) and tx[3].is_integer():
+                tx = (tx[0], tx[1], tx[2], int(tx[3]))
+            else:
+                LOGGER.error('Row {} ({}): GBIF Ignore is not an integer.'.format(rw_num, nm))
+                continue
+            
 
             if tx[1].lower() not in backbone_types:
                 gbif_info = {'status': 'non-backbone'}
