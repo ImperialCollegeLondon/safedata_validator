@@ -45,6 +45,8 @@ from shapely import wkt
 from shapely.errors import WKTReadingError
 import xlrd
 
+from version import __version__
+
 # define some regular expressions used to check validity
 RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]')
 RE_EMAIL = re.compile(r'\S+@\S+\.\S+')
@@ -3012,9 +3014,10 @@ def _safedata_validator_cli():
     parser.add_argument('--validate_doi', action="store_true", default=False,
                         help=('Check the validity of any publication DOIs, '
                               'provided by the user. Requires a web connection.'))
-
+    parser.add_argument('--version', action='version',
+                        version='%(prog)s {version}'.format(version=__version__))
+    
     args = parser.parse_args()
-
-    check_file(fname=args.fname, verbose=True, locations=args.locations,
-               gbif_database=args.gbif_database, validate_doi=args.validate_doi,
-               check=args.check, project_id=args.project_id)
+    
+    
+    check_file(verbose=True, **vars(args))
