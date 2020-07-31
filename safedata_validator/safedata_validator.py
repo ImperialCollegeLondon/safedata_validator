@@ -2237,8 +2237,8 @@ class Dataset(object):
                         extra={'indent_before': 2, 'indent_after': 3})
 
             if not is_valid_r_name(fld_name):
-                LOGGER.error('Field name is not valid: common errors are spaces and non-alphanumeric '
-                             'characters other than underscore and full stop')
+                LOGGER.error('Field name "' + fld_name + '" is not valid: common errors are spaces and '
+                             'non-alphanumeric characters other than underscore and full stop')
 
         # try and figure out what else is available
         # check the description
