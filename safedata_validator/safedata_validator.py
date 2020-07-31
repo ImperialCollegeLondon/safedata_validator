@@ -2539,12 +2539,13 @@ class Dataset(object):
         # Check types and allow all xlrd.XL_CELL_DATE or all xlrd.XL_CELL_STRING
         # but not a mix
         cell_types = {dt.ctype for dt in data}
-        data = [dt.value for dt in data]
 
         if not data:
             # Data is empty - external file description
             extent = None
         elif cell_types == {xlrd.XL_CELL_DATE}:
+
+            data = [dt.value for dt in data]
 
             # For date and time options, check decimal components
             if which == 'date':
@@ -2574,6 +2575,8 @@ class Dataset(object):
 
         elif cell_types == {xlrd.XL_CELL_TEXT}:
 
+            data = [dt.value for dt in data]
+
             # internal function to check dates
             def parse_datetime(dt, which='date'):
                 try:
@@ -2602,11 +2605,13 @@ class Dataset(object):
                 LOGGER.error('Problem in parsing date/time strings: ', extra={'join': bad_data})
 
         else:
-            first_text = next(idx for idx, val in enumerate(data) if val.ctype == xlrd.XL_CELL_TEXT)
+            first_cell_type = data[0].ctype
+            first_text = next(idx for idx, val in enumerate(data) if val.ctype != first_cell_type)
             LOGGER.error('Field contains data with mixed formatting. Use either Excel date formats or '
                          'ISO formatted text. Note that text can look _exactly_ like an Excel date or '
                          'time cell, you may need to copy the column and format as numbers to spot '
-                         'errors. First cell with text content at ' + str(first_text))
+                         'errors. The number of the first row with formatting not matching the first '
+                         'value is: ' + str(first_text))
 
             extent = None
 
