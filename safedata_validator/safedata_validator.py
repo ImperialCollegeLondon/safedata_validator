@@ -55,6 +55,9 @@ RE_WSPACE_ONLY = re.compile(r'^\s*$')
 RE_CONTAINS_WSPACE = re.compile(r'\s')
 RE_CONTAINS_PUNC = re.compile(r'[,;:]')
 RE_DOI = re.compile('https?://(dx.)?doi.org/')
+RE_R_ELLIPSIS = re.compile('^\\.{2}[0-9]+$|^\\.{3}$')
+RE_R_NAME_CHARS = re.compile('^[\w\.]+$')
+RE_R_NAME_BAD_START = re.compile('^_|^\\.[0-9]')
 
 # note that logically the next one also catches whitespace at both ends
 RE_WSPACE_AT_ENDS = re.compile(r'^\s+.+|.+\s+$')
@@ -259,6 +262,35 @@ def all_numeric(data):
     nums = [dt for dt in data if isinstance(dt, numbers.Number)]
 
     return [len(nums) == len(data), nums]
+
+
+def is_valid_r_name(string):
+
+    reserved_words = ["if", "else", "repeat", "while", "function", "for", "in",
+                      "next", "break", "TRUE", "FALSE", "NULL", "Inf", "NaN",
+                      "NA", "NA_integer_", "NA_real_", "NA_complex_", "NA_character_"]
+
+    valid = True
+
+    # length (not worrying about pre 2.13.0)
+    if len(string) > 10000:
+        valid = False
+
+    # ellipsis reserved words ('...' and '..#')
+    if RE_R_ELLIPSIS.match(string):
+        valid = False
+
+    # is it a reserved word?
+    if string in reserved_words:
+        valid = False
+
+    if not RE_R_NAME_CHARS.match(string):
+        valid = False
+
+    if RE_R_NAME_BAD_START.match(string):
+        valid = False
+
+    return valid
 
 
 def web_gbif_validate(tax, rnk, gbif_id=None, gbif_ignore=None):
@@ -2204,12 +2236,9 @@ class Dataset(object):
             LOGGER.info('Checking field {}'.format(fld_name_ascii),
                         extra={'indent_before': 2, 'indent_after': 3})
 
-            if is_padded(fld_name):
-                LOGGER.error('Field name contains white space padding')
-
-            if len(fld_name) > len(fld_name_ascii):
-                LOGGER.error('Field name contains non ASCII characters')
-
+            if not is_valid_r_name(fld_name):
+                LOGGER.error('Field name is not valid: common errors are spaces and non-alphanumeric '
+                             'characters other than underscore and full stop')
 
         # try and figure out what else is available
         # check the description
