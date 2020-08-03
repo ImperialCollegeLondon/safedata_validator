@@ -3,9 +3,13 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+version = {}
+with open("safedata_validator/version.py") as fp:
+    exec(fp.read(), version)
+
 setuptools.setup(
     name="safedata_validator",
-    version="1.2.6",
+    version=version['__version__'],
     author="David Orme",
     author_email="d.orme@imperial.ac.uk",
     description="Validator for data files in the SAFE data submission format.",

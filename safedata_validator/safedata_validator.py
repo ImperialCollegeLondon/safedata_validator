@@ -45,6 +45,8 @@ from shapely import wkt
 from shapely.errors import WKTReadingError
 import xlrd
 
+from version import __version__
+
 # define some regular expressions used to check validity
 RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]')
 RE_EMAIL = re.compile(r'\S+@\S+\.\S+')
@@ -53,6 +55,9 @@ RE_WSPACE_ONLY = re.compile(r'^\s*$')
 RE_CONTAINS_WSPACE = re.compile(r'\s')
 RE_CONTAINS_PUNC = re.compile(r'[,;:]')
 RE_DOI = re.compile('https?://(dx.)?doi.org/')
+RE_R_ELLIPSIS = re.compile('^\\.{2}[0-9]+$|^\\.{3}$')
+RE_R_NAME_CHARS = re.compile('^[\w\.]+$')
+RE_R_NAME_BAD_START = re.compile('^_|^\\.[0-9]')
 
 # note that logically the next one also catches whitespace at both ends
 RE_WSPACE_AT_ENDS = re.compile(r'^\s+.+|.+\s+$')
@@ -259,7 +264,36 @@ def all_numeric(data):
     return [len(nums) == len(data), nums]
 
 
-def web_gbif_validate(tax, rnk, gbif_id=None):
+def is_valid_r_name(string):
+
+    reserved_words = ["if", "else", "repeat", "while", "function", "for", "in",
+                      "next", "break", "TRUE", "FALSE", "NULL", "Inf", "NaN",
+                      "NA", "NA_integer_", "NA_real_", "NA_complex_", "NA_character_"]
+
+    valid = True
+
+    # length (not worrying about pre 2.13.0)
+    if len(string) > 10000:
+        valid = False
+
+    # ellipsis reserved words ('...' and '..#')
+    if RE_R_ELLIPSIS.match(string):
+        valid = False
+
+    # is it a reserved word?
+    if string in reserved_words:
+        valid = False
+
+    if not RE_R_NAME_CHARS.match(string):
+        valid = False
+
+    if RE_R_NAME_BAD_START.match(string):
+        valid = False
+
+    return valid
+
+
+def web_gbif_validate(tax, rnk, gbif_id=None, gbif_ignore=None):
     """
     Validates a taxon name and rank against the GBIF web API. It uses the API endpoint
     species/match?name=XXX&rank=YYY&strict=true
@@ -309,6 +343,8 @@ def web_gbif_validate(tax, rnk, gbif_id=None):
                 return {'status': 'no_match', 'note': resp['note']}
             else:
                 return {'status': 'no_match'}
+        elif resp['usageKey'] == gbif_ignore:
+            return {'status': 'ignored'}
         else:
             gbif_id = resp['usageKey']
 
@@ -374,7 +410,7 @@ def web_gbif_validate(tax, rnk, gbif_id=None):
     return ret
 
 
-def local_gbif_validate(conn, tax, rnk, gbif_id=None):
+def local_gbif_validate(conn, tax, rnk, gbif_id=None, gbif_ignore=None):
     """
     Validates a taxon name and rank against a connection to a local GBIF database.
 
@@ -474,7 +510,11 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None):
                 else:
                     # A single accepted usage - pick the first row to index
                     tax_gbif = tax_gbif[0]
-
+    
+    # Check if this is being ignored
+    if tax_gbif['id'] == gbif_ignore:
+        return {'status': 'ignored'}
+    
     # Should now have a single row for the preferred hit, so package that up and set
     # what is going to be used to build the hierarchy
     if tax_gbif['status'].lower() in ['accepted', 'doubtful']:
@@ -913,7 +953,7 @@ class Dataset(object):
                 None or a list of records.
             """
 
-            fields, mandatory, title, multi = block
+            fields, mandatory, title, only_one = block
 
             mandatory_fields = [f[0] for f in fields if f[1]]
             optional_fields = [f[0] for f in fields if not f[1]]
@@ -949,7 +989,7 @@ class Dataset(object):
                 LOGGER.info('Metadata for {} found: {} records'.format(title, len(block)),
                             extra={'indent_before': depth, 'indent_after': depth + 1})
 
-                if len(block) > 1 and not multi:
+                if len(block) > 1 and only_one:
                     LOGGER.error('Only a single record should be present')
 
                 # report on block fields
@@ -1695,7 +1735,8 @@ class Dataset(object):
             taxa = [(tx['name'],
                      (None if is_blank(tx.get('taxon name')) else tx.get('taxon name'),
                       None if is_blank(tx.get('taxon type')) else tx.get('taxon type'),
-                      None if is_blank(tx.get('taxon id')) else tx.get('taxon id')),
+                      None if is_blank(tx.get('taxon id')) else tx.get('taxon id'),
+                      None if is_blank(tx.get('ignore id')) else tx.get('ignore id')),
                      (None if is_blank(tx.get('parent name')) else tx.get('parent name'),
                       None if is_blank(tx.get('parent type')) else tx.get('parent type'),
                       None if is_blank(tx.get('parent id')) else tx.get('parent id')))
@@ -1784,11 +1825,15 @@ class Dataset(object):
             # row index
             rw_num = idx + 2
 
-            # Sanitize inputs. Only two patterns of taxon provision are valid:
-            #   name + type + id and name + type
+            # Sanitize inputs. Three patterns of taxon provision are valid:
+            #   name + type + id - ignore
+            #   name + type - id - ignore
+            #   name + type - id + ignore
             provided = [not is_blank(vl) for vl in tx]
 
-            if provided not in [[True, True, False], [True, True, True]]:
+            if provided not in [[True, True, True, False],
+                                [True, True, False, False],
+                                [True, True, False, True]]:
                 LOGGER.error('Row {} ({}): incomplete information'.format(rw_num, nm))
                 continue
 
@@ -1797,14 +1842,20 @@ class Dataset(object):
             # sure that valid taxa that have had parents provided get indexed correctly. It is
             # only an issue when taxa are not found and also have an invalid parent
 
-            # Check ID is an integer (xlrd will load as float)
-            if tx[2] is None:
-                pass
-            elif isinstance(tx[2], float) and tx[2].is_integer():
-                tx = (tx[0], tx[1], int(tx[2]))
-            else:
-                LOGGER.error('Row {} ({}): GBIF ID is not an integer.'.format(rw_num, nm))
-                continue
+            # Check ID and ignore are integers (xlrd will load as float)
+            if tx[2] is not None:
+                if isinstance(tx[2], float) and tx[2].is_integer():
+                    tx = (tx[0], tx[1], int(tx[2]), tx[3])
+                else:
+                    LOGGER.error('Row {} ({}): GBIF ID is not an integer.'.format(rw_num, nm))
+                    continue
+            
+            if tx[3] is not None:
+                if isinstance(tx[3], float) and tx[3].is_integer():
+                    tx = (tx[0], tx[1], tx[2], int(tx[3]))
+                else:
+                    LOGGER.error('Row {} ({}): GBIF Ignore is not an integer.'.format(rw_num, nm))
+                    continue
 
             if tx[1].lower() not in backbone_types:
                 gbif_info = {'status': 'non-backbone'}
@@ -1897,6 +1948,12 @@ class Dataset(object):
 
                     taxon_hierarchy.update(gbif_info['hier'])
 
+            elif tax_status == 'ignored' and par_status is None:
+                LOGGER.error('Row {} ({}): GBIF match ignored and no parent information '
+                             'provided'.format(rw_num, nm))
+            elif tax_status == 'ignored' and par_status == 'invalid':
+                LOGGER.error('Row {} ({}): GBIF match ignored and parent information '
+                             'invalid'.format(rw_num, nm))
             elif tax_status == 'no_match' and par_status is None:
                 # d) Taxon is a backbone type but is not found in GBIF.
                 if 'note' in gbif_info:
@@ -1910,10 +1967,10 @@ class Dataset(object):
                 LOGGER.error('Row {} ({}): not found in GBIF and has invalid parent '
                              'information.'.format(rw_num, nm))
 
-            elif tax_status == 'no_match' and par_status == 'valid':
+            elif tax_status in ('no_match', 'ignored') and par_status == 'valid':
                 # e) Taxon is a backbone type that is not present in GBIF but the user has provided
                 #    a valid set of parent taxon information.
-                LOGGER.info('Row {} ({}): not found in GBIF but has valid parent '
+                LOGGER.info('Row {} ({}): not found or ignored in GBIF but has valid parent '
                             'information'.format(rw_num, nm))
 
                 # construct a taxon index entry and add the parent hierarchy
@@ -2179,12 +2236,9 @@ class Dataset(object):
             LOGGER.info('Checking field {}'.format(fld_name_ascii),
                         extra={'indent_before': 2, 'indent_after': 3})
 
-            if is_padded(fld_name):
-                LOGGER.error('Field name contains white space padding')
-
-            if len(fld_name) > len(fld_name_ascii):
-                LOGGER.error('Field name contains non ASCII characters')
-
+            if not is_valid_r_name(fld_name):
+                LOGGER.error('Field name "' + fld_name + '" is not valid: common errors are spaces and '
+                             'non-alphanumeric characters other than underscore and full stop')
 
         # try and figure out what else is available
         # check the description
@@ -2485,12 +2539,13 @@ class Dataset(object):
         # Check types and allow all xlrd.XL_CELL_DATE or all xlrd.XL_CELL_STRING
         # but not a mix
         cell_types = {dt.ctype for dt in data}
-        data = [dt.value for dt in data]
 
         if not data:
             # Data is empty - external file description
             extent = None
         elif cell_types == {xlrd.XL_CELL_DATE}:
+
+            data = [dt.value for dt in data]
 
             # For date and time options, check decimal components
             if which == 'date':
@@ -2520,6 +2575,8 @@ class Dataset(object):
 
         elif cell_types == {xlrd.XL_CELL_TEXT}:
 
+            data = [dt.value for dt in data]
+
             # internal function to check dates
             def parse_datetime(dt, which='date'):
                 try:
@@ -2548,11 +2605,13 @@ class Dataset(object):
                 LOGGER.error('Problem in parsing date/time strings: ', extra={'join': bad_data})
 
         else:
-            first_text = next(idx for idx, val in enumerate(data) if val.ctype == xlrd.XL_CELL_TEXT)
+            first_cell_type = data[0].ctype
+            first_text = next(idx for idx, val in enumerate(data) if val.ctype != first_cell_type)
             LOGGER.error('Field contains data with mixed formatting. Use either Excel date formats or '
                          'ISO formatted text. Note that text can look _exactly_ like an Excel date or '
                          'time cell, you may need to copy the column and format as numbers to spot '
-                         'errors. First cell with text content at ' + str(first_text))
+                         'errors. The number of the first row with formatting not matching the first '
+                         'value is: ' + str(first_text))
 
             extent = None
 
@@ -3012,9 +3071,10 @@ def _safedata_validator_cli():
     parser.add_argument('--validate_doi', action="store_true", default=False,
                         help=('Check the validity of any publication DOIs, '
                               'provided by the user. Requires a web connection.'))
-
+    parser.add_argument('--version', action='version',
+                        version='%(prog)s {version}'.format(version=__version__))
+    
     args = parser.parse_args()
-
-    check_file(fname=args.fname, verbose=True, locations=args.locations,
-               gbif_database=args.gbif_database, validate_doi=args.validate_doi,
-               check=args.check, project_id=args.project_id)
+    
+    
+    check_file(verbose=True, **vars(args))

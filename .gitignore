@@ -23,3 +23,6 @@ dist
 # Do not include the local copy of the taxon database
 local_db/backbone-current-simple.sqlite
 local_db/taxdump.tar.gz
+
+# Ignore local pyenv settings
+.python-version
