@@ -4,7 +4,8 @@ theme: readthedocs
 markdown_extensions:
   - admonition
 extra_css:
-    - custom.css
+  - custom.css
+use_directory_urls: false
 nav:
   - 'Introduction': 'index.md'
   - 'Data availability': 'availability.md'
@@ -21,3 +22,4 @@ nav:
     - 'Installation': 'safedata_validator/install.md'
     - 'Building local GBIF': 'safedata_validator/build_local_gbif.md'
     - 'GBIF validation notes': 'safedata_validator/gbif_validation.md'
+  - 'Build notes': build_notes.md

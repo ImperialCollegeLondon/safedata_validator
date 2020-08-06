@@ -343,10 +343,19 @@ def web_gbif_validate(tax, rnk, gbif_id=None, gbif_ignore=None):
                 return {'status': 'no_match', 'note': resp['note']}
             else:
                 return {'status': 'no_match'}
-        elif resp['usageKey'] == gbif_ignore:
-            return {'status': 'ignored'}
         else:
             gbif_id = resp['usageKey']
+
+        # Check if this is being ignored - this restricts ignoring to non accepted names
+        # as it would be pretty odd to ignore a real match
+        if gbif_ignore is not None:
+            if resp['status'] == 'ACCEPTED':
+                return {'status': 'ignoring_accepted'}
+
+            if resp['acceptedUsageKey'] == gbif_ignore:
+                return {'status': 'ignored'}
+            else:
+                return {'status': 'bad_ignore'}
 
     # Now use the species/{id} endpoint
     url = u"http://api.gbif.org/v1/species/{}".format(gbif_id)
@@ -511,9 +520,17 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None, gbif_ignore=None):
                     # A single accepted usage - pick the first row to index
                     tax_gbif = tax_gbif[0]
     
-    # Check if this is being ignored
-    if tax_gbif['id'] == gbif_ignore:
-        return {'status': 'ignored'}
+    # Check if this is being ignored - this restricts ignoring to non accepted names
+    # as it would be pretty odd to ignore a real match
+    if gbif_ignore is not None:
+        if tax_gbif['status'] == 'ACCEPTED':
+            return {'status': 'ignoring_accepted'}
+
+        if tax_gbif['parent_key'] == gbif_ignore:
+            return {'status': 'ignored'}
+        else:
+            return {'status': 'bad_ignore'}
+
     
     # Should now have a single row for the preferred hit, so package that up and set
     # what is going to be used to build the hierarchy
@@ -1264,7 +1281,7 @@ class Dataset(object):
             # simplify to cell values not xlrd.Cells
             strip_ctypes(external_files)
 
-            bad_names = [RE_CONTAINS_WSPACE.search(exf['file']) for exf in self.external_files]
+            bad_names = [exf['file']  for exf in external_files if RE_CONTAINS_WSPACE.search(exf['file'])]
             if any(bad_names):
                 LOGGER.error('External file names must not contain whitespace: ',
                              extra={'join': bad_names, 'quote': True})
@@ -1812,9 +1829,9 @@ class Dataset(object):
                 parent_status[prnt] = ('valid', prnt_info)
 
                 if 'user' in prnt_info:
-                    LOGGER.warn('{}: parent considered a {} of {} in GBIF '
+                    LOGGER.warn('{}: parent considered a {} of {} ({}) in GBIF '
                                 'backbone'.format(prnt_string, prnt_info['user'][4],
-                                                  prnt_info['canon'][2]))
+                                                  prnt_info['canon'][2], prnt_info['canon'][0]))
 
         # Now check main taxa
         LOGGER.info('Validating {} taxa'.format(len(taxa)),
@@ -1905,9 +1922,9 @@ class Dataset(object):
             if tax_status == 'found' and par_status is None:
                 # a) Good backbone with no parent, provide info on taxon status
                 if 'user' in gbif_info:
-                    LOGGER.warn('Row {} ({}): considered a {} of {} in GBIF '
+                    LOGGER.warn('Row {} ({}): considered a {} of {} ({}) in GBIF '
                                 'backbone'.format(rw_num, nm, gbif_info['user'][4],
-                                                  gbif_info['canon'][2]))
+                                                  gbif_info['canon'][2], gbif_info['canon'][0]))
                     self.taxon_index.append([nm] + gbif_info['user'])
                     self.taxon_index.append([nm] + gbif_info['canon'])
 
@@ -1934,9 +1951,9 @@ class Dataset(object):
                                  'information is incompatible'.format(rw_num, nm))
                 else:
                     if 'user' in gbif_info:
-                        LOGGER.warn('Row {} ({}): considered a {} of {} in GBIF '
+                        LOGGER.warn('Row {} ({}): considered a {} of {} ({}) in GBIF '
                                     'backbone'.format(rw_num, nm, gbif_info['user'][4],
-                                                      gbif_info['canon'][2]))
+                                                      gbif_info['canon'][2], gbif_info['canon'][0]))
 
                         # Add user and canonical usage, including as_name and as_rank
                         self.taxon_index.append([nm] + gbif_info['user'])
@@ -1947,7 +1964,10 @@ class Dataset(object):
                         self.taxon_index.append([nm] + gbif_info['canon'])
 
                     taxon_hierarchy.update(gbif_info['hier'])
-
+            elif tax_status == 'ignoring_accepted':
+                LOGGER.error('Row {} ({}): Ignoring an accepted usage.'.format(rw_num, nm))
+            elif tax_status == 'bad_ignore':
+                LOGGER.error('Row {} ({}): Ignore ID does not match the GBIF accepted use.'.format(rw_num, nm))
             elif tax_status == 'ignored' and par_status is None:
                 LOGGER.error('Row {} ({}): GBIF match ignored and no parent information '
                              'provided'.format(rw_num, nm))
@@ -1970,7 +1990,7 @@ class Dataset(object):
             elif tax_status in ('no_match', 'ignored') and par_status == 'valid':
                 # e) Taxon is a backbone type that is not present in GBIF but the user has provided
                 #    a valid set of parent taxon information.
-                LOGGER.info('Row {} ({}): not found or ignored in GBIF but has valid parent '
+                LOGGER.info('Row {} ({}): not found or GBIF match ignored but has valid parent '
                             'information'.format(rw_num, nm))
 
                 # construct a taxon index entry and add the parent hierarchy
