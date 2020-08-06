@@ -26,6 +26,4 @@ You can see published datasets at the  [SAFE Project Zenodo community](https://z
     that the datasets are not linked together under our [curation account](availability.md#data-curation).
 
 
-
-
-
+There is a separate document containing [build notes](build_notes.md) on the package design and build process.

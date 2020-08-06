@@ -20,6 +20,9 @@ local_notes
 build
 dist
 
+# mkdocs local site build
+site
+
 # Do not include the local copy of the taxon database
 local_db/backbone-current-simple.sqlite
 local_db/taxdump.tar.gz
