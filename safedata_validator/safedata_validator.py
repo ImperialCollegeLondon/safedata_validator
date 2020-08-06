@@ -1264,7 +1264,7 @@ class Dataset(object):
             # simplify to cell values not xlrd.Cells
             strip_ctypes(external_files)
 
-            bad_names = [RE_CONTAINS_WSPACE.search(exf['file']) for exf in self.external_files]
+            bad_names = [exf['file']  for exf in external_files if RE_CONTAINS_WSPACE.search(exf['file'])]
             if any(bad_names):
                 LOGGER.error('External file names must not contain whitespace: ',
                              extra={'join': bad_names, 'quote': True})
