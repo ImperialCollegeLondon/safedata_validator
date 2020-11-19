@@ -14,7 +14,7 @@ You will need to do the following:
 
       You want the `current-backbone-simple.txt.gz` file. The following commands will download and extract it, but you can equally do this manually.
 
-        curl -O  http://rs.gbif.org/datasets/backbone/backbone-current-simple.txt.gz
+        curl -O  https://hosted-datasets.gbif.org/datasets/backbone/backbone-current-simple.txt.gz
         gunzip backbone-current-simple.txt.gz
 
 * You also need to download the SQL table definition for the file from this link:
@@ -77,7 +77,7 @@ You will need to do the following:
         create index backbone_id on backbone (id);
         .quit
 
-* You can now delete the `backbone-current-simple.txt` and `backbone-current-simple-truncate.txt` file.
+* You can now delete the `backbone-ddl.sql`, `backbone-current-simple.txt` and `backbone-current-simple-truncate.txt` file.
 
 * Edit the `gbif_database` entry in your configuration file to provide the path to your new SQLite file or provide the path as an argument.
 
