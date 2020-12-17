@@ -2559,10 +2559,11 @@ class Dataset(object):
         # Check types and allow all xlrd.XL_CELL_DATE or all xlrd.XL_CELL_STRING
         # but not a mix
         cell_types = {dt.ctype for dt in data}
+        extent = None
 
         if not data:
             # Data is empty - external file description
-            extent = None
+            pass
         elif cell_types == {xlrd.XL_CELL_DATE}:
 
             data = [dt.value for dt in data]
@@ -2590,8 +2591,6 @@ class Dataset(object):
 
                 if which == 'time':
                     extent = tuple(vl.time() for vl in extent)
-            else:
-                extent = None
 
         elif cell_types == {xlrd.XL_CELL_TEXT}:
 
@@ -2618,22 +2617,21 @@ class Dataset(object):
                 # intentionally scrub out timezones - Excel dates don't have them and can't
                 # compare datetimes with mixed tzinfo status
                 extent = tuple(dt.replace(tzinfo=None) for dt in extent)
-            else:
-                extent = None
 
             if len(bad_data):
                 LOGGER.error('Problem in parsing date/time strings: ', extra={'join': bad_data})
 
-        else:
+        elif cell_types == {xlrd.XL_CELL_DATE, xlrd.XL_CELL_TEXT}:
             first_cell_type = data[0].ctype
             first_text = next(idx for idx, val in enumerate(data) if val.ctype != first_cell_type)
-            LOGGER.error('Field contains data with mixed formatting. Use either Excel date formats or '
+            LOGGER.error('Field contains data with mixed test and date formatting. Use either Excel date formats or '
                          'ISO formatted text. Note that text can look _exactly_ like an Excel date or '
                          'time cell, you may need to copy the column and format as numbers to spot '
                          'errors. The number of the first row with formatting not matching the first '
                          'value is: ' + str(first_text))
 
-            extent = None
+        else:
+            LOGGER.error('Field contains cells formatted as neither text nor date')
 
         # range and extent setting
         if extent is not None:
