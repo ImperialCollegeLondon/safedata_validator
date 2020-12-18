@@ -14,3 +14,12 @@ Fixed:
 * Added system to allow users to forcibly ignore a GBIF match
 * Moved to gitflow and Travis
 * Now enforcing syntatically valid R names in field name
+
+1.2.8
+* Fixed bug in checking for spaces in external files
+* Added option to ignore a specific GBIF id in taxon checking, allowing 
+  users to refute GBIF taxonomy.
+
+2.0.0
+* Shifting to a pure Python 3 implementation. This is a hard shift from 2
+  to 3: there will be no support for 2/3 in parallel.

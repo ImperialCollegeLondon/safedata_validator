@@ -24,7 +24,6 @@ ii) Locations are validated against a list of valid locations. By default, this
     file can be provided for off line use.
 """
 
-from __future__ import print_function
 import argparse
 from collections import Counter
 import datetime
@@ -33,7 +32,7 @@ import logging
 import numbers
 import os
 import re
-from StringIO import StringIO
+from io import StringIO
 import sqlite3
 import textwrap
 
@@ -45,7 +44,7 @@ from shapely import wkt
 from shapely.errors import WKTReadingError
 import xlrd
 
-from version import __version__
+from .version import __version__
 
 # define some regular expressions used to check validity
 RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]')
@@ -139,7 +138,7 @@ class IndentFormatter(logging.Formatter):
             if hasattr(rec, 'quote') and rec.quote:
                 # quote if requested and then avoid requoting if the
                 # formatter is emitting to more than one stream handler
-                rec.join = ["'" + unicode(o) + "'" for o in rec.join]
+                rec.join = ["'" + str(o) + "'" for o in rec.join]
                 del rec.quote
             msg += ', '.join(rec.join)
 
@@ -187,7 +186,7 @@ def is_blank(value):
         Boolean
     """
 
-    return (value is None) or (RE_WSPACE_ONLY.match(unicode(value)) is not None)
+    return (value is None) or (RE_WSPACE_ONLY.match(str(value)) is not None)
 
 
 def is_padded(value):
@@ -200,7 +199,7 @@ def is_padded(value):
         Boolean
     """
 
-    return (value is not None) and bool(RE_WSPACE_AT_ENDS.match(unicode(value)))
+    return (value is not None) and bool(RE_WSPACE_AT_ENDS.match(str(value)))
 
 
 def duplication(data):
@@ -214,7 +213,7 @@ def duplication(data):
         A list of duplicated elements
     """
 
-    return [ky for ky, vl in Counter(data).iteritems() if vl > 1]
+    return [ky for ky, vl in list(Counter(data).items()) if vl > 1]
 
 
 def to_lowercase(str_vals):
@@ -327,7 +326,7 @@ def web_gbif_validate(tax, rnk, gbif_id=None, gbif_ignore=None):
     if gbif_id is None:
         # If no ID is provided then use the species/match?name={} endpoint to
         # try and find an ID for the combination
-        url = u"http://api.gbif.org/v1/species/match?name={}&rank={}&strict=true".format(tax, rnk)
+        url = "http://api.gbif.org/v1/species/match?name={}&rank={}&strict=true".format(tax, rnk)
         tax_gbif = requests.get(url)
 
         # failures here suggest some kind of gateway problem
@@ -337,7 +336,7 @@ def web_gbif_validate(tax, rnk, gbif_id=None, gbif_ignore=None):
         resp = tax_gbif.json()
 
         # check the response status
-        if resp['matchType'] == u'NONE':
+        if resp['matchType'] == 'NONE':
             # No match found - look for explanatory notes
             if 'note' in resp:
                 return {'status': 'no_match', 'note': resp['note']}
@@ -358,7 +357,7 @@ def web_gbif_validate(tax, rnk, gbif_id=None, gbif_ignore=None):
                 return {'status': 'bad_ignore'}
 
     # Now use the species/{id} endpoint
-    url = u"http://api.gbif.org/v1/species/{}".format(gbif_id)
+    url = "http://api.gbif.org/v1/species/{}".format(gbif_id)
     tax_gbif = requests.get(url)
 
     # unknown ID numbers return a 404 error
@@ -389,7 +388,7 @@ def web_gbif_validate(tax, rnk, gbif_id=None, gbif_ignore=None):
         hier_resp = resp
     else:
         # look up the accepted usage
-        usage_url = u"http://api.gbif.org/v1/species/{}".format(resp['acceptedKey'])
+        usage_url = "http://api.gbif.org/v1/species/{}".format(resp['acceptedKey'])
         accept = requests.get(usage_url)
 
         if accept.status_code != 200:
@@ -451,7 +450,7 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None, gbif_ignore=None):
     # to tax_gbif or exits returning an error condition of some sort
     if gbif_id is not None:
         # get the record associated with the provided ID
-        tax_sql = (u"select * from backbone where id = {}".format(gbif_id))
+        tax_sql = ("select * from backbone where id = {}".format(gbif_id))
         tax_gbif = conn.execute(tax_sql).fetchone()
 
         # check there is a result and that it is congruent with any
@@ -464,7 +463,7 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None, gbif_ignore=None):
 
     else:
         # get the set of records associated with the taxon or rank
-        tax_sql = (u"select * from backbone where canonical_name ='{}' and "
+        tax_sql = ("select * from backbone where canonical_name ='{}' and "
                     "rank= '{}';".format(tax, rnk.upper()))
         tax_gbif = conn.execute(tax_sql).fetchall()
 
@@ -483,7 +482,7 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None, gbif_ignore=None):
             tx_status = [tx['status'].lower() for tx in tax_gbif]
             tx_counts = Counter(tx_status)
 
-            if 'accepted' in tx_counts.keys():
+            if 'accepted' in list(tx_counts.keys()):
                 # Accepted hits are first preference
                 if tx_counts['accepted'] == 1:
                     # only one accepted match alongside other usages so extract that hit
@@ -494,7 +493,7 @@ def local_gbif_validate(conn, tax, rnk, gbif_id=None, gbif_ignore=None):
                     return {'status': 'no_match',
                             'note': 'Multiple equal matches for {}'.format(tax)}
 
-            elif 'doubtful' in tx_counts.keys():
+            elif 'doubtful' in list(tx_counts.keys()):
                 # Doubtful hits get next preference - not quite sure about this!
                 if tx_counts['doubtful'] == 1:
                     # only one doubtful match alongside other usages so extract that hit
@@ -746,7 +745,7 @@ class Dataset(object):
                     raise IOError('Local locations file not found')
 
                 try:
-                    loc_payload = simplejson.load(file(locations))
+                    loc_payload = simplejson.load(open(locations, mode='r'))
                 except simplejson.errors.JSONDecodeError:
                     LOGGER.critical('Local locations file not JSON encoded.')
                     raise IOError('Local locations file not JSON encoded.')
@@ -831,7 +830,7 @@ class Dataset(object):
         if current_vals is None:
             setattr(self, which, extent)
         else:
-            extent = zip(current_vals, extent)
+            extent = list(zip(current_vals, extent))
             setattr(self, which, (min(extent[0]), max(extent[1])))
 
     # Main methods to populate class attributes
@@ -859,10 +858,10 @@ class Dataset(object):
         # validate project_id is one of None, an integer or a list of integers
         if project_id is None:
             pass
-        elif isinstance(project_id, (int, long)):
+        elif isinstance(project_id, int):
             project_id = [project_id]
         elif isinstance(project_id, list):
-            if not all([isinstance(pid, (int, long)) for pid in project_id]):
+            if not all([isinstance(pid, int) for pid in project_id]):
                 LOGGER.error("Invalid value in list of project_ids.")
                 project_id = None
         else:
@@ -939,7 +938,7 @@ class Dataset(object):
                                False, 'Permits', False))
 
         # Check the minimal keys are expected - mandatory fields in mandatory blocks
-        required_blocks = (blk[0] for blk in fields.values() if blk[1])
+        required_blocks = (blk[0] for blk in list(fields.values()) if blk[1])
         required = {fld[0] for blk in required_blocks for fld in blk if fld[1]}
 
         found = set(summary.keys())
@@ -948,7 +947,7 @@ class Dataset(object):
             LOGGER.error('Missing mandatory metadata fields: ', extra={'join': required - found})
 
         # Check only valid keys are found
-        valid_blocks = (blk[0] for blk in fields.values())
+        valid_blocks = (blk[0] for blk in list(fields.values()))
         valid_fields = {fld[0] for blk in valid_blocks for fld in blk}
 
         if found - valid_fields:
@@ -986,11 +985,12 @@ class Dataset(object):
 
             # Set empty cells to None - ignore the cell type 'empty' here and
             # test the cell value directly to catch pure whitespace content
-            for k in block.keys():
+            for k in list(block.keys()):
                 block[k] = [None if dt is None or is_blank(dt.value) else dt for dt in block[k]]
 
             # Pivot to dictionary of records
-            block = [dict(zip(block.keys(), vals)) for vals in zip(*block.values())]
+            block = [dict(list(zip(list(block.keys()), vals))) 
+                     for vals in zip(*list(block.values()))]
 
             # Drop empty records
             block = [bl for bl in block if any(bl.values())]
@@ -1035,7 +1035,7 @@ class Dataset(object):
             """
 
             for bl in block:
-                bl.update(dict(zip(bl.keys(), [None if b is None else b.value for b in bl.values()])))
+                bl.update(dict(list(zip(list(bl.keys()), [None if b is None else b.value for b in list(bl.values())]))))
 
         # Now check singleton rows
         singletons = read_block(fields['core'])
@@ -1184,7 +1184,7 @@ class Dataset(object):
             # badly formatted orcids
             bad_orcid = [rec['orcid'] for rec in authors
                          if not is_blank(rec['orcid']) and
-                         (not isinstance(rec['orcid'], unicode) or
+                         (not isinstance(rec['orcid'], str) or
                           not RE_ORCID.match(rec['orcid']))]
             if bad_orcid:
                 LOGGER.error('ORCID not properly formatted: ',
@@ -1226,7 +1226,7 @@ class Dataset(object):
 
             dates = temp_extent[0]
 
-            date_field_types = {None if val is None else val.ctype for val in dates.values()}
+            date_field_types = {None if val is None else val.ctype for val in list(dates.values())}
 
             if not date_field_types.issubset({xlrd.XL_CELL_DATE, None}):
                 LOGGER.error('Start and/or end dates not formatted as dates')
@@ -1250,7 +1250,7 @@ class Dataset(object):
 
             bbox = geo_extent[0]
 
-            bbox_field_types = {None if val is None else val.ctype for val in bbox.values()}
+            bbox_field_types = {None if val is None else val.ctype for val in list(bbox.values())}
 
             if not bbox_field_types.issubset({xlrd.XL_CELL_NUMBER, None}):
                 LOGGER.error('Geographic extents not numeric')
@@ -1386,7 +1386,7 @@ class Dataset(object):
         # Duplicated headers are a problem because the values in the locations dictionaries get
         # overwritten. Depending on what gets overwritten, this can produce really unpredictable
         # bugs, so just stop here.
-        hdrs = [cl.value for cl in loc_rows.next()]
+        hdrs = [cl.value for cl in next(loc_rows)]
         dupes = duplication([h for h in hdrs if not is_blank(h)])
         if dupes:
             LOGGER.error('Duplicated location sheet headers: ',
@@ -1405,14 +1405,14 @@ class Dataset(object):
         locs = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in loc_rows]
 
         # strip out any rows that consist of nothing but empty cells
-        locs = [row for row in locs if not all(is_blank(vl) for vl in row.values())]
+        locs = [row for row in locs if not all(is_blank(vl) for vl in list(row.values()))]
 
         # Location name cleaning - convert floats to unicode via int to handle fractal point numbers
         for rw in locs:
-            if isinstance(rw['location name'], unicode):
+            if isinstance(rw['location name'], str):
                 pass
             elif isinstance(rw['location name'], float):
-                rw['location name'] = unicode(int(rw['location name']))
+                rw['location name'] = str(int(rw['location name']))
 
         # check for rogue whitespace
         ws_padded = [rw['location name'] for rw in locs if is_padded(rw['location name'])]
@@ -1432,7 +1432,7 @@ class Dataset(object):
         # VALIDATE LOCATIONS
         # Get existing location names and aliases -new location names must not appear
         # in it and existing locations must.
-        existing_loc_names = set(self.valid_locations.keys() + self.aliases.keys())
+        existing_loc_names = set(list(self.valid_locations.keys()) + list(self.aliases.keys()))
 
         # Split up old and new if there are there any new ones?
         if 'new' in hdrs:
@@ -1504,13 +1504,13 @@ class Dataset(object):
 
                     LOGGER.info('Validating lat / long data', extra={'indent_before': 1, 'indent_after': 2})
 
-                    lats = [vl['latitude'] for vl in new_locs if vl['latitude'] != u'NA']
+                    lats = [vl['latitude'] for vl in new_locs if vl['latitude'] != 'NA']
                     non_blank_lats = [vl for vl in lats if not is_blank(vl)]
                     if len(non_blank_lats) < len(lats):
                         LOGGER.error('Blank latitude values for new locations: use NA.')
                     self.check_field_geo({}, non_blank_lats, which='latitude')
 
-                    longs = [vl['longitude'] for vl in new_locs if vl['longitude'] != u'NA']
+                    longs = [vl['longitude'] for vl in new_locs if vl['longitude'] != 'NA']
                     non_blank_longs = [vl for vl in longs if not is_blank(vl)]
                     if len(non_blank_longs) < len(longs):
                         LOGGER.error('Blank longitude values for new locations: use NA.')
@@ -1530,7 +1530,7 @@ class Dataset(object):
                         # Check for blank, NA or something that might be WKT
                         if is_blank(this_new_loc['wkt']):
                             blank_wkt += 1
-                        elif this_new_loc['wkt'] == u'NA':
+                        elif this_new_loc['wkt'] == 'NA':
                             pass
                         else:
                             # Run the potential WKT through the parser
@@ -1584,8 +1584,8 @@ class Dataset(object):
 
             # get the extents of known unaliased locations
             if bbox_keys:
-                bbox = [vl for ky, vl in self.valid_locations.iteritems() if ky in bbox_keys]
-                bbox = zip(*bbox)
+                bbox = [vl for ky, vl in list(self.valid_locations.items()) if ky in bbox_keys]
+                bbox = list(zip(*bbox))
                 self.update_extent((min(bbox[0]), max(bbox[1])), float, 'longitudinal_extent')
                 self.update_extent((min(bbox[2]), max(bbox[3])), float, 'latitudinal_extent')
 
@@ -1610,11 +1610,11 @@ class Dataset(object):
         for this_new_loc in new_locs:
             new_entry = [this_new_loc['location name'], True, this_new_loc['type']]
 
-            if 'wkt' in this_new_loc and this_new_loc['wkt'] != u'NA':
+            if 'wkt' in this_new_loc and this_new_loc['wkt'] != 'NA':
                 new_entry.append(this_new_loc['wkt'])
             elif ('latitude' in hdrs and 'longitude' in hdrs) and \
-                    ((this_new_loc['latitude'] != u'NA') and (this_new_loc['longitude'] != u'NA')):
-                new_entry.append(u'Point({longitude} {latitude})'.format(**this_new_loc))
+                    ((this_new_loc['latitude'] != 'NA') and (this_new_loc['longitude'] != 'NA')):
+                new_entry.append('Point({longitude} {latitude})'.format(**this_new_loc))
             else:
                 new_entry.append(None)
 
@@ -1684,7 +1684,7 @@ class Dataset(object):
         # A) SANITIZE INPUTS
         # get and check the headers
         tx_rows = sheet.get_rows()
-        hdrs = to_lowercase([cl.value for cl in tx_rows.next()])
+        hdrs = to_lowercase([cl.value for cl in next(tx_rows)])
 
         # duplicated headers are a problem in that it will cause values in the taxon
         # dictionaries to be overwritten. Depending on what gets overwritten, this can
@@ -1698,7 +1698,7 @@ class Dataset(object):
         # Load dictionaries of the taxa and strip out any rows that consist of nothing
         # but empty cells
         taxa = [{ky: cl.value for ky, cl in zip(hdrs, rw)} for rw in tx_rows]
-        taxa = [row for row in taxa if not all([is_blank(vl) for vl in row.values()])]
+        taxa = [row for row in taxa if not all([is_blank(vl) for vl in list(row.values())])]
 
         # check number of taxa found and standardise names
         if len(taxa) == 0:
@@ -1710,7 +1710,7 @@ class Dataset(object):
 
         # clean the contents of whitespace padding
         for idx, tx in enumerate(taxa):
-            for ky, vl in tx.iteritems():
+            for ky, vl in list(tx.items()):
                 if ky.lower() != 'comments' and is_padded(vl):
                     LOGGER.error('Whitespace padding for {} in row {}:'
                                  ' {}'.format(ky, idx + 2, repr(vl)))
@@ -2018,7 +2018,7 @@ class Dataset(object):
         indexed = [tx[1] for tx in self.taxon_index]
 
         # add parent into taxon index
-        for key, (valid, prnt_info) in parent_status.iteritems():
+        for key, (valid, prnt_info) in list(parent_status.items()):
             if prnt_info is not None and prnt_info['canon'][0] not in indexed:
                 if 'user' in prnt_info:
                     self.taxon_index.append([None] + prnt_info['user'])
@@ -2156,7 +2156,7 @@ class Dataset(object):
 
             elif len(first_column_rle) == 3:
                 n_terminal_blanks = dwsh.max_row - first_column_rle[0][1] - first_column_rle[1][1]
-                row_range = range(dwsh.max_row - 1, (dwsh.max_row - 1) - n_terminal_blanks, - 1)
+                row_range = list(range(dwsh.max_row - 1, (dwsh.max_row - 1) - n_terminal_blanks, - 1))
                 for check_row in row_range:
                     if all(is_blank(val) for val in worksheet.row_values(check_row)):
                         dwsh.max_row -= 1
@@ -2174,11 +2174,11 @@ class Dataset(object):
         metadata = [[None if is_blank(val) else val
                      for val in worksheet.col_values(cl, 0, dwsh.field_name_row)]
                     for cl in range(1, dwsh.max_col)]
-        metadata = [dict(zip(dwsh.descriptors, fld)) for fld in metadata]
+        metadata = [dict(list(zip(dwsh.descriptors, fld))) for fld in metadata]
 
         # Insert column index
         for idx, fld in enumerate(metadata):
-            fld[u'col_idx'] = idx + 1
+            fld['col_idx'] = idx + 1
         
         # check field names unique (drop None). This doesn't cause as many problems
         # as duplications in Taxa and Locations, which expect certain fields, so warn
@@ -2229,9 +2229,9 @@ class Dataset(object):
 
         # Skip any field with no user provided metadata or data
         blank_data = [is_blank(cl.value) for cl in data]
-        blank_meta = [is_blank(vl) for ky, vl in meta.iteritems()
+        blank_meta = [is_blank(vl) for ky, vl in list(meta.items())
                       if ky not in ['col_idx', 'column']]
-        name_is_string = isinstance(meta['field_name'], (str, unicode))
+        name_is_string = isinstance(meta['field_name'], str)
         
         if is_blank(meta['field_name']) or not name_is_string:
             LOGGER.info('Checking Column {}'.format(xlrd.colname(meta['col_idx'])),
@@ -2280,7 +2280,7 @@ class Dataset(object):
         if field_type != 'comments':
 
             # Look for NAs and Excel errors
-            na_vals = [dt.value == u'NA' for dt in data]
+            na_vals = [dt.value == 'NA' for dt in data]
             xl_error = [dt.ctype == xlrd.XL_CELL_ERROR for dt in data]
 
             if any(na_vals):
@@ -2513,7 +2513,7 @@ class Dataset(object):
             LOGGER.error('Provide descriptions for either all or none of the categories')
             parts = [pt[0:2] if len(pt) >= 2 else [pt[0], None] for pt in parts]
 
-        return zip(*parts)
+        return list(zip(*parts))
 
     @staticmethod
     def validate_geo_extent(extent, which):
@@ -2559,10 +2559,11 @@ class Dataset(object):
         # Check types and allow all xlrd.XL_CELL_DATE or all xlrd.XL_CELL_STRING
         # but not a mix
         cell_types = {dt.ctype for dt in data}
+        extent = None
 
         if not data:
             # Data is empty - external file description
-            extent = None
+            pass
         elif cell_types == {xlrd.XL_CELL_DATE}:
 
             data = [dt.value for dt in data]
@@ -2590,8 +2591,6 @@ class Dataset(object):
 
                 if which == 'time':
                     extent = tuple(vl.time() for vl in extent)
-            else:
-                extent = None
 
         elif cell_types == {xlrd.XL_CELL_TEXT}:
 
@@ -2618,22 +2617,21 @@ class Dataset(object):
                 # intentionally scrub out timezones - Excel dates don't have them and can't
                 # compare datetimes with mixed tzinfo status
                 extent = tuple(dt.replace(tzinfo=None) for dt in extent)
-            else:
-                extent = None
 
             if len(bad_data):
                 LOGGER.error('Problem in parsing date/time strings: ', extra={'join': bad_data})
 
-        else:
+        elif cell_types == {xlrd.XL_CELL_DATE, xlrd.XL_CELL_TEXT}:
             first_cell_type = data[0].ctype
             first_text = next(idx for idx, val in enumerate(data) if val.ctype != first_cell_type)
-            LOGGER.error('Field contains data with mixed formatting. Use either Excel date formats or '
+            LOGGER.error('Field contains data with mixed test and date formatting. Use either Excel date formats or '
                          'ISO formatted text. Note that text can look _exactly_ like an Excel date or '
                          'time cell, you may need to copy the column and format as numbers to spot '
                          'errors. The number of the first row with formatting not matching the first '
                          'value is: ' + str(first_text))
 
-            extent = None
+        else:
+            LOGGER.error('Field contains cells formatted as neither text nor date')
 
         # range and extent setting
         if extent is not None:
@@ -2672,8 +2670,8 @@ class Dataset(object):
         """
 
         # location names should be strings but we allow integer point numbers
-        data = [unicode(int(dt.value)) if dt.ctype == xlrd.XL_CELL_NUMBER
-                else unicode(dt.value) for dt in data]
+        data = [str(int(dt.value)) if dt.ctype == xlrd.XL_CELL_NUMBER
+                else str(dt.value) for dt in data]
 
         # check if locations are all provided
         found = set(data)
@@ -2728,7 +2726,7 @@ class Dataset(object):
         if not ct_ok:
             # Can't check further if no levels descriptor
             pass
-        elif ct_ok and not isinstance(meta['levels'], unicode):
+        elif ct_ok and not isinstance(meta['levels'], str):
             # Can't really check anything here either
             LOGGER.error('Category description does not seem to be text')
         else:
@@ -2757,11 +2755,11 @@ class Dataset(object):
             reported = {lv.value for lv in reported}
             found = set()
             for lv in reported:
-                if isinstance(lv, float) and lv.is_integer() and unicode(int(lv)) in level_labels:
+                if isinstance(lv, float) and lv.is_integer() and str(int(lv)) in level_labels:
                     found.add(lv)
-                elif isinstance(lv, float) and unicode(lv) in level_labels:
+                elif isinstance(lv, float) and str(lv) in level_labels:
                     found.add(lv)
-                elif unicode(lv) in level_labels:
+                elif str(lv) in level_labels:
                     found.add(lv)
 
             if found != reported:
@@ -2870,7 +2868,7 @@ class Dataset(object):
 
         if len(nums) < len(data):
             LOGGER.error('Field contains non-numeric data')
-            if any([RE_DMS.search(unicode(dt)) for dt in data]):
+            if any([RE_DMS.search(str(dt)) for dt in data]):
                 LOGGER.warn('Possible degrees minutes and seconds formatting? Use decimal degrees')
 
         # Check the locations
@@ -2990,7 +2988,7 @@ class Dataset(object):
                           'funders', 'project_id', 'temporal_extent', 'title', 'external_files',
                           'permits']
 
-        components = {ky: vl for ky, vl in self.__dict__.iteritems() if ky in component_keys}
+        components = {ky: vl for ky, vl in list(self.__dict__.items()) if ky in component_keys}
 
         # add in the data worksheets
         components['dataworksheets'] = [dwsh.__dict__ for dwsh in self.dataworksheets]

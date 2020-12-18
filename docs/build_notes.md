@@ -2,6 +2,15 @@
 
 TODO Incomplete
 
+### Configure `git`
+
+It is easier if `git` is configured to push new tags along with commits. This essentially just means that new releases can be sent with a single commit, which is simpler and saves Travis from building both the the code commit and then the tagged version. This only needs to be set once.
+
+```sh
+set git config --global push.followTags true
+```
+
+
 Using git-flow and travis (although no tests at present so travis does very little except for testing the thing builds)
 
 Use git flow to create a release and then bump the version number in `version.py`.
@@ -27,7 +36,7 @@ python setup.py sdist bdist_wheel
 Remembering to change the version number, you can then create an account at pypi and testpypi and use `twine` to test:
 
 ```
-twine upload -r testpypi dist/*1.2.7*
+twine upload -r testpypi dist/*1.2.8*
 ```
 
 and then - once that seems to have gone ok - release the distribution for use via `pip`
