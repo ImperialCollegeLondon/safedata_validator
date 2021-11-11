@@ -59,6 +59,7 @@ pip install twine
 python setup.py sdist bdist_wheel
 # Upload just the new versions to the Test Pypi site and check it out
 twine upload -r testpypi dist/safedata_validator-x.y.z*
-# Upload to the real PyPi site. twine upload -r pypi dist/safedata_validator-x.y.z*
+# Upload to the real PyPi site
+twine upload -r pypi dist/safedata_validator-x.y.z*
 ```
 
