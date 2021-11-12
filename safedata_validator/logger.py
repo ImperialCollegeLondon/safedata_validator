@@ -14,6 +14,14 @@ Note that the handlers are created when the module is loaded, so when running
 behind a web server, the content of the handlers persist between runs of the 
 code. To avoid constant concatenation of outputs, Dataset.__init__() empties 
 them.
+
+The depth of indenting can either be set when a message is logged:
+
+    LOGGER.info('Configuring Resources', extra=dict(depth=0))
+    
+or alternatively set directly to set the indent depth for subsequent messages:
+ 
+    FORMATTER.depth = 1
 """
 
 
@@ -42,12 +50,7 @@ class IndentFormatter(logging.Formatter):
           to the end of the message.
         - 'quote': a flag to set joined entries to be quoted to show
           whitespace around values.
-        - 'indent_before' or 'indent_after': two options to set the indent
-          depth of the formatter.
     """
-
-    # TODO - Remove the indent_before/after mechanism and use FORMATTER.depth directly,
-    #        which is a much cleaner and more adaptable route to the same endpoint.
 
     def __init__(self, fmt=None, datefmt=None):
         logging.Formatter.__init__(self, fmt, datefmt)
@@ -55,17 +58,15 @@ class IndentFormatter(logging.Formatter):
 
     def format(self, rec):
 
-        # adjust indent before
-        if hasattr(rec, 'indent_before'):
-            self.depth = int(rec.indent_before)
-
-        # store so users don't have to provide both
-        rec.indent_before = self.depth
+        if hasattr(rec, 'depth'):
+            self.depth = getattr(rec, 'depth')
 
         rec.indent = '    ' * self.depth
+
         # encode level
-        codes = {'DEBUG': '>', 'INFO': '-', 'WARNING': '?', 'ERROR': '!', 'CRITICAL': '*'}
+        codes = {'DEBUG': '>', 'INFO': '-', 'WARNING': '?', 'ERROR': '!', 'CRITICAL': 'X'}
         rec.levelcode = codes[rec.levelname]
+
         # format message
         msg = logging.Formatter.format(self, rec)
         # add any joined values
@@ -77,17 +78,24 @@ class IndentFormatter(logging.Formatter):
                 del rec.quote
             msg += ', '.join(rec.join)
 
-        # adjust indent after
-        if hasattr(rec, 'indent_after'):
-            self.depth = int(rec.indent_after)
-
-        # store so users don't have to provide both
-        rec.indent_after = self.depth
-
         return msg
 
 
+def log_and_raise(logger, msg, raise_type):
+    """ A convenience function that adds a message and a critical entry
+    to the logger and then raises an exception with the same message.
 
+    Args:
+        logger: A logging.Logger instance
+        msg: A message to add to the log and error
+        raise_type: An exception type
+
+    Returns:
+        None
+    """
+
+    logger.critical(msg)
+    raise raise_type(msg)
 
 # Setup the logging instance
 LOGGER = logging.getLogger(__name__)
