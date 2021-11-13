@@ -134,30 +134,14 @@ class Taxon:
 
 class LocalGBIFValidator:
 
-    def __init__(self, gbif_database: str):
+    def __init__(self, resources):
         # TODO - remove use of LOGGER within these functions. More portable
 
-        LOGGER.info('Validating local GBIF database: ' + gbif_database)
+        self.gbif_conn = resources.get_local_gbif_conn()
 
-        # Does the provided path exist and is it a functional SQLite database
-        # with a backbone table? Because sqlite3 can connect to any existing path,
-        # use a query attempt to reveal exceptions
+    def __del__(self):
 
-        if not os.path.exists(gbif_database):
-            LOGGER.critical('Local GBIF database not found')
-            raise IOError('Local GBIF database not found')
-        try:
-            conn = sqlite3.connect(gbif_database)
-            _ = conn.execute('select count(*) from backbone;')
-        except sqlite3.OperationalError:
-            LOGGER.critical('Local GBIF database does not contain the backbone table')
-            raise IOError('Local GBIF database does not contain the backbone table')
-        except sqlite3.DatabaseError:
-            LOGGER.critical('Local SQLite database not valid')
-            raise IOError('Local SQLite database not valid')
-        else:
-            self.gbif_conn = conn
-            self.gbif_conn.row_factory = sqlite3.Row
+        self.gbif_conn .close()
 
     def search(self, taxon: Taxon):
 
