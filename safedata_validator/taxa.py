@@ -1,14 +1,10 @@
-import os
-import sqlite3
-import requests
 from collections import Counter
-import xlrd
 from typing import Union, Optional
 import dataclasses
 from enforce_typing import enforce_types
 
-from .logger import LOGGER
-from .validators import (ToLower, IsUnique, BlankToNone, CellToValue, 
+from .logger import LOGGER, FORMATTER, log_and_raise
+from .validators import (ToLower, IsUnique, BlankToNone, CellToValue,
                          IsPadded, IsNotBlank, AllNone)
 
 """
@@ -395,6 +391,21 @@ class RemoteGBIFValidator:
             taxon.canon_id = response['acceptedKey']
 
         return taxon
+
+
+def load_taxa(wb, resources):
+    """Validate and populate the taxon list used in a dataset.
+
+
+    Args:
+        wb:
+        resources:
+
+    Returns:
+
+    """
+
+    pass
 
 
 # class Taxa:

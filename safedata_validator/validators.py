@@ -1,7 +1,7 @@
 import re
 from numbers import Number
 from collections import Counter
-import xlrd
+import openpyxl
 from typing import Any
 
 """
@@ -105,16 +105,17 @@ class ToLower(Standardiser):
 
 class CellToValue(Standardiser):
 
-    """Converts xlrd cells to their values
+    """Converts openpyxl cells to their values
     """
 
     @property
     def valid_types(self):
-        return xlrd.sheet.Cell
+        return (openpyxl.cell.read_only.ReadOnlyCell,
+                openpyxl.cell.read_only.EmptyCell)
 
     @staticmethod
     def standardise(value):
-        return None if value is None else value.value
+        return None if isinstance(value, openpyxl.cell.read_only.EmptyCell) else value.value
 
 
 class BlankToNone(Standardiser):
@@ -198,9 +199,17 @@ class Validator:
 
 class AllNone(Validator):
 
+    def __init__(self, values, none_ok=True):
+        """It makes no use this Validator with none_ok = False, so the defaults
+        are changed here and none_ok = False raises an error.
+        """
+        if not none_ok:
+            raise RuntimeError('AllNone should not be called with none_ok=False')
+        super(AllNone, self).__init__(values=values, none_ok=none_ok)
+
     @property
     def valid_types(self):
-        return str, int, float # TODO - consider Any?
+        return object  # Lets _anything_ through
 
     @staticmethod
     def test(values):
