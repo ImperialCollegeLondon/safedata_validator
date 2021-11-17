@@ -56,6 +56,14 @@ class IndentFormatter(logging.Formatter):
         logging.Formatter.__init__(self, fmt, datefmt)
         self.depth = 0
 
+    def pop(self, n=1):
+
+        self.depth = max(0, self.depth - n)
+
+    def push(self, n=1):
+
+        self.depth = self.depth + n
+
     def format(self, rec):
 
         if hasattr(rec, 'depth'):

@@ -1,8 +1,12 @@
 import re
 from numbers import Number
 from collections import Counter
+from collections.abc import Iterable
 import openpyxl
 from typing import Any
+
+from safedata_validator import NA_type
+from safedata_validator.logger import LOGGER
 
 """
 Some regular expressions used within validators are defined at the module 
@@ -19,6 +23,224 @@ RE_DOI = re.compile('https?://(dx.)?doi.org/')
 RE_WSPACE_AT_ENDS = re.compile(r'^\s+.+|.+\s+$')
 RE_DMS = re.compile(r'[°\'"dms’”]+')
 
+
+# TODO - pandas has Excel reading including vectorised string operations?
+#        It uses openpyxl for xlsx but doesn't seem to use the memory optimised
+#        read_only workbook. Speed vs memory use?
+
+
+class CellsToValuesOrnate:
+    """Conversion of openpyxl cells to cleaned values
+
+    This class takes an iterable of openpyxl cells and carries out standard
+    cleaning of the contents:
+
+    * Conversion of empty cells to None
+    * Detection of cells containing only whitespace and conversion to None
+    * Detection of padded strings and stripping
+
+    The class attributes include a count of None and whitespace cells and
+    a list of strings that required stripping.
+    """
+
+    # NOTE - I really like the Cleaner design, but the repeated iteration
+    # is about twice as slow is the other implementation.
+
+    def __init__(self, cells):
+        """
+
+        :param cells:
+        """
+
+        # TODO - pandas has vectorised string operations? But doesn't
+        #        seem to use the memory optimised read_only workbook.
+        #        Speed vs memory use?
+
+        # Extract values from cells, where openpyxl.cell.read_only.EmptyCell
+        # has a value of None.
+        empty_filter = Cleaner(tfunc=lambda x: isinstance(x, openpyxl.cell.read_only.EmptyCell),
+                               rfunc=lambda x: None,
+                               rfunc_false=lambda x: x.value,
+                               iterable=cells)
+
+        # Whitespace cells
+        ws_filter = Cleaner(tfunc=lambda x: isinstance(x, str) and x.isspace(),
+                            rfunc=lambda x: None,
+                            iterable=empty_filter.iterable)
+
+        # Padding
+        pad_filter = Cleaner(tfunc=lambda x: isinstance(x, str) and x.strip() != x,
+                             rfunc=lambda x: x.strip(),
+                             iterable=ws_filter.iterable, keep=True)
+
+        self.values = pad_filter.iterable
+        self.n_empty = empty_filter.n_replaced
+        self.n_whitespace = ws_filter.n_replaced
+        self.padded = pad_filter.replaced
+
+    def __iter__(self):
+        yield from self.values
+
+    # def report(self):
+    #
+    #     LOGGER.
+
+
+class Cleaner:
+
+    def __init__(self, tfunc, rfunc, iterable, rfunc_false=None, keep=False):
+        """Clean an iterable of input values
+
+        This class is a general purpose input cleaner. The test function `tfunc`
+        should return a boolean. It is applied to each value in `iterable` and
+        the value in `iterable` is replaced with the output of `rfunc(value)`
+        when `tfunc` is True. Optionally, rfunc_false can be applied to values
+        that fail the test and `keep` can be set to save the original values
+        passed to `rfunc`.
+
+        The __iter__ method is set to iterate over the resulting cleaned values.
+
+        Args:
+            tfunc: A test function taking a value from `iterable` and
+                returning a boolean
+            rfunc: A replacement function applied to iterable values
+                where `tfunc` is True
+            iterable: An iterable of values to be tested
+            rfunc_false: A replacement function applied to iterable values
+                where `tfunc` is False
+            keep: A boolean flag to show whether to keep inputs to `rfunc`.
+
+        Attributes:
+            n_replaced: A count of inputs where `tfunc` is True
+            replaced: When `keep` is True, a list of of original values, otherwise None
+            keep: The value of `keep`
+            tfunc: The test function
+            rfunc: The replacement function used when `tfunc` is True.
+            rfunc_false: An optional replacement function used when `tfunc` is False.
+            iterable: The cleaned iterable of values
+        """
+
+        self.n_replaced = 0
+        self.replaced = [] if keep else None
+        self.tfunc = tfunc
+        self.rfunc = rfunc
+        self.rfunc_false = rfunc_false
+        self.keep = keep
+        self.iterable = iterable
+
+        self.iterable = [v for v in self._iter()]
+
+    def _iter(self):
+
+        for obj in self:
+            if self.tfunc(obj):
+                self.n_replaced += 1
+                if self.keep:
+                    self.replaced.append(obj)
+                obj = self.rfunc(obj)
+                yield obj
+            elif self.rfunc_false is not None:
+                yield self.rfunc_false(obj)
+            else:
+                yield obj
+
+    def __iter__(self):
+        yield from self.iterable
+
+
+class CellsToValues:
+    """Conversion of openpyxl cells to cleaned values
+
+    This class takes an iterable of openpyxl cells and carries out standard
+    cleaning of the contents:
+
+    * Conversion of empty cells to None
+    * Detection of cells containing only whitespace and conversion to None
+    * Detection of padded strings and stripping to clean string
+    * Collection of cell object types
+
+    The class attributes include a count of None and whitespace cells and
+    a list of strings that required stripping.
+    """
+
+    def __init__(self, cells):
+        """
+
+        :param cells:
+        """
+
+        self.values = [None] * len(cells)
+        self.n_empty = 0
+        self.n_na = 0
+        self.n_whitespace = 0
+        self.padded = []
+        self.types = [type(None)] * len(cells)
+
+        for idx, this_cell in enumerate(cells):
+
+            if isinstance(this_cell, openpyxl.cell.read_only.EmptyCell):
+                self.n_empty += 1
+                continue
+
+            this_val = this_cell.value
+
+            if isinstance(this_val, str):
+                if this_val.isspace():
+                    self.n_whitespace += 1
+                    continue
+                elif this_val == 'NA':
+                    self.values[idx] = this_val
+                    self.types[idx] = NA_type
+                    self.n_na += 1
+                else:
+                    this_val_strip = this_val.strip()
+                    if this_val_strip != this_val:
+                        self.values[idx] = this_val_strip
+                        self.padded.append(this_val)
+                    else:
+                        self.values[idx] = this_val
+                    self.types[idx] = str
+            else:
+                self.values[idx] = this_val
+                self.types[idx] = type(this_val)
+
+    def __iter__(self):
+        yield from self.values
+
+    def check(self, none=True, pad=True, na=True, ws=True):
+        """
+
+        Args:
+            none:
+            pad:
+            na:
+            ws:
+            valid_types: A tuple of valid types
+
+        Returns:
+
+        """
+
+        ret = True
+
+        if none and self.n_empty:
+            LOGGER.error('Data contains empty cells')
+            ret = False
+
+        if ws and self.n_whitespace:
+            LOGGER.error('Data contains text cells containing only whitespace')
+            ret = False
+
+        if pad and self.padded:
+            LOGGER.error('Data contains text with whitespace padding: ',
+                         extra={'join': self.padded})
+            ret = False
+
+        if na and self.n_na:
+            LOGGER.error(f'Data contains {self.n_na} NA values')
+            ret = False
+
+        return ret
 
 def _screen_values(obj):
     """
@@ -81,7 +303,7 @@ class Standardiser:
         return repr(self.values)
 
     def __iter__(self):
-        return iter(self.values)
+        yield from self.values
 
     @property
     def valid_types(self):
@@ -125,7 +347,7 @@ class BlankToNone(Standardiser):
 
     @property
     def valid_types(self):
-        return str, int, float
+        return object
 
     @staticmethod
     def standardise(value):
@@ -141,7 +363,8 @@ class Validator:
     value or each member of the list. The class instance then populates lists of
     valid and invalid values and the all_valid property indicates whether there
     are any invalid values. To make instances easy to use in logical tests, the
-    __bool__ method is defined to return the content of all_valid.
+    __bool__ method is defined to return the content of all_valid. The __iter__
+    method is also defined to make it easy to iterate over valid values.
 
     The test applied is defined in the test static method, which can be overridden
     to create Validators with different criteria. The read only property valid_types
@@ -180,11 +403,17 @@ class Validator:
         if self.invalid:
             self.all_valid = False
 
+
+    # TODO - not sure this isn't confusing, having to use all_valid is clearer
+
     def __bool__(self):
         return self.all_valid
 
     def __repr__(self):
         return str(self.all_valid)
+
+    def __iter__(self):
+        yield from self.valid
 
     @property
     def valid_types(self):
@@ -216,6 +445,25 @@ class AllNone(Validator):
         return [(v, v is None) for v in values]
 
 
+class NotNone(Validator):
+
+    def __init__(self, values, none_ok=True):
+        """It makes no use this Validator with none_ok = False, so the defaults
+        are changed here and none_ok = False raises an error.
+        """
+        if not none_ok:
+            raise RuntimeError('AllNone should not be called with none_ok=False')
+        super(NotNone, self).__init__(values=values, none_ok=none_ok)
+
+    @property
+    def valid_types(self):
+        return object  # Lets _anything_ through
+
+    @staticmethod
+    def test(values):
+        return [(v, v is not None) for v in values]
+
+
 class IsBlank(Validator):
 
     @property
@@ -225,6 +473,7 @@ class IsBlank(Validator):
     @staticmethod
     def test(values):
         return [(v, (v is None) or (RE_WSPACE_ONLY.match(v) is not None)) for v in values]
+
 
 class IsNotBlank(Validator):
 
@@ -279,7 +528,6 @@ class IsPadded(Validator):
     @staticmethod
     def test(values):
         return [(v, v is not None and isinstance(v, str) and RE_WSPACE_AT_ENDS.match(v) is not None) for v in values]
-
 
 
 # In Progress

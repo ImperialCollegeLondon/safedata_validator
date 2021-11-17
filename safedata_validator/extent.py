@@ -12,7 +12,7 @@
 # Locations
 # Taxa
 
-from logger import LOGGER
+from safedata_validator.logger import LOGGER
 
 
 class FieldDescriptor:
@@ -20,24 +20,32 @@ class FieldDescriptor:
 
 
 class Extent:
-    """
-    This class holds the extent of a particular variable across a dataset. It is
-    designed to track the extents required by GEMINI 2: latitude, longitude and
-    date, but the implementation is general. Values are fed to the class using the
-    update method, which adjusts the extent as necessary.
 
-    The Extent instance is created by providing a datatype and optionally any hard
-    and soft bounds to be applied. Hard bounds log an error when exceeded and soft
-    bounds log a warning.
-    """
+    def __init__(self, label, datatype, hard_bounds=None, soft_bounds=None):
+        """
+        This class holds the extent of a particular variable across a dataset.
+        It is designed to track the extents required by GEMINI 2: latitude,
+        longitude and date, but the implementation is general. Values are fed
+        to the class using the update method, which adjusts the extent as
+        necessary.
 
-    def __init__(self, datatype, hard_bounds=None, soft_bounds=None):
+        The Extent instance is created by providing a datatype and optionally
+        any hard and soft bounds to be applied. Hard bounds log an error when
+        exceeded and soft bounds log a warning.
+
+        Args:
+            label: A label for the extent, used in reporting
+            datatype: A type or tuple of types for input checking
+            hard_bounds: A 2 tuple of hard bounds
+            soft_bounds: A 2 tuple of soft bounds
+        """
 
         # The extent is stored internally as a list for ease of update
         # but only accessible via the property as a tuple to avoid it
         # being modifiable by reference. All other variables are similarly
         # protected against adjustment.
 
+        self.label = label
         self._datatype = datatype
         self._extent = [None, None]
         self._hard_bounds = None
@@ -57,7 +65,7 @@ class Extent:
         self._soft_bounds = soft_bounds
 
     def __repr__(self):
-        return f'Extent: {self.extent}'
+        return f'Extent: {self.label} {self.extent}'
 
     @property
     def datatype(self):
@@ -75,25 +83,19 @@ class Extent:
     def soft_bounds(self):
         return self._soft_bounds
 
-    def _check_datatype(self, values):
-        """
-        Private function to check bounds and values are of the correct datatype
-        :param values: Iterable of values to check.
-        :return: None
-        """
-        values_match_datatype = [isinstance(v, self.datatype) for v in values]
-
-        if not all(values_match_datatype):
-            raise AttributeError(f'Values are not all of type {self.datatype}')
-
     def _check_bounds(self, bounds):
         """
-        Private function to validate hard and soft bounds
-        :param bounds: Expecting an iterable of length 2 with low, high values
-        :return: None
+        Private function to validate hard and soft bounds, these are set at
+        dataset initialisation and so raise an error, rather than logging.
+
+        Args:
+            bounds: Expecting an iterable of length 2 with low, high values
         """
 
-        self._check_datatype(bounds)
+        values_match_datatype = [isinstance(v, self.datatype) for v in bounds]
+
+        if not all(values_match_datatype):
+            raise AttributeError(f'Bounds are not all of type {self.datatype}')
 
         if len(bounds) != 2 or bounds[1] <= bounds[0]:
             raise AttributeError('Bounds must be provided as (low, high) tuples')
@@ -102,12 +104,19 @@ class Extent:
         """
         Takes a set of values and updates the extent of values provided to the
         instance.
-        :param values: An iterable of values, which should all be of the datatype
-            specified when creating the Extent instance.
-        :return: None
+
+        Args:
+             values: An iterable of values, which should all be of the datatype(s)
+                specified when creating the Extent instance.
         """
 
-        self._check_datatype(values)
+        values_match_datatype = [isinstance(v, self.datatype) for v in values]
+
+        if not all(values_match_datatype):
+            invalid = [v for v, b in zip(values, values_match_datatype) if not b]
+            values = [v for v, b in zip(values, values_match_datatype) if b]
+            LOGGER.error(f'Values are not all of type {self.datatype}: ',
+                         extra={'join': invalid, 'quote': True})
 
         values = (min(values), max(values))
 
