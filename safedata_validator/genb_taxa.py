@@ -40,8 +40,9 @@ class MicrobeTaxon:
         # DON'T KNOW IF THIS WOULD BE RETURNED IN OUR CASE
         * taxon_status: the taxonomic status of the taxon with one of the following values:
           accepted, doubtful, synonym etc. etc.
-        # AGAIN UNUSURE IF THIS IS SOMETHING WE WANT IN THE NEW CASE
+        # AGAIN UNSURE IF THIS IS SOMETHING WE WANT IN THE NEW CASE
         * parent_id: a GBIF id for the accepted parent taxon.
+        * canon_usage: a Taxon instance holding the canonical usage for the taxon
         # WILL NEED TO FIND OUT IF ANY EXTRA INFORMATION IS ACTUALLY PROVIDED
         * note: a string of any extra information provided by the search
         # UNSURE ON THIS ONE
@@ -55,7 +56,8 @@ class MicrobeTaxon:
     ignore_gbnk: Optional[Union[int, float]] = None
     is_backbone: bool = dataclasses.field(init=False)
     is_canon: bool = dataclasses.field(init=False)
-    canon_id: int = dataclasses.field(init=False)
+    # DON'T KNOW IF THIS SHOULD BECOME MicrobeTaxon OR NOT
+    canon_usage: 'Taxon' = dataclasses.field(init=False)  # https://stackoverflow.com/questions/33533148
     parent_id: int = dataclasses.field(init=False)
     taxon_status: str = dataclasses.field(init=False)
     lookup_status: str = dataclasses.field(init=False)
@@ -79,7 +81,7 @@ class MicrobeTaxon:
         self.rank = self.rank.lower()
         self.is_backbone = self.rank in BACKBONE_RANKS
         self.is_canon = False
-        self.canon_id = None
+        self.canon_usage = None
         self.parent_id = None
         self.taxon_status = None
         self.lookup_status = 'unvalidated'
