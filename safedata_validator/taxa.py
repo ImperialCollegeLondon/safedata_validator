@@ -782,35 +782,38 @@ class Taxa:
         FORMATTER.pop()
 
 
-def taxon_index_to_text(taxa):
+def taxon_index_to_text(taxa, html=False, depth=4):
     """
-    Turns the taxon index for a dataset into a text representation
-    of the taxonomic hierarchy used in the dataset. Takes a list
-    of dicts keyed by the fields of dataset_taxa - this could come
-    from db.datasets_taxa for a published dataset but also from
-    the dataset_metadata of submitted datasets.
+    Turns the taxon index from a Taxa instance into a text representation
+    of the taxonomic hierarchy used in the dataset.
     """
 
-    def indent(n):
+    lbr = '<br>' if html else '\n'
 
-        return ('&ensp;-&ensp;' * n)
+    def indent(n, html=html):
 
-    def format_name(tx):
+        ind = '&ensp;' * depth if html else ' ' * depth
+        return ind * n
+
+    def format_name(tx, html=html):
 
         # format the canonical name
-        if tx['taxon_rank'] in ['genus', 'species', 'subspecies']:
-            return '<i>{}</i>'.format(tx['taxon_name'])
-        elif tx['taxon_rank'] in ['morphospecies', 'functional group']:
-            return '[{}]'.format(tx['taxon_name'])
+        if tx[4] in ['genus', 'species', 'subspecies']:
+            if html:
+                return f'<i>{tx[3]}</i>'
+            else:
+                return f'_{tx[3]}_'
+        elif tx[4] in ['morphospecies', 'functional group']:
+            return f'[{tx[0]}]'
         else:
-            return tx['taxon_name']
+            return tx[3]
 
     # Container to hold the output
     html = StringIO()
 
-    # group by parent taxon, subsitituting 0 for None
-    taxa.sort(key=lambda x: x['gbif_parent_id'] or 0)
-    grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x['gbif_parent_id'])}
+    # group by parent taxon id in position 2, subsitituting 0 for None
+    taxa.sort(key=lambda x: x[2] or 0)
+    grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x[2])}
 
     # start the stack with the kingdoms - these taxa will have None as a parent
     stack = [{'current': grouped[None][0], 'next': grouped[None][1:]}]
@@ -822,30 +825,30 @@ def taxon_index_to_text(taxa):
         canon_name = format_name(current)
 
         # Look for a non-None entry in next that shares the same worksheet name
-        next_ws_names = [tx['worksheet_name'] for tx in stack[-1]['next']
-                         if tx['worksheet_name'] is not None]
+        next_ws_names = [tx[0] for tx in stack[-1]['next']
+                         if tx[0] is not None]
 
-        if current['worksheet_name'] in next_ws_names:
+        if current[0] in next_ws_names:
             # pop out the matching entry and find which is 'accepted'
-            name_pair = stack[-1]['next'].pop(next_ws_names.index(current['worksheet_name']))
-            if current['gbif_status'] == 'accepted':
+            name_pair = stack[-1]['next'].pop(next_ws_names.index(current[0]))
+            if current[5] == 'accepted':
                 as_name = format_name(name_pair)
-                as_status = name_pair['gbif_status']
+                as_status = name_pair[5]
             else:
                 as_name = canon_name
-                as_status = current['gbif_status']
+                as_status = current[5]
                 canon_name = format_name(name_pair)
 
-            txt = '{} {} (as {}: {})<br>'.format(indent(len(stack)), canon_name, as_status, as_name)
+            txt = f'{indent(len(stack))} {canon_name} (as {as_status}: {as_name}){lbr}'
         else:
-            txt = '{} {} <br>'.format(indent(len(stack)), canon_name)
+            txt = f'{indent(len(stack))} {canon_name}{lbr}'
 
         html.write(txt)
 
         # Is this taxon a parent for other taxa - if so add that taxon to the top of
         # the stack, otherwise start looking for a next taxon to push onto the stack.
         # If there is none at the top, pop and look down.
-        parent_id = current['gbif_id']
+        parent_id = current[1]
         if parent_id in grouped:
             stack.append({'current': grouped[parent_id][0], 'next': grouped[parent_id][1:]})
         else:
