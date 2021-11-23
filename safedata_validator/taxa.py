@@ -1,11 +1,13 @@
 from collections import Counter
 from typing import Union, Optional
 import dataclasses
+import sqlite3
+import requests
 from enforce_typing import enforce_types
 
-from .logger import LOGGER, FORMATTER, log_and_raise
-from .validators import (ToLower, IsUnique, BlankToNone, CellToValue,
-                         IsPadded, IsNotBlank, AllNone)
+from safedata_validator.logger import LOGGER, FORMATTER, CH, log_and_raise
+from safedata_validator.validators import (GetDataFrame, IsLower, IsNotBlank,
+                                           IsNotPadded, IsString, HasDuplicates)
 
 """
 This module describes classes and methods used to compile taxonomic data from
@@ -68,6 +70,7 @@ class Taxon:
         * taxon_status: the taxonomic status of the taxon with one of the following values:
           accepted, doubtful, synonym etc. etc.
         * parent_id: a GBIF id for the accepted parent taxon.
+        * canon_usage: a Taxon instance holding the canonical usage for the taxon
         * note: a string of any extra information provided by the search
         * hierarchy: a list of 2-tuples of rank and GBIF ID for the taxonomic hierarchy
     """
@@ -79,7 +82,7 @@ class Taxon:
     ignore_gbif: Optional[Union[int, float]] = None
     is_backbone: bool = dataclasses.field(init=False)
     is_canon: bool = dataclasses.field(init=False)
-    canon_id: int = dataclasses.field(init=False)
+    canon_usage: 'Taxon' = dataclasses.field(init=False)  # https://stackoverflow.com/questions/33533148
     parent_id: int = dataclasses.field(init=False)
     taxon_status: str = dataclasses.field(init=False)
     lookup_status: str = dataclasses.field(init=False)
@@ -103,7 +106,7 @@ class Taxon:
         self.rank = self.rank.lower()
         self.is_backbone = self.rank in BACKBONE_RANKS
         self.is_canon = False
-        self.canon_id = None
+        self.canon_usage = None
         self.parent_id = None
         self.taxon_status = None
         self.lookup_status = 'unvalidated'
@@ -131,13 +134,14 @@ class Taxon:
 class LocalGBIFValidator:
 
     def __init__(self, resources):
-        # TODO - remove use of LOGGER within these functions. More portable
 
-        self.gbif_conn = resources.get_local_gbif_conn()
+        conn = sqlite3.connect(resources.gbif_database)
+        conn.row_factory = sqlite3.Row
+        self.gbif_conn = conn
 
     def __del__(self):
 
-        self.gbif_conn .close()
+        self.gbif_conn.close()
 
     def search(self, taxon: Taxon):
 
@@ -154,7 +158,8 @@ class LocalGBIFValidator:
         """
 
         if not taxon.is_backbone:
-            raise GBIFError('Cannot validate non-backbone taxa')
+            taxon.lookup_status = 'Cannot validate non-backbone taxa'
+            return taxon
 
         if taxon.gbif_id is not None:
 
@@ -163,7 +168,8 @@ class LocalGBIFValidator:
 
             # Check that name and rank are congruent with id
             if (id_taxon.name != taxon.name) or (id_taxon.rank != taxon.rank):
-                raise GBIFError('ID does not match name and rank')
+                taxon.lookup_status = 'ID does not match name and rank'
+                return taxon
 
             return id_taxon
 
@@ -172,12 +178,14 @@ class LocalGBIFValidator:
 
             sql = (f"select * from backbone where canonical_name ='{taxon.name}' "
                    f"and rank= '{taxon.rank.upper()}';")
+
             taxon_rows = self.gbif_conn.execute(sql).fetchall()
             selected_row = None
 
             if len(taxon_rows) == 0:
                 # No matching rows
-                raise GBIFError('No match found')
+                taxon.lookup_status = 'No match found'
+                return taxon
             elif len(taxon_rows) == 1:
                 # one matching row - extract it from the list
                 selected_row = taxon_rows[0]
@@ -211,11 +219,17 @@ class LocalGBIFValidator:
             if selected_row is None:
                 # No single row has been accepted as the best, so return no
                 # match and a note, as the API interface does.
-                raise GBIFError(f'Multiple equal matches for {taxon.name}')
+                taxon.lookup_status = f'Multiple equal matches for {taxon.name}'
+                return taxon
 
             # Should now have a single row for the preferred hit, which can be
-            # extracted from the database
-            return self.id_lookup(selected_row['id'])
+            # extracted from the database, unless the user has explicitly ruled
+            # this out via the ignore_gbif argument.
+            if selected_row['id'] == taxon.ignore_gbif:
+                taxon.lookup_status = f'GBIF ID {taxon.ignore_gbif} ignored'
+                return taxon
+            else:
+                return self.id_lookup(selected_row['id'])
 
     def id_lookup(self, gbif_id: int):
         """Method to return a Taxon directly from a GBIF ID
@@ -248,6 +262,7 @@ class LocalGBIFValidator:
                       gbif_id=taxon_row['id'])
         taxon.lookup_status = 'found'
         taxon.taxon_status = taxon_row['status'].lower()
+        taxon.parent_id = taxon_row['parent_key']
 
         # Add the taxonomic hierarchy, using a mapping of backbone ranks (except
         # subspecies) to backbone table fields.
@@ -256,14 +271,15 @@ class LocalGBIFValidator:
                            if ky in taxon_row.keys()]
 
         # parent key in the local database has the odd property that the parent
-        # tax_gbif['parent_key']dual duty: points up to parent for canon taxa
-        # and 'up' to canon for non-canon taxa.
+        # tax_gbif['parent_key'] does dual duty: points up to parent for canon
+        # taxa and 'up' to canon for non-canon taxa, so need to look through both
+        # to get the canon and parent populated.
         if taxon.taxon_status in ['accepted', 'doubtful']:
             taxon.is_canon = True
-            taxon.parent_id = taxon_row['parent_key']
         else:
             taxon.is_canon = False
-            taxon.canon_id = taxon_row['parent_key']
+            taxon.canon_usage = self.id_lookup(taxon.parent_id)
+            taxon.parent_id = taxon.canon_usage.parent_id
 
         return taxon
 
@@ -306,7 +322,8 @@ class RemoteGBIFValidator:
 
             # Check that name and rank are congruent with id
             if (id_taxon.name != taxon.name) or (id_taxon.rank != taxon.rank):
-                raise GBIFError('ID does not match name and rank')
+                taxon.lookup_status = 'ID does not match name and rank'
+                return taxon
 
             return id_taxon
         else:
@@ -327,14 +344,19 @@ class RemoteGBIFValidator:
             if response['matchType'] == u'NONE':
                 # No match found - look for explanatory notes
                 if 'note' in response:
-                    raise GBIFError(response['note'])
+                    taxon.lookup_status = response['note']
+                    return taxon
                 else:
-                    raise GBIFError('No match found')
+                    taxon.lookup_status = 'No match found'
+                    return taxon
 
-            return self.id_lookup(response['usageKey'])
+            if response['usageKey'] == taxon.ignore_gbif:
+                taxon.lookup_status = f'GBIF ID {taxon.ignore_gbif} ignored'
+                return taxon
+            else:
+                return self.id_lookup(response['usageKey'])
 
-    @staticmethod
-    def id_lookup(gbif_id: int):
+    def id_lookup(self, gbif_id: int):
         """Method to return a Taxon directly from a GBIF ID
 
         Params:
