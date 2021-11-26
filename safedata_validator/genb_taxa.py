@@ -3,9 +3,9 @@ import dataclasses
 import requests
 from enforce_typing import enforce_types
 
-# THIS DIFFERS SO I SHOULD RENAME
-BACKBONE_RANKS = ['superkingdom', 'kingdom', 'phylum', 'order', 'class', 'family',
-                  'genus', 'species', 'subspecies']
+# Extended version of backbone ranks to capture superkingdoms
+BACKBONE_RANKS_EX = ['superkingdom', 'kingdom', 'phylum', 'order', 'class',
+                    'family', 'genus', 'species', 'subspecies']
 
 """
 This module describes classes and methods used to both assess the validity of
@@ -100,7 +100,7 @@ class RemoteNCBIValidator:
 
         # ALSO WORK OUT WHAT INFO I SHOULD BE PROVIDING TO THE LOGGER
         # Check that the taxon rank provided is a backbone rank
-        if tax_dic["taxon_rank"] in BACKBONE_RANKS:
+        if tax_dic["taxon_rank"] in BACKBONE_RANKS_EX:
             # In this case use provided rank
             rnk = tax_dic["taxon_rank"]
 
@@ -117,15 +117,15 @@ class RemoteNCBIValidator:
             # Set as not a valid taxa
             vld_tax = False
             # Find lowest index
-            r_ID = len(BACKBONE_RANKS) - 1
+            r_ID = len(BACKBONE_RANKS_EX) - 1
 
             # While loop that runs until valid taxa is found
             while vld_tax == False:
                 # Check if taxa id is found
-                if tax_dic[f"{BACKBONE_RANKS[r_ID]}_id"] != None:
+                if tax_dic[f"{BACKBONE_RANKS_EX[r_ID]}_id"] != None:
                     # Close loop and store rank
                     vld_tax = True
-                    rnk = BACKBONE_RANKS[r_ID]
+                    rnk = BACKBONE_RANKS_EX[r_ID]
                 # Raise error once backbone ranks have been exhausted
                 elif r_ID < 1:
                     raise NCBIError("""NCBI taxa ID cannot be mapped onto
@@ -134,9 +134,9 @@ class RemoteNCBIValidator:
                     r_ID -= 1
 
         # Loop over all ranks down to the taxon_rank
-        for i in range(1+BACKBONE_RANKS.index(rnk)):
+        for i in range(1+BACKBONE_RANKS_EX.index(rnk)):
             print(i)
-            print(BACKBONE_RANKS[i])
+            print(BACKBONE_RANKS_EX[i])
 
 
 
