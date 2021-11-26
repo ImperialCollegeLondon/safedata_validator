@@ -102,7 +102,7 @@ class RemoteNCBIValidator:
         # Check that the taxon rank provided is a backbone rank
         if tax_dic["taxon_rank"] in BACKBONE_RANKS_EX:
             # In this case use provided rank
-            rnk = tax_dic["taxon_rank"]
+            rnk = BACKBONE_RANKS_EX.index(tax_dic["taxon_rank"])
 
         # Filter out ID's without ranks (e.g. strains)
         else:
@@ -123,9 +123,9 @@ class RemoteNCBIValidator:
             while vld_tax == False:
                 # Check if taxa id is found
                 if tax_dic[f"{BACKBONE_RANKS_EX[r_ID]}_id"] != None:
-                    # Close loop and store rank
+                    # Close loop and store rank number
                     vld_tax = True
-                    rnk = BACKBONE_RANKS_EX[r_ID]
+                    rnk = r_ID
                 # Raise error once backbone ranks have been exhausted
                 elif r_ID < 1:
                     raise NCBIError("""NCBI taxa ID cannot be mapped onto
@@ -133,14 +133,11 @@ class RemoteNCBIValidator:
                 else:
                     r_ID -= 1
 
-        # Loop over all ranks down to the taxon_rank
-        for i in range(1+BACKBONE_RANKS_EX.index(rnk)):
-            print(i)
-            print(BACKBONE_RANKS_EX[i])
+        # Create dictonary of reduced taxa info using a list
+        red_taxa = {f"{BACKBONE_RANKS_EX[i]}":tax_dic[f"{BACKBONE_RANKS_EX[i]}_name"]
+                    for i in range(0,rnk+1)}
 
-
-
-        return tax_dic
+        return red_taxa
         # NEED TO WORK OUT WHAT TO DO BELOW HERE
         # Basically want to produce an object that contains all relevant taxonomic information
         # E.g. kingdom to lowest known level
