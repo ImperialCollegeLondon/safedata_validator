@@ -3,10 +3,9 @@ import dataclasses
 import requests
 from enforce_typing import enforce_types
 
-# DELETE THE BELOW WHEN I AM DONE, AND INSTEAD IMPORT FROM TAXA
-BACKBONE_RANKS = ['kingdom', 'phylum', 'order', 'class', 'family',
+# THIS DIFFERS SO I SHOULD RENAME
+BACKBONE_RANKS = ['superkingdom', 'kingdom', 'phylum', 'order', 'class', 'family',
                   'genus', 'species', 'subspecies']
-# from safedata_validator.taxa import BACKBONE_RANKS
 
 """
 This module describes classes and methods used to both assess the validity of
@@ -36,7 +35,7 @@ class NCBIError(Exception):
 # Meta questions:
 # What do we want to store? GBIF compatable taxonomy? With or without GenBank ID?
 # How do we address newly defined species?
-# Do we want a LocalNCBIValidator
+# Do we want a LocalNCBIValidator?
 
 # TO DO - So we want a GenBank taxonomy to be provided
 # From name alone we should be able to find an ID
@@ -52,6 +51,9 @@ class NCBIError(Exception):
 # So check if taxa provided exists if GBIF, if not check up hierachy until one that does is found
 # Then tell user that they have to contract their taxonomic specification to this levels
 
+# TO DO - Citation
+# Work out how to appropraitely cite and credit anyones work that I make use of
+
 @enforce_types
 class RemoteNCBIValidator:
     # ADD MORE COMMENTS HERE AS AND WHEN I FIGURE THEM OUT
@@ -60,7 +62,7 @@ class RemoteNCBIValidator:
     """
     # Functionality to find taxa information from genbank ID
     def id_lookup(self, genbank_id: int):
-        """Method to return taxonomic information from a GenBank ID. THERE'S PROBABLY MORE TO SAY THOUGH
+        """Method to return full taxonomic information from a GenBank ID. THERE'S PROBABLY MORE TO SAY THOUGH
 
         Params:
             genbank_id: An integer
@@ -82,15 +84,67 @@ class RemoteNCBIValidator:
         # Retrive data using the url
         taxon_row = requests.get(up_url)
 
-        # Extract the response
+        # Filter out problems with accessing the remote server
+        if taxon_row.status_code != 200:
+            raise NCBIError('Connection error to remote server')
+
+        # Extract the response (as a list of dictionaries)
         response = taxon_row.json()
 
         # Check if list is empty
         if not response:
             raise NCBIError()
 
-        return response
+        # Only extract first dictonary in the list
+        tax_dic = response[0]
+
+        # ALSO WORK OUT WHAT INFO I SHOULD BE PROVIDING TO THE LOGGER
+        # Check that the taxon rank provided is a backbone rank
+        if tax_dic["taxon_rank"] in BACKBONE_RANKS:
+            # In this case use provided rank
+            rnk = tax_dic["taxon_rank"]
+
+        # Filter out ID's without ranks (e.g. strains)
+        else:
+            # Check whether taxa is non standard or just non backbone
+            if tax_dic["taxon_rank"] == "no rank":
+                # Check for strains
+                print("Either a strain or a clade")
+            else:
+                t = tax_dic["taxon_rank"]
+                print(f"Rank {t} not a backbone rank")
+
+            # Set as not a valid taxa
+            vld_tax = False
+            # Find lowest index
+            r_ID = len(BACKBONE_RANKS) - 1
+
+            # While loop that runs until valid taxa is found
+            while vld_tax == False:
+                # Check if taxa id is found
+                if tax_dic[f"{BACKBONE_RANKS[r_ID]}_id"] != None:
+                    # Close loop and store rank
+                    vld_tax = True
+                    rnk = BACKBONE_RANKS[r_ID]
+                # Raise error once backbone ranks have been exhausted
+                elif r_ID < 1:
+                    raise NCBIError("""NCBI taxa ID cannot be mapped onto
+                    backbone ranks""")
+                else:
+                    r_ID -= 1
+
+        # Loop over all ranks down to the taxon_rank
+        for i in range(1+BACKBONE_RANKS.index(rnk)):
+            print(i)
+            print(BACKBONE_RANKS[i])
+
+
+
+        return tax_dic
         # NEED TO WORK OUT WHAT TO DO BELOW HERE
+        # Basically want to produce an object that contains all relevant taxonomic information
+        # E.g. kingdom to lowest known level
+        # From this function want to populate a taxa with ID number and full list of taxa inforamation (backbone only)
 
         # # Create and populate taxon
         # taxon = Taxon(name=response['canonicalName'],
@@ -125,6 +179,10 @@ class RemoteNCBIValidator:
 # Make validator
 val = RemoteNCBIValidator()
 # Look up an ID
-test = val.id_lookup(3333)
+# E coli (562)
+# E coli strain (1444049)
+# Streptophytina subphylum (131221)
+# Opisthokonta clade (33154)
+test = val.id_lookup(131221)
 # Print out whatever gets returns
 print(test)
