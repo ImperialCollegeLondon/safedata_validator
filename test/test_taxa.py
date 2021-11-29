@@ -33,16 +33,19 @@ def test_taxon_init_errors(test_input, expected_exception):
         _ = taxa.Taxon(**test_input)
 
 # ------------------------------------------
-# Testing Validators
+# Testing taxon validators
 # ------------------------------------------
 
 
 @pytest.mark.parametrize(
     'test_input,expected',
     [(dict(name='Crematogaster borneensis', rank='species'),
-      ('found', True, 1324716)),
+      ('found', True, 1324716, None)),
      (dict(name='Morus', rank='genus', gbif_id=2480962),
-      ('found', True, 2480962))])
+      ('found', True, 2480962, None)),
+     (dict(name='Alsomitra simplex', rank='species'),
+      ('found', False, 5537041, 3623287))
+     ])
 def test_validator_search(validators, test_input, expected):
     """This test checks inputs against expected outputs for both the local
     and remote validator classes.
@@ -52,11 +55,14 @@ def test_validator_search(validators, test_input, expected):
     """
 
     tx = taxa.Taxon(**test_input)
-    found = validators.search(tx)
-    
-    assert found.lookup_status == expected[0]
-    assert found.is_canon == expected[1]
-    assert found.gbif_id == expected[2]
+    srch_out = validators.search(tx)
+
+    assert srch_out.lookup_status == expected[0]
+    assert srch_out.is_canon == expected[1]
+    assert srch_out.gbif_id == expected[2]
+
+    if not srch_out.is_canon:
+        assert srch_out.canon_usage.gbif_id == expected[3]
 
 
 @pytest.mark.parametrize(
@@ -92,3 +98,7 @@ def test_validator_gbif_lookup_errors(validators, test_input, expected_exception
 
     with pytest.raises(expected_exception):
         _ = validators.id_lookup(test_input)
+
+
+# TODO - dynamically create taxon worksheets with single row to test
+#        all the outcomes and failure modes.
