@@ -66,9 +66,6 @@ class IndentFormatter(logging.Formatter):
 
     def format(self, rec):
 
-        if hasattr(rec, 'depth'):
-            self.depth = getattr(rec, 'depth')
-
         rec.indent = '    ' * self.depth
 
         # encode level
@@ -77,14 +74,9 @@ class IndentFormatter(logging.Formatter):
 
         # format message
         msg = logging.Formatter.format(self, rec)
-        # add any joined values
+        # add any joined values as repr
         if hasattr(rec, 'join'):
-            if hasattr(rec, 'quote') and rec.quote:
-                # quote if requested and then avoid requoting if the
-                # formatter is emitting to more than one stream handler
-                rec.join = ["'" + o + "'" for o in rec.join]
-                del rec.quote
-            msg += ', '.join(rec.join)
+            msg += ', '.join([repr(o) for o in rec.join])
 
         return msg
 
