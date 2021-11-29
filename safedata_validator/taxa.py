@@ -782,7 +782,7 @@ class Taxa:
         FORMATTER.pop()
 
 
-def taxon_index_to_text(taxa, html=False, depth=4):
+def taxon_index_to_text(taxa, html=False, indent_width=4):
     """
     Turns the taxon index from a Taxa instance into a text representation
     of the taxonomic hierarchy used in the dataset.
@@ -790,16 +790,16 @@ def taxon_index_to_text(taxa, html=False, depth=4):
 
     lbr = '<br>' if html else '\n'
 
-    def indent(n, html=html):
+    def indent(n, use_html=html):
 
-        ind = '&ensp;' * depth if html else ' ' * depth
-        return ind * n
+        ind = '&ensp;' if use_html else ' '
+        return ind * indent_width * (n - 1)
 
-    def format_name(tx, html=html):
+    def format_name(tx, use_html=html):
 
         # format the canonical name
         if tx[4] in ['genus', 'species', 'subspecies']:
-            if html:
+            if use_html:
                 return f'<i>{tx[3]}</i>'
             else:
                 return f'_{tx[3]}_'
