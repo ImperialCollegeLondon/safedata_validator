@@ -1,4 +1,6 @@
+from datetime import date
 import pytest
+import dotmap
 import os
 import string
 import openpyxl
@@ -84,7 +86,7 @@ from safedata_validator.summary import *
 def test_authors(caplog, alterations, should_log_error, expected_log):
 
     # Initialise a Summary instance.
-    summary = Summary(None)
+    summary = Summary(None, None)
 
     # Valid set of information
     input = {'author name': ('Orme, David',),
@@ -99,6 +101,91 @@ def test_authors(caplog, alterations, should_log_error, expected_log):
 
     # Test the block load
     summary._load_authors()
+
+    if should_log_error:
+        assert 'ERROR' in [r.levelname for r in caplog.records]
+
+    assert expected_log in caplog.text
+
+
+@pytest.mark.parametrize('row_data,should_log_error,expected_log', [
+    ({"access status": ("Open",), # Open
+      "embargo date": (None,),
+      "access conditions": (None,)},
+     False,
+     'Metadata for Access details found'),
+    ({"access status": (123,), # Bad access status type
+      "embargo date": (None,),
+      "access conditions": (None,)},
+     True,
+     'Field access status contains values of wrong type'),
+    ({"access status": ("Oeopn",), # Bad access status value
+      "embargo date": (None,),
+      "access conditions": (None,)},  
+     True,
+     'Access status must be Open, Embargo or Restricted'),
+    ({"access status": ("Embargo",), # Embargoed correctly
+      "embargo date": (datetime.datetime.today() + datetime.timedelta(days=365),),
+      "access conditions": (None,)},  
+     False,
+     'Metadata for Access details found'),
+    ({"access status": ("Embargo",), # Bad embargo date type
+      "embargo date": (123,),
+      "access conditions": (None,)},
+     True,
+     'Field embargo date contains values of wrong type'),
+    ({"access status": ("Embargo",), # Embargo date in the past
+      "embargo date": (datetime.datetime.today() - datetime.timedelta(days=365),),
+      "access conditions": (None,)},
+     True,
+     'Embargo date is in the past'),
+    ({"access status": ("Embargo",), # Embargo date too far into the future
+      "embargo date": (datetime.datetime.today() + datetime.timedelta(days=5*365),),
+      "access conditions": (None,)},
+     True,
+     'Embargo date more than'),
+    ({"access status": ("Embargo",), # Conditions set on embargoed data
+      "embargo date": (datetime.datetime.today() + datetime.timedelta(days=365),),
+      "access conditions": ("My precious, mine",)},
+     True,
+     'Access conditions cannot be set on embargoed data'),
+    ({"access status": ("Restricted",), # Restricted
+      "embargo date": (None,),
+      "access conditions": ("My precious, mine",)},  
+     False,
+     'Metadata for Access details found'),
+    ({"access status": ("Restricted",), # Restricted but with no conditions
+      "embargo date": (None,),
+      "access conditions": (None,)},  
+     True,
+     'Dataset restricted but no access conditions specified'),
+    ({"access status": ("Restricted",), # Bad type on access conditions
+      "embargo date": (None,),
+      "access conditions": (123,)},  
+     True,
+     'Field access conditions contains values of wrong type'),
+    ({"access status": ("Restricted",), # Embargo date set on restricted data
+      "embargo date": (datetime.datetime.today() + datetime.timedelta(days=365),),
+      "access conditions": ("My precious, mine",)},
+     True,
+     'Do not set an embargo date with restricted datasets'),
+    ({"access status": ("Open", "Embargoed"), # Not a singleton record
+      "embargo date": (None, None),
+      "access conditions": (None, None)},
+     True,
+     'Only a single record should be present'),
+    ])
+def test_access(caplog, row_data, should_log_error, expected_log):
+
+    # Initialise a Summary instance.
+    summary = Summary(None, None)
+
+    # Update valid to test error conditions and populate _rows
+    # directly (bypassing .load() and need to pack in worksheet object
+    summary._rows = row_data
+
+    # Test the block load
+    summary._load_access_details()
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
@@ -126,7 +213,7 @@ def test_authors(caplog, alterations, should_log_error, expected_log):
 def test_keywords(caplog, alterations, should_log_error, expected_log):
 
     # Initialise a Summary instance.
-    summary = Summary(None)
+    summary = Summary(None, None)
 
     # Valid set of information
     input = {'keywords': ('abc', 'def')}
@@ -188,7 +275,7 @@ def test_keywords(caplog, alterations, should_log_error, expected_log):
 def test_permits(caplog, alterations, should_log_error, expected_log):
 
     # Initialise a Summary instance.
-    summary = Summary(None)
+    summary = Summary(None, None)
 
     # Valid set of information
     input = {'permit type': ('research',),
@@ -238,7 +325,7 @@ def test_permits(caplog, alterations, should_log_error, expected_log):
 def test_doi(caplog, alterations, should_log_error, expected_log, do_val_doi):
 
     # Initialise a Summary instance.
-    summary = Summary(None, validate_doi=do_val_doi)
+    summary = Summary(None, None, validate_doi=do_val_doi)
 
     # Valid set of information
     input = {'publication doi': ('https://doi.org/10.1098/rstb.2011.0049',)}
@@ -310,7 +397,7 @@ def test_doi(caplog, alterations, should_log_error, expected_log, do_val_doi):
 def test_funders(caplog, alterations, should_log_error, expected_log):
 
     # Initialise a Summary instance.
-    summary = Summary(None)
+    summary = Summary(None, None)
 
     # Valid set of information
     input = {'funding body': ('NERC',),
@@ -370,7 +457,7 @@ def test_funders(caplog, alterations, should_log_error, expected_log):
 def test_temporal_extent(caplog, alterations, should_log_error, expected_log):
 
     # Initialise a Summary instance.
-    summary = Summary(None)
+    summary = Summary(None, None)
 
     # Valid set of information - openpyxl loads dates as datetimes.
     input = {'start date': (datetime.datetime(2001, 1, 1),),
@@ -386,8 +473,284 @@ def test_temporal_extent(caplog, alterations, should_log_error, expected_log):
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
+    else:
+        assert summary.temporal_extent.extent == (datetime.datetime(2001, 1, 1), datetime.datetime(2011, 1, 1))
 
     assert expected_log in caplog.text
+
+
+@pytest.mark.parametrize('alterations,should_log_error,expected_log', [
+    (dict(),  # no amendments
+     False,
+     'Metadata for Geographic Extents found'),
+    ({'south': (None,),
+      'north': (None,),
+      'east': (None,),
+      'west': (None,)
+      },
+     False,  # Not a mandatory block
+     ''),
+    ({'south': (None,)},
+     True,
+     'Missing metadata in mandatory field south'),  # via _read_block
+    ({'south': ('   ',)},
+     True,
+     'Whitespace only cells in field south'),  # via _read_block
+    ({'south': ('2001-01-01',)},
+     True,
+     'Field south contains values of wrong type'),  # via _read_block
+    ({'north': (None,)},
+     True,
+     'Missing metadata in mandatory field north'),  # via _read_block
+    ({'north': ('   ',)},
+     True,
+     'Whitespace only cells in field north'),  # via _read_block
+    ({'north': ('2001-01-01',)},
+     True,
+     'Field north contains values of wrong type'),  # via _read_block
+    ({'east': (None,)},
+     True,
+     'Missing metadata in mandatory field east'),  # via _read_block
+    ({'east': ('   ',)},
+     True,
+     'Whitespace only cells in field east'),  # via _read_block
+    ({'east': ('2001-01-01',)},
+     True,
+     'Field east contains values of wrong type'),  # via _read_block
+    ({'west': (None,)},
+     True,
+     'Missing metadata in mandatory field west'),  # via _read_block
+    ({'west': ('   ',)},
+     True,
+     'Whitespace only cells in field west'),  # via _read_block
+    ({'west': ('2001-01-01',)},
+     True,
+     'Field west contains values of wrong type'),  # via _read_block
+    ({'west': (116.75, 116.75), 'east': (117.82, 117.82),
+      'south': (4.50, 4.50), 'north': (5.07, 5.07)},
+     True,
+     'Only a single record should be present'),
+    ({'west': (117.82, ), 'east': (116.75, )},
+     True,
+     'West limit is greater than east limit'),
+    ({'south': (5.07, ), 'east': (4.50, )},
+     True,
+     'South limit is greater than north limit'),
+])
+def test_geographic_extent(caplog, alterations, should_log_error, expected_log):
+
+    # Initialise a Summary instance.
+    summary = Summary(None, None)
+
+    # Valid set of information
+    input = {'west': (116.75, ), 'east': (117.82, ),
+             'south': (4.50, ), 'north': (5.07, )}
+
+    # Update valid to test error conditions and populate _rows
+    # directly (bypassing .load() and need to pack in worksheet object
+    input.update(alterations)
+    summary._rows = input
+
+    # Test the block load
+    summary._load_geographic_extent()
+
+    if should_log_error:
+        assert 'ERROR' in [r.levelname for r in caplog.records]
+
+    assert expected_log in caplog.text
+
+
+@pytest.mark.parametrize('alterations,should_log_error,expected_log', [
+    (dict(),  # no amendments
+     False,
+     'Metadata for External Files found'),
+    ({'external file': (None,),
+      'external file description': (None,)
+      },
+     False,  # Not a mandatory block
+     ''),
+    ({'external file': (123,)},
+     True,  # Non string filenames
+     'Field external file contains values of wrong type'),
+    ({'external file description': (456,)},
+     True,  # Non string description
+     'Field external file description contains values of wrong type'),
+    ({'external file': (None, None)
+      },
+     True,  # Must provide names
+     'Missing metadata in mandatory field external file'),
+    ({'external file description': (None, None)
+      },
+     True,  # Must describe files
+     'Missing metadata in mandatory field external file description'),
+    ({'external file': ('   ', '   \t')
+      },
+     True,  # Empty names
+     'Missing metadata in mandatory field external file'),
+    ({'external file': (' BaitTrapImages.zip', 'BaitTrapTransects.geojson ')
+      },
+     True,  # Whitespace in filenames (captures padding too)
+     'External file names must not contain whitespace'),
+    ({'external file': ('Bait Trap Images.zip', 'Bait Trap Transects.geojson')
+      },
+     True,  # Whitespace in filenames (captures padding too)
+     'External file names must not contain whitespace'),
+])
+def test_external_files(caplog, alterations, should_log_error, expected_log):
+
+    # Initialise a Summary instance.
+    summary = Summary(None, None)
+
+    # Valid set of information
+    input = {'external file': ('BaitTrapImages.zip', 'BaitTrapTransects.geojson'),
+             'external file description': ('Zip file containing 5000 JPEG images of bait trap cards',
+                                           'GeoJSON file containing polylines of the bait trap transects')}
+
+    # Update valid to test error conditions and populate _rows
+    # directly (bypassing .load() and need to pack in worksheet object
+    input.update(alterations)
+    summary._rows = input
+
+    # Test the block load
+    summary._load_external_files()
+
+    if should_log_error:
+        assert 'ERROR' in [r.levelname for r in caplog.records]
+
+    assert expected_log in caplog.text
+
+
+@pytest.mark.parametrize('alterations,alt_sheets,ext_alterations,should_log_error,expected_log', [
+    (dict(),  # no amendments
+     None,
+     dict(),
+     False,
+     'Metadata for Worksheets found'),
+    ({'worksheet title': ('My shiny dataset', None, 'Bait trap transect lines')}, # Missing data 
+     None,
+     dict(),
+     True,
+     'Missing metadata in mandatory field worksheet title'),
+    ({'worksheet name': ('DF', None, 'Transects')}, # Missing data 
+     None,
+     dict(),
+     True,
+     'Missing metadata in mandatory field worksheet name'),
+    ({'worksheet description': ('This is a test dataset', 'A test dataset too', None)}, # Missing data 
+     None,
+     dict(),
+     True,
+     'Missing metadata in mandatory field worksheet description'),
+    ({'worksheet external file': (None, None, None)}, # Missing data not a problem for external files
+     None,
+     dict(),
+     False,
+     'Metadata for Worksheets found'),
+    ({'worksheet title': (123, 123, 123)}, # Type errors 
+     None,
+     dict(),
+     True,
+     'Field worksheet title contains values of wrong type'),
+    ({'worksheet name': (123, 123, 123)},
+     None,
+     dict(),
+     True,
+     'Field worksheet name contains values of wrong type'),
+    ({'worksheet description': (123, 123, 123)},
+     None,
+     dict(),
+     True,
+     'Field worksheet description contains values of wrong type'),
+    ({'worksheet external file': (None, None, 123)},
+     None,
+     dict(),
+     True,
+     'Field worksheet external file contains values of wrong type'),
+    ({'worksheet name': ('NotInTheSheets',)}, # Unknown worksheet
+     None,
+     dict(),
+     True,
+     'Worksheet names not found in workbook'),
+    (dict(), # Unused worksheet
+     {'DF', 'Incidence', 'Transects', 'Summary', 'Taxa', 'Locations', 'NotUsed'},
+     dict(),
+     True,
+     ' Undocumented sheets found in workbook'),
+    ({'worksheet external file': (None, None, 'Amissingfile.dat',)}, # Unknown external file.
+     None,
+     dict(),
+     True,
+     'Worksheet descriptions refer to unreported external files'),
+    ({'worksheet title': ('My Taxa',),  'worksheet name': ('Taxa', ), #  Taxa included in data worksheets
+      'worksheet description': ('A list of taxa',), 'worksheet external file': (None,)},
+     None,
+     dict(),
+     True,
+     'Do not include Taxa or Locations metadata sheets in Data worksheet details'),
+    ({'worksheet title': ('My Locs',),  'worksheet name': ('Locations', ), #  Locations included in data worksheets
+      'worksheet description': ('A list of locations',), 'worksheet external file': (None,)},
+     None,
+     dict(),
+     True,
+     'Do not include Taxa or Locations metadata sheets in Data worksheet details'),
+    ({'worksheet title': (None,),  'worksheet name': (None, ), #  No data or external files
+      'worksheet description': (None,), 'worksheet external file': (None,)},
+     None,
+     {'external file': (None,), 'external file description': (None,)},
+     True,
+     'No data worksheets or external files provided - no data.'),
+    ({'worksheet title': (None,),  'worksheet name': (None, ), # Only external files
+      'worksheet description': (None,), 'worksheet external file': (None,)},
+     None,
+     dict(),
+     False,
+     'Only external file descriptions provided'),
+     ])
+def test_data_worksheets(caplog, alterations, alt_sheets, ext_alterations, should_log_error, expected_log):
+
+    """This test suite is more complex as the data worksheets need to match to the 
+    existing sheetnames in the workbook and potentially to a set of external files.
+    """
+
+    # Initialise a Summary instance
+    if alt_sheets is None:
+        summary = Summary(None, {'DF', 'Incidence', 'Transects', 'Summary', 'Taxa', 'Locations'})
+    else:
+        summary = Summary(None, alt_sheets)
+    
+    # Valid set of information
+    input = {'worksheet title': ('My shiny dataset', 'My incidence matrix', 
+                                 'Bait trap transect lines'),
+             'worksheet name': ('DF', 'Incidence', 'Transects'),
+             'worksheet description': ('This is a test dataset', 'A test dataset too', 
+                                       'Attribute table for transect GIS'),
+             'worksheet external file': (None, None, 'BaitTrapTransects.geojson')}
+
+
+    # Update valid to test error conditions and populate _rows
+    # directly (bypassing .load() and need to pack in worksheet object
+    input.update(alterations)
+    summary._rows = input
+    
+    # Populate the external files 
+    external = {'external file': ('BaitTrapImages.zip', 'BaitTrapTransects.geojson'),
+                'external file description': ('Zip file containing 5000 JPEG images of bait trap cards',
+                                              'GeoJSON file containing polylines of the bait trap transects')}
+
+    external.update(ext_alterations)
+    summary._rows.update(external)
+
+    # Load the external file data
+    summary._load_external_files()
+
+    # Test the block load
+    summary._load_data_worksheets()
+
+    if should_log_error:
+        assert 'ERROR' in [r.levelname for r in caplog.records]
+
+    assert expected_log in caplog.text
+
 
 
 

@@ -2,7 +2,7 @@ import requests
 from enforce_typing import enforce_types
 import datetime
 import re
-from safedata_validator.logger import LOGGER, FORMATTER, CH, log_and_raise
+from safedata_validator.logger import LOGGER, FORMATTER, CH, loggerinfo_push_pop
 from safedata_validator.validators import (GetDataFrame, IsLower, IsNotBlank,
                                            IsNotPadded, IsNotSpace, IsString,
                                            NoPunctuation, HasDuplicates)
@@ -13,6 +13,7 @@ RE_DOI = re.compile(r'https?://(dx.)?doi.org/')
 RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]')
 RE_EMAIL = re.compile(r'\S+@\S+\.\S+')
 RE_NAME = re.compile(r'[^,]+,[ ]?[^,]+')
+RE_CONTAINS_WSPACE = re.compile(r'\s')
 
 
 class Summary:
@@ -33,12 +34,13 @@ class Summary:
     # an internal field name, if needed in the code or by Zenodo.
 
     fields = dict(core=([('safe project id', True, 'pid', int),
-                         ('access status', True, 'access', str),
-                         ('embargo date', False, 'embargo_date', datetime.datetime),
-                         ('access conditions', False, 'access_conditions', str),
                          ('title', True, None, str),
                          ('description', True, None, str)],
                         True, 'Core fields', True),
+                  access=([('access status', True, 'access', str),
+                           ('embargo date', False, 'embargo_date', datetime.datetime),
+                           ('access conditions', False, 'access_conditions', str)],
+                          True, 'Access details', True),
                   keywords=([('keywords', True, None, str)],
                             True, 'Keywords', False),
                   doi=([('publication doi', True, None, str)],
@@ -74,17 +76,18 @@ class Summary:
                             ('permit number', True, 'number', (str, int, float))],
                            False, 'Permits', False))
 
-    def __init__(self, worksheet, validate_doi=False, valid_pid=None):
+    def __init__(self, worksheet, sheetnames, validate_doi=False, valid_pid=None):
 
         """
         Checks the information in the summary worksheet and looks for the
-        metadata and dataset worksheets. The function is intended to try and
+        metadata and dataset worksheets. The methods are intended to try and
         get as much information as possible from the worksheet: the dictionary
         of metadata returned will have None for any missing data, which should
         be handled by downstream code.
 
         Args:
             worksheet: An openpyxl worksheet instance.
+            sheetnames: A set of sheet names found in the workbook.
             validate_doi: Check any publication DOIs, requiring a web connection.
             valid_pid: If provided, an integer or list of integer values that are
                 permitted in the Project ID field (usually one for a new dataset
@@ -93,7 +96,10 @@ class Summary:
         """
 
         self.worksheet = worksheet
+        # TODO - sanitise these
+        self.sheetnames = sheetnames
         self.validate_doi = validate_doi
+        self._valid_pid = valid_pid
 
         self.project_id = None
         self.title = None
@@ -107,9 +113,11 @@ class Summary:
         self.temporal_extent = Extent('temporal extent', datetime.date)
         self.latitudinal_extent = Extent('latitudinal extent', float)
         self.longitudinal_extent = Extent('longitudinal extent', float)
+        self.external_files = None
+        self.dataworksheet_summaries = None
+
         self._rows = None
         self._ncols = None
-        self._valid_pid = []
 
         # validate project_id is one of None, an integer or a list of integers
         if valid_pid is None:
@@ -142,6 +150,20 @@ class Summary:
         FORMATTER.push()
 
         start_errors = CH.counters['ERROR']
+
+
+
+
+        # summary of processing
+        n_errors = CH.counters['ERROR'] - start_errors
+        if n_errors > 0:
+            LOGGER.info('Summary contains {} errors'.format(n_errors),
+                        extra={'indent_before': 1, 'indent_after': 0})
+        else:
+            LOGGER.info('Summary formatted correctly',
+                        extra={'indent_before': 1, 'indent_after': 0})
+
+
 
     def _load_rows(self):
 
@@ -225,7 +247,6 @@ class Summary:
                 return None
         else:
             LOGGER.info(f'Metadata for {title} found: {len(block)} records')
-            FORMATTER.push()
 
             if len(block) > 1 and only_one:
                 LOGGER.error('Only a single record should be present')
@@ -255,6 +276,7 @@ class Summary:
 
             return block
 
+    @loggerinfo_push_pop('Loading author metadata')
     def _load_authors(self):
 
         authors = self._read_block(*self.fields['authors'])
@@ -285,6 +307,7 @@ class Summary:
 
         self.authors = authors
 
+    @loggerinfo_push_pop('Loading keywords metadata')
     def _load_keywords(self):
 
         keywords = self._read_block(*self.fields['keywords'])
@@ -298,6 +321,7 @@ class Summary:
 
             self.keywords = keywords.values
 
+    @loggerinfo_push_pop('Loading permit metadata')
     def _load_permits(self):
 
         # LOOK FOR PERMIT DETAILS - users provide a permit authority, number and permit type
@@ -314,6 +338,7 @@ class Summary:
 
         self.permits = permits
 
+    @loggerinfo_push_pop('Loading DOI metadata')
     def _load_doi(self):
 
         # CHECK FOR PUBLICATION DOIs
@@ -338,6 +363,7 @@ class Summary:
 
         self.publication_doi = pub_doi
 
+    @loggerinfo_push_pop('Loading funding metadata')
     def _load_funders(self):
 
         # LOOK FOR FUNDING DETAILS - users provide a funding body and a description
@@ -367,18 +393,158 @@ class Summary:
             else:
                 self.temporal_extent.update([start_date, end_date])
 
+    @loggerinfo_push_pop('Loading geographic extent metadata')
     def _load_geographic_extent(self):
 
         # Geographic extents
         geo_extent = self._read_block(*self.fields['geo'])
-        bbox = geo_extent[0]
 
-        if all([isinstance(v, float) for v in bbox]):
-            self.latitudinal_extent.update([bbox['south'], bbox['north']])
-            self.longitudinal_extent.update([bbox['west'], bbox['east']])
+        if geo_extent is not None:
+
+            bbox = geo_extent[0]
+
+            if all([isinstance(v, float) for v in bbox]):
+
+                if bbox['south'] > bbox['north']:
+                    LOGGER.error('South limit is greater than north limit')
+                else:
+                    self.latitudinal_extent.update([bbox['south'], bbox['north']])
+
+                if bbox['west'] > bbox['east']:
+                    LOGGER.error('West limit is greater than east limit')
+                else:
+                    self.longitudinal_extent.update([bbox['west'], bbox['east']])
+
+    @loggerinfo_push_pop('Loading external file metadata')
+    def _load_external_files(self):
+
+        # LOAD EXTERNAL FILES - small datasets will usually be contained
+        # entirely in a single Excel file, but where formatting or size issues
+        # require external files, then names and descriptions are included in
+        # the summary information
+
+        external_files = self._read_block(*self.fields['external'])
+
+        # external file specific validation - no internal spaces.
+        if external_files is not None:
+
+            bad_names = [exf['file'] for exf in external_files
+                         if isinstance(exf['file'], str) and RE_CONTAINS_WSPACE.search(exf['file'])]
+            if any(bad_names):
+                LOGGER.error('External file names must not contain whitespace: ',
+                             extra={'join': bad_names})
+
+        self.external_files = external_files
+
+    @loggerinfo_push_pop('Loading data worksheet metadata')
+    def _load_data_worksheets(self):
+
+        # Load the WORKSHEETS block
+        data_worksheets = self._read_block(*self.fields['worksheet'])
+
+        # Strip out faulty inclusion of Taxa and Location worksheets in
+        # data worksheets before considering combinations of WS and external files
+        if data_worksheets is not None:
+
+            cited_sheets = [ws['name'] for ws in data_worksheets]
+
+            if ('Locations' in cited_sheets) or ('Taxa' in cited_sheets):
+                LOGGER.error('Do not include Taxa or Locations metadata sheets in '
+                             'Data worksheet details')
+
+                data_worksheets = [ws for ws in data_worksheets
+                                   if ws['name'] not in ('Locations', 'Taxa')] or None
+
+        # Look to see what data is available - must be one or both of data worksheets
+        # or external files and validate worksheets if present.
+        cited_sheets = set()
+
+        if data_worksheets is None and self.external_files is None:
+            LOGGER.error("No data worksheets or external files provided - no data.")
+        elif data_worksheets is None:
+            LOGGER.info("Only external file descriptions provided")
+        elif data_worksheets is not None:
+            # Check sheet names
+            cited_sheets = {ws['name'] for ws in data_worksheets}
+            # names not in list of sheets
+            bad_names = cited_sheets - self.sheetnames
+            if bad_names:
+                LOGGER.error('Worksheet names not found in workbook: ',
+                             extra={'join': bad_names, 'quote': True})
+            # bad external files
+            external_in_sheet = {ws['external'] for ws in data_worksheets
+                                 if ws['external'] is not None}
+            if self.external_files is not None:
+                external_names = {ex['file'] for ex in self.external_files}
+            else:
+                external_names = set()
+
+            bad_externals = external_in_sheet - external_names
+            if bad_externals:
+                LOGGER.error('Worksheet descriptions refer to unreported external files: ',
+                             extra={'join': bad_externals})
+
+        # Check for existing sheets without description
+        extra_names = self.sheetnames - {'Summary', 'Taxa', 'Locations'} - cited_sheets
+        if extra_names:
+            LOGGER.error('Undocumented sheets found in workbook: ',
+                         extra={'join': extra_names})
+        
+        self.data_worksheets = data_worksheets
+
+    @loggerinfo_push_pop('Loading access metadata')
+    def _load_access_details(self):
+
+        # Load the ACCESS DETAILS block
+        access = self._read_block(*self.fields['access'])
+        access = access[0]
+
+        # Access specific validation - bad types handled by _read_block
+        # - status must be in list of three accepted values
+        if isinstance(access['access'], str):
+
+            status = access['access'].lower()
+            embargo_date = access['embargo_date']
+
+            if status not in ['open', 'embargo', 'restricted']:
+                LOGGER.error(f'Access status must be Open, Embargo or Restricted not {access}')
+            
+            if status == 'embargo':
+                
+                if embargo_date is None:
+                    LOGGER.error('Dataset embargoed but no embargo date provided')
+                elif isinstance(embargo_date, datetime.datetime):
+                    now = datetime.datetime.now()
+
+                    if embargo_date < now:
+                        LOGGER.error('Embargo date is in the past.')
+                    elif embargo_date > now + datetime.timedelta(days=2 * 365):
+                        LOGGER.error('Embargo date more than two years in the future.')
+                    else:
+                        LOGGER.info(f'Dataset access: embargoed until {embargo_date }')
+                        self.embargo_date = embargo_date.date().isoformat()
+                
+                if access['access_conditions'] is not None:
+                    LOGGER.error('Access conditions cannot be set on embargoed data.')
+
+            elif status == 'restricted':
+                access_conditions = access['access_conditions']
+
+                if embargo_date is not None:
+                    LOGGER.error('Do not set an embargo date with restricted datasets')
+                
+                if access_conditions is None:
+                    LOGGER.error('Dataset restricted but no access conditions specified')
+                else:
+                    LOGGER.info(f'Dataset access: restricted with conditions {access_conditions}')
+                    self.access_conditions = access_conditions
+            else:
+                LOGGER.info(f'Dataset access: {status}')
 
 
-    def _unused_blocks(self):
+
+
+    def _load_core(self):
 
 
         # Now check core rows
@@ -450,129 +616,3 @@ class Summary:
                             self.access_conditions = access_conditions
                 else:
                     LOGGER.info(f'Dataset access: {self.access}')
-
-
-
-        # PROCESS BLOCKS OF CELLS
-        # Load the AUTHORS block
-
-
-
-
-        # CHECK EXTENTS - there are six fields to provide temporal and geographic
-        # extents for the data. These two extents are a mandatory component of Gemini
-        # Metadata so need to be provided if the worksheets and locations don't
-        # populate the extents.
-
-
-
-        # Geographic extents
-        geo_extent = read_block(fields['geo'])
-
-        if geo_extent is not None:
-
-            bbox = geo_extent[0]
-
-            bbox_field_types = {None if val is None else val.ctype for val in list(bbox.values())}
-
-            if not bbox_field_types.issubset({xlrd.XL_CELL_NUMBER, None}):
-                LOGGER.error('Geographic extents not numeric')
-            elif all(bbox.values()):
-
-                strip_ctypes(geo_extent)
-                valid = self.validate_geo_extent((bbox['west'], bbox['east']), 'longitude')
-                if valid:
-                    self.update_extent((bbox['west'], bbox['east']), float, 'longitudinal_extent')
-
-                valid = self.validate_geo_extent((bbox['south'], bbox['north']), 'latitude')
-                if valid:
-                    self.update_extent((bbox['south'], bbox['north']), float, 'latitudinal_extent')
-
-        # Finally, check the information on data content
-        LOGGER.info('Checking data: worksheets and external files',
-                    extra={'indent_before': 1})
-
-        # LOAD EXTERNAL FILES - small datasets will usually be contained
-        # entirely in a single Excel file, but where formatting or size issues
-        # require external files, then names and descriptions are included in
-        # the summary information
-
-        external_files = read_block(fields['external'])
-
-        # external file specific validation
-        if external_files is not None:
-            # simplify to cell values not xlrd.Cells
-            strip_ctypes(external_files)
-
-            bad_names = [exf['file'] for exf in external_files if RE_CONTAINS_WSPACE.search(exf['file'])]
-            if any(bad_names):
-                LOGGER.error('External file names must not contain whitespace: ',
-                             extra={'join': bad_names, 'quote': True})
-
-        self.external_files = external_files
-
-        # Load the WORKSHEETS block
-        dataworksheet_summaries = read_block(fields['worksheet'])
-
-        # Strip out faulty inclusion of Taxa and Location worksheets in data worksheets
-        if dataworksheet_summaries is not None:
-            # simplify to cell values not xlrd.Cells
-            strip_ctypes(dataworksheet_summaries)
-
-            # - catch inclusion of Taxa and Locations in data worksheets
-            cited_sheets = [ws['name'] for ws in dataworksheet_summaries]
-
-            if ('Locations' in cited_sheets) or ('Taxa' in cited_sheets):
-                LOGGER.error('Do not include Taxa or Locations metadata sheets in '
-                             'Data worksheet details')
-
-                dataworksheet_summaries = [ws for ws in dataworksheet_summaries
-                                           if ws['name'] not in ('Locations', 'Taxa')]
-
-                dataworksheet_summaries = None if not dataworksheet_summaries else dataworksheet_summaries
-
-        # Look to see what data is available - must be one or both of data worksheets
-        # or external files and validate worksheets if present.
-        cited_sheets = set()
-
-        if dataworksheet_summaries is None and external_files is None:
-            LOGGER.error("No data worksheets or external files provided - no data.")
-        elif dataworksheet_summaries is None:
-            LOGGER.info("Only external file descriptions provided")
-        elif dataworksheet_summaries is not None:
-            # Check sheet names
-            cited_sheets = {ws['name'] for ws in dataworksheet_summaries}
-            # names not in list of sheets
-            bad_names = cited_sheets - self.sheet_names
-            if bad_names:
-                LOGGER.error('Worksheet names not found in workbook: ',
-                             extra={'join': bad_names, 'quote': True})
-            # bad external files
-            external_in_sheet = {ws['external'] for ws in dataworksheet_summaries
-                                 if ws['external'] is not None}
-            if self.external_files is not None:
-                external_names = {ex['file'] for ex in self.external_files}
-            else:
-                external_names = set()
-
-            bad_externals = external_in_sheet - external_names
-            if bad_externals:
-                LOGGER.error('Worksheet descriptions refer to unreported external files.',
-                             extra={'join': bad_externals, 'quote': True})
-
-        # Check for existing sheets without description
-        extra_names = self.sheet_names - {'Summary', 'Taxa', 'Locations'} - cited_sheets
-        if extra_names:
-            LOGGER.error('Undocumented sheets found in workbook: ',
-                         extra={'join': extra_names, 'quote': True})
-
-        self.dataworksheet_summaries = dataworksheet_summaries
-
-        # summary of processing
-        n_errors = CH.counters['ERROR'] - start_errors
-        if n_errors > 0:
-            LOGGER.info('Summary contains {} errors'.format(n_errors),
-                        extra={'indent_before': 1, 'indent_after': 0})
-        else:
-            LOGGER.info('Summary formatted correctly',
-                        extra={'indent_before': 1, 'indent_after': 0})
