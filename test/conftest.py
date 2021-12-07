@@ -2,6 +2,7 @@ import pytest
 import os
 import simplejson
 from safedata_validator.resources import Resources
+import openpyxl
 
 """
 This file contains fixtures that will be available to all test suites.
@@ -11,7 +12,7 @@ This file contains fixtures that will be available to all test suites.
 fixture_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
 loc_file = os.path.join(fixture_dir, 'locations.json')
 gbif_file = os.path.join(fixture_dir, 'gbif_backbone_truncated.sqlite')
-
+good_file_path = os.path.join(fixture_dir, 'Test_format_good.xlsx')
 
 @pytest.fixture(scope='module')
 def config_filesystem(fs):
@@ -89,3 +90,11 @@ def resources_local_and_remote(request):
         return resources_with_remote_gbif
     elif request.param == 'local':
         return resources_with_local_gbif
+
+
+
+@pytest.fixture(scope='module')
+def good_excel_file():
+
+    wb = openpyxl.load_workbook(good_file_path, read_only=True)
+    return wb

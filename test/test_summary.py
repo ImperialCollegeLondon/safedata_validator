@@ -1,9 +1,5 @@
-from datetime import date
+import datetime
 import pytest
-import dotmap
-import os
-import string
-import openpyxl
 
 from safedata_validator.logger import LOGGER
 from safedata_validator.summary import *
@@ -752,5 +748,9 @@ def test_data_worksheets(caplog, alterations, alt_sheets, ext_alterations, shoul
     assert expected_log in caplog.text
 
 
+def test_load_from_file(good_excel_file):
 
+    summary = Summary(good_excel_file['Summary'], set(good_excel_file.sheetnames))
+    summary.load()
 
+    assert summary.n_errors == 0

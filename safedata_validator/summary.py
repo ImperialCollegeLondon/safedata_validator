@@ -1,14 +1,12 @@
 import requests
-from enforce_typing import enforce_types
+# from enforce_typing import enforce_types
 import datetime
 import re
 from safedata_validator.logger import LOGGER, FORMATTER, CH, loggerinfo_push_pop
-from safedata_validator.validators import (GetDataFrame, IsLower, IsNotBlank,
-                                           IsNotPadded, IsNotSpace, IsString,
-                                           NoPunctuation, HasDuplicates)
+from safedata_validator.validators import (IsNotSpace, IsString, NoPunctuation)
 from safedata_validator.extent import Extent
 
-# Compile some global regex expressions
+# Compile some regex expressions used in Summary checking
 RE_DOI = re.compile(r'https?://(dx.)?doi.org/')
 RE_ORCID = re.compile(r'[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]')
 RE_EMAIL = re.compile(r'\S+@\S+\.\S+')
@@ -76,6 +74,8 @@ class Summary:
                             ('permit number', True, 'number', (str, int, float))],
                            False, 'Permits', False))
 
+    # TODO - pass in dataset instead of sheetnames? or indeed worksheet.
+
     def __init__(self, worksheet, sheetnames, validate_doi=False, valid_pid=None):
 
         """
@@ -105,19 +105,20 @@ class Summary:
         self.title = None
         self.description = None
         self.access = None
-        self.access_conditions = None
-        self.embargo_date = None
         self.authors = None
+        self.permits = None
         self.publication_doi = None
+        self.funders = None
         self.keywords = None
         self.temporal_extent = Extent('temporal extent', datetime.date)
         self.latitudinal_extent = Extent('latitudinal extent', float)
         self.longitudinal_extent = Extent('longitudinal extent', float)
         self.external_files = None
-        self.dataworksheet_summaries = None
+        self.data_worksheets = None
 
         self._rows = None
         self._ncols = None
+        self.n_errors = None
 
         # validate project_id is one of None, an integer or a list of integers
         if valid_pid is None:
@@ -134,38 +135,16 @@ class Summary:
             LOGGER.error("Provided project id must be an integer or list of integers")
             self._valid_pid = None
 
-    def load(self, worksheet, validate_doi=False, valid_pid=None):
+    @loggerinfo_push_pop('Checking Summary worksheet')
+    def load(self):
         """
-
-        Args:
-            worksheet:
-            validate_doi:
-            valid_pid:
 
         Returns:
 
         """
         # try and get the summary worksheet
-        LOGGER.info("Checking Summary worksheet")
-        FORMATTER.push()
 
         start_errors = CH.counters['ERROR']
-
-
-
-
-        # summary of processing
-        n_errors = CH.counters['ERROR'] - start_errors
-        if n_errors > 0:
-            LOGGER.info('Summary contains {} errors'.format(n_errors),
-                        extra={'indent_before': 1, 'indent_after': 0})
-        else:
-            LOGGER.info('Summary formatted correctly',
-                        extra={'indent_before': 1, 'indent_after': 0})
-
-
-
-    def _load_rows(self):
 
         # load worksheet rows
         rows = list(self.worksheet.iter_rows(values_only=True))
@@ -196,6 +175,26 @@ class Summary:
         if found - valid_fields:
             LOGGER.error('Unknown metadata fields: ',
                          extra={'join': found - valid_fields})
+
+        # Now process the field blocks
+        self._load_core()
+        self._load_access_details()
+        self._load_authors()
+        self._load_keywords()
+        self._load_doi()
+        self._load_temporal_extent()
+        self._load_geographic_extent()
+        self._load_funders()
+        self._load_permits()
+        self._load_external_files()
+        self._load_data_worksheets()
+
+        # summary of processing
+        self.n_errors = CH.counters['ERROR'] - start_errors
+        if self.n_errors > 0:
+            LOGGER.info('Summary contains {} errors'.format(self.n_errors > 0))
+        else:
+            LOGGER.info('Summary formatted correctly')
 
     def _read_block(self, field_desc, mandatory, title, only_one):
         """
@@ -244,7 +243,9 @@ class Summary:
         if not block:
             if mandatory:
                 LOGGER.error(f'No {title} metadata found')
-                return None
+            else:
+                LOGGER.info(f'No {title} metadata found')
+            return None
         else:
             LOGGER.info(f'Metadata for {title} found: {len(block)} records')
 
@@ -314,6 +315,7 @@ class Summary:
 
         # extra data validation for keywords
         if keywords:
+            keywords = [rec['keywords'] for rec in keywords]
             keywords = NoPunctuation(keywords)
             if not keywords:
                 LOGGER.error('Put each keyword in a separate cell, do not separate '
@@ -376,6 +378,7 @@ class Summary:
 
         self.funders = funders
 
+    @loggerinfo_push_pop('Loading temporal extent metadata')
     def _load_temporal_extent(self):
 
         temp_extent = self._read_block(*self.fields['date'])
@@ -522,7 +525,6 @@ class Summary:
                         LOGGER.error('Embargo date more than two years in the future.')
                     else:
                         LOGGER.info(f'Dataset access: embargoed until {embargo_date }')
-                        self.embargo_date = embargo_date.date().isoformat()
                 
                 if access['access_conditions'] is not None:
                     LOGGER.error('Access conditions cannot be set on embargoed data.')
@@ -537,82 +539,24 @@ class Summary:
                     LOGGER.error('Dataset restricted but no access conditions specified')
                 else:
                     LOGGER.info(f'Dataset access: restricted with conditions {access_conditions}')
-                    self.access_conditions = access_conditions
             else:
                 LOGGER.info(f'Dataset access: {status}')
+        
+        self.access = access
 
-
-
-
+    @loggerinfo_push_pop('Loading core metadata')
     def _load_core(self):
 
-
         # Now check core rows
-        singletons = read_block(*fields['core'])
-        singletons = singletons[0]
+        core = self._read_block(*self.fields['core'])
+        core = core[0]
 
         # Project ID specific validation
-        pid = singletons['pid']
+        pid = core['pid']
 
         # Check the value is in the provided list
-        if project_id is not None and pid not in project_id:
-            pid_str = ', '.join([str(p) for p in project_id])
+        if pid is not None and self._valid_pid is not None and pid not in self._valid_pid:
             LOGGER.error(f'SAFE Project ID in file ({pid}) does not match any '
-                         f'provided project ids ({pid_str})')
+                         f'provided project ids: ', extra={'join': self._valid_pid})
         else:
             self.project_id = pid
-
-        # Title validation
-        if singletons['title'] is None:
-            LOGGER.error('Dataset title is blank')
-        else:
-            self.title = singletons['title']
-
-        # Description validation
-        if singletons['description'] is not None:
-            LOGGER.error('Dataset description is blank')
-        else:
-            self.description = singletons['description'].value
-
-        # Access status and embargo validation
-        if singletons['access'] is not None:
-            access = singletons['access']
-            if not isinstance(access, str):
-                LOGGER.error(f'Access status not a text value: {access}')
-            elif access.lower() not in ['open', 'embargo', 'restricted']:
-                LOGGER.error('Access status must be Open, Embargo or Restricted '
-                             f'not {access}')
-            else:
-                self.access = access.lower()
-
-                if self.access == 'embargo':
-                    embargo_date = singletons['embargo_date']
-                    if embargo_date is None:
-                        LOGGER.error('Dataset embargoed but no embargo date provided')
-                    else:
-
-                        if not isinstance(embargo_date, datetime.datetime):
-                            LOGGER.error(f'Embargo date not a date value: {embargo_date }')
-                        else:
-                            now = datetime.datetime.now()
-
-                            if embargo_date < now:
-                                LOGGER.error('Embargo date is in the past.')
-                            elif embargo_date > now + datetime.timedelta(days=2 * 365):
-                                LOGGER.error('Embargo date more than two years in the future.')
-                            else:
-                                LOGGER.info(f'Dataset access: embargoed until {embargo_date }')
-                                self.embargo_date = embargo_date.date().isoformat()
-                elif self.access == 'restricted':
-                    access_conditions = singletons['access_conditions']
-
-                    if access_conditions is None:
-                        LOGGER.error('Dataset restricted but no access conditions specified')
-                    else:
-                        if not isinstance(access_conditions, str):
-                            LOGGER.error(f'Access conditions are not text: {access_conditions}')
-                        else:
-                            LOGGER.info(f'Dataset access: restricted with conditions {access_conditions}')
-                            self.access_conditions = access_conditions
-                else:
-                    LOGGER.info(f'Dataset access: {self.access}')
