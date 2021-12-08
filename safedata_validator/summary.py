@@ -390,8 +390,8 @@ class Summary:
             end_date = temp_extent[0]['end date']
 
             if (isinstance(start_date, datetime.datetime) and
-                    isinstance(end_date, datetime.datetime) and
-                    start_date > end_date):
+                isinstance(end_date, datetime.datetime) and
+                start_date > end_date):
                 LOGGER.error('Start date is after end date')
             else:
                 self.temporal_extent.update([start_date, end_date])
@@ -405,9 +405,8 @@ class Summary:
         if geo_extent is not None:
 
             bbox = geo_extent[0]
-
-            if all([isinstance(v, float) for v in bbox]):
-
+            
+            if all([isinstance(v, float) for v in bbox.values()]):
                 if bbox['south'] > bbox['north']:
                     LOGGER.error('South limit is greater than north limit')
                 else:

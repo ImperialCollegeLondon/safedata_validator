@@ -422,7 +422,7 @@ def test_funders(caplog, alterations, should_log_error, expected_log):
     ({'start date': (None,),
       'end date': (None,)},
      False,  # Not a mandatory block
-     ''),
+     'No Date Extents metadata found'),
     ({'start date': (None,)},
      True,
      'Missing metadata in mandatory field start date'),  # via _read_block
@@ -470,7 +470,7 @@ def test_temporal_extent(caplog, alterations, should_log_error, expected_log):
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
     else:
-        assert summary.temporal_extent.extent == (datetime.datetime(2001, 1, 1), datetime.datetime(2011, 1, 1))
+        assert summary.temporal_extent.extent == (input['start date'][0], input['end date'][0])
 
     assert expected_log in caplog.text
 
@@ -529,7 +529,7 @@ def test_temporal_extent(caplog, alterations, should_log_error, expected_log):
     ({'west': (117.82, ), 'east': (116.75, )},
      True,
      'West limit is greater than east limit'),
-    ({'south': (5.07, ), 'east': (4.50, )},
+    ({'south': (5.07, ), 'north': (4.50, )},
      True,
      'South limit is greater than north limit'),
 ])
