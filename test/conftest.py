@@ -87,9 +87,9 @@ def resources_local_and_remote(request):
     """
 
     if request.param == 'remote':
-        return resources_with_remote_gbif
+        return Resources(locations=loc_file, gbif_database=None)
     elif request.param == 'local':
-        return resources_with_local_gbif
+        return Resources(locations=loc_file, gbif_database=gbif_file)
 
 
 

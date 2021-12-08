@@ -16,6 +16,7 @@ def validators(resources_with_local_gbif, request):
 # Testing Taxon
 # ------------------------------------------
 
+
 @pytest.mark.parametrize(
     'test_input,expected_exception',
     [(dict(),  # no parameters
@@ -99,6 +100,33 @@ def test_validator_gbif_lookup_errors(validators, test_input, expected_exception
     with pytest.raises(expected_exception):
         _ = validators.id_lookup(test_input)
 
+# ------------------------------------------
+# Testing Taxa _validate_tuple
+# - This private method tests the individual tuples of taxon and parent
+#   provided in the Taxa sheet, separating loading from testing. The test
+#   cases test the various combinations of good and bad inputs.
+# ------------------------------------------
 
-# TODO - dynamically create taxon worksheets with single row to test
-#        all the outcomes and failure modes.
+
+@pytest.mark.parametrize(
+    'taxon_tuple,expected_log',
+    [(('Crematogaster borneensis',
+            ('Crematogaster borneensis', 'Species', None, None),
+            None),
+       'Taxon found in GBIF backbone (accepted)'),
+      (('Dolichoderus sp.',
+            ('Dolichoderus', 'Genus', None, None),
+            None),
+       'Taxon found in GBIF backbone (accepted)'),
+       (('Ponerinae #1',
+            ('Ponerinae', 'Subfamily', None, None),
+            ('Formicidae', 'Family', None, None)),
+       'subfamily with valid parent information'),
+    ])
+def test_validate_tuple(caplog, resources_local_and_remote, taxon_tuple, expected_log):
+
+    taxa_instance = taxa.Taxa(resources_local_and_remote)
+    taxa_instance.validate_tuple(taxon_tuple)
+
+    assert expected_log in caplog.text
+
