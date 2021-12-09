@@ -66,9 +66,6 @@ class IndentFormatter(logging.Formatter):
 
     def format(self, rec):
 
-        if hasattr(rec, 'depth'):
-            self.depth = getattr(rec, 'depth')
-
         rec.indent = '    ' * self.depth
 
         # encode level
@@ -77,33 +74,12 @@ class IndentFormatter(logging.Formatter):
 
         # format message
         msg = logging.Formatter.format(self, rec)
-        # add any joined values
+        # add any joined values as repr
         if hasattr(rec, 'join'):
-            if hasattr(rec, 'quote') and rec.quote:
-                # quote if requested and then avoid requoting if the
-                # formatter is emitting to more than one stream handler
-                rec.join = ["'" + o + "'" for o in rec.join]
-                del rec.quote
-            msg += ', '.join(rec.join)
+            msg += ', '.join([repr(o) for o in rec.join])
 
         return msg
 
-
-def log_and_raise(logger, msg, raise_type):
-    """ A convenience function that adds a message and a critical entry
-    to the logger and then raises an exception with the same message.
-
-    Args:
-        logger: A logging.Logger instance
-        msg: A message to add to the log and error
-        raise_type: An exception type
-
-    Returns:
-        None
-    """
-
-    logger.critical(msg)
-    raise raise_type(msg)
 
 # Setup the logging instance
 LOGGER = logging.getLogger(__name__)
@@ -148,3 +124,45 @@ elif not verbose:
     if 'console_log' in handler_names:
         console_log_handler = LOGGER.handlers[handler_names.index('console_log')]
         LOGGER.removeHandler(console_log_handler)
+
+#
+# CONVENIENCE FUNCTIONS
+#
+
+def log_and_raise(logger, msg, raise_type):
+    """ A convenience function that adds a message and a critical entry
+    to the logger and then raises an exception with the same message.
+
+    Args:
+        logger: A logging.Logger instance
+        msg: A message to add to the log and error
+        raise_type: An exception type
+
+    Returns:
+        None
+    """
+
+    logger.critical(msg)
+    raise raise_type(msg)
+
+
+def loggerinfo_push_pop(wrapper_message):
+    """This is a convenience decorator to allow reduce boilerplate logger code
+    around functions."""
+
+    def decorator_func(func):
+        def wrapper_func(*args, **kwargs):
+
+            # Emit the logger info and step in a level
+            LOGGER.info(wrapper_message)
+            FORMATTER.push()
+
+            # Invoke the wrapped function 
+            retval = func(*args, **kwargs)
+
+            # Step back out
+            FORMATTER.pop()
+
+            return retval
+        return wrapper_func
+    return decorator_func

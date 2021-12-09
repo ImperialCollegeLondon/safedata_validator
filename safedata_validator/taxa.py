@@ -1,4 +1,5 @@
 from collections import Counter
+from logging import Formatter
 from typing import Union, Optional
 import dataclasses
 from io import StringIO
@@ -7,9 +8,9 @@ import sqlite3
 import requests
 from enforce_typing import enforce_types
 
-from safedata_validator.logger import LOGGER, FORMATTER, CH, log_and_raise
-from safedata_validator.validators import (GetDataFrame, IsLower, IsNotBlank,
-                                           IsNotPadded, IsString, HasDuplicates)
+from safedata_validator.logger import LOGGER, FORMATTER, CH, loggerinfo_push_pop
+from safedata_validator.validators import (GetDataFrame, IsLower, 
+                                           IsNotPadded, HasDuplicates)
 
 """
 This module describes classes and methods used to compile taxonomic data from
@@ -37,8 +38,8 @@ BACKBONE_RANKS = ['kingdom', 'phylum', 'order', 'class', 'family',
 #        that is used within a generic id_lookup and search class.
 #        Notably there us much less information in the row return from the
 #        local SQL db (e.g. merging acceptedKey and parentKey, but also not
-#        providing parent hierarcy taxon names.  Could defining some SQL
-#        queries to add some of that information into the local database?
+#        providing parent hierarchy taxon names.  Could define an SQL
+#        document to structure the local database to match remote?
 
 
 class GBIFError(Exception):
@@ -408,59 +409,71 @@ class RemoteGBIFValidator:
         return taxon
 
 
-@dataclasses.dataclass()
 class Taxa:
-    """
-           Attempts to load and check the content of the Taxa worksheet. The
-        method checks that all taxa have a local name and then validates
-        taxon names and parent names against the GBIF backbone. It populates
-        two things:
-            i)  the taxon_names attribute of the dataset, which is just a set of
-                names used as a validation list for taxon names used in data worksheets.
-            ii) the taxon_index attribute of the dataset, which contains a set
-                of lists recording the full hierarchy of the taxa in the dataset
-                for use in dataset searching, so including not just the named taxa,
-                but all higher taxa needed to complete the backbone.
 
-                Each list consists of:
-                    [worksheet_name (str),
-                     gbif_id (int),
-                     gbif_parent_id (int),
-                     canonical_name (str),
-                     taxonomic_rank (str),
-                     status (str)]
+    def __init__(self, resources):
+        """A class to hold a list of taxon names and a validated taxonomic 
+        index for those taxa and their taxonomic hierarchy. The validate_taxon
+        method checks that taxon details and their optional parent taxon can be
+        matched into the the GBIF backbone and populates two things:
 
-                Where a taxon is not accepted or doubtful on GBIF, two entries are
-                inserted for the taxon, one under the canon name and one under the
-                provided name. They will share the same worksheet name and so can
-                be paired back up for description generation. The worksheet name
-                for parent taxa and deeper taxonomic hierarchy is set to None.
+        i)  the taxon_names attribute of the dataset, which is just a set of
+            names used as a validation list for taxon names used in data worksheets.
+        ii) the taxon_index attribute of the dataset, which contains a set
+            of lists structured as:
 
-            The index can then be used:
-            a) to generate the taxonomic coverage section of the dataset description, and
-            b) as the basis of a SQL dataset_taxa table to index the taxonomic coverage
-               of datasets.
-    """
+                [worksheet_name (str),
+                gbif_id (int),
+                gbif_parent_id (int),
+                canonical_name (str),
+                taxonomic_rank (str),
+                status (str)]
 
-    taxon_index = []
-    taxon_names = set()
+            Where a taxon is not accepted or doubtful on GBIF, two entries are
+            inserted for the taxon, one under the canon name and one under the
+            provided name. They will share the same worksheet name and so can
+            be paired back up for description generation. The worksheet name
+            for parent taxa and deeper taxonomic hierarchy is set to None.
+        
+        The index_higher_taxa method can be used to extend the taxon_index to
+        include all of the higher taxa linking the validated taxa.
 
-    def load(self, worksheet, resources):
+        The index can then be used:
+
+        a) to generate the taxonomic coverage section of the dataset description, and
+        b) as the basis of a SQL dataset_taxa table to index the taxonomic coverage
+        of datasets.
         """
 
+        self.taxon_index = []
+        self.taxon_names = set()
+        self.parents = dict()
+        self.hierarchy = set()
+        self.n_errors = None
+        
+        # Get a validator instance
+        if resources.use_local_gbif:
+            self.validator = LocalGBIFValidator(resources)
+        else:
+            self.validator = RemoteGBIFValidator()
+    
+    @loggerinfo_push_pop('Loading Taxa worksheet')
+    def load(self, worksheet):
+        """Loads a set of taxa from the rows of a SAFE formatted Taxa worksheet and 
+        then adds the higher taxa for those rows.
+
         Args:
-            worksheet:
-            resources:
+            worksheet: An openpyxl worksheet instance following the Taxa formatting
 
         Returns:
-            Updates the taxon_names and taxon_index attributes of the class instance.
-
+            Updates the taxon_names and taxon_index attributes of the class instance
+            using the data in the worksheet.
         """
 
         start_errors = CH.counters['ERROR']
 
         # Get the field headers from the first row
-        LOGGER.info("Reading taxa headers")
+        LOGGER.info("Reading taxa data")
         FORMATTER.push()
         dframe = GetDataFrame(worksheet)
 
@@ -502,6 +515,7 @@ class Taxa:
 
         # get dictionaries of the taxa
         taxa = [dict(zip(headers, rw)) for rw in zip(*dframe.data_columns)]
+        FORMATTER.pop()
 
         # check number of taxa found
         if len(taxa) == 0:
@@ -520,9 +534,7 @@ class Taxa:
         #       (taxon name, taxon type, taxon id, ignore id),
         #       (parent name, parent type, parent id, None))
 
-        taxon_tuples = []
-
-        for row in taxa:
+        for idx, row in enumerate(taxa):
             m_tuple = (row['taxon name'], row['taxon type'], row['taxon id'], row['ignore id'])
             p_tuple = (row['parent name'], row['parent type'], row['parent id'], None)
 
@@ -530,65 +542,91 @@ class Taxa:
             if p_tuple == (None, None, None, None):
                 p_tuple = None
 
-            self.taxon_names.update(row['name'])
-            taxon_tuples.append((row['name'], m_tuple, p_tuple))
-
-        # Get a validator instance
-        if resources.use_local_gbif:
-            validator = LocalGBIFValidator(resources)
-        else:
-            validator = RemoteGBIFValidator()
-
-        # Build a dictionary keyed on taxon tuples that stores Taxon
-        # objects for parents and children. This is then used to look up
-        # combinations of parent and taxon in cross validation
-
-        parent_dict = {}
-        taxon_hier = set()
-
-        parents = set([tx[2] for tx in taxon_tuples if tx[2] is not None])
-
-        if len(parents):
-            LOGGER.info(f'Checking {len(parents)} parent taxa')
+            self.taxon_names.update([row['name']])
+            LOGGER.info(f"Validating row {idx + 1}: {row['name']}")
             FORMATTER.push()
-
-            for p_tuple in parents:
-
-                # Create a taxon object
-                p_taxon = Taxon(name=p_tuple[0], rank=p_tuple[1],
-                                gbif_id=p_tuple[2], ignore_gbif=p_tuple[3])
-
-                # Parents _must_ be a backbone type
-                if not p_taxon.is_backbone:
-                    LOGGER.error(f'{p_taxon}: is not of a backbone rank')
-                    continue
-
-                # Look for a match
-                p_taxon = validator.search(p_taxon)
-
-                if not p_taxon.found:
-                    LOGGER.error(f'{p_taxon}: {p_taxon.lookup_status}')
-
-                # Store the search results keyed by parent tuple and update hierarchy and index
-                parent_dict[p_tuple] = p_taxon
-                taxon_hier.update([rw for rw in p_taxon.hierarchy if rw[1] is not None])
-                self.taxon_index.append([None, p_taxon.gbif_id, p_taxon.parent_id,
-                                         p_taxon.name, p_taxon.rank, p_taxon.taxon_status])
-
-                # If not canon usage, issue a warning using the canon usage
-                # stored in the Taxon object and update the index
-                if not p_taxon.is_canon:
-                    LOGGER.warning(f'{p_taxon.name}: considered a {p_taxon.taxon_status}'
-                                   f' of {p_taxon.canon_usage.name} in GBIF backbone')
-                    taxon_hier.update([rw for rw in p_taxon.canon_usage.hierarchy if rw[1] is not None])
-                    self.taxon_index.append([None,
-                                             p_taxon.canon_usage.gbif_id,
-                                             p_taxon.canon_usage.parent_id,
-                                             p_taxon.canon_usage.name,
-                                             p_taxon.canon_usage.rank,
-                                             p_taxon.canon_usage.taxon_status])
-
+            self.validate_tuple((row['name'], m_tuple, p_tuple))
             FORMATTER.pop()
+        
+        # Add the higher taxa
+        self.index_higher_taxa()
+
+        # summary of processing
+        self.n_errors = CH.counters['ERROR'] - start_errors
+        if self.n_errors > 0:
+            LOGGER.info('Taxa contains {} errors'.format(self.n_errors))
+        else:
+            LOGGER.info('{} taxa loaded correctly'.format(len(self.taxon_names)))
+
+        FORMATTER.pop()
+
+    # TODO - would be nice to use the decorator, but more complex than
+    #        I had anticipated: https://stackoverflow.com/questions/11731136/
+    #        @loggerinfo_push_pop(f'Validating {self._row_description}')
+    #        It also ties validate_tuple to the load method.
+    def validate_tuple(self, taxon_tuple):
+        """ Takes a standard representation of user information on a taxon and 
+        optionally a parent taxon, validates it and updates the instance to 
+        include the new details. The taxon tuple has the form:
+
+        ('worksheet_name', 
+         ('taxon name', 'taxon type', 'taxon id', 'ignore id'),
+         ('parent name', 'parent type', 'parent id', None))
+
+        If there is no parent information, the structure is:
+        ('worksheet_name', 
+         ('taxon name', 'taxon type', 'taxon id', 'ignore id'),
+          None)
+
+        Args:
+            taxon_tuple: A taxon tuple in standard form as above
+
+        Returns:
+            Updates the taxon_names and taxon_index attributes of the class instance.
+        """
+
+        m_name, m_tuple, p_tuple = taxon_tuple
+
+        # Parent taxon checking - can be None, already processed with a previous
+        # tuple and stored in the taxon index, or be new and need processing.
+        if p_tuple is None:
+            p_taxon = None
+        elif p_tuple in self.parents:
+            p_taxon = self.parents[p_tuple]
+            LOGGER.info(f'Parent taxon ({p_taxon}) already checked')
+        else:
+            # Create a taxon object
+            p_taxon = Taxon(name=p_tuple[0], rank=p_tuple[1],
+                            gbif_id=p_tuple[2], ignore_gbif=p_tuple[3])
+
+            # Parents _must_ be a backbone type
+            if not p_taxon.is_backbone:
+                LOGGER.error(f'Parent taxon ({p_taxon}) is not of a backbone rank')
+
+            # Look for a match
+            p_taxon = self.validator.search(p_taxon)
+
+            if not p_taxon.found:
+                LOGGER.error(f'Parent taxon ({p_taxon}) {p_taxon.lookup_status}')
+
+            # Store the search results keyed by parent tuple and update hierarchy and index
+            self.parents[p_tuple] = p_taxon
+            self.hierarchy.update([rw for rw in p_taxon.hierarchy if rw[1] is not None])
+            self.taxon_index.append([None, p_taxon.gbif_id, p_taxon.parent_id,
+                                        p_taxon.name, p_taxon.rank, p_taxon.taxon_status])
+
+            # If not canon usage, issue a warning using the canon usage
+            # stored in the Taxon object and update the index
+            if not p_taxon.is_canon:
+                LOGGER.warning(f'Parent taxon ({p_taxon.name}) considered a {p_taxon.taxon_status}'
+                               f' of {p_taxon.canon_usage.name} in GBIF backbone')
+                self.hierarchy.update([rw for rw in p_taxon.canon_usage.hierarchy if rw[1] is not None])
+                self.taxon_index.append([None,
+                                            p_taxon.canon_usage.gbif_id,
+                                            p_taxon.canon_usage.parent_id,
+                                            p_taxon.canon_usage.name,
+                                            p_taxon.canon_usage.rank,
+                                            p_taxon.canon_usage.taxon_status])
 
         # Now check main taxa
         #
@@ -609,39 +647,27 @@ class Taxa:
         # tx_nomatch     | [    X d)    ] |  O e)  |
         # tx_nonbackbone | [    X f)    ] |  O g)  |
 
-        LOGGER.info(f'Validating {len(taxon_tuples)} taxa')
-        FORMATTER.push()
+        # Create the taxon instance
+        m_taxon = Taxon(name=m_tuple[0], rank=m_tuple[1],
+                        gbif_id=m_tuple[2], ignore_gbif=m_tuple[3])
 
-        for idx, (m_name, m_tuple, p_tuple) in enumerate(taxon_tuples):
+        # Handle non-backbone cases first - just needs a valid parent.
+        if not m_taxon.is_backbone:
 
-            # Get a row label and retrieve the parent taxon (which is often None)
-            rw_ref = f'Row {idx + 2} ({m_name})'
-            p_taxon = parent_dict.get(p_tuple)
-
-            # Create the taxon instance
-            m_taxon = Taxon(name=m_tuple[0], rank=m_tuple[1],
-                            gbif_id=m_tuple[2], ignore_gbif=m_tuple[3])
-
-            # Handle non-backbone cases first - just needs a valid parent.
-            if not m_taxon.is_backbone:
-
-                if p_taxon is None or not p_taxon.found:
-                    # f) Non backbone with no or bad parent information
-                    LOGGER.error(f'{rw_ref}: taxa of type {m_taxon.rank} must '
-                                 'have valid parent information.')
-                else:
-                    # g) Taxon is a non backbone type with good parent info
-                    LOGGER.info(f'{rw_ref}: {m_taxon.rank} with valid parent information ')
-                    # Update index - no taxon hierarchy except for parent
-                    self.taxon_index.append([m_name, -1, p_taxon.gbif_id,
-                                             m_taxon.name, m_taxon.rank,
-                                             'user'])
-
-                continue
-
+            if p_taxon is None or not p_taxon.found:
+                # f) Non backbone with no or bad parent information
+                LOGGER.error(f'Taxon of type {m_taxon.rank} must '
+                              'have valid parent information.')
+            else:
+                # g) Taxon is a non backbone type with good parent info
+                LOGGER.info(f'{m_taxon.rank} with valid parent information ')
+                # Update index - no taxon hierarchy except for parent
+                self.taxon_index.append([m_name, -1, p_taxon.gbif_id,
+                                            m_taxon.name, m_taxon.rank,
+                                            'user'])
+        else:
             # Otherwise try and validate backbone taxon
-
-            m_taxon = validator.search(m_taxon)
+            m_taxon = self.validator.search(m_taxon)
 
             # Flag ignored matches
             if ((not m_taxon.is_canon) and
@@ -657,16 +683,17 @@ class Taxa:
                 self.taxon_index.append([m_name, m_taxon.gbif_id, m_taxon.parent_id,
                                          m_taxon.name, m_taxon.rank,
                                          m_taxon.taxon_status])
-                taxon_hier.update([rw for rw in m_taxon.hierarchy if rw[1] is not None])
+                
+                self.hierarchy.update([rw for rw in m_taxon.hierarchy if rw[1] is not None])
 
                 # a) Good backbone with no parent, provide info on taxon status
                 if m_taxon.is_canon:
-                    LOGGER.info(f'{rw_ref}: in GBIF backbone ({m_taxon.taxon_status})')
+                    LOGGER.info(f'Taxon found in GBIF backbone ({m_taxon.taxon_status})')
                 elif m_taxon.ignore_match:
-                    LOGGER.error(f'{rw_ref}: ignoring match to canon usage '
+                    LOGGER.error('Taxon set to ignore match to canon usage '
                                  f'({m_taxon.canon_usage.name}) but no parent provided')
                 else:
-                    LOGGER.warn(f'{rw_ref}: considered a {m_taxon.taxon_status} '
+                    LOGGER.warn(f'Taxon considered a {m_taxon.taxon_status} '
                                 f'of {m_taxon.canon_usage.name} in GBIF backbone')
 
                     # Add the canon index entry and update hierarchy
@@ -675,7 +702,7 @@ class Taxa:
                                              m_taxon.canon_usage.name,
                                              m_taxon.canon_usage.rank,
                                              m_taxon.canon_usage.taxon_status])
-                    taxon_hier.update([rw for rw in m_taxon.canon_usage.hierarchy if rw[1] is not None])
+                    self.hierarchy.update([rw for rw in m_taxon.canon_usage.hierarchy if rw[1] is not None])
 
             elif m_taxon.found and p_taxon is not None:
 
@@ -686,9 +713,9 @@ class Taxa:
                     self.taxon_index.append([m_name, m_taxon.gbif_id, p_taxon.gbif_id,
                                              m_taxon.name, m_taxon.rank,
                                              'user'])
-                    taxon_hier.update([rw for rw in p_taxon.hierarchy if rw[1] is not None])
+                    self.hierarchy.update([rw for rw in p_taxon.hierarchy if rw[1] is not None])
 
-                    LOGGER.info(f'{rw_ref}: ignoring match to ({m_taxon.canon_usage.name})')
+                    LOGGER.info(f'ignoring match to ({m_taxon.canon_usage.name})')
 
                 elif p_taxon.found:
                     # c) Good backbone with good parent - are they compatible? Check if all
@@ -697,26 +724,26 @@ class Taxa:
                     taxon_hier = set(m_taxon.hierarchy)
 
                     if not set(parent_hier).issubset(taxon_hier):
-                        LOGGER.error(f'{rw_ref}: additional parent information is incompatible')
+                        LOGGER.error(f' additional parent information is incompatible')
                     else:
-                        LOGGER.info(f'{rw_ref}: in GBIF backbone ({m_taxon.taxon_status}) with '
+                        LOGGER.info(f' in GBIF backbone ({m_taxon.taxon_status}) with '
                                     'compatible parent info')
 
                     # Add to index and hierarchy
                     self.taxon_index.append([m_name, m_taxon.gbif_id, m_taxon.parent_id,
                                              m_taxon.name, m_taxon.rank,
                                              m_taxon.taxon_status])
-                    taxon_hier.update([rw for rw in m_taxon.hierarchy if rw[1] is not None])
+                    self.hierarchy.update([rw for rw in m_taxon.hierarchy if rw[1] is not None])
 
                 else:
                     # b) Good backbone with bad parent
-                    LOGGER.error(f'{rw_ref}: additional parent information is not valid.')
+                    LOGGER.error(f' additional parent information is not valid.')
 
                     # Add to index and hierarchy
                     self.taxon_index.append([m_name, m_taxon.gbif_id, m_taxon.parent_id,
                                              m_taxon.name, m_taxon.rank,
                                              m_taxon.taxon_status])
-                    taxon_hier.update([rw for rw in m_taxon.hierarchy if rw[1] is not None])
+                    self.hierarchy.update([rw for rw in m_taxon.hierarchy if rw[1] is not None])
 
             elif not m_taxon.found and p_taxon is not None:
 
@@ -726,10 +753,10 @@ class Taxa:
                         # e) Taxon is a backbone type that is not present in GBIF
                         #    but the user has provided a valid set of parent taxon
                         #    information.
-                        LOGGER.info(f'{rw_ref}: not found in GBIF but has valid parent information')
+                        LOGGER.info(f' not found in GBIF but has valid parent information')
                     else:
                         # g) Taxon is a non backbone type with good parent info
-                        LOGGER.info(f'{rw_ref}: {m_taxon.rank} with valid parent information ')
+                        LOGGER.info(f'{m_taxon.rank} with valid parent information ')
 
                     # Add to index  - parent already in hierarchy so nothing to add
                     self.taxon_index.append([m_name, -1, p_taxon.gbif_id,
@@ -739,50 +766,41 @@ class Taxa:
                 elif m_taxon.is_backbone and p_taxon is None:
                     # d1) Taxon is a backbone type but is not found in GBIF.
                     if m_taxon.note is None:
-                        LOGGER.error(f'{rw_ref}: name and rank combination not found')
+                        LOGGER.error(f' name and rank combination not found')
                     else:
-                        LOGGER.error(f'{rw_ref}: {m_taxon.note}')
+                        LOGGER.error(f' {m_taxon.note}')
                 elif m_taxon.is_backbone and not p_taxon.found:
                     # d2) Taxon is a backbone type not found in GBIF and the
                     #     provided parent isn't valid
-                    LOGGER.error(f'{rw_ref}): not found in GBIF and has invalid parent information.')
+                    LOGGER.error(f': not found in GBIF and has invalid parent information.')
                 elif not m_taxon.is_backbone and (p_taxon is None or not p_taxon.found):
                     # f) Non backbone with no or bad parent information
-                    LOGGER.error(f'{rw_ref}: taxa of type {m_taxon.rank} must have valid '
+                    LOGGER.error(f': taxa of type {m_taxon.rank} must have valid '
                                  'parent information.')
+
+    @loggerinfo_push_pop('Indexing taxonomic hierarchy')
+    def index_higher_taxa(self):
 
         # Use the taxon hierarchy entries to add higher taxa
         # - drop taxa with a GBIF ID already in the index
 
         known = [tx[1] for tx in self.taxon_index if tx[1] != -1]
-        to_add = [tx for tx in taxon_hier if tx[1] not in known]
+        to_add = [tx for tx in self.hierarchy if tx[1] not in known]
         to_add.sort(key=lambda val: BACKBONE_RANKS.index(val[0]))
-        LOGGER.info('Indexing taxonomic hierarchy')
-        FORMATTER.push()
 
         # Look up the taxonomic hierarchy
         for tx_lev, tx_id in to_add:
-            higher_taxon = validator.id_lookup(tx_id)
-            self.taxon_index.append([None,  higher_taxon.gbif_id,
+            higher_taxon = self.validator.id_lookup(tx_id)
+            self.taxon_index.append([None,  
+                                     higher_taxon.gbif_id,
                                      higher_taxon.parent_id,
                                      higher_taxon.name,
                                      higher_taxon.rank,
                                      higher_taxon.taxon_status])
             LOGGER.info(f'Added {tx_lev} {higher_taxon}')
 
-        FORMATTER.pop()
 
-        # summary of processing
-        n_errors = CH.counters['ERROR'] - start_errors
-        if n_errors > 0:
-            LOGGER.info('Taxa contains {} errors'.format(n_errors))
-        else:
-            LOGGER.info('{} taxa loaded correctly'.format(len(self.taxon_names)))
-
-        FORMATTER.pop()
-
-
-def taxon_index_to_text(taxa, html=False, depth=4):
+def taxon_index_to_text(taxon_index, html=False, indent_width=4):
     """
     Turns the taxon index from a Taxa instance into a text representation
     of the taxonomic hierarchy used in the dataset.
@@ -790,16 +808,16 @@ def taxon_index_to_text(taxa, html=False, depth=4):
 
     lbr = '<br>' if html else '\n'
 
-    def indent(n, html=html):
+    def indent(n, use_html=html):
 
-        ind = '&ensp;' * depth if html else ' ' * depth
-        return ind * n
+        ind = '&ensp;' if use_html else ' '
+        return ind * indent_width * (n - 1)
 
-    def format_name(tx, html=html):
+    def format_name(tx, use_html=html):
 
         # format the canonical name
         if tx[4] in ['genus', 'species', 'subspecies']:
-            if html:
+            if use_html:
                 return f'<i>{tx[3]}</i>'
             else:
                 return f'_{tx[3]}_'
@@ -812,8 +830,8 @@ def taxon_index_to_text(taxa, html=False, depth=4):
     html = StringIO()
 
     # group by parent taxon id in position 2, subsitituting 0 for None
-    taxa.sort(key=lambda x: x[2] or 0)
-    grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x[2])}
+    taxon_index.sort(key=lambda x: x[2] or 0)
+    grouped = {k: list(v) for k, v in groupby(taxon_index, lambda x: x[2])}
 
     # start the stack with the kingdoms - these taxa will have None as a parent
     stack = [{'current': grouped[None][0], 'next': grouped[None][1:]}]

@@ -1,8 +1,8 @@
 
 from dataclasses import dataclass
 from safedata_validator.logger import LOGGER, FORMATTER, CH
-from safedata_validator.validators import (CellsToValues, ToLower, IsUnique,
-                                           NotNone, AllNone)
+from safedata_validator.validators import (GetDataFrame, IsLower, IsNotBlank,
+                                           IsString, HasDuplicates)
 from safedata_validator.extent import Extent
 
 from shapely import wkt
@@ -39,26 +39,19 @@ class Locations:
 
         start_errors = CH.counters['ERROR']
 
-        # Get the field headers from the first row
-        LOGGER.info("Reading location headers")
+        # Load the locations data frame - which runs header checks
+        LOGGER.info("Reading location data")
         FORMATTER.push()
-        headers = CellsToValues(worksheet[1])
-        headers.check()
+        dframe = GetDataFrame(worksheet)
 
-        # TODO - this type checking may be a common pattern across other modules
-        #        and so could be made into a method of CellToValues but implementation
-        #        not clear at this point.
-
-        if set(headers.types) != {str}:
-            LOGGER.error('Location headers are not all text strings')
+        # Dupe headers likely cause serious issues, so stop
+        if 'duplicated' in dframe.bad_headers:
+            LOGGER.error('Cannot parse locations with duplicated headers')
             return
 
-        headers = IsUnique(ToLower(headers.values))
-
-        if not headers:
-            LOGGER.error('Duplicated location sheet headers: ',
-                         extra={'join': headers.invalid})
-            return
+        # Reduce to lower case
+        # TODO - not trapping dupes that are only case differences. Do that in GetDataFrame?
+        headers = IsLower(dframe.headers).values
 
         # Check location names are available
         if 'location name' not in headers:
@@ -73,44 +66,31 @@ class Locations:
         self.wkt = 'wkt' in headers
         self.new = 'new' in headers
 
-        FORMATTER.pop()
+        # Location name cleaning
+        loc_names = dframe.data_columns[headers.index('location name')]
 
-        # Get data rows and drop empty ones
-        LOGGER.info("Reading location data")
-        FORMATTER.push()
+        loc_names = IsNotBlank(loc_names)
 
-        # Load the data, doing the base sanitisation
-        locs = [CellsToValues(rw) for rw in worksheet.iter_rows(min_row=2)]
+        # Check for blanks
+        if not loc_names:
+            LOGGER.error('Blank location names: ',
+                         extra={'join': loc_names.failed})
 
-        # TODO - this checking may also be a common pattern across other modules
-        #        and so could be made into a method of CellToValues but implementation
-        #        not clear at this point. The draft check() method is part way there,
-        #        but isn't as flexible
-
-        # Check for padded strings and whitespace empty cells, using repr to
-        # show newlines and quote
-        for rw_num, rw_dat in enumerate(locs):
-            if rw_dat.padded:
-                LOGGER.error('Whitespace padded data in row {rw_num + 2}: ',
-                             extra={'join': [repr(v) for v in rw_dat.padded]})
-            if rw_dat.n_whitespace:
-                LOGGER.error('Blank cells with whitespace only in row {rw_num + 2}: ')
-
-        # Get dictionaries of value, ditching empty rows.
-        locs = [dict(zip(headers, rw.values)) for rw in locs if not AllNone(rw.values)]
-
-        # Location name cleaning - convert names to strings
-        for row in locs:
-            if not isinstance(row['location name'], str):
-                row['location name'] = str(row['location name'])
+        # Convert non-strings to strings (e.g. numeric site codes)
+        loc_names = IsString(loc_names)
 
         # look for duplicates
-        unique = IsUnique([rw['location name'] for rw in locs])
-        if not unique:
+        unique = HasDuplicates(loc_names)
+        if unique:
             LOGGER.error('Duplicated location names: ',
-                         extra={'join': unique.invalid, 'quote': True})
+                         extra={'join': unique.duplicated})
+
+        dframe.data_columns[headers.index('location name')] = loc_names
 
         # VALIDATE LOCATIONS
+
+        # Get dictionaries of values for each row
+        locs = [dict(zip(headers, rw)) for rw in zip(*dframe.data_columns)]
 
         # Get existing location names and aliases - new location names must
         # not appear in it and existing locations must.
@@ -121,15 +101,14 @@ class Locations:
         if self.new:
 
             # Check the New column is just yes, no
-            is_new = set(ToLower([rw['new'] for rw in locs]))
-
-            # look for blanks
-            if None in is_new:
+            is_new = set(IsLower([rw['new'] for rw in locs]))
+            is_new = IsNotBlank(is_new)
+            if not is_new:
                 LOGGER.error('New locations field contains blank rows.')
 
             # check only yes or no entries
             valid_new = {'yes', 'no'}
-            if not is_new.issubset(valid_new):
+            if not set(is_new).issubset(valid_new):
                 LOGGER.error('New field contains values other than yes and no: ',
                              extra={'join': is_new - valid_new, 'quote': True})
 
@@ -154,7 +133,7 @@ class Locations:
 
             else:
                 # get lowercase types
-                geo_types = set(ToLower([vl['type'] for vl in new_locs]))
+                geo_types = set(IsLower([vl['type'] for vl in new_locs]))
 
                 # Handle blanks
                 if None in geo_types:
@@ -166,7 +145,7 @@ class Locations:
                 bad_geo_types = geo_types - valid_geotypes
                 if bad_geo_types:
                     LOGGER.error('Unknown location types: ',
-                                 extra={'join': bad_geo_types, 'quote': True})
+                                 extra={'join': bad_geo_types})
 
             # Look for duplicate names
             duplicates_existing = [rw['location name'] for rw in new_locs
@@ -192,7 +171,7 @@ class Locations:
                     for axs in ['latitude', 'longitude']:
 
                         axs_vals = [vl[axs] for vl in new_locs if vl[axs] != 'NA']
-                        axs_vals = NotNone(axs_vals)
+                        axs_vals = IsNotBlank(axs_vals)
 
                         if not axs_vals:
                             LOGGER.error(f'Blank {axs} values for new locations: use NA.')
@@ -200,7 +179,7 @@ class Locations:
                         # Create an extent object to check values and report extents
                         self.extents[axs].update(axs_vals)
 
-                if 'wkt' in headers:
+                if self.wkt:
 
                     LOGGER.info('Validating WKT data')
 
@@ -231,7 +210,7 @@ class Locations:
 
                     if bad_wkt:
                         LOGGER.error('WKT information badly formatted, not geometrically valid or 3D: ',
-                                     extra={'join': bad_wkt, 'quote': True})
+                                     extra={'join': bad_wkt})
 
             # new location names
             new_loc_names = {rw['location name'] for rw in new_locs}

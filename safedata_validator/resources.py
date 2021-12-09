@@ -217,16 +217,3 @@ class Resources:
                 self.use_local_gbif = True
             finally:
                 conn.close()
-
-    def get_local_gbif_conn(self):
-        """Get a GBIF database connection
-
-        Returns:
-            A sqlite3 connection instance to the GBIF backbone database. This
-            should be closed after use.
-        """
-        conn = sqlite3.connect(self.gbif_database)
-        conn.row_factory = sqlite3.Row
-
-        return conn
-
