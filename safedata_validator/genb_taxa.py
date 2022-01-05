@@ -32,27 +32,60 @@ class NCBIError(Exception):
         self.message = message
         super().__init__(self.message)
 
-# Meta questions:
-# What do we want to store? GBIF compatable taxonomy? With or without GenBank ID?
-# How do we address newly defined species?
-# Do we want a LocalNCBIValidator?
-
-# TO DO - So we want a GenBank taxonomy to be provided
+# TODO - So we want a GenBank taxonomy to be provided
 # From name alone we should be able to find an ID
 # But probably worth asking for a taxon ID in case of name conflicts
 # First stage is basically does this exist in GenBank at all
 
-# TO DO - Synonym checking
+# TODO - Synonym checking
 # GenBank lists hetrotypic synonyms this can be used for synonym checking
 # Problem is what if the synonyms preferred with GenBank are not those preferred by GBIF?
 # Can we save and store all synonyms and test them all in that case?
 
-# TO DO - Validate against GBIF
+# TODO - Validate against GBIF
 # So check if taxa provided exists if GBIF, if not check up hierachy until one that does is found
 # Then tell user that they have to contract their taxonomic specification to this levels
 
-# TO DO - Citation
+# TODO - Citation
 # Work out how to appropraitely cite and credit anyones work that I make use of
+
+# QUESTIONS FOR DAVID
+# WHERE SHOULD WARNINGS BE SENT TO? HALF SORTED THIS, BUT STILL NEED TO WORK OUT THE LOGGER
+# WHAT SHOULD WE DO ABOUT SUPERKINGDOM, DOMAIN, KINGDOM ISSUE?
+# DO WE WANT A LocalNCBIValidator?
+# HOW DO I ACTUALLY SET UP TESTING?
+
+@enforce_types
+@dataclasses.dataclass
+class MicTaxon:
+    """Holds taxonomic information from a user on a microbial taxa. This can be
+    populated using NCBI GenBank validation.
+
+    There are 3 class properties that can be used to create an instance:
+        * name
+        * taxa_hier: Dictionary of valid taxonomic hierachy
+        * genbank_id: GenBank ID for full taxa (i.e. including non-backbone ranks)
+    The remaining properties are populated by processing functions not when
+    an instance is created.
+        * diverg: does the GenBank ID and stored taxa info diverge, and if so how?
+    """
+
+    # Init properties
+    name: str
+    taxa_hier: dict
+    genbank_id: Optional[Union[int, float]] = None
+    diverg: str = dataclasses.field(init=False)
+
+    def __post_init__(self):
+        """Sets the defaults for the post-init properties and checks inputs
+        """
+
+        if self.genbank_id is not None:
+            if isinstance(self.genbank_id, float) and not self.genbank_id.is_integer():
+                raise ValueError('GenBank Id is not an integer')
+            self.genbank_id = int(self.genbank_id)
+
+        self.diverg = None
 
 @enforce_types
 class RemoteNCBIValidator:
@@ -61,7 +94,7 @@ class RemoteNCBIValidator:
     NCBI APIs. This doesn't need an __init__ method and just contains methods.
     """
     # Functionality to find taxa information from genbank ID
-    def id_lookup(self, genbank_id: int):
+    def id_lookup(self, nnme: str, genbank_id: int):
         """Method to return full taxonomic information from a GenBank ID. THERE'S PROBABLY MORE TO SAY THOUGH
 
         Params:
@@ -98,7 +131,6 @@ class RemoteNCBIValidator:
         # Only extract first dictonary in the list
         tax_dic = response[0]
 
-        # ALSO WORK OUT WHAT INFO I SHOULD BE PROVIDING TO THE LOGGER
         # Check that the taxon rank provided is a backbone rank
         if tax_dic["taxon_rank"] in BACKBONE_RANKS_EX:
             # In this case use provided rank
@@ -106,14 +138,6 @@ class RemoteNCBIValidator:
 
         # Filter out ID's without ranks (e.g. strains)
         else:
-            # Check whether taxa is non standard or just non backbone
-            if tax_dic["taxon_rank"] == "no rank":
-                # Check for strains
-                print("Either a strain or a clade")
-            else:
-                t = tax_dic["taxon_rank"]
-                print(f"Rank {t} not a backbone rank")
-
             # Set as not a valid taxa
             vld_tax = False
             # Find lowest index
@@ -137,41 +161,21 @@ class RemoteNCBIValidator:
         red_taxa = {f"{BACKBONE_RANKS_EX[i]}":tax_dic[f"{BACKBONE_RANKS_EX[i]}_name"]
                     for i in range(0,rnk+1)}
 
-        return red_taxa
-        # NEED TO WORK OUT WHAT TO DO BELOW HERE
-        # Basically want to produce an object that contains all relevant taxonomic information
-        # E.g. kingdom to lowest known level
-        # From this function want to populate a taxa with ID number and full list of taxa inforamation (backbone only)
+        # Create and populate microbial taxon
+        mtaxon = MicTaxon(name=nnme,genbank_id=genbank_id,taxa_hier=red_taxa)
 
-        # # Create and populate taxon
-        # taxon = Taxon(name=response['canonicalName'],
-        #               rank=response['rank'].lower(),
-        #               gbif_id=response['nubKey'])
-        #
-        # # First, set the parent key - in the GBIF API, this is always provided
-        # # and always points to the true parent taxon, unlike parent_key in
-        # # the simple local database. Note that parentKey is not included in the
-        # # response for Kingdom level taxa, hence get().
-        # taxon.parent_id = response.get('parentKey')
-        # taxon.taxon_status = response['taxonomicStatus'].lower()
-        # taxon.lookup_status = 'found'
+        # Check for non-backbone rank cases
+        if tax_dic["taxon_rank"] not in BACKBONE_RANKS_EX:
+            # Check whether taxa is non standard or just non backbone
+            if tax_dic["taxon_rank"] == "no rank":
+                # No rank, i.e. non-standard like strain or clade
+                mtaxon.diverg='no rank'
+            else:
+                # Otherwise store (non-standard) taxon rank to explain divergence
+                t = tax_dic["taxon_rank"]
+                mtaxon.diverg=f"{t}"
 
-        # # Add the taxonomic hierarchy from the accepted usage - these are tuples
-        # # to be used to extend a set for the taxonomic hierarchy
-        # taxon.hierarchy = [(rk, response[ky])
-        #                    for rk, ky in [(r, r + 'Key') for r in BACKBONE_RANKS[:-1]]
-        #                    if ky in response]
-        #
-        # # Now populate the canon details, which requires another look up if the
-        # # user details are for a synonym etc.
-        # if taxon.taxon_status in ('accepted', 'doubtful'):
-        #     taxon.is_canon = True
-        # else:
-        #     taxon.is_canon = False
-        #     # acceptedKey is not provided in the response for canon taxa.
-        #     taxon.canon_usage = self.id_lookup(response['acceptedKey'])
-        #
-        # return taxon
+        return mtaxon
 
 # Make validator
 val = RemoteNCBIValidator()
@@ -180,6 +184,6 @@ val = RemoteNCBIValidator()
 # E coli strain (1444049)
 # Streptophytina subphylum (131221)
 # Opisthokonta clade (33154)
-test = val.id_lookup(131221)
+test = val.id_lookup("E coli",562)
 # Print out whatever gets returns
 print(test)
