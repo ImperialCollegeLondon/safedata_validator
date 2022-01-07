@@ -56,7 +56,7 @@ class GBIFError(Exception):
         super().__init__(self.message)
 
 
-@enforce_types
+@enforce_types  # However, the checking code should handle bad inputs elegantly.
 @dataclasses.dataclass
 class Taxon:
     """Holds taxonomic information from a user, which can be populated using GBIF validation.
@@ -495,17 +495,17 @@ class Taxa:
             LOGGER.error('Duplicated names found: ',
                          extra={'join': dupl_taxon_names.duplicated})
 
-        # Clean string fields of padding
-        str_fields = ['name', 'taxon name', 'taxon type', 'parent name', 'parent type']
+        # # Clean string fields of padding
+        # str_fields = ['name', 'taxon name', 'taxon type', 'parent name', 'parent type']
 
-        for each_field in set(headers).intersection(str_fields):
-            idx = headers.index(each_field)
-            field_data = IsNotPadded(dframe.data_columns[idx])
+        # for each_field in set(headers).intersection(str_fields):
+        #     idx = headers.index(each_field)
+        #     field_data = IsNotPadded(dframe.data_columns[idx])
 
-            if not field_data:
-                LOGGER.error(f'Field {each_field} contains padded strings: ',
-                             extra={'join': field_data.failed})
-                dframe.data_columns[idx] = field_data.values
+        #     if not field_data:
+        #         LOGGER.error(f'Field {each_field} contains padded strings: ',
+        #                      extra={'join': field_data.failed})
+        #         dframe.data_columns[idx] = field_data.values
 
         # get dictionaries of the taxa
         taxa = [dict(zip(headers, rw)) for rw in zip(*dframe.data_columns)]
@@ -522,24 +522,24 @@ class Taxa:
                      'parent name', 'parent type', 'parent id']
         taxa = [{fld: tx.get(fld) for fld in tx_fields} for tx in taxa]
 
-        # Standardize the taxon representation into pairs of taxon and parent dicts.
+        # Standardize the taxon representation into lists of taxon and parent data
         # Note that parent tuples cannot have an ignore id.
-        #     (name,
-        #       (taxon name, taxon type, taxon id, ignore id),
-        #       (parent name, parent type, parent id, None))
+        #     [name,
+        #       [taxon name, taxon type, taxon id, ignore id],
+        #       [parent name, parent type, parent id]]
 
         for idx, row in enumerate(taxa):
-            m_tuple = (row['taxon name'], row['taxon type'], row['taxon id'], row['ignore id'])
-            p_tuple = (row['parent name'], row['parent type'], row['parent id'], None)
+            taxon_info = [row['taxon name'], row['taxon type'], row['taxon id'], row['ignore id']]
+            parent_info = [row['parent name'], row['parent type'], row['parent id']]
 
             # If there is no parent information, replace the parent tuple with None
-            if p_tuple == (None, None, None, None):
-                p_tuple = None
+            if parent_info == [None, None, None]:
+                parent_info = None
 
             self.taxon_names.update([row['name']])
             LOGGER.info(f"Validating row {idx + 1}: {row['name']}")
             FORMATTER.push()
-            self.validate_tuple((row['name'], m_tuple, p_tuple))
+            self.validate_and_add_taxon((row['name'], taxon_info, parent_info))
             FORMATTER.pop()
         
         # Add the higher taxa
@@ -560,38 +560,105 @@ class Taxa:
     #        @loggerinfo_push_pop(f'Validating {self._row_description}')
     #        but this implementation ties validate_tuple() to needing that property populated
     
-    def validate_tuple(self, taxon_tuple):
-        """ Takes a standard representation of user information on a taxon and 
-        optionally a parent taxon, validates it and updates the instance to 
-        include the new details. The taxon tuple has the form:
+    def validate_and_add_taxon(self, taxon_input):
+        """ Takes user information on a taxon and optionally a parent taxon, 
+        validates it and updates the Taxa instance to  include the new details. 
+        This is principally used to process rows found in a Taxa worksheet, but
+        is deliberately separated out so that a Taxa instance can be populated
+        independently of an Excel dataset.
 
-        ('worksheet_name', 
-         ('taxon name', 'taxon type', 'taxon id', 'ignore id'),
-         ('parent name', 'parent type', 'parent id', None))
+        The taxon_input has the form:
+
+        ['worksheet_name', 
+         ['taxon name', 'taxon type', 'taxon id', 'ignore id'],
+         ['parent name', 'parent type', 'parent id']]
 
         If there is no parent information, the structure is:
-        ('worksheet_name', 
-         ('taxon name', 'taxon type', 'taxon id', 'ignore id'),
-          None)
+        ['worksheet_name', 
+         ['taxon name', 'taxon type', 'taxon id', 'ignore id'],
+          None]
 
         Args:
-            taxon_tuple: A taxon tuple in standard form as above
+            taxon_input: Taxon information in standard form as above
 
         Returns:
             Updates the taxon_names and taxon_index attributes of the class instance.
         """
 
-        m_name, m_tuple, p_tuple = taxon_tuple
+        m_name, taxon_info, parent_info = taxon_input
 
+        # Sanitise inputs
+        if m_name is None or not isinstance(m_name, str) or m_name.isspace():
+            LOGGER.error('Worksheet name missing, whitespace only or not text')
+        elif m_name != m_name.strip():
+            LOGGER.error(f"Worksheet name has whitespace padding: {repr(m_name)}")
+            m_name = m_name.strip()
+        
+        # Check the parent details
+        p_fail = False
+        if parent_info is not None:
+            # Name and rank must be unpadded strings - can still check cleaned padded strings
+            for idx, idx_name in ((0, 'Parent name'), (1, 'Parent rank')):
+                val = parent_info[idx]
+
+                if val is None or not isinstance(val, str):
+                    LOGGER.error(f'{idx_name} missing or not text')
+                    p_fail = True
+                elif val != val.strip():
+                    LOGGER.error(f"{idx_name} has whitespace padding: {repr(val)}")
+                    parent_info[idx] = val.strip()
+
+            # ID can be None or an integer (openpyxl loads all values as float)
+            if not(parent_info[2] is None or 
+                   (isinstance(parent_info[2], float) and parent_info[2].is_integer()) or 
+                   isinstance(parent_info[2], int)) :
+                LOGGER.error('Parent GBIF ID contains value that is not an integer')
+                p_fail = True
+        
+        # Check the main taxon details
+        mfail = False
+
+        # Name and rank must be unpadded strings - can still check cleaned padded strings
+        for idx, idx_name in ((0, 'Taxon name'), (1, 'Taxon rank')):
+            val = taxon_info[idx]
+
+            if val is None or not isinstance(val, str) or val.isspace():
+                LOGGER.error(f'{idx_name} missing, whitespace only or not text')
+                mfail = True
+            elif val != val.strip():
+                LOGGER.error(f"{idx_name} has whitespace padding: {repr(val)}")
+                taxon_info[idx] = val.strip()
+
+        # GBIF ID and Ignore ID can be None or an integer (openpyxl loads all values as float)
+        for idx, idx_name in ((2, 'GBIF ID'), (3, 'Ignore ID')):
+            val = taxon_info[idx]
+        
+            if not(val is None or 
+                   (isinstance(val, float) and val.is_integer()) or 
+                   isinstance(val, int)) :
+                LOGGER.error(f'{idx_name} contains value that is not an integer: {val}')
+                mfail = True
+        
+        if p_fail:
+            LOGGER.error(f'Parent taxon details not properly formatted, cannot validate')
+        
+        if mfail:
+            LOGGER.error(f'Taxon details not properly formatted, cannot validate')
+        
+        if mfail or p_fail:
+            return
+
+        # Now that inputs are sanitised, continue with checking...
         # Parent taxon checking - can be None, already processed with a previous
-        # tuple and stored in the taxon index, or be new and need processing.
-        if p_tuple is None:
+        # information and stored in the parent index using a tuple of the parent
+        # as a key, or be new and need processing.
+        if parent_info is None:
             p_taxon = None
-        elif p_tuple in self.parents:
-            p_taxon = self.parents[p_tuple]
+        elif tuple(parent_info) in self.parents:
+            p_taxon = self.parents[tuple(parent_info)]
         else:
             # Create a taxon object
-            p_taxon = Taxon(name=p_tuple[0], rank=p_tuple[1], gbif_id=p_tuple[2])
+            p_taxon = Taxon(name=parent_info[0], rank=parent_info[1], gbif_id=parent_info[2])
 
             # Look for a match
             if p_taxon.is_backbone:
@@ -611,8 +678,8 @@ class Taxa:
                                             p_taxon.canon_usage.rank,
                                             p_taxon.canon_usage.taxon_status])
             
-            # Store the parent taxon keyed by parent tuple
-            self.parents[p_tuple] = p_taxon
+            # Store the parent taxon keyed by parent information (needs tuple)
+            self.parents[tuple(parent_info)] = p_taxon
 
         # Report on the parent information
         if p_taxon is not None:
@@ -652,8 +719,8 @@ class Taxa:
         # tx_nonbackbone |  X    |  X     |  O     |
 
         # Create the taxon instance
-        m_taxon = Taxon(name=m_tuple[0], rank=m_tuple[1], gbif_id=m_tuple[2])
-        ignore_gbif = m_tuple[3]
+        m_taxon = Taxon(name=taxon_info[0], rank=taxon_info[1], gbif_id=taxon_info[2])
+        ignore_gbif = taxon_info[3]
 
         if ignore_gbif is not None:
             # Handle ignored matches first
