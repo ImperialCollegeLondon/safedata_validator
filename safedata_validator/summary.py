@@ -192,7 +192,7 @@ class Summary:
         # summary of processing
         self.n_errors = CH.counters['ERROR'] - start_errors
         if self.n_errors > 0:
-            LOGGER.info('Summary contains {} errors'.format(self.n_errors > 0))
+            LOGGER.info('Summary contains {} errors'.format(self.n_errors))
         else:
             LOGGER.info('Summary formatted correctly')
 
@@ -472,7 +472,7 @@ class Summary:
             bad_names = cited_sheets - self.sheetnames
             if bad_names:
                 LOGGER.error('Worksheet names not found in workbook: ',
-                             extra={'join': bad_names, 'quote': True})
+                             extra={'join': bad_names})
             # bad external files
             external_in_sheet = {ws['external'] for ws in data_worksheets
                                  if ws['external'] is not None}

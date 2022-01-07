@@ -748,9 +748,18 @@ def test_data_worksheets(caplog, alterations, alt_sheets, ext_alterations, shoul
     assert expected_log in caplog.text
 
 
-def test_load_from_file(good_excel_file):
-
-    summary = Summary(good_excel_file['Summary'], set(good_excel_file.sheetnames))
+@pytest.mark.parametrize(
+    'example_excel_files, n_errors',
+    [('good', 0), 
+     ('bad', 16)], 
+    indirect = ['example_excel_files']  # take actual params from fixture
+)
+def test_summary_load(example_excel_files, n_errors):
+    """This tests the ensemble loading of a summary from a file using
+    indirect parameterisation to access the fixtures containing the
+    sample excel files.
+    """
+    summary = Summary(example_excel_files['Summary'], set(example_excel_files.sheetnames))
     summary.load()
 
-    assert summary.n_errors == 0
+    assert summary.n_errors == n_errors

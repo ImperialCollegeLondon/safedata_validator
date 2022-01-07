@@ -13,8 +13,8 @@ This file contains fixtures that will be available to all test suites.
 fixture_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
 loc_file = os.path.join(fixture_dir, 'locations.json')
 gbif_file = os.path.join(fixture_dir, 'gbif_backbone_truncated.sqlite')
-good_file_path = os.path.join(fixture_dir, 'Test_format_good_new.xlsx')
-bad_file_path = os.path.join(fixture_dir, 'Test_format_bad_new.xlsx')
+good_file_path = os.path.join(fixture_dir, 'Test_format_good.xlsx')
+bad_file_path = os.path.join(fixture_dir, 'Test_format_bad.xlsx')
 
 @pytest.fixture(scope='module')
 def config_filesystem(fs):
