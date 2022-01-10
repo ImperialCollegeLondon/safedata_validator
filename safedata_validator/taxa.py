@@ -28,7 +28,7 @@ The dataset 'Taxa' worksheet provides a set of taxonomic entries and the Taxa
 class is used to load and collate the set of taxonomic entries from a dataset.
 
 Note that we explicitly exclude form and variety from the set of GBIF backbone
-taxonomic levels because they cannot be matched into the backbone hierarchy 
+taxonomic levels because they cannot be matched into the backbone hierarchy
 without extra API calls.
 """
 
@@ -78,7 +78,7 @@ class Taxon:
         * note: a string of any extra information provided by the search
         * hierarchy: a list of 2-tuples of rank and GBIF ID for the taxonomic hierarchy
     """
-    
+
     # Init properties
     name: str
     rank: str
@@ -146,7 +146,7 @@ class LocalGBIFValidator:
 
         """
         Looks for a taxon in the GBIF database using name and rank and
-        an optional GBIF ID for disambiguation. 
+        an optional GBIF ID for disambiguation.
 
         Args:
             taxon: A Taxon instance
@@ -406,7 +406,7 @@ class RemoteGBIFValidator:
 class Taxa:
 
     def __init__(self, resources):
-        """A class to hold a list of taxon names and a validated taxonomic 
+        """A class to hold a list of taxon names and a validated taxonomic
         index for those taxa and their taxonomic hierarchy. The validate_taxon
         method checks that taxon details and their optional parent taxon can be
         matched into the the GBIF backbone and populates two things:
@@ -428,7 +428,7 @@ class Taxa:
             provided name. They will share the same worksheet name and so can
             be paired back up for description generation. The worksheet name
             for parent taxa and deeper taxonomic hierarchy is set to None.
-        
+
         The index_higher_taxa method can be used to extend the taxon_index to
         include all of the higher taxa linking the validated taxa.
 
@@ -444,16 +444,16 @@ class Taxa:
         self.parents = dict()
         self.hierarchy = set()
         self.n_errors = None
-        
+
         # Get a validator instance
         if resources.use_local_gbif:
             self.validator = LocalGBIFValidator(resources)
         else:
             self.validator = RemoteGBIFValidator()
-    
+
     @loggerinfo_push_pop('Loading Taxa worksheet')
     def load(self, worksheet):
-        """Loads a set of taxa from the rows of a SAFE formatted Taxa worksheet and 
+        """Loads a set of taxa from the rows of a SAFE formatted Taxa worksheet and
         then adds the higher taxa for those rows.
 
         Args:
@@ -541,7 +541,7 @@ class Taxa:
             FORMATTER.push()
             self.validate_and_add_taxon((row['name'], taxon_info, parent_info))
             FORMATTER.pop()
-        
+
         # Add the higher taxa
         self.index_higher_taxa()
 
@@ -556,25 +556,25 @@ class Taxa:
 
     # TODO - would be nice to use the decorator, but more complex than
     #        I had anticipated: https://stackoverflow.com/questions/11731136/
-    #        Could do this via e.g. 
+    #        Could do this via e.g.
     #        @loggerinfo_push_pop(f'Validating {self._row_description}')
     #        but this implementation ties validate_tuple() to needing that property populated
-    
+
     def validate_and_add_taxon(self, taxon_input):
-        """ Takes user information on a taxon and optionally a parent taxon, 
-        validates it and updates the Taxa instance to  include the new details. 
+        """ Takes user information on a taxon and optionally a parent taxon,
+        validates it and updates the Taxa instance to  include the new details.
         This is principally used to process rows found in a Taxa worksheet, but
         is deliberately separated out so that a Taxa instance can be populated
         independently of an Excel dataset.
 
         The taxon_input has the form:
 
-        ['worksheet_name', 
+        ['worksheet_name',
          ['taxon name', 'taxon type', 'taxon id', 'ignore id'],
          ['parent name', 'parent type', 'parent id']]
 
         If there is no parent information, the structure is:
-        ['worksheet_name', 
+        ['worksheet_name',
          ['taxon name', 'taxon type', 'taxon id', 'ignore id'],
           None]
 
@@ -593,7 +593,7 @@ class Taxa:
         elif m_name != m_name.strip():
             LOGGER.error(f"Worksheet name has whitespace padding: {repr(m_name)}")
             m_name = m_name.strip()
-        
+
         # Check the parent details
         p_fail = False
         if parent_info is not None:
@@ -609,12 +609,12 @@ class Taxa:
                     parent_info[idx] = val.strip()
 
             # ID can be None or an integer (openpyxl loads all values as float)
-            if not(parent_info[2] is None or 
-                   (isinstance(parent_info[2], float) and parent_info[2].is_integer()) or 
+            if not(parent_info[2] is None or
+                   (isinstance(parent_info[2], float) and parent_info[2].is_integer()) or
                    isinstance(parent_info[2], int)) :
                 LOGGER.error('Parent GBIF ID contains value that is not an integer')
                 p_fail = True
-        
+
         # Check the main taxon details
         mfail = False
 
@@ -632,19 +632,19 @@ class Taxa:
         # GBIF ID and Ignore ID can be None or an integer (openpyxl loads all values as float)
         for idx, idx_name in ((2, 'GBIF ID'), (3, 'Ignore ID')):
             val = taxon_info[idx]
-        
-            if not(val is None or 
-                   (isinstance(val, float) and val.is_integer()) or 
+
+            if not(val is None or
+                   (isinstance(val, float) and val.is_integer()) or
                    isinstance(val, int)) :
                 LOGGER.error(f'{idx_name} contains value that is not an integer: {val}')
                 mfail = True
-        
+
         if p_fail:
             LOGGER.error(f'Parent taxon details not properly formatted, cannot validate')
-        
+
         if mfail:
             LOGGER.error(f'Taxon details not properly formatted, cannot validate')
-        
+
         if mfail or p_fail:
             return
 
@@ -677,7 +677,7 @@ class Taxa:
                                             p_taxon.canon_usage.name,
                                             p_taxon.canon_usage.rank,
                                             p_taxon.canon_usage.taxon_status])
-            
+
             # Store the parent taxon keyed by parent information (needs tuple)
             self.parents[tuple(parent_info)] = p_taxon
 
@@ -685,7 +685,7 @@ class Taxa:
         if p_taxon is not None:
             if not p_taxon.is_backbone:
                 LOGGER.error(f'Parent taxon ({p_taxon.name}) is not of a backbone rank')
-                
+
             elif not p_taxon.found:
                 LOGGER.error(f'Parent taxon ({p_taxon.name}) {p_taxon.lookup_status}')
 
@@ -706,11 +706,11 @@ class Taxa:
         # The combinations are shown below. The taxon row is valid (O) for: a
         # found taxon (with or without a valid parent); a non-matching taxon
         # with a valid parent; a non-backbone taxon type with a valid
-        # parent; and a backbone taxon set to ignore the match with a valid 
+        # parent; and a backbone taxon set to ignore the match with a valid
         # parent.
         #
         # Everything else is invalid (X), possibly including a found taxon with
-        # a valid parent that isn't actually a parent of the child taxon 
+        # a valid parent that isn't actually a parent of the child taxon
         #
         #                | None  | pr_inv | pr_val |
         # tx_ignore      |  X    |  X     |  O     |
@@ -769,7 +769,7 @@ class Taxa:
                 self.taxon_index.append([m_name, -1, p_taxon.gbif_id,
                                             m_taxon.name, m_taxon.rank,
                                             'user'])
-        
+
         else:
             # Otherwise try and validate backbone taxon
             m_taxon = self.validator.search(m_taxon)
@@ -780,7 +780,7 @@ class Taxa:
                 self.taxon_index.append([m_name, m_taxon.gbif_id, m_taxon.parent_id,
                                          m_taxon.name, m_taxon.rank,
                                          m_taxon.taxon_status])
-                
+
                 self.hierarchy.update([rw for rw in m_taxon.hierarchy if rw[1] is not None])
 
                 # Good backbone with no parent, provide info on taxon status
@@ -835,7 +835,7 @@ class Taxa:
                 else:
                     # Taxon is a backbone type but not found but does have valid parent info
                     LOGGER.info('Taxon not found in GBIF but has valid parent information')
-                    
+
                     # Add to index  - parent already in hierarchy so nothing to add
                     self.taxon_index.append([m_name, -1, p_taxon.gbif_id,
                                              m_taxon.name, m_taxon.rank,
@@ -854,7 +854,7 @@ class Taxa:
         # Look up the taxonomic hierarchy
         for tx_lev, tx_id in to_add:
             higher_taxon = self.validator.id_lookup(tx_id)
-            self.taxon_index.append([None,  
+            self.taxon_index.append([None,
                                      higher_taxon.gbif_id,
                                      higher_taxon.parent_id,
                                      higher_taxon.name,

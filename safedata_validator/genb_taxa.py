@@ -2,6 +2,10 @@ from typing import Union, Optional
 import dataclasses
 import requests
 from enforce_typing import enforce_types
+from Bio import Entrez
+
+# CHANGE THIS TO A PURPOSE DEFINED EMAIL AT SOMEPOINT
+Entrez.email = "jc2017@ic.ac.uk"
 
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ['superkingdom', 'kingdom', 'phylum', 'order', 'class',
@@ -54,6 +58,8 @@ class NCBIError(Exception):
 # WHAT SHOULD WE DO ABOUT SUPERKINGDOM, DOMAIN, KINGDOM ISSUE?
 # DO WE WANT A LocalNCBIValidator?
 # HOW DO I ACTUALLY SET UP TESTING?
+# HOW TO HANDLE SPECIES NAMES, WHICH ARE OFTEN GIVEN AS E.G. VULPES VULPES
+# CAN/SHOULD WE SET UP AN EMAIL?
 
 @enforce_types
 @dataclasses.dataclass
@@ -95,13 +101,14 @@ class RemoteNCBIValidator:
     """
     # Functionality to find taxa information from genbank ID
     def id_lookup(self, nnme: str, genbank_id: int):
-        """Method to return full taxonomic information from a GenBank ID. THERE'S PROBABLY MORE TO SAY THOUGH
+        """Method to return full taxonomic information from a GenBank ID.
 
         Params:
+            nnme: A nickname to identify the taxon
             genbank_id: An integer
 
         Returns:
-            DECIDE WHAT I WANT IT TO RETURN
+            A MicTaxon object
         """
 
         if not isinstance(genbank_id, int):
@@ -177,13 +184,76 @@ class RemoteNCBIValidator:
 
         return mtaxon
 
+    # HOW ARE SYNONYMS HANDLED?
+    # New function to read in taxa information
+    def taxa_search(self, taxa: dict):
+        """Method to find GenBank ID from taxonomic information.
+
+        Params:
+            taxa: A dictonary containing taxonomic information
+
+        Returns:
+            A MicTaxon object
+        """
+
+        # Find last dictonary key
+        f_key = list(taxa.keys())[-1]
+
+        # Then find corresponding entry as a search term
+        s_term = taxa[f_key]
+
+        # Search taxonomy database
+        handle = Entrez.esearch(db="taxonomy", term=s_term)
+        record = Entrez.read(handle)
+        handle.close()
+
+        # Store count of the number of records found
+        c = int(record['Count'])
+        print(record)
+
+        # Check that a singular record has been provided before proceeding
+        if c == 1:
+            # Find taxa ID as single entry in the list
+            tID = int(record['IdList'][0])
+        else:
+            # NEED TO LOG AN ERROR HERE I RECKON
+            print("NOT GREAT")
+            # NEED TO HANDLE MULTIPLE ENTRY CASE HERE
+
+        # NEED TO HANDLE NETWORK ERRORS ETC
+        # OR EVEN HOW TO READ ALL THIS
+        # YEAH NEED TO WORK OUT HOW THIS FUNCTION EVEN WORKS
+        handle = Entrez.efetch(db="taxonomy", id="562", rettype="uilist", retmode="text")
+        print(handle.readline().strip())
+        handle.close()
+
+        # DO I READ THE DATA IN A DIFFERENT WAY OR JUST USE THE GENBANK ID?
+
+        # Fill in missing taxonomic information
+
+        # Check against backbone
+        # Generate instance
+        return
+
+
 # Make validator
 val = RemoteNCBIValidator()
-# Look up an ID
 # E coli (562)
+d1 = {'genus': 'Escherichia', 'species': 'Escherichia coli'}
 # E coli strain (1444049)
+d2 = {'species': 'Escherichia coli', 'strain': 'Escherichia coli 1-110-08_S1_C1'}
 # Streptophytina subphylum (131221)
+d3 = {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}
 # Opisthokonta clade (33154)
-test = val.id_lookup("E coli",562)
+# vulpes vulpes (9627)
+d4 = {'genus': 'Vulpes', 'species': 'Vulpes vulpes'}
+# Moraceae morus (3497)
+d5 = {'family': 'Moraceae', 'genus': 'Morus'}
+# Sulidae morus (37577)
+d6 = {'family': 'Sulidae', 'genus': 'Morus'}
+# Look up an ID
+# test = val.id_lookup("E coli",1444049)
+# Then test output of taxa search
+test = val.taxa_search(d2)
 # Print out whatever gets returns
 print(test)
