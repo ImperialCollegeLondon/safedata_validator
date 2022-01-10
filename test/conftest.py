@@ -1,5 +1,6 @@
 import pytest
 import os
+from requests.api import request
 import simplejson
 from safedata_validator.resources import Resources
 import openpyxl
@@ -13,6 +14,7 @@ fixture_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
 loc_file = os.path.join(fixture_dir, 'locations.json')
 gbif_file = os.path.join(fixture_dir, 'gbif_backbone_truncated.sqlite')
 good_file_path = os.path.join(fixture_dir, 'Test_format_good.xlsx')
+bad_file_path = os.path.join(fixture_dir, 'Test_format_bad.xlsx')
 
 @pytest.fixture(scope='module')
 def config_filesystem(fs):
@@ -92,9 +94,17 @@ def resources_local_and_remote(request):
         return Resources(locations=loc_file, gbif_database=gbif_file)
 
 
-
 @pytest.fixture(scope='module')
-def good_excel_file():
+def example_excel_files(request):
+    """This uses indirect parameterisation, to allow the shared fixture
+    to be paired with request specific expectations rather than all pair
+    combinations:
 
-    wb = openpyxl.load_workbook(good_file_path, read_only=True)
-    return wb
+    https://stackoverflow.com/questions/70379640
+    """
+    if request.param == 'good':
+        wb = openpyxl.load_workbook(good_file_path, read_only=True)
+        return wb
+    elif request.param == 'bad':
+        wb = openpyxl.load_workbook(bad_file_path, read_only=True)
+        return wb
