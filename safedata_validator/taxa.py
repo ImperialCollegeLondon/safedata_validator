@@ -822,7 +822,6 @@ class Taxa:
             elif not m_taxon.found:
 
                 if p_taxon is None:
-                    print(m_taxon.__dict__)
                     # Taxon is a backbone type but is not found in GBIF and has no parent info
                     if m_taxon.lookup_status == 'No match found':
                         LOGGER.error('Taxon name and rank combination not found')
