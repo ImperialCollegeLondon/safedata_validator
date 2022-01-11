@@ -3,6 +3,7 @@ import dataclasses
 import requests
 from enforce_typing import enforce_types
 from Bio import Entrez
+import xml.dom.minidom
 
 # CHANGE THIS TO A PURPOSE DEFINED EMAIL AT SOMEPOINT
 Entrez.email = "jc2017@ic.ac.uk"
@@ -60,6 +61,7 @@ class NCBIError(Exception):
 # HOW DO I ACTUALLY SET UP TESTING?
 # HOW TO HANDLE SPECIES NAMES, WHICH ARE OFTEN GIVEN AS E.G. VULPES VULPES
 # CAN/SHOULD WE SET UP AN EMAIL?
+# SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
 
 @enforce_types
 @dataclasses.dataclass
@@ -202,30 +204,36 @@ class RemoteNCBIValidator:
         # Then find corresponding entry as a search term
         s_term = taxa[f_key]
 
-        # Search taxonomy database
+        # NETWORK ERRORS!
+        # "Raises an IOError exception if there’s a network error"
         handle = Entrez.esearch(db="taxonomy", term=s_term)
         record = Entrez.read(handle)
         handle.close()
 
         # Store count of the number of records found
         c = int(record['Count'])
-        print(record)
 
         # Check that a singular record has been provided before proceeding
         if c == 1:
             # Find taxa ID as single entry in the list
             tID = int(record['IdList'][0])
+            # TEST TEST TEST
+            handle = Entrez.efetch(db="taxonomy", id=f"{tID}", rettype="", retmode="xml")
+            reply = Entrez.read(handle)
+            handle.close()
+            print(reply)
+            # WORK OUT WHAT I NEED TO EXTRACT
+
+        # Catch cases where no record is found
+        elif c == 0:
+            # NEED TO LOG AN ERROR HERE I RECKON
+            print("Not found error")
         else:
             # NEED TO LOG AN ERROR HERE I RECKON
-            print("NOT GREAT")
+            print("Ambiguity error")
             # NEED TO HANDLE MULTIPLE ENTRY CASE HERE
 
-        # NEED TO HANDLE NETWORK ERRORS ETC
-        # OR EVEN HOW TO READ ALL THIS
-        # YEAH NEED TO WORK OUT HOW THIS FUNCTION EVEN WORKS
-        handle = Entrez.efetch(db="taxonomy", id="562", rettype="uilist", retmode="text")
-        print(handle.readline().strip())
-        handle.close()
+
 
         # DO I READ THE DATA IN A DIFFERENT WAY OR JUST USE THE GENBANK ID?
 
@@ -240,20 +248,24 @@ class RemoteNCBIValidator:
 val = RemoteNCBIValidator()
 # E coli (562)
 d1 = {'genus': 'Escherichia', 'species': 'Escherichia coli'}
+# Enterobacteria family (543)
+d2 = {'family': 'Enterobacteria'}
 # E coli strain (1444049)
-d2 = {'species': 'Escherichia coli', 'strain': 'Escherichia coli 1-110-08_S1_C1'}
+d3 = {'species': 'Escherichia coli', 'strain': 'Escherichia coli 1-110-08_S1_C1'}
 # Streptophytina subphylum (131221)
-d3 = {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}
+d4 = {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}
 # Opisthokonta clade (33154)
 # vulpes vulpes (9627)
-d4 = {'genus': 'Vulpes', 'species': 'Vulpes vulpes'}
+d5 = {'genus': 'Vulpes', 'species': 'Vulpes vulpes'}
 # Moraceae morus (3497)
-d5 = {'family': 'Moraceae', 'genus': 'Morus'}
+d6 = {'family': 'Moraceae', 'genus': 'Morus'}
 # Sulidae morus (37577)
-d6 = {'family': 'Sulidae', 'genus': 'Morus'}
+d7 = {'family': 'Sulidae', 'genus': 'Morus'}
+# Microcopris hidakai (2602157)
+d8 = {'genus': 'Microcopris', 'species': 'Microcopris hidakai'}
 # Look up an ID
-# test = val.id_lookup("E coli",1444049)
+# test = val.id_lookup("E coli",2602157)
 # Then test output of taxa search
-test = val.taxa_search(d2)
+test = val.taxa_search(d1)
 # Print out whatever gets returns
 print(test)
