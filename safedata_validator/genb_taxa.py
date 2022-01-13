@@ -9,7 +9,7 @@ import xml.dom.minidom
 Entrez.email = "jc2017@ic.ac.uk"
 
 # Extended version of backbone ranks to capture superkingdoms
-BACKBONE_RANKS_EX = ['superkingdom', 'kingdom', 'phylum', 'order', 'class',
+BACKBONE_RANKS_EX = ['superkingdom', 'kingdom', 'phylum', 'class', 'order',
                     'family', 'genus', 'species', 'subspecies']
 
 """
@@ -50,9 +50,6 @@ class NCBIError(Exception):
 # TODO - Validate against GBIF
 # So check if taxa provided exists if GBIF, if not check up hierachy until one that does is found
 # Then tell user that they have to contract their taxonomic specification to this levels
-
-# TODO - Citation
-# Work out how to appropraitely cite and credit anyones work that I make use of
 
 # QUESTIONS FOR DAVID
 # WHERE SHOULD WARNINGS BE SENT TO? HALF SORTED THIS, BUT STILL NEED TO WORK OUT THE LOGGER
@@ -119,31 +116,33 @@ class RemoteNCBIValidator:
         if not genbank_id > 0:
             raise ValueError()
 
-        # Make appropriate url
-        up_url = f"""http://api.unipept.ugent.be/api/v1/taxonomy.json?input[]=
-                 {genbank_id}&extra=true&names=true"""
+        # Set status of taxa validity as initally false
+        valid = False
 
-        # Retrive data using the url
-        taxon_row = requests.get(up_url)
+        # Use efetch to find taxonomy details based on the index
+        handle = Entrez.efetch(db="taxonomy",
+                               id=f"{genbank_id}",
+                               retmode="xml")
+        # urllib.error.HTTPError: HTTP Error 500: Internal Server Error
+        # MAKE SURE THAT THIS ERROR CAN BE CAUGHT, BUT DON'T KNOW HOW TO DO THIS WITHOUT THE ERROR JUST FIRING
 
-        # Filter out problems with accessing the remote server
-        if taxon_row.status_code != 200:
-            raise NCBIError('Connection error to remote server')
+        # Extract as a single dictonary and close
+        tax_dic = Entrez.read(handle)[0]
+        handle.close()
 
-        # Extract the response (as a list of dictionaries)
-        response = taxon_row.json()
-
-        # Check if list is empty
-        if not response:
-            raise NCBIError()
-
-        # Only extract first dictonary in the list
-        tax_dic = response[0]
+        # Then extract the lineage
+        linx = tax_dic["LineageEx"]
+        # Find number of taxonomic ranks
+        tx_len = len(linx)
+        # Extract parent taxa ranks
+        rnks = [linx[i]["Rank"] for i in range(tx_len)]
 
         # Check that the taxon rank provided is a backbone rank
-        if tax_dic["taxon_rank"] in BACKBONE_RANKS_EX:
+        if tax_dic["Rank"] in BACKBONE_RANKS_EX:
+            # Set as a valid taxa
+            valid = True
             # In this case use provided rank
-            rnk = BACKBONE_RANKS_EX.index(tax_dic["taxon_rank"])
+            rnk = BACKBONE_RANKS_EX.index(tax_dic["Rank"])
 
         # Filter out ID's without ranks (e.g. strains)
         else:
@@ -155,10 +154,11 @@ class RemoteNCBIValidator:
             # While loop that runs until valid taxa is found
             while vld_tax == False:
                 # Check if taxa id is found
-                if tax_dic[f"{BACKBONE_RANKS_EX[r_ID]}_id"] != None:
+                if any([rnks[i] == f"{BACKBONE_RANKS_EX[r_ID]}" for i in range(tx_len)]):
                     # Close loop and store rank number
                     vld_tax = True
-                    rnk = r_ID
+                    # Add 1 to the rank as only including lineage in this case
+                    rnk = r_ID + 1
                 # Raise error once backbone ranks have been exhausted
                 elif r_ID < 1:
                     raise NCBIError("""NCBI taxa ID cannot be mapped onto
@@ -166,23 +166,41 @@ class RemoteNCBIValidator:
                 else:
                     r_ID -= 1
 
-        # Create dictonary of reduced taxa info using a list
-        red_taxa = {f"{BACKBONE_RANKS_EX[i]}":tax_dic[f"{BACKBONE_RANKS_EX[i]}_name"]
-                    for i in range(0,rnk+1)}
+        # Make list of backbone ranks we are looking for
+        actual_bb_rnks = BACKBONE_RANKS_EX[0:rnk]
+
+        # Number of missing ranks initialised to zero
+        m_rnk = 0
+
+        # Check that all desired backbone ranks appear in the lineage
+        if all(item in rnks for item in actual_bb_rnks) == False:
+            # Find all missing ranks
+            miss = list(set(actual_bb_rnks).difference(rnks))
+            # Count missing ranks
+            m_rnk = len(miss)
+            # Remove missing ranks from our list of desired ranks
+            for i in range(0,m_rnk):
+                actual_bb_rnks.remove(miss[i])
+
+        # Find valid indices (e.g. those corresponding to backbone ranks)
+        vinds = [idx for idx, element in enumerate(rnks) if element in actual_bb_rnks]
+
+        # Create dictonary of valid taxa lineage using a list
+        red_taxa = {f"{actual_bb_rnks[i]}":linx[vinds[i]]["ScientificName"]
+                    for i in range(0,rnk-m_rnk)}
+
+        # Then if taxa is valid then add taxa as final entry
+        if valid == True:
+            red_taxa[f"{BACKBONE_RANKS_EX[rnk]}"] = tax_dic["ScientificName"]
 
         # Create and populate microbial taxon
         mtaxon = MicTaxon(name=nnme,genbank_id=genbank_id,taxa_hier=red_taxa)
 
         # Check for non-backbone rank cases
-        if tax_dic["taxon_rank"] not in BACKBONE_RANKS_EX:
-            # Check whether taxa is non standard or just non backbone
-            if tax_dic["taxon_rank"] == "no rank":
-                # No rank, i.e. non-standard like strain or clade
-                mtaxon.diverg='no rank'
-            else:
-                # Otherwise store (non-standard) taxon rank to explain divergence
-                t = tax_dic["taxon_rank"]
-                mtaxon.diverg=f"{t}"
+        if valid == False:
+            # Store (non-standard) taxon rank to explain divergence
+            t = tax_dic["Rank"]
+            mtaxon.diverg=f"{t}"
 
         return mtaxon
 
@@ -249,23 +267,22 @@ val = RemoteNCBIValidator()
 # E coli (562)
 d1 = {'genus': 'Escherichia', 'species': 'Escherichia coli'}
 # Enterobacteria family (543)
-d2 = {'family': 'Enterobacteria'}
+d2 = {'order': 'Enterobacterales', 'family': 'Enterobacteria'}
 # E coli strain (1444049)
 d3 = {'species': 'Escherichia coli', 'strain': 'Escherichia coli 1-110-08_S1_C1'}
 # Streptophytina subphylum (131221)
 d4 = {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}
 # Opisthokonta clade (33154)
+d5 = {'superkingdom': 'Eukaryota', 'clade': 'Opisthokonta'}
 # vulpes vulpes (9627)
-d5 = {'genus': 'Vulpes', 'species': 'Vulpes vulpes'}
+d6 = {'genus': 'Vulpes', 'species': 'Vulpes vulpes'}
 # Moraceae morus (3497)
-d6 = {'family': 'Moraceae', 'genus': 'Morus'}
+d7 = {'family': 'Moraceae', 'genus': 'Morus'}
 # Sulidae morus (37577)
-d7 = {'family': 'Sulidae', 'genus': 'Morus'}
+d8 = {'family': 'Sulidae', 'genus': 'Morus'}
 # Microcopris hidakai (2602157)
-d8 = {'genus': 'Microcopris', 'species': 'Microcopris hidakai'}
+d9 = {'genus': 'Microcopris', 'species': 'Microcopris hidakai'}
 # Look up an ID
-# test = val.id_lookup("E coli",2602157)
+test = val.id_lookup("Nickname",33154)
 # Then test output of taxa search
-test = val.taxa_search(d1)
-# Print out whatever gets returns
-print(test)
+# test = val.taxa_search(d1)
