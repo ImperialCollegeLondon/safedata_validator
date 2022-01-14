@@ -444,7 +444,8 @@ class Taxa:
         self.parents = dict()
         self.hierarchy = set()
         self.n_errors = None
-        
+        self.taxon_names_used = set()
+
         # Get a validator instance
         if resources.use_local_gbif:
             self.validator = LocalGBIFValidator(resources)
@@ -466,7 +467,7 @@ class Taxa:
 
         start_errors = CH.counters['ERROR']
 
-        # Get the field headers from the first row
+        # Get the data read in.
         LOGGER.info("Reading taxa data")
         FORMATTER.push()
         dframe = GetDataFrame(worksheet)
@@ -494,18 +495,6 @@ class Taxa:
         if dupl_taxon_names:
             LOGGER.error('Duplicated names found: ',
                          extra={'join': dupl_taxon_names.duplicated})
-
-        # # Clean string fields of padding
-        # str_fields = ['name', 'taxon name', 'taxon type', 'parent name', 'parent type']
-
-        # for each_field in set(headers).intersection(str_fields):
-        #     idx = headers.index(each_field)
-        #     field_data = IsNotPadded(dframe.data_columns[idx])
-
-        #     if not field_data:
-        #         LOGGER.error(f'Field {each_field} contains padded strings: ',
-        #                      extra={'join': field_data.failed})
-        #         dframe.data_columns[idx] = field_data.values
 
         # get dictionaries of the taxa
         taxa = [dict(zip(headers, rw)) for rw in zip(*dframe.data_columns)]
@@ -587,12 +576,15 @@ class Taxa:
 
         m_name, taxon_info, parent_info = taxon_input
 
-        # Sanitise inputs
+        # Sanitise worksheet names for taxa - only keep unpadded strings.
         if m_name is None or not isinstance(m_name, str) or m_name.isspace():
             LOGGER.error('Worksheet name missing, whitespace only or not text')
         elif m_name != m_name.strip():
             LOGGER.error(f"Worksheet name has whitespace padding: {repr(m_name)}")
             m_name = m_name.strip()
+            self.taxon_names.add(m_name)
+        else:
+            self.taxon_names.add(m_name)
         
         # Check the parent details
         p_fail = False
