@@ -312,7 +312,7 @@ class BaseField:
         self.n_blank = 0
         self.n_excel_error = 0
         self.bad_values = []
-        self.bad_rows = []
+        self.bad_rows = [] # TODO check on implementation of this
 
         # field_name in meta is guaranteed by Dataset loading so 
         # use this to get a reporting name or sub in a column letter
@@ -865,7 +865,7 @@ class TaxaField(BaseField):
         super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
 
         if self.taxa is None:
-            self.log_stack.append(('40', 'No taxon details provided'))
+            self.log_stack.append((ERROR, 'No taxon details provided for dataset'))
         
         self.taxa_found = set()
     
@@ -873,10 +873,10 @@ class TaxaField(BaseField):
 
         data = super().validate_data(data, **kwargs)
 
-        numeric = IsString(data)
+        data = IsString(data, keep_failed=False)
 
-        if not numeric:
-            self.log_stack.append((ERROR, 'Cells contain non-numeric values'))
+        if not data:
+            self.log_stack.append((ERROR, 'Cells contain non-string values'))
 
         self.taxa_found.update(data)
     
@@ -884,18 +884,20 @@ class TaxaField(BaseField):
 
         super().report()
 
+        # TODO - not sure about this - no other fields test for emptiness?
         if self.taxa_found == set():
             LOGGER.error('No taxa loaded')
             return
         
-        extra_taxa = self.taxa_found.difference(self.taxa.taxon_names)
+        if self.taxa is not None:
+            extra_taxa = self.taxa_found.difference(self.taxa.taxon_names)
 
-        if extra_taxa:
-            LOGGER.error('Includes taxa missing from Taxa worksheet: ',
-                            extra={'join': extra_taxa})
+            if extra_taxa:
+                LOGGER.error('Includes unreported taxa: ',
+                                extra={'join': extra_taxa})
 
-        # add the found taxa to the list of taxa used
-        self.taxa.taxon_names_used.update(self.taxa_found)
+            # add the found taxa to the list of taxa used
+            self.taxa.taxon_names_used.update(self.taxa_found)
 
 def check_field_locations(self, data):
 

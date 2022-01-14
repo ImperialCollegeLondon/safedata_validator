@@ -356,6 +356,22 @@ def test_CategoricalField_validate_data(caplog, data, expected_log):
      (['C_born', 'V_salv', 'C_born', 'V_salv', 'C_born', 'V_salv'], 
       True,
       ((INFO, "Checking Column taxa_field"),)),
+     (['C_born', 'V_salv', 'C_born', 'V_salv', 'C_born', 'V_salv'], 
+      False,
+      ((INFO, "Checking Column taxa_field"),
+       (ERROR, 'No taxon details provided for dataset'))),
+     (['C_born', 123, 'C_born', 'V_salv', 'C_born', 'V_salv'], 
+      True,
+      ((INFO, "Checking Column taxa_field"),
+       (ERROR, 'Cells contain non-string values'))),
+     ([], 
+      True,
+      ((INFO, "Checking Column taxa_field"),
+       (ERROR, 'No taxa loaded'))),
+     (['C_born', 'V_salv', 'C_born', 'V_salv', 'C_born', 'V_salv', 'P_leo'], 
+      True,
+      ((INFO, "Checking Column taxa_field"),
+       (ERROR, 'Includes unreported taxa'))),
     ])
 def test_TaxaField_validate_data(caplog, field_test_taxa, data, provide_taxa_instance, expected_log):
     """Testing behaviour of the TaxaField class in using validate_data
@@ -365,13 +381,11 @@ def test_TaxaField_validate_data(caplog, field_test_taxa, data, provide_taxa_ins
         taxa = field_test_taxa
     else:
         taxa = None
-    
 
     fld = TaxaField({'field_type': 'taxa',
                      'description': 'My taxa',
                      'field_name': 'taxa_field'}, taxa=taxa)
     
-    print(fld.taxa.taxon_names)
     fld.validate_data(data)
     fld.report()
 
