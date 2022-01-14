@@ -545,9 +545,9 @@ class Taxa:
 
     # TODO - would be nice to use the decorator, but more complex than
     #        I had anticipated: https://stackoverflow.com/questions/11731136/
-    #        Could do this via e.g. 
-    #        @loggerinfo_push_pop(f'Validating {self._row_description}')
-    #        but this implementation ties validate_tuple() to needing that property populated
+    #        Could do this via e.g. @loggerinfo_push_pop(f'Validating
+    #        {self._row_description}') but this implementation ties
+    #        validate_and_add_taxon() to needing that property populated
     
     def validate_and_add_taxon(self, taxon_input):
         """ Takes user information on a taxon and optionally a parent taxon, 
