@@ -275,14 +275,14 @@ class BaseField:
         Base class to check field metadata and then test whether the data
         contents of a field are compatible with the metadata for the field.
         Largely used for checking data worksheets, but also by other methods.
-        This base class defines the core checking functions as a base class
-        and then subclasses implement data type specific checking.
+        This base class defines the core checking functions as a base class and
+        then subclasses implement data type specific checking.
 
-        In order to work with the row by row data loading from openpyxl,
-        the BaseField class does _not_ emit logging messages as they occur 
-        but holds a stack of messages created during initiation and as 
-        chunks of data are ingested. This logging can then be emitted using 
-        the report() method, once all the data has been ingested.
+        In order to work with the row by row data loading from openpyxl, the
+        BaseField class does _not_ emit logging messages as they occur but holds
+        a stack of messages created during initiation and as chunks of data are
+        ingested. This logging can then be emitted using the report() method,
+        along with any final checks, once all the data has been ingested.
 
         The base class also has a much more complex signature than the base
         functionality requires. Various subclasses need access to:
@@ -296,8 +296,14 @@ class BaseField:
 
         Args: 
             meta: A dictionary of field metadata
-            dwsh: A DataWorksheet, used to pass worksheet level information,
-                which at the moment is just taxa fields.
+            dwsh: A DataWorksheet instance, used to pass worksheet level
+                information, which at the moment is just taxa fields.
+            dataset: An Dataset instance, used to update dataset level
+                information, such as extents.
+            locations: A Locations instances, used to validate location
+                details and update locations used.
+            taxa: A Taxa instance, used to validate taxon details and update
+                taxa used.
         """
 
         self.meta = meta
@@ -664,7 +670,12 @@ class BaseField:
         return data.values
 
     def report(self):
+        """Report on field creation and data validation.
 
+        This  method emits any logging messages accumulated during the creation
+        of a field instance and data validation. The method also contains any final
+        checking of data values across all validated data.
+        """
         # Emit the accumulated messages
         for log_level, msg in self.log_stack:
             LOGGER.log(log_level, msg)
@@ -854,8 +865,8 @@ class DatetimeField(BaseField):
 
 class TaxaField(BaseField):
     """
-    Checks if all the values provided in a Taxon field are found
-    in the Taxa worksheet.
+    Checks if all the values provided in a taxa field are found
+    in the Taxa instance.
     """
 
     field_types = 'taxa'
@@ -898,6 +909,58 @@ class TaxaField(BaseField):
 
             # add the found taxa to the list of taxa used
             self.taxa.taxon_names_used.update(self.taxa_found)
+
+
+class LocationsField(BaseField):
+    """
+    Checks if all the values provided in a locations field are found
+    in the Locations instance.
+    """
+
+    # TODO - the structure of this and TaxaField are identical except for Locations
+    #        v Taxa as the validation sets. Could amalgamate into a base class.
+    field_types = 'locations'
+    required_descriptors = MANDATORY_DESCRIPTORS
+
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, taxa: Taxa = None, locations: Locations = None) -> None:
+        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+
+        if self.locations is None:
+            self.log_stack.append((ERROR, 'No location details provided for dataset'))
+        
+        self.locations_found = set()
+    
+    def validate_data(self, data: list, **kwargs):
+
+        data = super().validate_data(data, **kwargs)
+
+        data = IsString(data, keep_failed=False)
+
+        if not data:
+            self.log_stack.append((ERROR, 'Cells contain non-string values'))
+
+        self.locations.locations_used.update(data)
+    
+    def report(self):
+
+        super().report()
+
+        # TODO - not sure about this - no other fields test for emptiness?
+        if self.locations_found == set():
+            LOGGER.error('No locations loaded')
+            return
+        
+        if self.locations is not None:
+            extra_locs = self.locations_found.difference(self.locations.locations)
+
+            if extra_locs:
+                LOGGER.error('Includes unreported locations: ',
+                                extra={'join': extra_locs})
+
+            # add the found taxa to the list of taxa used
+            self.locations.locations_used.update(self.locations_found)
+
+
 
 def check_field_locations(self, data):
 

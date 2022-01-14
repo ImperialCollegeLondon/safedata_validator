@@ -1,12 +1,10 @@
-from posixpath import expanduser
 import pytest
 from logging import ERROR, WARNING, INFO
-from safedata_validator import field
 
 from safedata_validator.taxa import Taxa
-
+from safedata_validator.locations import Locations
 from safedata_validator.field import (BaseField, CategoricalField, NumericField,
-                                      TaxaField)
+                                      TaxaField, LocationsField)
 
 # Fixtures to provide Taxon, Locations, Dataset and Dataworksheet 
 # instances for testing
@@ -31,6 +29,22 @@ def field_test_taxa(resources_with_local_gbif):
         taxa.validate_and_add_taxon(tx)
     
     return taxa
+
+
+@pytest.fixture()
+def field_test_locations(resources_with_local_gbif):
+    """Fixture to provide a taxon object with a couple of names. These examples
+    need to be in the cutdown local GBIF testing database in fixtures.
+    """
+
+    locations = Locations(resources_with_local_gbif)
+
+    test_locs = [{'location name':'A1'}, 
+                 {'location name': 'A2'}]
+    
+    locations.validate_and_add_locations(test_locs)
+    
+    return locations
 
 # Checking the helper methods
 
@@ -398,16 +412,7 @@ def test_TaxaField_validate_data(caplog, field_test_taxa, data, provide_taxa_ins
 
 
 
-[{'field_type': 'location',
-  'description': 'SAFE 2nd order point number',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': 'Location',
-  'col_idx': 1},
+[
  {'field_type': 'date',
   'description': 'Collection date',
   'method': None,
