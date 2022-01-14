@@ -1,7 +1,36 @@
 from posixpath import expanduser
 import pytest
-from safedata_validator.field import BaseField, CategoricalField, NumericField
 from logging import ERROR, WARNING, INFO
+from safedata_validator import field
+
+from safedata_validator.taxa import Taxa
+
+from safedata_validator.field import (BaseField, CategoricalField, NumericField,
+                                      TaxaField)
+
+# Fixtures to provide Taxon, Locations, Dataset and Dataworksheet 
+# instances for testing
+
+@pytest.fixture()
+def field_test_taxa(resources_with_local_gbif):
+    """Fixture to provide a taxon object with a couple of names. These examples
+    need to be in the cutdown local GBIF testing database in fixtures.
+    """
+
+    taxa = Taxa(resources_with_local_gbif)
+
+    test_taxa = [
+        ('C_born', 
+            ['Crematogaster borneensis', 'Species', None, None], 
+            None), 
+        ('V_salv', 
+            ['Varanus salvator', 'Species', None, None], 
+            None),]
+    
+    for tx in test_taxa:
+        taxa.validate_and_add_taxon(tx)
+    
+    return taxa
 
 # Checking the helper methods
 
@@ -270,8 +299,6 @@ def test_CategoricalField_init(caplog, field_meta, expected_log):
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
 
-
-
 @pytest.mark.parametrize(
     'data, expected_log',
     [
@@ -321,7 +348,39 @@ def test_CategoricalField_validate_data(caplog, data, expected_log):
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
 
+# Taxon field - check init and validate_data (overloaded report just emits messages)
 
+@pytest.mark.parametrize(
+    'data, provide_taxa_instance, expected_log',
+    [
+     (['C_born', 'V_salv', 'C_born', 'V_salv', 'C_born', 'V_salv'], 
+      True,
+      ((INFO, "Checking Column taxa_field"),)),
+    ])
+def test_TaxaField_validate_data(caplog, field_test_taxa, data, provide_taxa_instance, expected_log):
+    """Testing behaviour of the TaxaField class in using validate_data
+    """
+
+    if provide_taxa_instance:
+        taxa = field_test_taxa
+    else:
+        taxa = None
+    
+
+    fld = TaxaField({'field_type': 'taxa',
+                     'description': 'My taxa',
+                     'field_name': 'taxa_field'}, taxa=taxa)
+    
+    print(fld.taxa.taxon_names)
+    fld.validate_data(data)
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
 
 
 

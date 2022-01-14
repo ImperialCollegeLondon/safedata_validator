@@ -694,7 +694,7 @@ class NumericField(BaseField):
         
         data = super().validate_data(data, **kwargs)
         
-        numeric = IsNumber(IsNotExcelError(data, keep_failed=False))
+        numeric = IsNumber(data)
 
         if not numeric:
             self.log_stack.append((ERROR, 'Cells contain non-numeric values'))
@@ -851,28 +851,51 @@ class DatetimeField(BaseField):
             if which in ['date', 'datetime']:
                 self.update_extent(extent, datetime.datetime, 'temporal_extent')
 
+
 class TaxaField(BaseField):
+    """
+    Checks if all the values provided in a Taxon field are found
+    in the Taxa worksheet.
+    """
 
     field_types = 'taxa'
     required_descriptors = MANDATORY_DESCRIPTORS
 
-    def _validate_data_extra(self, data, **kwargs):
-        """
-        Checks if all the values provided in a Taxon field are found
-        in the Taxa worksheet.
-        Args:
-            data: A list of data values, allegedly taxon names
-        """
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, taxa: Taxa = None, locations: Locations = None) -> None:
+        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
 
-        found = set(dt.value for dt in data)
-        if self.taxon_names == set():
-            LOGGER.error('No taxa loaded', 2)
-        if not found.issubset(self.taxon_names):
+        if self.taxa is None:
+            self.log_stack.append(('40', 'No taxon details provided'))
+        
+        self.taxa_found = set()
+    
+    def validate_data(self, data: list, **kwargs):
+
+        data = super().validate_data(data, **kwargs)
+
+        numeric = IsString(data)
+
+        if not numeric:
+            self.log_stack.append((ERROR, 'Cells contain non-numeric values'))
+
+        self.taxa_found.update(data)
+    
+    def report(self):
+
+        super().report()
+
+        if self.taxa_found == set():
+            LOGGER.error('No taxa loaded')
+            return
+        
+        extra_taxa = self.taxa_found.difference(self.taxa.taxon_names)
+
+        if extra_taxa:
             LOGGER.error('Includes taxa missing from Taxa worksheet: ',
-                            extra={'join': found - self.taxon_names, 'quote': True})
+                            extra={'join': extra_taxa})
 
         # add the found taxa to the list of taxa used
-        self.taxon_names_used.update(found)
+        self.taxa.taxon_names_used.update(self.taxa_found)
 
 def check_field_locations(self, data):
 
