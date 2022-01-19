@@ -165,6 +165,21 @@ class IsNotNumericString(Filter):
     def rfunc(val):
         return val
 
+class IsLocName(Filter):
+
+    @staticmethod
+    def tfunc(val):
+
+        if isinstance(val, (str, int)) or (
+            isinstance(val, float) and val.is_integer()):
+                return True
+        
+        return False
+
+    @staticmethod
+    def rfunc(val):
+        return str(val)
+
 
 class IsNotBlank(Filter):
 
