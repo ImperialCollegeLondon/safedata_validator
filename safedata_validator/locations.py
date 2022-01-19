@@ -28,6 +28,7 @@ class Locations:
             A Locations instance
         """
 
+        self.n_errors = 0
         self.locations = set()
         self.location_index = []
         self.extents = {'latitude': Extent('latitude', (float, int)),
@@ -43,18 +44,17 @@ class Locations:
     def load(self, worksheet: worksheet):
 
         """
-        Attempts to load and check the contents of a Locations worksheet and
-        compile the geographic extent of the locations used. 
+        Loads and check the contents of a Locations worksheet and compile the
+        geographic extent of the locations used. 
 
         Args:
-            worksheet:
+            worksheet: An openpyxl worksheet instance containing data describing
+                locations.
         """
 
         start_errors = CH.counters['ERROR']
 
         # Load the locations data frame - which runs header checks
-        LOGGER.info("Reading location data")
-        FORMATTER.push()
         dframe = GetDataFrame(worksheet)
 
         # Dupe headers likely cause serious issues, so stop
@@ -80,17 +80,18 @@ class Locations:
             
             # Check the New column is just yes, no
             new_vals = IsLower([rw['new'] for rw in locs])
-            new_vals = IsNotBlank(new_vals)
+            new_vals = IsNotBlank(new_vals, keep_failed=False)
             if not new_vals:
-                LOGGER.error('New locations field contains blank rows.')
+                LOGGER.error("Missing values in 'new' field")
 
             # check only yes or no entries
             valid_new = {'yes', 'no'}
             bad_new = set(new_vals) - valid_new
             if bad_new:
-                LOGGER.error('New locations field contains values other than yes and no: ',
+                LOGGER.error("Values other than yes and no in 'new' field: ",
                              extra={'join': bad_new})
-        
+
+            # Parse locations that can be assigned to new or known.
             known_locs = [rw for rw in locs 
                           if isinstance(rw['new'], str) and rw['new'].lower() == 'no']
             new_locs = [rw for rw in locs 
@@ -98,19 +99,19 @@ class Locations:
         else:
             new_locs = []
             known_locs = locs
-
-        if new_locs:
-            self.validate_new_locations(new_locs)
         
         if known_locs:
             known_loc_names = [lc['location name'] for lc in known_locs]
-            self.validate_known_locations(known_loc_names)
+            self.add_known_locations(known_loc_names)
         
-        # summary of processing
-        n_errors = CH.counters['ERROR'] - start_errors
+        if new_locs:
+            self.add_new_locations(new_locs)
 
-        if n_errors > 0:
-            LOGGER.info('Locations contains {} errors'.format(n_errors))
+        # summary of processing
+        self.n_errors = CH.counters['ERROR'] - start_errors
+
+        if self.n_errors > 0:
+            LOGGER.info('Locations contains {} errors'.format(self.n_errors))
         else:
             LOGGER.info('{} locations loaded correctly'.format(len(self.locations)))
 
@@ -156,7 +157,7 @@ class Locations:
         dupes = HasDuplicates(loc_names)
         if dupes:
             LOGGER.error('New location names contain duplicated values: ', 
-                         extra={'join': dupes})
+                         extra={'join': dupes.duplicated})
 
         # Look for new names that duplicate known names
         duplicates_existing = [rw['location name'] for rw in locs
@@ -212,7 +213,7 @@ class Locations:
             if lonlat_provided:
 
                 LOGGER.info('Validating lat / long data')
-
+                FORMATTER.push()
                 for axs in ['latitude', 'longitude']:
                     
                     # Allow NAs for unknown location points
@@ -232,10 +233,13 @@ class Locations:
                     # Update extents
                     if axs_vals.values:
                         self.extents[axs].update(axs_vals)
-
+                FORMATTER.pop()
+            
             if wkt_provided:
 
                 LOGGER.info('Validating WKT data')
+                FORMATTER.push()
+
                 blank_wkt = []
                 non_string_wkt = []
                 bad_wkt = []
@@ -278,6 +282,8 @@ class Locations:
                     LOGGER.error('WKT information badly formatted, not geometrically valid or 3D: ',
                                     extra={'join': bad_wkt})
 
+                FORMATTER.pop()
+        
         # new location names
         # - test for duplicated names to already added values
         dupes = [lc for lc in loc_names if lc in self.locations]
@@ -317,7 +323,7 @@ class Locations:
         dupes = HasDuplicates(loc_names)
         if dupes:
             LOGGER.error('Added names contain duplicated values: ', 
-                         extra={'join': dupes})
+                         extra={'join': dupes.duplicated})
 
         # Validate and standardise types - strings or integer codes.
         loc_names = IsLocName(loc_names, keep_failed=False)
@@ -345,8 +351,8 @@ class Locations:
         if bbox_keys:
             bbox = [vl for ky, vl in list(self.valid_locations.items()) if ky in bbox_keys]
             bbox = list(zip(*bbox))
-            self.longitudinal_extent.update((min(bbox[0]), max(bbox[1])))
-            self.latitudinal_extent.update((min(bbox[2]), max(bbox[3])))
+            self.extents['longitude'].update((min(bbox[0]), max(bbox[1])))
+            self.extents['latitude'].update((min(bbox[2]), max(bbox[3])))
 
         # Update location names and index
         # - test for duplicated names to already added values

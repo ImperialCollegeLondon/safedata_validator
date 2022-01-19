@@ -1,7 +1,9 @@
 import pytest
 from logging import ERROR, WARNING, INFO
 from safedata_validator.locations import Locations
+import openpyxl
 
+from test.conftest import resources_with_local_gbif
 
 @pytest.fixture()
 def locations_inst(resources_with_local_gbif):
@@ -178,3 +180,90 @@ def test_add_new_locations(caplog, locations_inst,
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize(
+  "headers,rows,expected_log",
+  [ # Good input - known locations and new locations
+    ( ('location name',),
+      ( ('A_1',), ('A_2',), ('A_3',)),
+      ( (INFO, 'Loading Locations worksheet'),
+        (INFO, 'Checking known locations'),
+        (INFO, '3 locations loaded correctly'))),
+    ( ('location name', 'new', 'type', 'wkt'),
+      ( ('A_1', 'no', None, None), 
+        ('A_2', 'no', None, None), 
+        ('New_1', 'yes', 'point', 'POINT(117 4)'),
+        ('New_2', 'yes', 'point', 'POINT(117 4)')),
+      ( (INFO, 'Loading Locations worksheet'),
+        (INFO, 'Checking known locations'),
+        (INFO, 'Checking new locations'),
+        (INFO, 'Validating WKT data'),
+        (INFO, '4 locations loaded correctly'))),
+    # Duplicated headers
+    ( ('location name','location name'),
+      ( ('A_1',), ('A_2',), ('A_3',)),
+      ( (INFO, 'Loading Locations worksheet'),
+        (ERROR, 'Headers contain duplicated values'),
+        (ERROR, 'Cannot parse locations with duplicated headers'))),
+    # Duplicated headers
+    ( ('location_name',),
+      ( ('A_1',), ('A_2',), ('A_3',)),
+      ( (INFO, 'Loading Locations worksheet'),
+        (ERROR, 'Location name column not found'))),
+    # Errors in new fields
+    ( ('location name', 'new', 'type', 'wkt'),
+      ( ('A_1', None, None, None), 
+        ('A_2', 'no', None, None), 
+        ('New_1', 'yes', 'point', 'POINT(117 4)'),
+        ('New_2', 'yes', 'point', 'POINT(117 4)')),
+      ( (INFO, 'Loading Locations worksheet'),
+        (ERROR, "Missing values in 'new' field"),
+        (INFO, 'Checking known locations'),
+        (INFO, 'Checking new locations'),
+        (INFO, 'Validating WKT data'),
+        (INFO, 'Locations contains 1 error'))),
+    # New versus known
+    ( ('location name', 'new', 'type', 'wkt'),
+      ( ('A_1', 'known', None, None), 
+        ('A_2', 'no', None, None), 
+        ('New_1', 'yes', 'point', 'POINT(117 4)'),
+        ('New_2', 'yes', 'point', 'POINT(117 4)')),
+      ( (INFO, 'Loading Locations worksheet'),
+        (ERROR, "Values other than yes and no in 'new' field"),
+        (INFO, 'Checking known locations'),
+        (INFO, 'Checking new locations'),
+        (INFO, 'Validating WKT data'),
+        (INFO, 'Locations contains 1 error'))),
+  ]
+)
+def test_load_from_instance(caplog, locations_inst, headers, rows, expected_log):
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(headers)
+
+    for this_row in rows:
+      ws.append(this_row)
+
+    locations_inst.load(ws)
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize(
+    'example_excel_files, n_errors',
+    [('good', 0), 
+     ('bad', 8)], 
+    indirect = ['example_excel_files']  # take actual params from fixture
+)
+def test_load_from_file(locations_inst, example_excel_files, n_errors):
+
+    locations_inst.load(example_excel_files['Locations'])
+    assert locations_inst.n_errors == n_errors
+
