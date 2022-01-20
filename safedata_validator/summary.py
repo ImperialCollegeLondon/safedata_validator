@@ -107,8 +107,10 @@ class Summary:
         self.funders = None
         self.keywords = None
         self.temporal_extent = Extent('temporal extent', datetime.date)
-        self.latitudinal_extent = Extent('latitudinal extent', float)
-        self.longitudinal_extent = Extent('longitudinal extent', float)
+        self.latitudinal_extent = Extent('latitudinal extent', (float, int),
+                                         hard_bounds=(-90,90), soft_bounds=(-4, 8))
+        self.longitudinal_extent = Extent('longitudinal extent', (float, int),
+                                          hard_bounds=(-180,180), soft_bounds=(108, 120))
         self.external_files = None
         self.data_worksheets = None
 
