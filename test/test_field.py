@@ -4,7 +4,8 @@ import datetime
 
 from safedata_validator.taxa import Taxa
 from safedata_validator.locations import Locations
-from safedata_validator.field import (BaseField, CategoricalField, NumericField,
+from safedata_validator.dataset import Dataset
+from safedata_validator.field import (BaseField, CategoricalField, GeoField, NumericField,
                                       TaxaField, LocationsField)
 
 # Fixtures to provide Taxon, Locations, Dataset and Dataworksheet 
@@ -45,6 +46,17 @@ def field_test_locations(resources_with_local_gbif):
     locations.add_known_locations(test_locs)
     
     return locations
+
+@pytest.fixture()
+def field_test_dataset(resources_with_local_gbif):
+    """Fixture to provide a taxon object with a couple of names. These examples
+    need to be in the cutdown local GBIF testing database in fixtures.
+    """
+
+    dataset = Dataset(resources_with_local_gbif)
+    
+    return dataset
+
 
 # Checking the helper methods
 
@@ -502,8 +514,80 @@ def test_LocationsField_validate_data(caplog, field_test_locations, data, expect
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
 
+# Geographic coordinates field.
+
+@pytest.mark.parametrize(
+    'provide_ds_instance, expected_log',
+    [
+      ( True,
+        ( (INFO, "Checking Column geocoords"),)),
+      ( False,
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'No dataset object provided - cannot update extents'))),
+       ])
+def test_GeoField_init(caplog, field_test_dataset, provide_ds_instance, expected_log):
+    """Testing behaviour of the GeoField class in handling missing dataset.
+    """
+
+    if provide_ds_instance:
+        ds = field_test_dataset
+    else:
+        ds = None
+
+    fld = GeoField({'field_name': 'geocoords',
+                    'field_type': 'latitude',
+                    'description': 'my gcs'}, 
+                     dataset=ds)
+    fld.report()
+    
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
 
 
+@pytest.mark.parametrize(
+    'data, expected_log',
+    [ # Good data
+      ( [1,2,3,4,5,6], 
+        ( (INFO, "Checking Column geocoords"),)),
+      # Bad inputs
+      ( [1,'2',3,4,5,6], 
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'Field contains non-numeric data'))),
+      ( [1,'2°',3,4,5,6], 
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'Field contains non-numeric data'),
+          (WARNING, 'Possible degrees minutes and seconds formatting?'))),
+      ( [1,2,3,4,5,600], 
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'Values range (1, 600) exceeds hard bounds'))),
+      ( [1,2,3,4,5,60], 
+        ( (INFO, "Checking Column geocoords"),
+          (WARNING, 'Values range (1, 60) exceeds soft bounds'))),
+    ])
+@pytest.mark.parametrize(
+    'which', ['latitude', 'longitude'])
+def test_GeoField_validate_data(caplog, field_test_dataset, data, expected_log, which):
+    """Testing behaviour of the TaxaField class in using validate_data
+    """
+
+    fld = GeoField({'field_name': 'geocoords',
+                    'field_type': which,
+                    'description': 'my gcs'}, 
+                    dataset=field_test_dataset)
+
+    fld.validate_data(data)
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
 
 
 

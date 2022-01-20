@@ -8,7 +8,8 @@ from openpyxl.utils import get_column_letter
 from safedata_validator.validators import (IsNotBlank, IsNotExcelError, IsNotPadded,
                                            HasDuplicates, IsNotNA, IsNumber, 
                                            IsNotNumericString, IsString, IsLocName,
-                                           blank_value, valid_r_name)
+                                           blank_value, valid_r_name, RE_DMS)
+
 from safedata_validator.logger import LOGGER, FORMATTER, CH, loggerinfo_push_pop
 from safedata_validator.dataset import Dataset
 from safedata_validator.locations import Locations
@@ -553,31 +554,6 @@ class BaseField:
 
         return level_labels, level_desc
 
-    @staticmethod
-    def validate_geo_extent(extent, which):
-
-        if which == 'latitude':
-            bnds = [-90, -4, 8, 90]
-        elif which == 'longitude':
-            bnds = [-180, 108, 120, 180]
-
-        if extent[0] > extent[1]:
-            LOGGER.error('{0}: lower bound greater than upper bound'.format(which.capitalize()))
-            return False
-
-        out_of_bounds = extent[0] < bnds[0] or extent[1] > bnds[3]
-        out_of_borneo = bnds[0] <= extent[0] < bnds[1] or bnds[2] < extent[1] <= bnds[3]
-
-        if out_of_bounds:
-            LOGGER.error('{0} values not in valid range[{1[0]}, {1[3]}]: '
-                         '{2}'.format(which.capitalize(), bnds, extent))
-            return False
-        elif out_of_borneo:
-            LOGGER.warn('{0} values not in Borneo [{1[1]}, {1[2]}]: '
-                        '{2}'.format(which.capitalize(), bnds, extent))
-            return True
-        else:
-            return True
 
 
 
@@ -774,108 +750,6 @@ class CategoricalField(BaseField):
                             extra={'join': unused})
 
 
-class DatetimeField(BaseField):
-
-    field_types = ('date', 'time', 'datetime')
-
-    def ingest(self, data, which='datetime'):
-
-        """
-        Checks for data consistency in date and datetime fields. Excel
-        doesn't distinguish, both are loaded as datetime.datetime objects
-        so we check that the values are compatible with the user provided
-        field type. Also handle datetimes provided as strings in common
-        ISO formats
-        Args:
-            meta: The field metadata, to be updated with the range
-            data: A list of data values, allegedly containing datetimes or dates
-            which: The datetime type to be checked for.
-        """
-
-        # Check types and allow all xlrd.XL_CELL_DATE or all xlrd.XL_CELL_STRING
-        # but not a mix
-        cell_types = {dt.ctype for dt in data}
-        extent = None
-
-        if not data:
-            # Data is empty - external file description
-            pass
-        elif cell_types == {xlrd.XL_CELL_DATE}:
-
-            data = [dt.value for dt in data]
-
-            # For date and time options, check decimal components
-            if which == 'date':
-                contains_time = [dt % 1 > 0 for dt in data]
-                if any(contains_time):
-                    LOGGER.error('Some values also contain time components')
-
-            elif which == 'time':
-                contains_date = [1 <= dt for dt in data]
-                if any(contains_date):
-                    LOGGER.error('Some values also contain date components')
-
-            # For date containing options, check for actual dates and get extents
-            if which in ['date', 'datetime']:
-                if any(0.0 <= dt < 1.0 for dt in data):
-                    LOGGER.error('Some values _only_  contain time components')
-
-            # get extents
-            if len(data):
-                extent = (xlrd.xldate_as_datetime(min(data), self.workbook.datemode),
-                            xlrd.xldate_as_datetime(max(data), self.workbook.datemode))
-
-                if which == 'time':
-                    extent = tuple(vl.time() for vl in extent)
-
-        elif cell_types == {xlrd.XL_CELL_TEXT}:
-
-            data = [dt.value for dt in data]
-
-            # internal function to check dates
-            def parse_datetime(dt, which='date'):
-                try:
-                    if which == 'time':
-                        dt = parser.isoparser().parse_isotime(dt)
-                    else:
-                        dt = parser.isoparse(dt)
-
-                    return dt, True
-                except ValueError:
-                    return dt, False
-
-            parsed_data = [parse_datetime(dt, which) for dt in data]
-            good_data = set((dt[0] for dt in parsed_data if dt[1]))
-            bad_data = set((dt[0] for dt in parsed_data if not dt[1]))
-
-            if len(good_data):
-                extent = (min(good_data), max(good_data))
-                # intentionally scrub out timezones - Excel dates don't have them and can't
-                # compare datetimes with mixed tzinfo status
-                extent = tuple(dt.replace(tzinfo=None) for dt in extent)
-
-            if len(bad_data):
-                LOGGER.error('Problem in parsing date/time strings: ', extra={'join': bad_data})
-
-        elif cell_types == {xlrd.XL_CELL_DATE, xlrd.XL_CELL_TEXT}:
-            first_cell_type = data[0].ctype
-            first_text = next(idx for idx, val in enumerate(data) if val.ctype != first_cell_type)
-            LOGGER.error('Field contains data with mixed test and date formatting. Use either Excel date formats or '
-                            'ISO formatted text. Note that text can look _exactly_ like an Excel date or '
-                            'time cell, you may need to copy the column and format as numbers to spot '
-                            'errors. The number of the first row with formatting not matching the first '
-                            'value is: ' + str(first_text))
-
-        else:
-            LOGGER.error('Field contains cells formatted as neither text nor date')
-
-        # range and extent setting
-        if extent is not None:
-            meta['range'] = extent
-            if which in ['date', 'datetime']:
-                self.update_extent(extent, datetime.datetime, 'temporal_extent')
-
-
 class TaxaField(BaseField):
     """
     Checks if all the values provided in a taxa field are found
@@ -987,17 +861,44 @@ class GeoField(BaseField):
 
         if self.dataset is None:
             self._log('No dataset object provided - cannot update extents')
- 
-    def validate_data(self, data: list, **kwargs):
 
+        self.min = None
+        self.max = None
+        
+    def validate_data(self, data: list, **kwargs):
+        """Testing of the data range is deferred to report() to avoid
+        triggering logging from the Extent objects until data loading is
+        completed
+        """
         data = super().validate_data(data, **kwargs)
 
-        data = IsNumber(data)
+        data = IsNumber(data, keep_failed=False)
 
         if not data:
-            LOGGER.error('Field contains non-numeric data')
-            if any([RE_DMS.search(str(dt)) for dt in data]):
-                LOGGER.warn('Possible degrees minutes and seconds formatting? Use decimal degrees')
+            self._log('Field contains non-numeric data')
+
+            if any([RE_DMS.search(str(dt)) for dt in data.failed]):
+                self._log('Possible degrees minutes and seconds formatting? Use decimal degrees', 
+                          WARNING)
+        
+        if data.values:
+            self.min = min(data.values + [self.min]) if self.min else min(data.values)
+            self.max = max(data.values + [self.max]) if self.max else max(data.values)
+
+    def report(self):
+
+        super().report()
+
+        if self.min is None or self.max is None:
+            return()
+        
+        if self.dataset is not None:
+            if self.meta['field_type'] == 'latitude':
+                self.dataset.latitudinal_extent.update([self.min, self.max])
+            elif self.meta['field_type'] == 'longitude':
+                self.dataset.longitudinal_extent.update([self.min, self.max])
+
+
 
 def check_field_geo(self, meta, data, which='latitude'):
 
@@ -1036,6 +937,107 @@ def check_field_geo(self, meta, data, which='latitude'):
 
 
 
+
+class DatetimeField(BaseField):
+
+    field_types = ('date', 'time', 'datetime')
+
+    def ingest(self, data, which='datetime'):
+
+        """
+        Checks for data consistency in date and datetime fields. Excel
+        doesn't distinguish, both are loaded as datetime.datetime objects
+        so we check that the values are compatible with the user provided
+        field type. Also handle datetimes provided as strings in common
+        ISO formats
+        Args:
+            meta: The field metadata, to be updated with the range
+            data: A list of data values, allegedly containing datetimes or dates
+            which: The datetime type to be checked for.
+        """
+
+        # Check types and allow all xlrd.XL_CELL_DATE or all xlrd.XL_CELL_STRING
+        # but not a mix
+        cell_types = {dt.ctype for dt in data}
+        extent = None
+
+        if not data:
+            # Data is empty - external file description
+            pass
+        elif cell_types == {xlrd.XL_CELL_DATE}:
+
+            data = [dt.value for dt in data]
+
+            # For date and time options, check decimal components
+            if which == 'date':
+                contains_time = [dt % 1 > 0 for dt in data]
+                if any(contains_time):
+                    LOGGER.error('Some values also contain time components')
+
+            elif which == 'time':
+                contains_date = [1 <= dt for dt in data]
+                if any(contains_date):
+                    LOGGER.error('Some values also contain date components')
+
+            # For date containing options, check for actual dates and get extents
+            if which in ['date', 'datetime']:
+                if any(0.0 <= dt < 1.0 for dt in data):
+                    LOGGER.error('Some values _only_  contain time components')
+
+            # get extents
+            if len(data):
+                extent = (xlrd.xldate_as_datetime(min(data), self.workbook.datemode),
+                            xlrd.xldate_as_datetime(max(data), self.workbook.datemode))
+
+                if which == 'time':
+                    extent = tuple(vl.time() for vl in extent)
+
+        elif cell_types == {xlrd.XL_CELL_TEXT}:
+
+            data = [dt.value for dt in data]
+
+            # internal function to check dates
+            def parse_datetime(dt, which='date'):
+                try:
+                    if which == 'time':
+                        dt = parser.isoparser().parse_isotime(dt)
+                    else:
+                        dt = parser.isoparse(dt)
+
+                    return dt, True
+                except ValueError:
+                    return dt, False
+
+            parsed_data = [parse_datetime(dt, which) for dt in data]
+            good_data = set((dt[0] for dt in parsed_data if dt[1]))
+            bad_data = set((dt[0] for dt in parsed_data if not dt[1]))
+
+            if len(good_data):
+                extent = (min(good_data), max(good_data))
+                # intentionally scrub out timezones - Excel dates don't have them and can't
+                # compare datetimes with mixed tzinfo status
+                extent = tuple(dt.replace(tzinfo=None) for dt in extent)
+
+            if len(bad_data):
+                LOGGER.error('Problem in parsing date/time strings: ', extra={'join': bad_data})
+
+        elif cell_types == {xlrd.XL_CELL_DATE, xlrd.XL_CELL_TEXT}:
+            first_cell_type = data[0].ctype
+            first_text = next(idx for idx, val in enumerate(data) if val.ctype != first_cell_type)
+            LOGGER.error('Field contains data with mixed test and date formatting. Use either Excel date formats or '
+                            'ISO formatted text. Note that text can look _exactly_ like an Excel date or '
+                            'time cell, you may need to copy the column and format as numbers to spot '
+                            'errors. The number of the first row with formatting not matching the first '
+                            'value is: ' + str(first_text))
+
+        else:
+            LOGGER.error('Field contains cells formatted as neither text nor date')
+
+        # range and extent setting
+        if extent is not None:
+            meta['range'] = extent
+            if which in ['date', 'datetime']:
+                self.update_extent(extent, datetime.datetime, 'temporal_extent')
 
 
 
