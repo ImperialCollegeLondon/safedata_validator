@@ -1,23 +1,4 @@
-# DataWorksheet
-#	 Field
-#		 Set of required FieldDescriptor
-#		 Set of required Validators: is_in_set (taxa, locations, factors), is_of_type, is_reg_match
-#		 Bounds [new feature]
-#
-# Dataset
-#	 Summary
-#	 Extent
-#    FieldDescriptor
-
-# Locations
-# Taxa
-
 from safedata_validator.logger import LOGGER
-
-
-class FieldDescriptor:
-    pass
-
 
 class Extent:
 
