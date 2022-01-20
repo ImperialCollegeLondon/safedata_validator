@@ -1,10 +1,11 @@
 from openpyxl import load_workbook
+import datetime
 from safedata_validator.resources import Resources
 from safedata_validator.locations import Locations
 from safedata_validator.taxa import Taxa
 from safedata_validator.summary import Summary
 from safedata_validator.logger import LOGGER, FORMATTER, CH, log_and_raise
-
+from safedata_validator.extent import Extent
 
 class Dataset:
 
@@ -28,6 +29,13 @@ class Dataset:
         self.summary = Summary()
         self.locations = Locations()
         self.taxa = Taxa()
+
+        # Extents - these can be loaded from the Summary or compiled from the
+        # data, so the Summary and dataset extents are held separately so that
+        # they can be validated against one another once all data is checked.
+        self.temporal_extent = Extent('temporal extent', datetime.date)
+        self.latitudinal_extent = Extent('latitudinal extent', float)
+        self.longitudinal_extent = Extent('longitudinal extent', float)
 
         # Open the workbook with:
         #  - read_only to use the memory optimised read_only implementation.
