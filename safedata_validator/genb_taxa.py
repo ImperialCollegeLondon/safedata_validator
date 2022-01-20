@@ -206,7 +206,7 @@ class RemoteNCBIValidator:
 
     # HOW ARE SYNONYMS HANDLED?
     # New function to read in taxa information
-    def taxa_search(self, taxa: dict):
+    def taxa_search(self, nnme: str, taxa: dict):
         """Method to find GenBank ID from taxonomic information.
 
         Params:
@@ -226,6 +226,7 @@ class RemoteNCBIValidator:
         # "Raises an IOError exception if there’s a network error"
         handle = Entrez.esearch(db="taxonomy", term=s_term)
         record = Entrez.read(handle)
+        print(record)
         handle.close()
 
         # Store count of the number of records found
@@ -235,31 +236,28 @@ class RemoteNCBIValidator:
         if c == 1:
             # Find taxa ID as single entry in the list
             tID = int(record['IdList'][0])
-            # TEST TEST TEST
-            handle = Entrez.efetch(db="taxonomy", id=f"{tID}", rettype="", retmode="xml")
-            reply = Entrez.read(handle)
-            handle.close()
-            print(reply)
-            # WORK OUT WHAT I NEED TO EXTRACT
-
+            # Use ID lookup function to find generate as a MicTaxon object
+            mtaxon = id_lookup(nnme,tID)
         # Catch cases where no record is found
         elif c == 0:
             # NEED TO LOG AN ERROR HERE I RECKON
             print("Not found error")
         else:
-            # NEED TO LOG AN ERROR HERE I RECKON
-            print("Ambiguity error")
-            # NEED TO HANDLE MULTIPLE ENTRY CASE HERE
+            # Check whether multiple taxonomic levels have been provided
+            if len(taxa) == 1:
+                # If not raise an error
+                # LOG ERROR!!!!!!!!!!!
+                print("Ambiguity error")
+            else:
+                # Unsure exactly what to do here
+                b = 1000
+                # Definetly need to search the higher taxonomic level
+                # Verify it exists and that I haven't been fed garbage
+                # Store details of this parent taxa
+                # Then load in parent taxa details for all potential taxa
+                # And then select the one with the right details
 
-
-
-        # DO I READ THE DATA IN A DIFFERENT WAY OR JUST USE THE GENBANK ID?
-
-        # Fill in missing taxonomic information
-
-        # Check against backbone
-        # Generate instance
-        return
+        return mtaxon
 
 
 # Make validator
@@ -276,13 +274,17 @@ d4 = {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}
 d5 = {'superkingdom': 'Eukaryota', 'clade': 'Opisthokonta'}
 # vulpes vulpes (9627)
 d6 = {'genus': 'Vulpes', 'species': 'Vulpes vulpes'}
+# Morus (NA)
+d7 = {'genus': 'Morus'}
 # Moraceae morus (3497)
-d7 = {'family': 'Moraceae', 'genus': 'Morus'}
+d8 = {'family': 'Moraceae', 'genus': 'Morus'}
 # Sulidae morus (37577)
-d8 = {'family': 'Sulidae', 'genus': 'Morus'}
+d9 = {'family': 'Sulidae', 'genus': 'Morus'}
 # Microcopris hidakai (2602157)
-d9 = {'genus': 'Microcopris', 'species': 'Microcopris hidakai'}
+d10 = {'genus': 'Microcopris', 'species': 'Microcopris hidakai'}
+# Nonsense garbage (NA)
+d11 = {'genus': 'Nonsense', 'species': 'Nonsense garbage'}
 # Look up an ID
-test = val.id_lookup("Nickname",33154)
+# test = val.id_lookup("Nickname",562)
 # Then test output of taxa search
-# test = val.taxa_search(d1)
+test = val.taxa_search("Nickname",d8)
