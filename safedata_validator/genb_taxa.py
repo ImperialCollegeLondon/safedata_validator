@@ -37,15 +37,17 @@ class NCBIError(Exception):
         self.message = message
         super().__init__(self.message)
 
-# TODO - So we want a GenBank taxonomy to be provided
-# From name alone we should be able to find an ID
-# But probably worth asking for a taxon ID in case of name conflicts
-# First stage is basically does this exist in GenBank at all
+# TODO - Ambiguity resolution => This is currently in progress
 
 # TODO - Synonym checking
 # GenBank lists hetrotypic synonyms this can be used for synonym checking
 # Problem is what if the synonyms preferred with GenBank are not those preferred by GBIF?
 # Can we save and store all synonyms and test them all in that case?
+
+# TODO - Error logging, work out where errors and warnings should be sent
+
+# TODO - Unit testing, work out how I set up unit tests. Probably best begun early
+# Worth asking David how to do this if I can't work it out myself
 
 # TODO - Validate against GBIF
 # So check if taxa provided exists if GBIF, if not check up hierachy until one that does is found
@@ -207,7 +209,10 @@ class RemoteNCBIValidator:
     # HOW ARE SYNONYMS HANDLED?
     # New function to read in taxa information
     def taxa_search(self, nnme: str, taxa: dict):
-        """Method to find GenBank ID from taxonomic information.
+        """Method that takes in taxonomic information, and finds the corresponding
+        genbank ID. This genbank ID is then used to generate a MicTaxon object,
+        which is returned. This function also makes use of parent taxa information
+        to distinguish between ambigious taxa names.
 
         Params:
             taxa: A dictonary containing taxonomic information
@@ -226,7 +231,6 @@ class RemoteNCBIValidator:
         # "Raises an IOError exception if there’s a network error"
         handle = Entrez.esearch(db="taxonomy", term=s_term)
         record = Entrez.read(handle)
-        print(record)
         handle.close()
 
         # Store count of the number of records found
@@ -237,25 +241,77 @@ class RemoteNCBIValidator:
             # Find taxa ID as single entry in the list
             tID = int(record['IdList'][0])
             # Use ID lookup function to find generate as a MicTaxon object
-            mtaxon = id_lookup(nnme,tID)
+            mtaxon = self.id_lookup(nnme,tID)
         # Catch cases where no record is found
         elif c == 0:
             # NEED TO LOG AN ERROR HERE I RECKON
             print("Not found error")
+            return
         else:
             # Check whether multiple taxonomic levels have been provided
             if len(taxa) == 1:
                 # If not raise an error
                 # LOG ERROR!!!!!!!!!!!
                 print("Ambiguity error")
+                return
             else:
-                # Unsure exactly what to do here
-                b = 1000
-                # Definetly need to search the higher taxonomic level
-                # Verify it exists and that I haven't been fed garbage
-                # Store details of this parent taxa
-                # Then load in parent taxa details for all potential taxa
-                # And then select the one with the right details
+                # Find second from last dictonary key
+                f_key = list(taxa.keys())[-2]
+                # Then find corresponding entry as a search term
+                s_term = taxa[f_key]
+
+                # Then find details of this parent record
+                # NETWORK ERRORS!
+                # "Raises an IOError exception if there’s a network error"
+                handle = Entrez.esearch(db="taxonomy", term=s_term)
+                p_record = Entrez.read(handle)
+                handle.close()
+
+                # Store count of the number of records found
+                pc = int(p_record['Count'])
+
+                # Check that single parent taxa exists in reords
+                if pc == 0:
+                    print("Parent taxa doesn't exist")
+                    return
+                elif pc > 1:
+                    print("Multiple possible parent taxa")
+                    return
+                else:
+                    # Find parent taxa ID as single entry in the list
+                    pID = int(p_record['IdList'][0])
+                    # Then use ID lookup function to find generate as a MicTaxon object
+                    ptaxon = self.id_lookup("parent",pID)
+
+                # Save parent taxa rank and name
+                p_key = list(ptaxon.taxa_hier.keys())[-1]
+                p_val = ptaxon.taxa_hier[p_key]
+
+                # Use list comprehension to make list of potential taxa
+                potents = [self.id_lookup(f"c{i}",int(record['IdList'][i]))
+                            for i in range(0,c)]
+
+                # Check if relevant rank exists in the child taxa
+                child = [p_key in potents[i].taxa_hier for i in range(0,c)]
+
+                # Then look for matching rank name pairs
+                for i in range(0,c):
+                    # Only check cases where rank exists in the child taxa
+                    if child[i] == True:
+                        child[i] = (potents[i].taxa_hier[f"{p_key}"] == p_val)
+
+                # Check for errors relating to finding too many or few child taxa
+                if sum(child) == 0:
+                    print("Not actually a parent taxa of first taxa")
+                    return
+                elif sum(child) > 1:
+                    print("More than one child of parent taxa")
+                    return
+                else:
+                    # Find index corresponding to correct child taxa
+                    tID = int(record['IdList'][child.index(True)])
+                    # Use ID lookup function to find generate as a MicTaxon object
+                    mtaxon = self.id_lookup(nnme,tID)
 
         return mtaxon
 
@@ -280,11 +336,14 @@ d7 = {'genus': 'Morus'}
 d8 = {'family': 'Moraceae', 'genus': 'Morus'}
 # Sulidae morus (37577)
 d9 = {'family': 'Sulidae', 'genus': 'Morus'}
+# Chordata morus (NA)
+d10 = {'phylum': 'Chordata', 'genus': 'Morus'}
+# Eukaryota morus(NA)
+d11 = {'superkingdom': 'Eukaryota', 'genus': 'Morus'}
 # Microcopris hidakai (2602157)
-d10 = {'genus': 'Microcopris', 'species': 'Microcopris hidakai'}
+d12 = {'genus': 'Microcopris', 'species': 'Microcopris hidakai'}
 # Nonsense garbage (NA)
-d11 = {'genus': 'Nonsense', 'species': 'Nonsense garbage'}
-# Look up an ID
-# test = val.id_lookup("Nickname",562)
+d13 = {'genus': 'Nonsense', 'species': 'Nonsense garbage'}
 # Then test output of taxa search
-test = val.taxa_search("Nickname",d8)
+test = val.taxa_search("Nickname",d1)
+print(test)
