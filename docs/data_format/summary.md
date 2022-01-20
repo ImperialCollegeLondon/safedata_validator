@@ -40,9 +40,7 @@ Some blocks allow multiple records (e.g. authors and data worksheets) with sets 
 
 !!! Warning "Mandatory block"
 
-    **Embargo date** is only required if the **Access status** value is 'Embargo'. 
-	**Access conditions** is only required if the **Access status** value is 'Restricted'.
-	The other fields are mandatory.
+    All fields are mandatory.
 
 This block provides a set of core details for the dataset. You can only provide a single value for each field.
 
@@ -54,18 +52,32 @@ This block provides a set of core details for the dataset. You can only provide 
 * **Description**: This will be the public description of the dataset. Note that you can have paragraphs of text
   within a single cell in Excel, so please do provide a reasonable summary. You will need to use Alt + Enter (or
   Alt + Shift + Enter on a Mac) to insert a carriage return.
-* **Access status**<a name="access-status"></a>: You must enter an Access Status of  `Open`, `Embargo` or `Restricted`. 
-  We prefer as much data as possible to be open access: see the [statement on data availability](../availability.md). 
-* **Embargo date**: If you choose embargoed access status then you must also enter the date when the embargo will 
-  end. This must be an Excel date formatted value and you cannot embargo data for more than two years. 
-* **Access conditions**: If you choose restricted access status then you must also provide text describing the 
-  access conditions.  
 
 |  |  |  |  |
 |--------------------|-----------------------------------|---|---|
 | SAFE Project ID       | 1 | | |
 | Title             | Example data for the SAFE Project  | | |
 | Description           | This is an example dataset.  | | |
+
+# The access block
+
+!!! Warning "Mandatory block"
+
+    **Embargo date** is only required if the **Access status** value is 'Embargo'. 
+    **Access conditions** is only required if the **Access status** value is 'Restricted'.
+
+This block provides the access details for the dataset. You can only provide a single value for each field.
+
+* **Access status**<a name="access-status"></a>: You must enter an Access Status of  `Open`, `Embargo` or `Restricted`. 
+  We prefer as much data as possible to be open access: see the [statement on data availability](../availability.md). 
+* **Embargo date**: If you choose embargoed access status then you must also enter the date when the embargo will 
+  end. This must be an Excel date formatted value and you cannot embargo data for more than two years. Do not provide
+  access conditions: embargoed datasets become freely available when the embargo ends. 
+* **Access conditions**: If you choose restricted access status then you must also provide text describing the 
+  access conditions. Do not provide an embargo date - restricted datasets are permanently restricted.
+
+|  |  |  |  |
+|--------------------|-----------------------------------|---|---|
 | Access status        | Embargo | | |
 | Embargo date          | 03/09/18 | | |
 | Access conditions | (see above)| | |

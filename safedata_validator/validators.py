@@ -20,13 +20,51 @@ RE_CONTAINS_PUNC = re.compile(r'[,;:]')
 RE_WSPACE_AT_ENDS = re.compile(r'^\s+.+|.+\s+$')
 RE_DMS = re.compile(r'[°\'"dms’”]+')
 
+RE_R_ELLIPSIS = re.compile(r'^\\.{2}[0-9]+$|^\\.{3}$')
+RE_R_NAME_CHARS = re.compile(r'^[\w\.]+$')
+RE_R_NAME_BAD_START = re.compile(r'^_|^\\.[0-9]')
 
-# INFO - pandas has Excel reading including vectorised string operations?
-#        It uses openpyxl for xlsx but doesn't seem to use the memory optimised
-#        read_only workbook. Speed vs memory use? Also less flexible
-#      - datatable also interesting, but less flexible and (10/2021) relies
-#        on xlrd, which is no longer recommended for xslx files.
+EXCEL_ERRORS = set(["#DIV/0!", "#NAME?", "#N/A", "#NUM!", "#VALUE!", 
+                    "#REF!",  "#NULL!", "#SPILL!", "#CALC!"])
 
+# First some simple single value validators
+
+def blank_value(value):
+    """Simple check for 'empty' strings (None or whitespace only)"""
+    return (value is None) or (str(value).isspace())
+
+
+def valid_r_name(string):
+    """Check that a field name is a valid r name"""
+
+    reserved_words = ["if", "else", "repeat", "while", "function", "for", "in",
+                      "next", "break", "TRUE", "FALSE", "NULL", "Inf", "NaN",
+                      "NA", "NA_integer_", "NA_real_", "NA_complex_", "NA_character_"]
+
+    valid = True
+
+    # length (not worrying about pre 2.13.0)
+    if len(string) > 10000:
+        valid = False
+
+    # ellipsis reserved words ('...' and '..#')
+    if RE_R_ELLIPSIS.match(string):
+        valid = False
+
+    # is it a reserved word?
+    if string in reserved_words:
+        valid = False
+
+    if not RE_R_NAME_CHARS.match(string):
+        valid = False
+
+    if RE_R_NAME_BAD_START.match(string):
+        valid = False
+
+    return valid
+
+# Now a class of validator to handle sets of values and track 
+# invalid values
 
 class Filter:
 
@@ -38,7 +76,7 @@ class Filter:
         to yield different checking behaviour. These methods are:
 
             * `tfunc`, which should perform a boolean test on a value and,
-            * `rfunc`, which should return  a value for failing inputs.
+            * `rfunc`, which should return a value for failing inputs.
 
         The __iter__ method is set to iterate over the resulting checked values
         and the __bool__ method is set to report whether any values failed the
@@ -102,6 +140,47 @@ class IsString(Filter):
         return val
 
 
+class IsNumber(Filter):
+
+    @staticmethod
+    def tfunc(val):
+        return isinstance(val, (float, int))
+
+    @staticmethod
+    def rfunc(val):
+        return val
+
+
+class IsNotNumericString(Filter):
+
+    @staticmethod
+    def tfunc(val):
+        try:
+            float(val)
+            return False
+        except ValueError:
+            return True
+
+    @staticmethod
+    def rfunc(val):
+        return val
+
+class IsLocName(Filter):
+
+    @staticmethod
+    def tfunc(val):
+
+        if isinstance(val, (str, int)) or (
+            isinstance(val, float) and val.is_integer()):
+                return True
+        
+        return False
+
+    @staticmethod
+    def rfunc(val):
+        return str(val)
+
+
 class IsNotBlank(Filter):
 
     @staticmethod
@@ -149,6 +228,26 @@ class IsNotPadded(Filter):
         return val.strip()
 
 
+class IsNotNA(Filter):
+
+    @staticmethod
+    def tfunc(val):
+        return not((isinstance(val, str) and val == 'NA'))
+
+    @staticmethod
+    def rfunc(val):
+        return val
+
+class IsNotExcelError(Filter):
+
+    @staticmethod
+    def tfunc(val):
+        return not(isinstance(val, str) and (val in EXCEL_ERRORS))
+
+    @staticmethod
+    def rfunc(val):
+        return val
+
 class IsLower(Filter):
 
     @staticmethod
@@ -170,10 +269,8 @@ class NoPunctuation(Filter):
     def rfunc(val):
         return val
 
-
 # HasDuplicates acts at the level of the set of values, not individual values,
 # so is not a Filter subclass
-
 
 class HasDuplicates:
 
@@ -206,6 +303,11 @@ class HasDuplicates:
     def __repr__(self):
         return str(bool(len(self.duplicated)))
 
+# INFO - pandas has Excel reading including vectorised string operations?
+#        It uses openpyxl for xlsx but doesn't seem to use the memory optimised
+#        read_only workbook. Speed vs memory use? Also less flexible
+#      - datatable also interesting, but less flexible and (10/2021) relies
+#        on xlrd, which is no longer recommended for xslx files.
 
 class GetDataFrame:
 

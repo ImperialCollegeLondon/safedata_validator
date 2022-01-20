@@ -1,5 +1,3 @@
-from logging import log
-from posixpath import expanduser
 import pytest
 from safedata_validator import taxa
 from safedata_validator.resources import Resources
@@ -421,6 +419,9 @@ def test_validate_taxon_lookup(caplog, resources_local_and_remote,
         exp_rec = expected_log_entries[idx]
         assert log_rec.levelname == exp_rec[0]
         assert exp_rec[1] in log_rec.message
+
+# TODO - add test to check that duplicate worksheet names are caught. 
+
 
 @pytest.mark.parametrize(
     'example_excel_files, n_errors, n_taxa',

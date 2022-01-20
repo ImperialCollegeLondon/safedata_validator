@@ -466,13 +466,19 @@ class Summary:
         elif data_worksheets is None:
             LOGGER.info("Only external file descriptions provided")
         elif data_worksheets is not None:
-            # Check sheet names
+            # Check sheet names in list of sheets
             cited_sheets = {ws['name'] for ws in data_worksheets}
-            # names not in list of sheets
-            bad_names = cited_sheets - self.sheetnames
-            if bad_names:
-                LOGGER.error('Worksheet names not found in workbook: ',
-                             extra={'join': bad_names})
+
+            # Names not in list of sheets
+            for each_ws in data_worksheets:
+                # Now match to sheet names
+                if each_ws['name'] not in self.sheetnames:
+                    if each_ws['external'] is not None:
+                        LOGGER.info(f"Worksheet summary {each_ws['name']} recognized as placeholder for "
+                                    f"external file {each_ws['external']}")
+                    else: 
+                        LOGGER.error(f"Data worksheet {each_ws['name']} not found")
+
             # bad external files
             external_in_sheet = {ws['external'] for ws in data_worksheets
                                  if ws['external'] is not None}

@@ -27,5 +27,8 @@ site
 local_db/backbone-current-simple.sqlite
 local_db/taxdump.tar.gz
 
+# ignore the local example inputs folder
+local_example_inputs/*
+
 # Ignore local pyenv settings
 .python-version
