@@ -4,25 +4,6 @@ import pytest
 from safedata_validator.logger import LOGGER
 from safedata_validator.summary import *
 
-# @pytest.fixture()
-# def summary_ws():
-#
-#     wb = openpyxl.Workbook()
-#     ws = wb.active
-#
-#     # Create a 11 by 38 simple block of data with A-K column headers
-#     # containing a multiplication table.
-#     for col in range(1, 12):
-#         ws.cell(column=col, row=1).value = openpyxl.utils.get_column_letter(col)
-#         for row in range(2, 40):
-#             ws.cell(column=col, row=row).value = (row - 1) * col
-#
-#     # Put in an empty cell at 20, 50 which leads to the kind of extra rows
-#     # and columns that often occur with Excel
-#     ws.cell(column=20, row=50).value = None
-#
-#     return ws
-
 
 # TODO - _read_block is being tested by repeated _read_`block` calls and
 #        this could be simplified to reduce the code, but there are block
@@ -321,7 +302,7 @@ def test_permits(caplog, alterations, should_log_error, expected_log):
 def test_doi(caplog, alterations, should_log_error, expected_log, do_val_doi):
 
     # Initialise a Summary instance.
-    summary = Summary(None, None, validate_doi=do_val_doi)
+    summary = Summary(validate_doi=do_val_doi)
 
     # Valid set of information
     input = {'publication doi': ('https://doi.org/10.1098/rstb.2011.0049',)}
@@ -666,7 +647,7 @@ def test_external_files(caplog, alterations, should_log_error, expected_log):
      None,
      dict(),
      True,
-     'Worksheet names not found in workbook'),
+     'Data worksheet NotInTheSheets not found'),
     (dict(), # Unused worksheet
      {'DF', 'Incidence', 'Transects', 'Summary', 'Taxa', 'Locations', 'NotUsed'},
      dict(),
@@ -709,10 +690,8 @@ def test_data_worksheets(caplog, alterations, alt_sheets, ext_alterations, shoul
     """
 
     # Initialise a Summary instance
-    if alt_sheets is None:
-        summary = Summary(None, {'DF', 'Incidence', 'Transects', 'Summary', 'Taxa', 'Locations'})
-    else:
-        summary = Summary(None, alt_sheets)
+    summary = Summary()
+    sheetnames = alt_sheets or {'DF', 'Incidence', 'Transects', 'Summary', 'Taxa', 'Locations'}
     
     # Valid set of information
     input = {'worksheet title': ('My shiny dataset', 'My incidence matrix', 
@@ -740,7 +719,7 @@ def test_data_worksheets(caplog, alterations, alt_sheets, ext_alterations, shoul
     summary._load_external_files()
 
     # Test the block load
-    summary._load_data_worksheets()
+    summary._load_data_worksheets(sheetnames)
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
@@ -759,7 +738,7 @@ def test_summary_load(example_excel_files, n_errors):
     indirect parameterisation to access the fixtures containing the
     sample excel files.
     """
-    summary = Summary(example_excel_files['Summary'], set(example_excel_files.sheetnames))
-    summary.load()
+    summary = Summary()
+    summary.load(example_excel_files['Summary'], set(example_excel_files.sheetnames))
 
     assert summary.n_errors == n_errors

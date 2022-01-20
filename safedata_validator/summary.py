@@ -74,9 +74,8 @@ class Summary:
                             ('permit number', True, 'number', (str, int, float))],
                            False, 'Permits', False))
 
-    # TODO - pass in dataset instead of sheetnames? or indeed worksheet.
 
-    def __init__(self, worksheet, sheetnames, validate_doi=False, valid_pid=None):
+    def __init__(self, validate_doi=False, valid_pid=None):
 
         """
         Checks the information in the summary worksheet and looks for the
@@ -95,9 +94,6 @@ class Summary:
                 and any of those ids would be valid).
         """
 
-        self.worksheet = worksheet
-        # TODO - sanitise these
-        self.sheetnames = sheetnames
         self.validate_doi = validate_doi
         self._valid_pid = valid_pid
 
@@ -136,19 +132,29 @@ class Summary:
             self._valid_pid = None
 
     @loggerinfo_push_pop('Checking Summary worksheet')
-    def load(self):
+    def load(self, worksheet, sheetnames):
         """
+        Checks the information in a summary worksheet and looks for the
+        metadata and dataset worksheets. The methods are intended to try and
+        get as much information as possible from the worksheet: the dictionary
+        of metadata returned will have None for any missing data, which should
+        be handled by downstream code.
 
-        Returns:
-
+        Args:
+            worksheet: An openpyxl worksheet instance.
+            sheetnames: A set of sheet names found in the workbook.
+            validate_doi: Check any publication DOIs, requiring a web connection.
+            valid_pid: If provided, an integer or list of integer values that are
+                permitted in the Project ID field (usually one for a new dataset
+                but more if a published dataset is associated with multiple projects
+                and any of those ids would be valid).
         """
-        # try and get the summary worksheet
 
         start_errors = CH.counters['ERROR']
 
         # load worksheet rows
-        rows = list(self.worksheet.iter_rows(values_only=True))
-        self._ncols = self.worksheet.max_column
+        rows = list(worksheet.iter_rows(values_only=True))
+        self._ncols = worksheet.max_column
 
         # convert into dictionary using the lower cased first entry as the key
         row_headers = IsString([r[0] for r in rows])
@@ -187,7 +193,7 @@ class Summary:
         self._load_funders()
         self._load_permits()
         self._load_external_files()
-        self._load_data_worksheets()
+        self._load_data_worksheets(sheetnames)
 
         # summary of processing
         self.n_errors = CH.counters['ERROR'] - start_errors
@@ -439,7 +445,7 @@ class Summary:
         self.external_files = external_files
 
     @loggerinfo_push_pop('Loading data worksheet metadata')
-    def _load_data_worksheets(self):
+    def _load_data_worksheets(self, sheetnames):
 
         # Load the WORKSHEETS block
         data_worksheets = self._read_block(*self.fields['worksheet'])
@@ -472,7 +478,7 @@ class Summary:
             # Names not in list of sheets
             for each_ws in data_worksheets:
                 # Now match to sheet names
-                if each_ws['name'] not in self.sheetnames:
+                if each_ws['name'] not in sheetnames:
                     if each_ws['external'] is not None:
                         LOGGER.info(f"Worksheet summary {each_ws['name']} recognized as placeholder for "
                                     f"external file {each_ws['external']}")
@@ -493,7 +499,7 @@ class Summary:
                              extra={'join': bad_externals})
 
         # Check for existing sheets without description
-        extra_names = self.sheetnames - {'Summary', 'Taxa', 'Locations'} - cited_sheets
+        extra_names = sheetnames - {'Summary', 'Taxa', 'Locations'} - cited_sheets
         if extra_names:
             LOGGER.error('Undocumented sheets found in workbook: ',
                          extra={'join': extra_names})
