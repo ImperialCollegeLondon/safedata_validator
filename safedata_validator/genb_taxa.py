@@ -37,12 +37,14 @@ class NCBIError(Exception):
         self.message = message
         super().__init__(self.message)
 
-# TODO - Ambiguity resolution => This is currently in progress
-
 # TODO - Synonym checking
 # GenBank lists hetrotypic synonyms this can be used for synonym checking
 # Problem is what if the synonyms preferred with GenBank are not those preferred by GBIF?
 # Can we save and store all synonyms and test them all in that case?
+
+# TODO - 'AkaTaxIds', these are taxas that have been redfined in GenBanks Database
+# At the very least this should generate a warning, as part of this what happens if
+# the wrong name is searched for?
 
 # TODO - Error logging, work out where errors and warnings should be sent
 
@@ -75,6 +77,7 @@ class MicTaxon:
     The remaining properties are populated by processing functions not when
     an instance is created.
         * diverg: does the GenBank ID and stored taxa info diverge, and if so how?
+        * syns: list of synonymus names for the taxa
     """
 
     # Init properties
@@ -82,6 +85,7 @@ class MicTaxon:
     taxa_hier: dict
     genbank_id: Optional[Union[int, float]] = None
     diverg: str = dataclasses.field(init=False)
+    synonyms: list[str] = dataclasses.field(init=False)
 
     def __post_init__(self):
         """Sets the defaults for the post-init properties and checks inputs
@@ -93,6 +97,7 @@ class MicTaxon:
             self.genbank_id = int(self.genbank_id)
 
         self.diverg = None
+        self.synonyms = []
 
 @enforce_types
 class RemoteNCBIValidator:
@@ -204,6 +209,11 @@ class RemoteNCBIValidator:
             t = tax_dic["Rank"]
             mtaxon.diverg=f"{t}"
 
+        # Check that OtherNames exist in the dictonary
+        if 'OtherNames' in tax_dic.keys():
+            # If so find and add synonyms to potentially search GBIF for
+            mtaxon.synonyms = (tax_dic["OtherNames"])["Synonym"]
+            
         return mtaxon
 
     # HOW ARE SYNONYMS HANDLED?
@@ -328,7 +338,7 @@ d3 = {'species': 'Escherichia coli', 'strain': 'Escherichia coli 1-110-08_S1_C1'
 d4 = {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}
 # Opisthokonta clade (33154)
 d5 = {'superkingdom': 'Eukaryota', 'clade': 'Opisthokonta'}
-# vulpes vulpes (9627)
+# Vulpes vulpes (9627)
 d6 = {'genus': 'Vulpes', 'species': 'Vulpes vulpes'}
 # Morus (NA)
 d7 = {'genus': 'Morus'}
@@ -344,6 +354,11 @@ d11 = {'superkingdom': 'Eukaryota', 'genus': 'Morus'}
 d12 = {'genus': 'Microcopris', 'species': 'Microcopris hidakai'}
 # Nonsense garbage (NA)
 d13 = {'genus': 'Nonsense', 'species': 'Nonsense garbage'}
+# Tenacibaculum maritimum (1000)
+d14 = {'genus': 'Tenacibaculum', 'species': 'Tenacibaculum maritimum'}
+# Maybe find synonym of this one to test
 # Then test output of taxa search
-test = val.taxa_search("Nickname",d1)
+# test = val.taxa_search("Nickname",d1)
+# Search for ID
+test = val.id_lookup("Nickname",1000)
 print(test)
