@@ -118,3 +118,6 @@ def test_islower(input_vals, output_vals):
     out = IsLower(input_vals)
 
     assert out.values == output_vals
+
+
+# TODO - more unit tests on other validators.

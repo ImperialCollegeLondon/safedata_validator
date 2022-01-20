@@ -1,28 +1,19 @@
-
-from dataclasses import dataclass
-from safedata_validator.logger import LOGGER, FORMATTER, CH
-from safedata_validator.validators import (GetDataFrame, IsLower, IsNotBlank,
-                                           IsString, HasDuplicates)
-from safedata_validator.extent import Extent
-
+from openpyxl import worksheet
 from shapely import wkt
 from shapely.errors import WKTReadingError
 
+from safedata_validator.logger import LOGGER, FORMATTER, CH, loggerinfo_push_pop
+from safedata_validator.validators import (GetDataFrame, IsLower, IsNotBlank, IsNumber,
+                                           IsString, HasDuplicates, IsLocName)
+from safedata_validator.extent import Extent
 
-@dataclass()
+from safedata_validator.resources import Resources
+
+
 class Locations:
 
-    # Init properties
-    locations: [str] = None
-    location_index: [list] = None
-    extents = {'latitude': Extent('latitude', (float, int)),
-               'longitude': Extent('latitude', (float, int))}
-    new = False
-    lonlat = False
-    wkt = False
-
-    def load(self, worksheet, resources):
-
+    def __init__(self, resources: Resources) -> None:
+        
         """
         Attempts to load and check the contents of the Locations worksheet and
         compile the geographic extent of the locations used. The values in the
@@ -37,11 +28,33 @@ class Locations:
             A Locations instance
         """
 
+        self.n_errors = 0
+        self.locations = set()
+        self.location_index = []
+        self.extents = {'latitude': Extent('latitude', (float, int)),
+                        'longitude': Extent('longitude', (float, int))}
+        self.locations_used = set()
+
+        self.valid_locations = resources.valid_locations
+        self.location_aliases = resources.location_aliases
+        self.known_loc_names = set(list(resources.valid_locations.keys()) +
+                                   list(resources.location_aliases.keys()))
+
+    @loggerinfo_push_pop('Loading Locations worksheet')
+    def load(self, worksheet: worksheet):
+
+        """
+        Loads and check the contents of a Locations worksheet and compile the
+        geographic extent of the locations used. 
+
+        Args:
+            worksheet: An openpyxl worksheet instance containing data describing
+                locations.
+        """
+
         start_errors = CH.counters['ERROR']
 
         # Load the locations data frame - which runs header checks
-        LOGGER.info("Reading location data")
-        FORMATTER.push()
         dframe = GetDataFrame(worksheet)
 
         # Dupe headers likely cause serious issues, so stop
@@ -49,8 +62,9 @@ class Locations:
             LOGGER.error('Cannot parse locations with duplicated headers')
             return
 
-        # Reduce to lower case
-        # TODO - not trapping dupes that are only case differences. Do that in GetDataFrame?
+        # Reduce to lower case 
+        # TODO - not trapping dupes that are only case
+        #        differences. Do that in GetDataFrame?
         headers = IsLower(dframe.headers).values
 
         # Check location names are available
@@ -58,141 +72,190 @@ class Locations:
             LOGGER.error('Location name column not found')
             return
 
-        # Record which geom columns are present
-        if ('latitude' in headers) ^ ('longitude' in headers):
-            LOGGER.error('Provide both or neither of latitude and longitude')
-
-        self.lonlat = 'latitude' in headers and 'longitude' in headers
-        self.wkt = 'wkt' in headers
-        self.new = 'new' in headers
-
-        # Location name cleaning
-        loc_names = dframe.data_columns[headers.index('location name')]
-
-        loc_names = IsNotBlank(loc_names)
-
-        # Check for blanks
-        if not loc_names:
-            LOGGER.error('Blank location names: ',
-                         extra={'join': loc_names.failed})
-
-        # Convert non-strings to strings (e.g. numeric site codes)
-        loc_names = IsString(loc_names)
-
-        # look for duplicates
-        unique = HasDuplicates(loc_names)
-        if unique:
-            LOGGER.error('Duplicated location names: ',
-                         extra={'join': unique.duplicated})
-
-        dframe.data_columns[headers.index('location name')] = loc_names
-
-        # VALIDATE LOCATIONS
-
         # Get dictionaries of values for each row
         locs = [dict(zip(headers, rw)) for rw in zip(*dframe.data_columns)]
 
-        # Get existing location names and aliases - new location names must
-        # not appear in it and existing locations must.
-        existing_loc_names = set(list(resources.valid_locations.keys()) +
-                                 list(resources.location_aliases.keys()))
-
         # Split up old and new if there are there any new ones?
-        if self.new:
-
+        if 'new' in headers:
+            
             # Check the New column is just yes, no
-            is_new = set(IsLower([rw['new'] for rw in locs]))
-            is_new = IsNotBlank(is_new)
-            if not is_new:
-                LOGGER.error('New locations field contains blank rows.')
+            new_vals = IsLower([rw['new'] for rw in locs])
+            new_vals = IsNotBlank(new_vals, keep_failed=False)
+            if not new_vals:
+                LOGGER.error("Missing values in 'new' field")
 
             # check only yes or no entries
             valid_new = {'yes', 'no'}
-            if not set(is_new).issubset(valid_new):
-                LOGGER.error('New field contains values other than yes and no: ',
-                             extra={'join': is_new - valid_new, 'quote': True})
+            bad_new = set(new_vals) - valid_new
+            if bad_new:
+                LOGGER.error("Values other than yes and no in 'new' field: ",
+                             extra={'join': bad_new})
 
-            # extract the new and old locations - dropping None
-            new_locs = [rw for rw in locs if rw['new'].lower() == 'yes']
-            locs = [rw for rw in locs if rw['new'].lower() == 'no']
+            # Parse locations that can be assigned to new or known.
+            known_locs = [rw for rw in locs 
+                          if isinstance(rw['new'], str) and rw['new'].lower() == 'no']
+            new_locs = [rw for rw in locs 
+                          if isinstance(rw['new'], str) and rw['new'].lower() == 'yes']
         else:
             new_locs = []
-        FORMATTER.pop()
-
-        # Process new locations if there are any
-        new_loc_names = set()
-
+            known_locs = locs
+        
+        if known_locs:
+            known_loc_names = [lc['location name'] for lc in known_locs]
+            self.add_known_locations(known_loc_names)
+        
         if new_locs:
-            LOGGER.info(f'Checking {len(new_locs)} new locations')
-            FORMATTER.push()
+            self.add_new_locations(new_locs)
 
-            # Type is required - used to indicate the kind of location in the absence
-            # of any actual geodata
-            if 'type' not in headers:
-                LOGGER.error('New locations reported but Type field missing')
+        # summary of processing
+        self.n_errors = CH.counters['ERROR'] - start_errors
 
-            else:
-                # get lowercase types
-                geo_types = set(IsLower([vl['type'] for vl in new_locs]))
+        if self.n_errors > 0:
+            LOGGER.info('Locations contains {} errors'.format(self.n_errors))
+        else:
+            LOGGER.info('{} locations loaded correctly'.format(len(self.locations)))
 
-                # Handle blanks
-                if None in geo_types:
-                    LOGGER.error('Types for new locations contains blank entries.')
-                    geo_types -= {None}
+    @loggerinfo_push_pop('Checking new locations')
+    def add_new_locations(self, locs):
+        """This method takes list of dictionaries giving the details of
+        new locations to be added to the instance. These dictionaries
+        should contain keys `location name` and `type` and then at least 
+        one of  both `latitude` _and_ `longitude` or `wkt`.
+        """
 
-                # Handle unknown geo types
-                valid_geotypes = {'point', 'linestring', 'polygon', 'transect', 'area'}
-                bad_geo_types = geo_types - valid_geotypes
-                if bad_geo_types:
-                    LOGGER.error('Unknown location types: ',
-                                 extra={'join': bad_geo_types})
+        # Validation - TODO check locs is a list of dicts 
+        # - Do all the dicts have the same keys
+        loc_keys = set([tuple(k.keys()) for k in locs])
+        if len(loc_keys) > 1:
+            # TODO - should this be CRITICAL? Check error types.
+            LOGGER.error('Inconsistent keys in add_new_locations')
+            return
+        
+        # - Do they provide location names...
+        loc_keys = loc_keys.pop()
+        if 'location name' not in loc_keys:
+            LOGGER.error("No location name entries in add_new_locations")
+            return
 
-            # Look for duplicate names
-            duplicates_existing = [rw['location name'] for rw in new_locs
-                                   if rw['location name'] in existing_loc_names]
+        # - ... and are any of those names blank ...
+        loc_names = [itm['location name'] for itm in locs]
+        loc_names = IsNotBlank(loc_names, keep_failed=False)
+        if not loc_names:
+            LOGGER.error('Location names contains empty cells or whitespace text')
 
-            if duplicates_existing:
-                LOGGER.error('New location names duplicate existing names and aliases: ',
-                             extra={'join': duplicates_existing})
+        # - ... or not strings. Only allow strings for new locations - known 
+        #   locations get a pass for integer site codes but not here.
+        loc_names = IsString(loc_names)
+        if not loc_names:
+            LOGGER.error('New location names include non-string values: ',
+                         extra={'join': loc_names.failed})
 
-            # Look for geographic data (even if it is just the explicit statement
-            # that none is available using NA)
-            if not self.lonlat or self.wkt:
-                LOGGER.error('New locations reported: you must provide Lat/Long or WKT')
+        # Look for duplicated names in inputs - this includes all types and so
+        # could give messy information but can't detect duplicates late on
+        # cleaned names because we're dealing with sets by that point and there
+        # can be no duplication in sets
+        dupes = HasDuplicates(loc_names)
+        if dupes:
+            LOGGER.error('New location names contain duplicated values: ', 
+                         extra={'join': dupes.duplicated})
 
-            else:
-                # Check Lat Long and WKT using check_field_geo to validate the values,
-                # since this method automatically updates the dataset extents.
+        # Look for new names that duplicate known names
+        duplicates_existing = [rw['location name'] for rw in locs
+                               if rw['location name'] in self.known_loc_names]
 
-                if self.lonlat:
+        if duplicates_existing:
+            LOGGER.error('New location names duplicate known names and aliases: ',
+                            extra={'join': duplicates_existing})
 
-                    LOGGER.info('Validating lat / long data')
+        # Type is required - used to indicate the kind of location in the absence
+        # of any actual geodata
+        if 'type' not in loc_keys:
+            LOGGER.error('New locations do not provide the location type')
+            for this_loc in locs:
+                this_loc['type'] = "MISSING"
+        else:
+            # get lowercase types
+            geo_types = set(IsLower([vl['type'] for vl in locs]))
 
-                    for axs in ['latitude', 'longitude']:
+            # Handle blanks
+            geo_types = IsNotBlank(geo_types, keep_failed=False)
+            if not geo_types:
+                LOGGER.error('Types for new locations contains blank or whitespace entries.')
 
-                        axs_vals = [vl[axs] for vl in new_locs if vl[axs] != 'NA']
-                        axs_vals = IsNotBlank(axs_vals)
+            # Handle unknown geo types
+            valid_geotypes = {'point', 'linestring', 'polygon', 'transect', 'area'}
+            bad_geo_types = set(geo_types) - valid_geotypes
+            if bad_geo_types:
+                LOGGER.error('New locations include unknown location types: ',
+                                extra={'join': bad_geo_types})
+            
+        # Geometry information
+        # Record which geom columns are present
+        if ('latitude' in loc_keys) ^ ('longitude' in loc_keys):
+            LOGGER.error('New locations should either latitude _and_ longitude or neither')
 
-                        if not axs_vals:
-                            LOGGER.error(f'Blank {axs} values for new locations: use NA.')
+        lonlat_provided = 'latitude' in loc_keys and 'longitude' in loc_keys
+        wkt_provided = 'wkt' in loc_keys
 
-                        # Create an extent object to check values and report extents
+        # TODO - supplying both is not an error, and probably shouldn't be. WKT
+        # takes priority in the index when both are present, but not testing for
+        # congruence at present
+
+        # Look for geographic data (even if it is just the explicit statement
+        # that none is available using NA)
+        if not (lonlat_provided or wkt_provided):
+            LOGGER.error('New locations reported: you must provide Lat/Long or WKT,'
+                         'using NA explicitly when this data is missing.')
+        else:
+            # Check Lat Long and WKT using check_field_geo to validate the values,
+            # since this method automatically updates the dataset extents. 
+
+            if lonlat_provided:
+
+                LOGGER.info('Validating lat / long data')
+                FORMATTER.push()
+                for axs in ['latitude', 'longitude']:
+                    
+                    # Allow NAs for unknown location points
+                    axs_vals = [vl[axs] for vl in locs if vl[axs] != 'NA']
+                    axs_vals = IsNotBlank(axs_vals, keep_failed = False)
+                    if not axs_vals:
+                        LOGGER.error(f'Blank {axs} values for new locations: use NA.')
+                    
+                    # Check for data types _here_ to keep interpretable errors
+                    # TODO - maybe simplify Extent objects to _assume_ types.
+                    #        Probably no but there is some duplication of effort here
+                    axs_vals = IsNumber(axs_vals, keep_failed = False)
+                    if not axs_vals:
+                        LOGGER.error(f'Non-numeric {axs} values for new locations: ',
+                                     extra={'join': axs_vals.failed})
+
+                    # Update extents
+                    if axs_vals.values:
                         self.extents[axs].update(axs_vals)
+                FORMATTER.pop()
+            
+            if wkt_provided:
 
-                if self.wkt:
+                LOGGER.info('Validating WKT data')
+                FORMATTER.push()
 
-                    LOGGER.info('Validating WKT data')
+                blank_wkt = []
+                non_string_wkt = []
+                bad_wkt = []
 
-                    bad_wkt = []
-
-                    # Get locs where WKT not explicitly missing
-                    wkt_data = [l for l in new_locs if l['wkt'] != 'NA']
-                    wkt_found = [l for l in wkt_data if l['wkt'] is not None]
-
-                    if len(wkt_found) < len(wkt_data):
-                        LOGGER.error('WKT field contains blanks for new locations, use NA')
-
-                    for this_new_loc in wkt_found:
+                for this_new_loc in locs:
+                    
+                    if this_new_loc['wkt'] is None:
+                        blank_wkt.append(this_new_loc['location name'])
+                    elif not isinstance(this_new_loc['wkt'], str):
+                        non_string_wkt.append(this_new_loc['location name'])
+                    elif this_new_loc['wkt'].isspace():
+                        blank_wkt.append(this_new_loc['location name'])
+                    elif this_new_loc['wkt'] == 'NA':
+                        pass
+                    
+                    else:
 
                         # Run the potential WKT through the parser
                         try:
@@ -208,77 +271,97 @@ class Locations:
                             self.extents['latitude'].update([bnds[1], bnds[3]])
                             self.extents['longitude'].update([bnds[0], bnds[2]])
 
-                    if bad_wkt:
-                        LOGGER.error('WKT information badly formatted, not geometrically valid or 3D: ',
-                                     extra={'join': bad_wkt})
+                if blank_wkt:
+                    LOGGER.error('Blank WKT values for new locations: use NA.')
 
-            # new location names
-            new_loc_names = {rw['location name'] for rw in new_locs}
-            FORMATTER.pop()
+                if non_string_wkt:
+                    LOGGER.error('WKT values for new location not a string: ',
+                                 extra={'join': non_string_wkt})
 
-        # Process existing locations if there are any
-        loc_names = set()
+                if bad_wkt:
+                    LOGGER.error('WKT information badly formatted, not geometrically valid or 3D: ',
+                                    extra={'join': bad_wkt})
 
-        if locs:
-            LOGGER.info(f'Checking {len(locs)} existing locations ')
-            FORMATTER.push()
+                FORMATTER.pop()
+        
+        # new location names
+        # - test for duplicated names to already added values
+        dupes = [lc for lc in loc_names if lc in self.locations]
+        if dupes:
+            LOGGER.error('Location names already added to Location instance: ',
+                         extra={'join': dupes})
+        
+        self.locations.update(loc_names)
 
-            # check names exist
-            loc_names = {rw['location name'] for rw in locs}
-            unknown = loc_names - existing_loc_names
-            if unknown:
-                LOGGER.error('Unknown locations found: ',
-                             extra={'join': unknown, 'quote': True})
-
-            # are aliases being used?
-            aliased = loc_names & set(resources.location_aliases.keys())
-            if aliased:
-                LOGGER.warn('Locations aliases used. Maybe change to primary location names: ',
-                            extra={'join': aliased})
-
-            # Get the bounding box of known locations and aliased locations
-            bbox_keys = (loc_names - (unknown | aliased)) | {resources.location_aliases[ky] for ky in aliased}
-
-            # get the extents of known unaliased locations
-            if bbox_keys:
-                bbox = [vl for ky, vl in list(resources.valid_locations.items()) if ky in bbox_keys]
-                bbox = list(zip(*bbox))
-                self.extents['longitude'].update((min(bbox[0]), max(bbox[1])))
-                self.extents['latitude'].update((min(bbox[2]), max(bbox[3])))
-
-            FORMATTER.pop()
-
-        # combine locations into set
-        self.locations = loc_names | new_loc_names
-
-        # Create tuples to populate a location index. These have the format (name, new, type, WKT).
-        # The WKT can not align completely with the type because the lat lon format only provides
-        # a single point, which we represent as a Point() WKT. So you could get Linestring, Point().
-        # This is historical - type should have been point, transect, area and is really just a
-        # description of what the location is. Then lat/long or WKT can be missing but if present
-        # give a point location or a more complex geometry.
-
-        index = [(row['location name'], False, None, None)
-                 for row in locs]
-
-        for this_new_loc in new_locs:
-
-            if self.wkt and this_new_loc['wkt'] != 'NA':
+        for this_new_loc in locs:
+            
+            if wkt_provided and this_new_loc['wkt'] != 'NA':
                 geom = this_new_loc['wkt']
-            elif self.lonlat and ((this_new_loc['latitude'] != 'NA') and (this_new_loc['longitude'] != 'NA')):
+            elif lonlat_provided and ((this_new_loc['latitude'] != 'NA') and (this_new_loc['longitude'] != 'NA')):
                 geom = 'Point({longitude} {latitude})'.format(**this_new_loc)
             else:
                 geom = None
 
-            index.append((this_new_loc['location name'], True,
-                          this_new_loc['type'], geom))
+            self.location_index.append((this_new_loc['location name'], True,
+                                        this_new_loc['type'], geom))
 
-        self.location_index = index
+    @loggerinfo_push_pop('Checking known locations')
+    def add_known_locations(self, loc_names: list):
+        """This method takes a list of values and tries to validate those
+        values against known locations from the loaded resources. The values
+        are expected to be strings"""
 
-        # summary of processing
-        n_errors = CH.counters['ERROR'] - start_errors
+        # Check for blanks
+        loc_names = IsNotBlank(loc_names, keep_failed=False)
+        if not loc_names:
+            LOGGER.error('Location names contains empty cells or whitespace text')
 
-        if n_errors > 0:
-            LOGGER.info('Locations contains {} errors'.format(n_errors))
-        else:
-            LOGGER.info('{} locations loaded correctly'.format(len(self.locations)))
+        # Look for duplicated values in names - this includes all types and so
+        # could give messy information but can't detect duplicates late on
+        # cleaned names because we're dealing with sets by that point and there
+        # can be no duplication
+        dupes = HasDuplicates(loc_names)
+        if dupes:
+            LOGGER.error('Added names contain duplicated values: ', 
+                         extra={'join': dupes.duplicated})
+
+        # Validate and standardise types - strings or integer codes.
+        loc_names = IsLocName(loc_names, keep_failed=False)
+
+        if not loc_names:
+            LOGGER.error('Location names contains values that are not strings or integers: ',
+                          extra={'join': loc_names.failed})
+
+        # Enforce strings and check loc names exist
+        loc_names = set([str(v) for v in loc_names])
+        unknown = loc_names - self.known_loc_names
+        if unknown:
+            LOGGER.error('Unknown locations found: ', extra={'join': unknown, })
+
+        # are aliases being used?
+        aliased = loc_names & set(self.location_aliases.keys())
+        if aliased:
+            LOGGER.warning('Locations aliases used. Maybe change to primary location names: ',
+                           extra={'join': aliased})
+
+        # Get the bounding box of known locations and aliased locations
+        bbox_keys = (loc_names - (unknown | aliased)) | {self.location_aliases[ky] for ky in aliased}
+
+        # get the extents of known unaliased locations
+        if bbox_keys:
+            bbox = [vl for ky, vl in list(self.valid_locations.items()) if ky in bbox_keys]
+            bbox = list(zip(*bbox))
+            self.extents['longitude'].update((min(bbox[0]), max(bbox[1])))
+            self.extents['latitude'].update((min(bbox[2]), max(bbox[3])))
+
+        # Update location names and index
+        # - test for duplicated names to already added values
+        dupes = [lc for lc in loc_names if lc in self.locations]
+        if dupes:
+            LOGGER.error('Location names already added to Location instance: ',
+                         extra={'join': dupes})
+
+        self.locations.update(loc_names)
+        index_entries = [(lc, False, None, None) for lc in loc_names]
+        self.location_index.append(index_entries)
+    
