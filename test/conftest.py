@@ -2,8 +2,13 @@ import pytest
 import os
 from requests.api import request
 import simplejson
-from safedata_validator.resources import Resources
 import openpyxl
+
+from safedata_validator.taxa import Taxa
+from safedata_validator.locations import Locations
+from safedata_validator.dataset import Dataset
+from safedata_validator.resources import Resources
+
 
 """
 This file contains fixtures that will be available to all test suites.
@@ -108,3 +113,54 @@ def example_excel_files(request):
     elif request.param == 'bad':
         wb = openpyxl.load_workbook(bad_file_path, read_only=True)
         return wb
+
+
+# Fixtures to provide Taxon, Locations, Dataset and Dataworksheet 
+# instances for testing
+
+@pytest.fixture(scope='module')
+def fixture_taxa(resources_with_local_gbif):
+    """Fixture to provide a taxon object with a couple of names. These examples
+    need to be in the cutdown local GBIF testing database in fixtures.
+    """
+
+    taxa = Taxa(resources_with_local_gbif)
+
+    test_taxa = [
+        ('C_born', 
+            ['Crematogaster borneensis', 'Species', None, None], 
+            None), 
+        ('V_salv', 
+            ['Varanus salvator', 'Species', None, None], 
+            None),]
+    
+    for tx in test_taxa:
+        taxa.validate_and_add_taxon(tx)
+    
+    return taxa
+
+
+@pytest.fixture(scope='module')
+def fixture_locations(resources_with_local_gbif):
+    """Fixture to provide a taxon object with a couple of names. These examples
+    need to be in the cutdown local GBIF testing database in fixtures.
+    """
+
+    locations = Locations(resources_with_local_gbif)
+
+    test_locs = ['A_1', 'A_2', 1, 2]
+    
+    locations.add_known_locations(test_locs)
+    
+    return locations
+
+@pytest.fixture(scope='module')
+def fixture_dataset(resources_with_local_gbif):
+    """Fixture to provide a taxon object with a couple of names. These examples
+    need to be in the cutdown local GBIF testing database in fixtures.
+    """
+
+    dataset = Dataset(resources_with_local_gbif)
+    
+    return dataset
+

@@ -2,60 +2,8 @@ import pytest
 from logging import ERROR, WARNING, INFO
 import datetime
 
-from safedata_validator.taxa import Taxa
-from safedata_validator.locations import Locations
-from safedata_validator.dataset import Dataset
 from safedata_validator.field import (BaseField, CategoricalField, GeoField, NumericField,
                                       TaxaField, LocationsField)
-
-# Fixtures to provide Taxon, Locations, Dataset and Dataworksheet 
-# instances for testing
-
-@pytest.fixture()
-def field_test_taxa(resources_with_local_gbif):
-    """Fixture to provide a taxon object with a couple of names. These examples
-    need to be in the cutdown local GBIF testing database in fixtures.
-    """
-
-    taxa = Taxa(resources_with_local_gbif)
-
-    test_taxa = [
-        ('C_born', 
-            ['Crematogaster borneensis', 'Species', None, None], 
-            None), 
-        ('V_salv', 
-            ['Varanus salvator', 'Species', None, None], 
-            None),]
-    
-    for tx in test_taxa:
-        taxa.validate_and_add_taxon(tx)
-    
-    return taxa
-
-
-@pytest.fixture()
-def field_test_locations(resources_with_local_gbif):
-    """Fixture to provide a taxon object with a couple of names. These examples
-    need to be in the cutdown local GBIF testing database in fixtures.
-    """
-
-    locations = Locations(resources_with_local_gbif)
-
-    test_locs = ['A_1', 'A_2', 1, 2]
-    
-    locations.add_known_locations(test_locs)
-    
-    return locations
-
-@pytest.fixture()
-def field_test_dataset(resources_with_local_gbif):
-    """Fixture to provide a taxon object with a couple of names. These examples
-    need to be in the cutdown local GBIF testing database in fixtures.
-    """
-
-    dataset = Dataset(resources_with_local_gbif)
-    
-    return dataset
 
 
 # Checking the helper methods
@@ -387,12 +335,12 @@ def test_CategoricalField_validate_data(caplog, data, expected_log):
           (ERROR, 'No taxon details provided for dataset'),
           (ERROR, 'No taxa loaded'))),
        ])
-def test_TaxaField_init(caplog, provide_taxa_instance, expected_log):
+def test_TaxaField_init(caplog, fixture_taxa, provide_taxa_instance, expected_log):
     """Testing behaviour of the TaxaField class in handling missing taxa.
     """
 
     if provide_taxa_instance:
-        taxa = field_test_taxa
+        taxa = fixture_taxa
     else:
         taxa = None
 
@@ -424,13 +372,13 @@ def test_TaxaField_init(caplog, provide_taxa_instance, expected_log):
       ((INFO, "Checking Column taxa_field"),
        (ERROR, 'Includes unreported taxa'))),
     ])
-def test_TaxaField_validate_data(caplog, field_test_taxa, data, expected_log):
+def test_TaxaField_validate_data(caplog, fixture_taxa, data, expected_log):
     """Testing behaviour of the TaxaField class in using validate_data
     """
 
     fld = TaxaField({'field_type': 'taxa',
                      'description': 'My taxa',
-                     'field_name': 'taxa_field'}, taxa=field_test_taxa)
+                     'field_name': 'taxa_field'}, taxa=fixture_taxa)
     
     fld.validate_data(data)
     fld.report()
@@ -455,12 +403,12 @@ def test_TaxaField_validate_data(caplog, field_test_taxa, data, expected_log):
           (ERROR, 'No location details provided for dataset'),
           (ERROR, 'No locations loaded'))),
        ])
-def test_LocationsField_init(caplog, field_test_locations, provide_loc_instance, expected_log):
+def test_LocationsField_init(caplog, fixture_locations, provide_loc_instance, expected_log):
     """Testing behaviour of the LocationsField class in handling missing locations.
     """
 
     if provide_loc_instance:
-        locs = field_test_locations
+        locs = fixture_locations
     else:
         locs = None
 
@@ -495,14 +443,14 @@ def test_LocationsField_init(caplog, field_test_locations, provide_loc_instance,
         ((INFO, "Checking Column locations"),
          (ERROR, "Includes unreported locations"))),
     ])
-def test_LocationsField_validate_data(caplog, field_test_locations, data, expected_log):
+def test_LocationsField_validate_data(caplog, fixture_locations, data, expected_log):
     """Testing behaviour of the TaxaField class in using validate_data
     """
 
     fld = LocationsField({'field_name': 'locations',
                           'field_type': 'locations',
                           'description': 'my locations'}, 
-                          locations=field_test_locations)
+                          locations=fixture_locations)
 
     fld.validate_data(data)
     fld.report()
@@ -525,12 +473,12 @@ def test_LocationsField_validate_data(caplog, field_test_locations, data, expect
         ( (INFO, "Checking Column geocoords"),
           (ERROR, 'No dataset object provided - cannot update extents'))),
        ])
-def test_GeoField_init(caplog, field_test_dataset, provide_ds_instance, expected_log):
+def test_GeoField_init(caplog, fixture_dataset, provide_ds_instance, expected_log):
     """Testing behaviour of the GeoField class in handling missing dataset.
     """
 
     if provide_ds_instance:
-        ds = field_test_dataset
+        ds = fixture_dataset
     else:
         ds = None
 
@@ -570,14 +518,14 @@ def test_GeoField_init(caplog, field_test_dataset, provide_ds_instance, expected
     ])
 @pytest.mark.parametrize(
     'which', ['latitude', 'longitude'])
-def test_GeoField_validate_data(caplog, field_test_dataset, data, expected_log, which):
+def test_GeoField_validate_data(caplog, fixture_dataset, data, expected_log, which):
     """Testing behaviour of the TaxaField class in using validate_data
     """
 
     fld = GeoField({'field_name': 'geocoords',
                     'field_type': which,
                     'description': 'my gcs'}, 
-                    dataset=field_test_dataset)
+                    dataset=fixture_dataset)
 
     fld.validate_data(data)
     fld.report()
@@ -588,6 +536,8 @@ def test_GeoField_validate_data(caplog, field_test_dataset, data, expected_log, 
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
+
+# Abundance fields
 
 
 
