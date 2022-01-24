@@ -1,9 +1,12 @@
 from typing import Union, Optional
 import dataclasses
+from Bio import Entrez
+
 import requests
 from enforce_typing import enforce_types
-from Bio import Entrez
-import xml.dom.minidom
+
+from safedata_validator.logger import (CH, FORMATTER, LOGGER,
+                                       loggerinfo_push_pop)
 
 # CHANGE THIS TO A PURPOSE DEFINED EMAIL AT SOMEPOINT
 Entrez.email = "jc2017@ic.ac.uk"
@@ -37,12 +40,10 @@ class NCBIError(Exception):
         self.message = message
         super().__init__(self.message)
 
-# TODO - Error logging, work out where errors and warnings should be sent
+# TODO - Make sure that docstrings are properly written out
 
 # TODO - Unit testing, work out how I set up unit tests. Probably best begun early
 # Worth asking David how to do this if I can't work it out myself
-
-# TODO - Make sure that docstrings are properly written out
 
 # TODO - Validate against GBIF
 # So check if taxa provided exists if GBIF, if not check up hierachy until one that does is found
@@ -122,11 +123,12 @@ class RemoteNCBIValidator:
         valid = False
 
         # Use efetch to find taxonomy details based on the index
-        handle = Entrez.efetch(db="taxonomy",
-                               id=f"{genbank_id}",
-                               retmode="xml")
-        # urllib.error.HTTPError: HTTP Error 500: Internal Server Error
-        # MAKE SURE THAT THIS ERROR CAN BE CAUGHT, BUT DON'T KNOW HOW TO DO THIS WITHOUT THE ERROR JUST FIRING
+        try:
+            handle = Entrez.efetch(db="taxonomy",
+                                   id=f"{genbank_id}",
+                                   retmode="xml")
+        except urllib.error.HTTPError:
+            NCBIError('Connection error to remote server')
 
         # Extract as a single dictonary and close
         tax_dic = Entrez.read(handle)[0]
@@ -163,8 +165,8 @@ class RemoteNCBIValidator:
                     rnk = r_ID + 1
                 # Raise error once backbone ranks have been exhausted
                 elif r_ID < 1:
-                    raise NCBIError("""NCBI taxa ID cannot be mapped onto
-                    backbone ranks""")
+                    LOGGER.error(f'Taxon rank of {nnme} cannot be found in backbone')
+                    return
                 else:
                     r_ID -= 1
 
@@ -212,7 +214,8 @@ class RemoteNCBIValidator:
         # Check if AkaTaxIds exists in taxonomic information
         if 'AkaTaxIds' in tax_dic.keys():
             # Warn user that they've given a superseeded taxa ID
-            print(f"Warning ID {(tax_dic['AkaTaxIds'])[0]} has been replaced by {tax_dic['TaxId']}")
+            LOGGER.warning(f"NCBI ID {(tax_dic['AkaTaxIds'])[0]} has been "
+                            f"superseeded by ID {tax_dic['TaxId']}")
             # Record that a superseeded GenBank ID has been provided
             mtaxon.superseed = True
 
@@ -238,9 +241,13 @@ class RemoteNCBIValidator:
         # Then find corresponding entry as a search term
         s_term = taxa[f_key]
 
-        # NETWORK ERRORS!
-        # "Raises an IOError exception if there’s a network error"
-        handle = Entrez.esearch(db="taxonomy", term=s_term)
+        # Search the online database
+        try:
+            handle = Entrez.esearch(db="taxonomy", term=s_term)
+        except urllib.error.HTTPError:
+            NCBIError('Connection error to remote server')
+
+        # If it works then save the response
         record = Entrez.read(handle)
         handle.close()
 
@@ -255,15 +262,14 @@ class RemoteNCBIValidator:
             mtaxon = self.id_lookup(nnme,tID)
         # Catch cases where no record is found
         elif c == 0:
-            # NEED TO LOG AN ERROR HERE I RECKON
-            print("Not found error")
+            LOGGER.error(f'Taxa {nnme} cannot be found')
             return
         else:
             # Check whether multiple taxonomic levels have been provided
             if len(taxa) == 1:
                 # If not raise an error
-                # LOG ERROR!!!!!!!!!!!
-                print("Ambiguity error")
+                LOGGER.error(f'Taxa {nnme} cannot be found using only one '
+                             f'taxonomic level, more should be provided')
                 return
             else:
                 # Find second from last dictonary key
@@ -272,21 +278,23 @@ class RemoteNCBIValidator:
                 s_term = taxa[f_key]
 
                 # Then find details of this parent record
-                # NETWORK ERRORS!
-                # "Raises an IOError exception if there’s a network error"
-                handle = Entrez.esearch(db="taxonomy", term=s_term)
+                try:
+                    handle = Entrez.esearch(db="taxonomy", term=s_term)
+                except urllib.error.HTTPError:
+                    NCBIError('Connection error to remote server')
+
                 p_record = Entrez.read(handle)
                 handle.close()
 
                 # Store count of the number of records found
                 pc = int(p_record['Count'])
 
-                # Check that single parent taxa exists in reords
+                # Check that single parent taxa exists in records
                 if pc == 0:
-                    print("Parent taxa doesn't exist")
+                    LOGGER.error(f'Provided parent taxa for {nnme} not found')
                     return
                 elif pc > 1:
-                    print("Multiple possible parent taxa")
+                    LOGGER.error(f'More than one possible parent taxa for {nnme} found')
                     return
                 else:
                     # Find parent taxa ID as single entry in the list
@@ -313,10 +321,11 @@ class RemoteNCBIValidator:
 
                 # Check for errors relating to finding too many or few child taxa
                 if sum(child) == 0:
-                    print("Not actually a parent taxa of first taxa")
+                    LOGGER.error(f'Parent taxa not actually a valid parent of {nnme}')
                     return
                 elif sum(child) > 1:
-                    print("More than one child of parent taxa")
+                    LOGGER.error(f'Parent taxa for {nnme} refers to multiple '
+                                 f'possible child taxa')
                     return
                 else:
                     # Find index corresponding to correct child taxa
@@ -331,8 +340,8 @@ class RemoteNCBIValidator:
             # Then check whether orginally supplied name is still used
             if taxa[f_key] != mtaxon.taxa_hier[f_key]:
                 # If not print a warning
-                print(f"Warning: {taxa[f_key]} not accepted usage should be "
-                      f"{mtaxon.taxa_hier[f_key]} instead")
+                LOGGER.warning(f'{taxa[f_key]} not accepted usage should be '
+                               f'{mtaxon.taxa_hier[f_key]} instead')
                 # And record the fact that usage is superseeded
                 mtaxon.superseed = True
 
@@ -370,8 +379,6 @@ d13 = {'genus': 'Nonsense', 'species': 'Nonsense garbage'}
 # Tenacibaculum maritimum (107401)
 d14 = {'genus': 'Tenacibaculum', 'species': 'Tenacibaculum maritimum'}
 # Cytophaga marina (1000)
-# At the moment this silently changes the taxon names
-# Clearly needs to be at least a warning
 d15 = {'genus': 'Cytophaga', 'species': 'Cytophaga marina'}
 # Maybe find synonym of this one to test as well
 # Then test output of taxa search
