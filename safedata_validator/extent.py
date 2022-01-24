@@ -1,23 +1,4 @@
-# DataWorksheet
-#	 Field
-#		 Set of required FieldDescriptor
-#		 Set of required Validators: is_in_set (taxa, locations, factors), is_of_type, is_reg_match
-#		 Bounds [new feature]
-#
-# Dataset
-#	 Summary
-#	 Extent
-#    FieldDescriptor
-
-# Locations
-# Taxa
-
 from safedata_validator.logger import LOGGER
-
-
-class FieldDescriptor:
-    pass
-
 
 class Extent:
 
@@ -122,13 +103,11 @@ class Extent:
 
         if self.hard_bounds and (self.hard_bounds[0] > values[0] or
                                  self.hard_bounds[1] < values[1]):
-            err = f'Values range {values} exceeds hard bounds {self.hard_bounds}'
-            LOGGER.error(err)
+            LOGGER.error(f'Values range {values} exceeds hard bounds {self.hard_bounds}')
 
-        if self.soft_bounds and (self.soft_bounds[0] > values[0] or
+        elif self.soft_bounds and (self.soft_bounds[0] > values[0] or
                                  self.soft_bounds[1] < values[1]):
-            wrn = f'Values range {values} exceeds soft bounds {self.soft_bounds}'
-            LOGGER.warning(wrn)
+            LOGGER.warning(f'Values range {values} exceeds soft bounds {self.soft_bounds}')
 
         if self.extent[0] is None or values[0] < self.extent[0]:
             self._extent[0] = values[0]
