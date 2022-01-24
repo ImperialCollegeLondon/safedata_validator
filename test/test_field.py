@@ -1,50 +1,10 @@
 import pytest
 from logging import ERROR, WARNING, INFO
+import datetime
 
-from safedata_validator.taxa import Taxa
-from safedata_validator.locations import Locations
-from safedata_validator.field import (BaseField, CategoricalField, NumericField,
+from safedata_validator.field import (BaseField, CategoricalField, GeoField, NumericField,
                                       TaxaField, LocationsField)
 
-# Fixtures to provide Taxon, Locations, Dataset and Dataworksheet 
-# instances for testing
-
-@pytest.fixture()
-def field_test_taxa(resources_with_local_gbif):
-    """Fixture to provide a taxon object with a couple of names. These examples
-    need to be in the cutdown local GBIF testing database in fixtures.
-    """
-
-    taxa = Taxa(resources_with_local_gbif)
-
-    test_taxa = [
-        ('C_born', 
-            ['Crematogaster borneensis', 'Species', None, None], 
-            None), 
-        ('V_salv', 
-            ['Varanus salvator', 'Species', None, None], 
-            None),]
-    
-    for tx in test_taxa:
-        taxa.validate_and_add_taxon(tx)
-    
-    return taxa
-
-
-@pytest.fixture()
-def field_test_locations(resources_with_local_gbif):
-    """Fixture to provide a taxon object with a couple of names. These examples
-    need to be in the cutdown local GBIF testing database in fixtures.
-    """
-
-    locations = Locations(resources_with_local_gbif)
-
-    test_locs = [{'location name':'A1'}, 
-                 {'location name': 'A2'}]
-    
-    locations.validate_and_add_locations(test_locs)
-    
-    return locations
 
 # Checking the helper methods
 
@@ -365,40 +325,60 @@ def test_CategoricalField_validate_data(caplog, data, expected_log):
 # Taxon field - check init and validate_data (overloaded report just emits messages)
 
 @pytest.mark.parametrize(
-    'data, provide_taxa_instance, expected_log',
+    'provide_taxa_instance, expected_log',
     [
-     (['C_born', 'V_salv', 'C_born', 'V_salv', 'C_born', 'V_salv'], 
-      True,
-      ((INFO, "Checking Column taxa_field"),)),
-     (['C_born', 'V_salv', 'C_born', 'V_salv', 'C_born', 'V_salv'], 
-      False,
-      ((INFO, "Checking Column taxa_field"),
-       (ERROR, 'No taxon details provided for dataset'))),
-     (['C_born', 123, 'C_born', 'V_salv', 'C_born', 'V_salv'], 
-      True,
-      ((INFO, "Checking Column taxa_field"),
-       (ERROR, 'Cells contain non-string values'))),
-     ([], 
-      True,
-      ((INFO, "Checking Column taxa_field"),
-       (ERROR, 'No taxa loaded'))),
-     (['C_born', 'V_salv', 'C_born', 'V_salv', 'C_born', 'V_salv', 'P_leo'], 
-      True,
-      ((INFO, "Checking Column taxa_field"),
-       (ERROR, 'Includes unreported taxa'))),
-    ])
-def test_TaxaField_validate_data(caplog, field_test_taxa, data, provide_taxa_instance, expected_log):
-    """Testing behaviour of the TaxaField class in using validate_data
+      ( True,
+        ( (INFO, "Checking Column taxa_field"),
+          (ERROR, 'No taxa loaded'))),
+      ( False,
+        ( (INFO, "Checking Column taxa_field"),
+          (ERROR, 'No taxon details provided for dataset'),
+          (ERROR, 'No taxa loaded'))),
+       ])
+def test_TaxaField_init(caplog, fixture_taxa, provide_taxa_instance, expected_log):
+    """Testing behaviour of the TaxaField class in handling missing taxa.
     """
 
     if provide_taxa_instance:
-        taxa = field_test_taxa
+        taxa = fixture_taxa
     else:
         taxa = None
 
     fld = TaxaField({'field_type': 'taxa',
                      'description': 'My taxa',
                      'field_name': 'taxa_field'}, taxa=taxa)
+    fld.report()
+    
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize(
+    'data, expected_log',
+    [
+     (['C_born', 'V_salv', 'C_born', 'V_salv', 'C_born', 'V_salv'], 
+      ((INFO, "Checking Column taxa_field"),)),
+     (['C_born', 123, 'C_born', 'V_salv', 'C_born', 'V_salv'], 
+      ((INFO, "Checking Column taxa_field"),
+       (ERROR, 'Cells contain non-string values'))),
+     ([], 
+      ((INFO, "Checking Column taxa_field"),
+       (ERROR, 'No taxa loaded'))),
+     (['C_born', 'V_salv', 'C_born', 'V_salv', 'C_born', 'V_salv', 'P_leo'], 
+      ((INFO, "Checking Column taxa_field"),
+       (ERROR, 'Includes unreported taxa'))),
+    ])
+def test_TaxaField_validate_data(caplog, fixture_taxa, data, expected_log):
+    """Testing behaviour of the TaxaField class in using validate_data
+    """
+
+    fld = TaxaField({'field_type': 'taxa',
+                     'description': 'My taxa',
+                     'field_name': 'taxa_field'}, taxa=fixture_taxa)
     
     fld.validate_data(data)
     fld.report()
@@ -409,6 +389,170 @@ def test_TaxaField_validate_data(caplog, field_test_taxa, data, provide_taxa_ins
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
+
+# Locations field - check init and validate_data (overloaded report just emits messages)
+
+@pytest.mark.parametrize(
+    'provide_loc_instance, expected_log',
+    [
+      ( True,
+        ( (INFO, "Checking Column locations"),
+          (ERROR, 'No locations loaded'))),
+      ( False,
+        ( (INFO, "Checking Column locations"),
+          (ERROR, 'No location details provided for dataset'),
+          (ERROR, 'No locations loaded'))),
+       ])
+def test_LocationsField_init(caplog, fixture_locations, provide_loc_instance, expected_log):
+    """Testing behaviour of the LocationsField class in handling missing locations.
+    """
+
+    if provide_loc_instance:
+        locs = fixture_locations
+    else:
+        locs = None
+
+    fld = LocationsField({'field_name': 'locations',
+                          'field_type': 'locations',
+                          'description': 'my locations'}, locations=locs)
+    fld.report()
+    
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize(
+    'data, expected_log',
+    [ # Good data
+      ( ['A_1', 'A_2', 'A_1', 'A_2', 'A_1', 'A_2'], 
+        ((INFO, "Checking Column locations"),)),
+      ( ['A_1', 'A_2', 1, 'A_2', 'A_1', 2], 
+        ((INFO, "Checking Column locations"),)),
+      # Bad data
+      ( ['A_1', 'A_2', 16.2, 'A_2', 'A_1', datetime.datetime.now()], 
+        ((INFO, "Checking Column locations"),
+         (ERROR, "Cells contain invalid location values"))),
+      ( [], 
+        ((INFO, "Checking Column locations"),
+         (ERROR, "No locations loaded"))),
+      ( ['A_1', 'A_2', 'A_3', 'A_2', 'A_1', 'A_3'], 
+        ((INFO, "Checking Column locations"),
+         (ERROR, "Includes unreported locations"))),
+    ])
+def test_LocationsField_validate_data(caplog, fixture_locations, data, expected_log):
+    """Testing behaviour of the TaxaField class in using validate_data
+    """
+
+    fld = LocationsField({'field_name': 'locations',
+                          'field_type': 'locations',
+                          'description': 'my locations'}, 
+                          locations=fixture_locations)
+
+    fld.validate_data(data)
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+# Geographic coordinates field.
+
+@pytest.mark.parametrize(
+    'provide_ds_instance, expected_log',
+    [
+      ( True,
+        ( (INFO, "Checking Column geocoords"),)),
+      ( False,
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'No dataset object provided - cannot update extents'))),
+       ])
+def test_GeoField_init(caplog, fixture_dataset, provide_ds_instance, expected_log):
+    """Testing behaviour of the GeoField class in handling missing dataset.
+    """
+
+    if provide_ds_instance:
+        ds = fixture_dataset
+    else:
+        ds = None
+
+    fld = GeoField({'field_name': 'geocoords',
+                    'field_type': 'latitude',
+                    'description': 'my gcs'}, 
+                     dataset=ds)
+    fld.report()
+    
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize(
+    'data, expected_log',
+    [ # Good data
+      ( [1,2,3,4,5,6], 
+        ( (INFO, "Checking Column geocoords"),)),
+      # Bad inputs
+      ( [1,'2',3,4,5,6], 
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'Field contains non-numeric data'))),
+      ( [1,'2°',3,4,5,6], 
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'Field contains non-numeric data'),
+          (WARNING, 'Possible degrees minutes and seconds formatting?'))),
+      ( [1,2,3,4,5,600], 
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'Values range (1, 600) exceeds hard bounds'))),
+      ( [1,2,3,4,5,60], 
+        ( (INFO, "Checking Column geocoords"),
+          (WARNING, 'Values range (1, 60) exceeds soft bounds'))),
+    ])
+@pytest.mark.parametrize(
+    'which', ['latitude', 'longitude'])
+def test_GeoField_validate_data(caplog, fixture_dataset, data, expected_log, which):
+    """Testing behaviour of the TaxaField class in using validate_data
+    """
+
+    fld = GeoField({'field_name': 'geocoords',
+                    'field_type': which,
+                    'description': 'my gcs'}, 
+                    dataset=fixture_dataset)
+
+    fld.validate_data(data)
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+# Abundance fields
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

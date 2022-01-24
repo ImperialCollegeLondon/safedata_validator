@@ -5,8 +5,11 @@ from typing import Iterable
 from openpyxl import worksheet
 from openpyxl.utils import get_column_letter
 
-from safedata_validator.validators import (IsNotBlank, IsNotExcelError, IsNotPadded, HasDuplicates, IsNotNA,
-                                           IsNumber, IsNotNumericString, IsString, blank_value, valid_r_name)
+from safedata_validator.validators import (IsNotBlank, IsNotExcelError, IsNotPadded,
+                                           HasDuplicates, IsNotNA, IsNumber, 
+                                           IsNotNumericString, IsString, IsLocName,
+                                           blank_value, valid_r_name, RE_DMS)
+
 from safedata_validator.logger import LOGGER, FORMATTER, CH, loggerinfo_push_pop
 from safedata_validator.dataset import Dataset
 from safedata_validator.locations import Locations
@@ -61,6 +64,7 @@ class DataWorksheet:
         self.fields = []
         self.external = None
         self.worksheet = worksheet
+        self.dataset = dataset
 
         # For sheet meta with an external file, add in the external file name
         if sheet_meta['external'] is not None:
@@ -191,6 +195,12 @@ class DataWorksheet:
 
         self.fields = field_meta
     
+        # set up a dictionary to map field types to BaseField subclasses
+        field_subclasses = BaseField.__subclasses__()
+        field_subclass_map = {}
+        for subc in field_subclasses:
+            field_subclass_map.update({ftype: subc for ftype in subc.field_types})
+
     def check_data(taxa, locations, summary):
 
 
@@ -281,8 +291,9 @@ class BaseField:
         In order to work with the row by row data loading from openpyxl, the
         BaseField class does _not_ emit logging messages as they occur but holds
         a stack of messages created during initiation and as chunks of data are
-        ingested. This logging can then be emitted using the report() method,
-        along with any final checks, once all the data has been ingested.
+        ingested. These logging messages can then be emitted using the report()
+        method, along with any final checks, once all the data has been
+        ingested.
 
         The base class also has a much more complex signature than the base
         functionality requires. Various subclasses need access to:
@@ -290,8 +301,8 @@ class BaseField:
             * Dataset level information - extents, taxa and locations.
             * Dataworksheet level information - taxon fields
 
-        Rather than muck around with changing subclass signatures and 
-        kwargs, the Base class makes all information available to all
+        Rather than having complex inheritance with changing subclass signatures
+        and kwargs, the Base class makes all information available to all
         subclasses.
 
         Args: 
@@ -328,7 +339,7 @@ class BaseField:
         else:
             field_name = str(self.meta['field_name'])
 
-        self.log_stack.append((INFO, f'Checking Column {field_name}'))
+        self._log(f'Checking Column {field_name}', INFO)
 
         # Now check required descriptors - values are present, non-blank and 
         # are unpadded strings (currently all descriptors are strings).
@@ -338,9 +349,9 @@ class BaseField:
         # Specific check that field name is valid - the column letter codes are always
         # valid, so missing names won't trigger this.
         if not valid_r_name(field_name):
-            self.log_stack.append((ERROR, f"Field name is not valid: {repr(field_name)}. "
-                                          "Common errors are spaces and non-alphanumeric "
-                                          "characters other than underscore and full stop"))
+            self._log(f"Field name is not valid: {repr(field_name)}. "
+                      "Common errors are spaces and non-alphanumeric "
+                      "characters other than underscore and full stop")
 
         # TODO - reimplement these two class attributes and steps as a single
         #        subclass specific extra meta method stub (_check_meta_extra?)
@@ -350,6 +361,10 @@ class BaseField:
         
         if self.check_interaction_meta:
             self._check_interaction_meta()
+
+    def _log(self, msg, level=ERROR):
+        """Helper function for adding to log stack"""
+        self.log_stack.append((level, msg))
 
     def _check_meta(self, descriptor):
         """
@@ -366,20 +381,20 @@ class BaseField:
         """
 
         if descriptor not in self.meta:
-            self.log_stack.append((ERROR, f'{descriptor} descriptor missing'))
+            self._log(f'{descriptor} descriptor missing')
             return False
 
         val = self.meta[descriptor]
         
         if blank_value(val):
-            self.log_stack.append((ERROR, f'{descriptor} descriptor is blank'))
+            self._log(f'{descriptor} descriptor is blank')
             self.meta[descriptor] = None  # standardise whitestring to None
             return False
         elif not isinstance(val, str):
-            self.log_stack.append((ERROR, f'{descriptor} descriptor is not a string: {repr(val)}'))
+            self._log(f'{descriptor} descriptor is not a string: {repr(val)}')
             return False
         elif val != val.strip():
-            self.log_stack.append((ERROR, f'{descriptor} descriptor has whitespace padding: {repr(val)}'))
+            self._log(f'{descriptor} descriptor has whitespace padding: {repr(val)}')
             self.meta[descriptor] = val.strip()
             return False
         else:
@@ -509,8 +524,7 @@ class BaseField:
 
         # simple formatting checks
         if any([pt > 2 for pt in n_parts]):
-            self.log_stack.append((ERROR, 'Extra colons in level description.'))
-            
+            self._log('Extra colons in level description.')
 
         # standardise descriptions
         if all([pt == 1 for pt in n_parts]):
@@ -519,20 +533,20 @@ class BaseField:
             # truncate extra colons
             parts = [pt[0:2] for pt in parts]
         else:
-            self.log_stack.append((ERROR, 'Provide descriptions for either all or none of the categories'))
+            self._log('Provide descriptions for either all or none of the categories')
             parts = [pt[0:2] if len(pt) >= 2 else [pt[0], None] for pt in parts]
 
         level_labels, level_desc = zip(*parts)
 
         # - repeated labels?
         if len(set(level_labels)) < len(level_labels):
-            self.log_stack.append((ERROR, 'Repeated level labels'))
+            self._log('Repeated level labels')
 
         # - check for numeric level names: integers would be more common
         #   but don't let floats sneak through either!
         level_labels = IsNotNumericString(level_labels)
         if not level_labels:
-            self.log_stack.append((ERROR, 'Numeric level names not permitted'))
+            self._log('Numeric level names not permitted')
 
         # Remove white space around the labels: simple spacing in the text
         # makes it easier to read and insisting on no space is unnecessary
@@ -540,31 +554,6 @@ class BaseField:
 
         return level_labels, level_desc
 
-    @staticmethod
-    def validate_geo_extent(extent, which):
-
-        if which == 'latitude':
-            bnds = [-90, -4, 8, 90]
-        elif which == 'longitude':
-            bnds = [-180, 108, 120, 180]
-
-        if extent[0] > extent[1]:
-            LOGGER.error('{0}: lower bound greater than upper bound'.format(which.capitalize()))
-            return False
-
-        out_of_bounds = extent[0] < bnds[0] or extent[1] > bnds[3]
-        out_of_borneo = bnds[0] <= extent[0] < bnds[1] or bnds[2] < extent[1] <= bnds[3]
-
-        if out_of_bounds:
-            LOGGER.error('{0} values not in valid range[{1[0]}, {1[3]}]: '
-                         '{2}'.format(which.capitalize(), bnds, extent))
-            return False
-        elif out_of_borneo:
-            LOGGER.warn('{0} values not in Borneo [{1[1]}, {1[2]}]: '
-                        '{2}'.format(which.capitalize(), bnds, extent))
-            return True
-        else:
-            return True
 
 
 
@@ -698,7 +687,7 @@ class NumericField(BaseField):
     """
     Subclass of BaseField to check for numeric data
     """
-    field_types = ('numeric')
+    field_types = ('numeric',)
     required_descriptors = MANDATORY_DESCRIPTORS.union(['method', 'units'])
 
     def validate_data(self, data: list, **kwargs):
@@ -708,7 +697,7 @@ class NumericField(BaseField):
         numeric = IsNumber(data)
 
         if not numeric:
-            self.log_stack.append((ERROR, 'Cells contain non-numeric values'))
+            self._log('Cells contain non-numeric values')
 
 
 class CategoricalField(BaseField):
@@ -742,7 +731,7 @@ class CategoricalField(BaseField):
         # XLRD reads all numbers as floats, so coerce floats back to int
         data = IsString(data, keep_failed=False)
         if not data:
-            self.log_stack.append((ERROR, 'Cells contain non-text values'))
+            self._log('Cells contain non-text values')
 
         self.reported_levels.update(data)
 
@@ -759,6 +748,194 @@ class CategoricalField(BaseField):
         if unused:
             LOGGER.error('Categories found in levels descriptor not used in data: ',
                             extra={'join': unused})
+
+
+class TaxaField(BaseField):
+    """
+    Checks if all the values provided in a taxa field are found
+    in the Taxa instance.
+    """
+
+    field_types = ('taxa',)
+
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, taxa: Taxa = None, locations: Locations = None) -> None:
+        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+
+        if self.taxa is None:
+            self._log('No taxon details provided for dataset')
+        
+        self.taxa_found = set()
+    
+    def validate_data(self, data: list, **kwargs):
+
+        data = super().validate_data(data, **kwargs)
+
+        data = IsString(data, keep_failed=False)
+
+        if not data:
+            self._log('Cells contain non-string values')
+
+        self.taxa_found.update(data)
+        self.taxa.taxon_names_used.update(data)
+    
+    def report(self):
+
+        super().report()
+
+        # TODO - not sure about this - no other fields test for emptiness?
+        if self.taxa_found == set():
+            LOGGER.error('No taxa loaded')
+            return
+        
+        if self.taxa is not None:
+            extra_taxa = self.taxa_found.difference(self.taxa.taxon_names)
+
+            if extra_taxa:
+                LOGGER.error('Includes unreported taxa: ',
+                                extra={'join': extra_taxa})
+
+            # add the found taxa to the list of taxa used
+            self.taxa.taxon_names_used.update(self.taxa_found)
+
+
+class LocationsField(BaseField):
+    """
+    Checks if all the values provided in a locations field are found
+    in the Locations instance.
+    """
+
+    field_types = ('locations',)
+    required_descriptors = MANDATORY_DESCRIPTORS
+
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, taxa: Taxa = None, locations: Locations = None) -> None:
+        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+
+        if self.locations is None:
+            self._log('No location details provided for dataset')
+        
+        self.locations_found = set()
+    
+    def validate_data(self, data: list, **kwargs):
+
+        data = super().validate_data(data, **kwargs)
+
+        data = IsLocName(data, keep_failed=False)
+
+        if not data:
+            self._log('Cells contain invalid location values')
+
+        # Now should be strings and integer codes - convert to string
+        # representations as used in the locations
+        data = [str(v) for v in data]
+
+        self.locations_found.update(data)
+        self.locations.locations_used.update(data)
+    
+    def report(self):
+
+        super().report()
+
+        # TODO - not sure about this - no other fields test for emptiness?
+        if self.locations_found == set():
+            LOGGER.error('No locations loaded')
+            return
+        
+        if self.locations is not None:
+            extra_locs = self.locations_found.difference(self.locations.locations)
+
+            if extra_locs:
+                LOGGER.error('Includes unreported locations: ',
+                                extra={'join': extra_locs})
+
+            # add the found taxa to the list of taxa used
+            self.locations.locations_used.update(self.locations_found)
+
+
+class GeoField(BaseField):
+
+    field_types = ('latitude', 'longitude')
+
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, taxa: Taxa = None, locations: Locations = None) -> None:
+        
+        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+
+        if self.dataset is None:
+            self._log('No dataset object provided - cannot update extents')
+
+        self.min = None
+        self.max = None
+        
+    def validate_data(self, data: list, **kwargs):
+        """Testing of the data range is deferred to report() to avoid
+        triggering logging from the Extent objects until data loading is
+        completed
+        """
+        data = super().validate_data(data, **kwargs)
+
+        data = IsNumber(data, keep_failed=False)
+
+        if not data:
+            self._log('Field contains non-numeric data')
+
+            if any([RE_DMS.search(str(dt)) for dt in data.failed]):
+                self._log('Possible degrees minutes and seconds formatting? Use decimal degrees', 
+                          WARNING)
+        
+        if data.values:
+            self.min = min(data.values + [self.min]) if self.min else min(data.values)
+            self.max = max(data.values + [self.max]) if self.max else max(data.values)
+
+    def report(self):
+
+        super().report()
+
+        if self.min is None or self.max is None:
+            return()
+        
+        if self.dataset is not None:
+            if self.meta['field_type'] == 'latitude':
+                self.dataset.latitudinal_extent.update([self.min, self.max])
+            elif self.meta['field_type'] == 'longitude':
+                self.dataset.longitudinal_extent.update([self.min, self.max])
+
+
+
+def check_field_geo(self, meta, data, which='latitude'):
+
+    """
+    Checks geographic coordinates. It also automatically updates
+    the geographic extent of the dataset.
+    Args:
+        meta: A dictionary of metadata descriptors for the field
+        data: A list of data values
+        which: One of latitude or longitude
+    """
+
+    # Are the values represented as decimal degrees - numeric.
+    nums = [dt for dt in data if isinstance(dt, float)]
+
+    if len(nums) < len(data):
+        LOGGER.error('Field contains non-numeric data')
+        if any([RE_DMS.search(str(dt)) for dt in data]):
+            LOGGER.warn('Possible degrees minutes and seconds formatting? Use decimal degrees')
+
+    # Check the locations
+    if len(nums):
+        min_geo = float(min(nums))
+        max_geo = float(max(nums))
+        extent = (min_geo, max_geo)
+        valid = self.validate_geo_extent(extent, which)
+
+        if valid:
+            # update the field metadata and the dataset extent
+            meta['range'] = extent
+            # Look up the extent name to update and then update it
+            which_extent = {'latitude': 'latitudinal_extent',
+                            'longitude': 'longitudinal_extent'}
+            self.update_extent(extent, float, which_extent[which])
+
+
+
 
 
 class DatetimeField(BaseField):
@@ -863,128 +1040,6 @@ class DatetimeField(BaseField):
                 self.update_extent(extent, datetime.datetime, 'temporal_extent')
 
 
-class TaxaField(BaseField):
-    """
-    Checks if all the values provided in a taxa field are found
-    in the Taxa instance.
-    """
-
-    field_types = 'taxa'
-    required_descriptors = MANDATORY_DESCRIPTORS
-
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, taxa: Taxa = None, locations: Locations = None) -> None:
-        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
-
-        if self.taxa is None:
-            self.log_stack.append((ERROR, 'No taxon details provided for dataset'))
-        
-        self.taxa_found = set()
-    
-    def validate_data(self, data: list, **kwargs):
-
-        data = super().validate_data(data, **kwargs)
-
-        data = IsString(data, keep_failed=False)
-
-        if not data:
-            self.log_stack.append((ERROR, 'Cells contain non-string values'))
-
-        self.taxa_found.update(data)
-    
-    def report(self):
-
-        super().report()
-
-        # TODO - not sure about this - no other fields test for emptiness?
-        if self.taxa_found == set():
-            LOGGER.error('No taxa loaded')
-            return
-        
-        if self.taxa is not None:
-            extra_taxa = self.taxa_found.difference(self.taxa.taxon_names)
-
-            if extra_taxa:
-                LOGGER.error('Includes unreported taxa: ',
-                                extra={'join': extra_taxa})
-
-            # add the found taxa to the list of taxa used
-            self.taxa.taxon_names_used.update(self.taxa_found)
-
-
-class LocationsField(BaseField):
-    """
-    Checks if all the values provided in a locations field are found
-    in the Locations instance.
-    """
-
-    # TODO - the structure of this and TaxaField are identical except for Locations
-    #        v Taxa as the validation sets. Could amalgamate into a base class.
-    field_types = 'locations'
-    required_descriptors = MANDATORY_DESCRIPTORS
-
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, taxa: Taxa = None, locations: Locations = None) -> None:
-        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
-
-        if self.locations is None:
-            self.log_stack.append((ERROR, 'No location details provided for dataset'))
-        
-        self.locations_found = set()
-    
-    def validate_data(self, data: list, **kwargs):
-
-        data = super().validate_data(data, **kwargs)
-
-        data = IsString(data, keep_failed=False)
-
-        if not data:
-            self.log_stack.append((ERROR, 'Cells contain non-string values'))
-
-        self.locations.locations_used.update(data)
-    
-    def report(self):
-
-        super().report()
-
-        # TODO - not sure about this - no other fields test for emptiness?
-        if self.locations_found == set():
-            LOGGER.error('No locations loaded')
-            return
-        
-        if self.locations is not None:
-            extra_locs = self.locations_found.difference(self.locations.locations)
-
-            if extra_locs:
-                LOGGER.error('Includes unreported locations: ',
-                                extra={'join': extra_locs})
-
-            # add the found taxa to the list of taxa used
-            self.locations.locations_used.update(self.locations_found)
-
-
-
-def check_field_locations(self, data):
-
-    """
-    Checks if all the values provided in a Locations field are
-    found in the Locations worksheet, reporting to the Messages instance.
-    Args:
-        data: A list of data values, allegedly taxon names
-    """
-
-    # location names should be strings but we allow integer point numbers
-    data = [str(int(dt.value)) if dt.ctype == xlrd.XL_CELL_NUMBER
-            else str(dt.value) for dt in data]
-
-    # check if locations are all provided
-    found = set(data)
-    if self.locations == set():
-        LOGGER.error('No locations loaded')
-    elif not found.issubset(self.locations):
-        LOGGER.error('Includes locations missing from Locations worksheet:',
-                        extra={'join': found - self.locations, 'quote': True})
-
-    # add the locations to the set of locations used
-    self.locations_used.update(found)
 
 def check_field_abundance(self, meta, data, taxa_fields):
 
@@ -1012,43 +1067,6 @@ def check_field_abundance(self, meta, data, taxa_fields):
         meta['range'] = (min(nums), max(nums))
 
 
-def check_field_numeric(self, meta, data):
-
-    """
-    Checks numeric type data, reporting to the Messages instance.
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values, allegedly numeric
-    """
-
-    # Check required descriptors
-    self._check_meta(meta, 'units')
-    self._check_meta(meta, 'method')
-
-    # Regardless of the outcome of the meta checks, can still check the
-    # data is all numeric, as it claims to be. Keep dates separate because
-    # they are a pain to find if included as their numeric storage value
-    good, bad, ugly = [], [], []
-    for dt in data:
-        if dt.ctype == xlrd.XL_CELL_NUMBER:
-            good.append(dt.value)
-        elif dt.ctype == xlrd.XL_CELL_DATE:
-            ugly.append(dt.value)
-        else:
-            bad.append(dt.value)
-
-    if bad:
-        LOGGER.error('Field contains non-numeric data: ',
-                        extra={'join': set(bad), 'quote': True})
-
-    if ugly:
-        ugly = [xlrd.xldate_as_datetime(ug, self.workbook.datemode).isoformat() for ug in ugly]
-        LOGGER.error('Field contains date/time formatted data - format will differ from '
-                        'from the values shown: ', extra={'join': ugly})
-
-    # update the field metadata if there is any data
-    if len(good):
-        meta['range'] = (min(good), max(good))
 
 def check_field_trait(self, meta, data, taxa_fields, which='categorical'):
 
