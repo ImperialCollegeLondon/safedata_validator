@@ -37,11 +37,6 @@ class NCBIError(Exception):
         self.message = message
         super().__init__(self.message)
 
-# TODO - Synonym checking
-# GenBank lists hetrotypic synonyms this can be used for synonym checking
-# Problem is what if the synonyms preferred with GenBank are not those preferred by GBIF?
-# Can we save and store all synonyms and test them all in that case?
-
 # TODO - 'AkaTaxIds', these are taxas that have been redfined in GenBanks Database
 # At the very least this should generate a warning, as part of this what happens if
 # the wrong name is searched for?
@@ -60,7 +55,6 @@ class NCBIError(Exception):
 # WHAT SHOULD WE DO ABOUT SUPERKINGDOM, DOMAIN, KINGDOM ISSUE?
 # DO WE WANT A LocalNCBIValidator?
 # HOW DO I ACTUALLY SET UP TESTING?
-# HOW TO HANDLE SPECIES NAMES, WHICH ARE OFTEN GIVEN AS E.G. VULPES VULPES
 # CAN/SHOULD WE SET UP AN EMAIL?
 # SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
 
@@ -213,7 +207,7 @@ class RemoteNCBIValidator:
         if 'OtherNames' in tax_dic.keys():
             # If so find and add synonyms to potentially search GBIF for
             mtaxon.synonyms = (tax_dic["OtherNames"])["Synonym"]
-            
+
         return mtaxon
 
     # HOW ARE SYNONYMS HANDLED?
@@ -356,7 +350,7 @@ d12 = {'genus': 'Microcopris', 'species': 'Microcopris hidakai'}
 d13 = {'genus': 'Nonsense', 'species': 'Nonsense garbage'}
 # Tenacibaculum maritimum (1000)
 d14 = {'genus': 'Tenacibaculum', 'species': 'Tenacibaculum maritimum'}
-# Maybe find synonym of this one to test
+# Maybe find synonym of this one to test as well
 # Then test output of taxa search
 # test = val.taxa_search("Nickname",d1)
 # Search for ID
