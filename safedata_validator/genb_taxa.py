@@ -37,14 +37,12 @@ class NCBIError(Exception):
         self.message = message
         super().__init__(self.message)
 
-# TODO - 'AkaTaxIds', these are taxas that have been redfined in GenBanks Database
-# At the very least this should generate a warning, as part of this what happens if
-# the wrong name is searched for?
-
 # TODO - Error logging, work out where errors and warnings should be sent
 
 # TODO - Unit testing, work out how I set up unit tests. Probably best begun early
 # Worth asking David how to do this if I can't work it out myself
+
+# TODO - Make sure that docstrings are properly written out
 
 # TODO - Validate against GBIF
 # So check if taxa provided exists if GBIF, if not check up hierachy until one that does is found
@@ -68,10 +66,11 @@ class MicTaxon:
         * name
         * taxa_hier: Dictionary of valid taxonomic hierachy
         * genbank_id: GenBank ID for full taxa (i.e. including non-backbone ranks)
-    The remaining properties are populated by processing functions not when
-    an instance is created.
+    The remaining properties are populated by processing functions not when an
+    instance is created.
         * diverg: does the GenBank ID and stored taxa info diverge, and if so how?
-        * syns: list of synonymus names for the taxa
+        * synonyms: list of synonymus names for the taxa
+        * superseed: Is supplied taxon name/ID still the accepted usage
     """
 
     # Init properties
@@ -80,6 +79,7 @@ class MicTaxon:
     genbank_id: Optional[Union[int, float]] = None
     diverg: str = dataclasses.field(init=False)
     synonyms: list[str] = dataclasses.field(init=False)
+    superseed: bool = dataclasses.field(init=False)
 
     def __post_init__(self):
         """Sets the defaults for the post-init properties and checks inputs
@@ -92,6 +92,7 @@ class MicTaxon:
 
         self.diverg = None
         self.synonyms = []
+        self.superseed = False
 
 @enforce_types
 class RemoteNCBIValidator:
@@ -208,9 +209,15 @@ class RemoteNCBIValidator:
             # If so find and add synonyms to potentially search GBIF for
             mtaxon.synonyms = (tax_dic["OtherNames"])["Synonym"]
 
+        # Check if AkaTaxIds exists in taxonomic information
+        if 'AkaTaxIds' in tax_dic.keys():
+            # Warn user that they've given a superseeded taxa ID
+            print(f"Warning ID {(tax_dic['AkaTaxIds'])[0]} has been replaced by {tax_dic['TaxId']}")
+            # Record that a superseeded GenBank ID has been provided
+            mtaxon.superseed = True
+
         return mtaxon
 
-    # HOW ARE SYNONYMS HANDLED?
     # New function to read in taxa information
     def taxa_search(self, nnme: str, taxa: dict):
         """Method that takes in taxonomic information, and finds the corresponding
@@ -317,6 +324,18 @@ class RemoteNCBIValidator:
                     # Use ID lookup function to find generate as a MicTaxon object
                     mtaxon = self.id_lookup(nnme,tID)
 
+        # Check if taxonomic rank supplied is used
+        if mtaxon.diverg == None:
+            # Find last dictonary key
+            f_key = list(taxa.keys())[-1]
+            # Then check whether orginally supplied name is still used
+            if taxa[f_key] != mtaxon.taxa_hier[f_key]:
+                # If not print a warning
+                print(f"Warning: {taxa[f_key]} not accepted usage should be "
+                      f"{mtaxon.taxa_hier[f_key]} instead")
+                # And record the fact that usage is superseeded
+                mtaxon.superseed = True
+
         return mtaxon
 
 
@@ -348,11 +367,15 @@ d11 = {'superkingdom': 'Eukaryota', 'genus': 'Morus'}
 d12 = {'genus': 'Microcopris', 'species': 'Microcopris hidakai'}
 # Nonsense garbage (NA)
 d13 = {'genus': 'Nonsense', 'species': 'Nonsense garbage'}
-# Tenacibaculum maritimum (1000)
+# Tenacibaculum maritimum (107401)
 d14 = {'genus': 'Tenacibaculum', 'species': 'Tenacibaculum maritimum'}
+# Cytophaga marina (1000)
+# At the moment this silently changes the taxon names
+# Clearly needs to be at least a warning
+d15 = {'genus': 'Cytophaga', 'species': 'Cytophaga marina'}
 # Maybe find synonym of this one to test as well
 # Then test output of taxa search
-# test = val.taxa_search("Nickname",d1)
+test = val.taxa_search("Nickname",d15)
 # Search for ID
-test = val.id_lookup("Nickname",1000)
+# test = val.id_lookup("Nickname",1000)
 print(test)
