@@ -1,9 +1,10 @@
+from cmath import exp
 from itertools import groupby
+from collections import OrderedDict
 from logging import ERROR, WARNING, INFO
-from typing import Iterable
-
 from openpyxl import worksheet
 from openpyxl.utils import get_column_letter
+from typing import List
 
 from safedata_validator.validators import (IsNotBlank, IsNotExcelError, IsNotPadded,
                                            HasDuplicates, IsNotNA, IsNumber, 
@@ -15,10 +16,10 @@ from safedata_validator.dataset import Dataset
 from safedata_validator.locations import Locations
 from safedata_validator.taxa import Taxa
 
-
 MANDATORY_DESCRIPTORS = {'field_type', 'description', 'field_name'}
 OPTIONAL_DESCRIPTORS = {'levels', 'method', 'units', 'taxon_name', 'taxon_field',
                         'interaction_name', 'interaction_field', 'file_container'}
+
 
 class DataWorksheet:
 
@@ -29,21 +30,34 @@ class DataWorksheet:
     wide resources, such as Locations, Taxa and Extents.
     """
 
-    def __init__(self, sheet_meta: dict, worksheet: worksheet, 
-                 dataset: Dataset = None) -> None:
+    @loggerinfo_push_pop('Checking data worksheet')
+    def __init__(self, 
+                 sheet_meta: dict,   # TODO Is this really needed by the object?
+                 taxa: Taxa = None,
+                 locations: Locations = None,
+                 dataset: Dataset = None,
+                 ) -> None:
         
         """
-        A method to load and check the formatting and content of a
-        data worksheet, turning the dictionary for this worksheet
-        in the dataset object into a DataWorksheet object.
+        This class is used to load and validate the formatting and content of a
+        data worksheet. Checking a DataWorksheet has the following workflow:
+
+        1) Create a DataWorksheet instance using the field metadata.
+        2) Use calls to the validate_data_rows method to pass in field
+           contents - this can be done repeatedly to handle chunked inputs.
+        3) Call the report method to obtain all of the logging associated 
+           with data validation and any final checks.
+
         Args:
             sheet_meta: The metadata dictionary for this worksheet from
                 the summary worksheet, containing the worksheet name, 
                 title and description and the names of any external files 
                 to be associated with this worksheet.
-            worksheet: The openpyxl Worksheet instance containing the data
-                to be validated.
-            dataset: A safedata_validator Dataset object containing 
+            field_meta: The field metadata as an OrderedDict - ordered from
+                top to bottom as they appear in the source file - keyed by
+                field descriptor with values as a list of field values for
+                that descriptor.
+            dataset: A safedata_validator Dataset object. 
             taxa: A safedata_validator Taxa instance for use in validating
                 taxon fields and traits
             locations: A safedata_validator Locations instance for use in
@@ -52,124 +66,90 @@ class DataWorksheet:
                 dataset level metadata like extents.
         """
 
-        # set defaults
+        # Set initial values
+        
+        # TODO - checks on sheetmeta 
         self.name = sheet_meta['name']
         self.description = sheet_meta['description']
         self.title = sheet_meta['title']
-        self.max_row = 0
-        self.max_col = 0
-        self.descriptors = None
-        self.taxa_fields = None
-        self.field_name_row = None
-        self.fields = []
-        self.external = None
-        self.worksheet = worksheet
-        self.dataset = dataset
-
         # For sheet meta with an external file, add in the external file name
-        if sheet_meta['external'] is not None:
-            self.external = sheet_meta['external']
+        self.external = sheet_meta.get('external')
 
-    def load(self, taxa, locations, summary):
+        # Links to reference objects for dataset level information, and taxa and
+        # location validation lists.
+        self.dataset = dataset
+        self.taxa = taxa
+        self.locations = locations
 
-        start_errors = CH.counters['ERROR']
-        LOGGER.info(f'Checking data worksheet {self.name}')
+        # set up a dictionary to map field types to BaseField subclasses
+        field_subclasses = BaseField.__subclasses__()
+        self.field_subclass_map = {}
+        for subc in field_subclasses:
+            self.field_subclass_map.update({ftype: subc for ftype in subc.field_types})
 
-        self._load_meta_and_size()
+        # Create the field meta attributes, populated using validate_field_meta
+        self.fields_loaded = False
+        self.field_meta = None
+        self.n_fields = None
+        self.descriptors = None
+        self.fields = None
+        self.taxa_fields = None
 
-        # TODO - openpyxl read-only mode provides row by row data access and used lazy
-        # loading to reduce memory usage. Scanning all of a column will need to
-        # load all data (which the old implementation using xlrd did, but which
-        # we might be also improve to reduce memory overhead by chunking large sheets).
-        # Either way, should use row by row ingestion.
-        
-    def _load_meta_and_size(self):
+        # Keep track of row numbering
+        self.n_row = 0
+        self.current_row = 1
+        self.row_numbers_sequential = True
+        self.start_errors = CH.counters['ERROR']
 
-        # get the  data dimensions
-        self.max_col = self.worksheet.max_column
-        self.max_row = self.worksheet.max_row
+    @loggerinfo_push_pop('Validating field metadata')
+    def validate_field_meta(self, field_meta: OrderedDict) -> List[dict]:
+        """This method is used to add and validate field_meta. The requirement
+        of an OrderedDict for field_meta is to check that the field name is the
+        last row in the metadata. A dict should by enough in Python 3.7+ where
+        insertion order is guaranteed, but OrderedDict is currently used to
+        cover 3.6 and to make the requirement explicit.
+        """
 
-        # trap completely empty worksheets
-        if self.max_row == 0:
-            LOGGER.error('Worksheet is empty')
-            return
+        # Checking field_meta - TODO more checking of structure
 
-        # Read the field metadata first, using a set of rows that should sample well
-        # into any data present
-        row_sample = len(MANDATORY_DESCRIPTORS) + len(OPTIONAL_DESCRIPTORS) + 10
-        ws_rows = self.worksheet.iter_rows(values_only=True, max_row=row_sample)
-        field_meta = [r for r in ws_rows]
-        
-        # Get the sequence of column types
-        first_column_types = [type(v[0]) for v in field_meta]
-        first_column_rle = [(v, len(list(g))) for v, g in groupby(first_column_types, None)]
-        first_column_type_seq = [v[0] for v in first_column_rle]
-
-        # Forbid anything except a narrow set of type sequences: 
-        # * descriptor only, 
-        # * descriptors + row numbers, 
-        # * descriptors + blanks, and
-        # * descriptors + row numbers + blanks. 
-        #
-        # Basically strings, then maybe integers. However, terminal blanks
-        # probably indicate unnumbered data rows, so those are allowed through
-        # for checking later.
-        if first_column_type_seq == [str]:
-            LOGGER.error('Cannot parse data: Column A appears to contain '
-                         f'more than {row_sample} decriptor names.')
-            return
-        elif first_column_type_seq not in ([str],
-                                         [str, int],
-                                         [str, type(None)],
-                                         [str, int, type(None)]):
-            LOGGER.error('Cannot parse data: Column A must contain a set of '
-                         'field descriptors and then row numbers')
-            return
-
-        # Reduce to meta, check descriptors and convert to field dictionaries
-        n_field_meta = first_column_rle[0][1]
-        field_meta = [field_meta[i] for i in range(n_field_meta)]
-        field_descriptors = [r[0] for r in field_meta]
-        
-        # Whitespace padding?
-        clean_descriptors = IsNotPadded(field_descriptors)
+        # - Descriptors
+        # Clean off whitespace padding?
+        clean_descriptors = IsNotPadded(field_meta.keys())
         if not clean_descriptors:
             # Report whitespace padding and clean up tuples
             LOGGER.error('Whitespace padding in descriptor names: ', 
                          extra={'join': clean_descriptors.failed})
             
-            for idx, cln in enumerate(clean_descriptors):
-                field_meta[idx] = tuple([cln] + list(field_meta[idx][1:]))
-            
-            field_descriptors = clean_descriptors.values
+            # Order preserved in dict and validator
+            cleaned_entries = [(ky, val) for ky, val 
+                               in zip(clean_descriptors, field_meta.values())]
+            field_meta = OrderedDict(cleaned_entries)
+
 
         # * Check for mandatory descriptors
-        mandatory_missing = set(MANDATORY_DESCRIPTORS).difference(field_descriptors)
+        mandatory_missing = set(MANDATORY_DESCRIPTORS).difference(field_meta.keys())
         if mandatory_missing:
             LOGGER.error('Mandatory field descriptors missing: ', 
                          extra={'join': mandatory_missing})
-            return
+            return False, None
 
         # * Expected descriptors - do _not_ preclude user defined descriptors
         #   but warn about them to alert to typos.
-        unknown_descriptors = set(field_descriptors).difference(
+        unknown_descriptors = set(field_meta.keys()).difference(
                                 MANDATORY_DESCRIPTORS.union(OPTIONAL_DESCRIPTORS))
         if unknown_descriptors:
             LOGGER.warning('Unknown field descriptors:', 
                            extra={'join': unknown_descriptors})
 
-        # * Check for field name as _last_ descriptor. This is a bit picky but
-        #   it is a historical restriction and makes the dataframe more
-        #   readable.
-        if field_descriptors[-1] != 'field_name':
-                LOGGER.error('Cannot parse data: field_name row is not the last descriptor')
-                return
+        # * Check for field name as _last_ descriptor. This is primarily to
+        #   make it easy to read the dataframe - just skip the other descriptors
+        if list(field_meta.keys())[-1] != 'field_name':
+                LOGGER.error('Field_name row is not the last descriptor')
         
         # Repackage field metadata into a list of per field descriptor
-        # dictionaries, dropping the first column containing descriptors names
-        self.field_name_row = n_field_meta
-        field_meta = [dict(zip(field_descriptors, vals)) for vals in zip(*field_meta)]
-        del field_meta[0]
+        # dictionaries, _importantly_ preserving the column order.
+        field_meta = [dict(zip(field_meta.keys(), val)) 
+                        for val in zip(*field_meta.values())]
 
         # Insert column index
         for idx, fld in enumerate(field_meta):
@@ -177,7 +157,7 @@ class DataWorksheet:
         
         # Check field names are unique. This doesn't cause as many problems as
         # duplications in Taxa and Locations, which expect certain fields, so
-        # warn and continue. Ignore missing mandatory values - these are handled
+        # warn and continue. Ignore empty mandatory values - these are handled
         # in field checking.
         field_names = [fld['field_name'] for fld in field_meta 
                        if fld['field_name'] is not None]
@@ -190,76 +170,204 @@ class DataWorksheet:
         for fld in field_meta:
             fld['field_type'] = None if fld['field_type'] is None else fld['field_type'].lower()
 
+        # Populate the instance variables
+        self.fields_loaded = True
+        self.field_meta = field_meta
+        self.n_fields = len(field_meta)
+        self.descriptors = field_meta[0].keys() # TODO - redundant?
+
+        # Now initialise the Field objects using the mapping of field types
+        # to the BaseField subclasses
+        self.fields = [self.field_subclass_map[fd['field_type']](fd) 
+                       for fd in self.field_meta]
+
         # get taxa field names for cross checking observation and trait data
-        self.taxa_fields = [fld['field_name'] for fld in field_meta if fld['field_type'] == 'taxa']
+        self.taxa_fields = [fld['field_name'] for fld in self.field_meta 
+                            if fld['field_type'] == 'taxa']
 
-        self.fields = field_meta
-    
-        # set up a dictionary to map field types to BaseField subclasses
-        field_subclasses = BaseField.__subclasses__()
-        field_subclass_map = {}
-        for subc in field_subclasses:
-            field_subclass_map.update({ftype: subc for ftype in subc.field_types})
+    def validate_data_rows(self, data_rows):
+        """Method to pass rows of data into the field checkers for a
+        dataworksheet. The data is expected to be as an list of rows
+        from a data file, with the first entry in each row being a row
+        number.
+        """
+        if not self.fields_loaded:
+            LOGGER.critical('No fields defined - use validate_field_meta')
+            return
 
-    def check_data(taxa, locations, summary):
+        # Check the lengths of the rows - I think this should fail hard
+        # because it will be a programming error, not a user error.
+        row_lengths = set([len(rw) for rw in data_rows])
+        if len(row_lengths) != 1:
+            LOGGER.error('Data rows of unequal length - cannot validate')
+            return
+        elif row_lengths.pop() != (self.n_fields + 1):
+            LOGGER.error('Data rows not of same length as field metadata - cannot validate')
+            return
 
+        # Convert the values into columns and extract the row numbers
+        data_cols = list(zip(*data_rows))
+        row_numbers = data_cols.pop(0)
 
+        # Check the row numbering - skip if this has already failed.
+        if self.row_numbers_sequential:
+            expected_numbers = tuple(range(self.current_row, 
+                                           self.current_row + len(row_numbers)))
+            
+            if row_numbers != expected_numbers:
+                self.row_numbers_sequential = False
+        else:
+            self.current_row += len(row_numbers)
+
+        # Now feed the sets of values into the Field validation
+        for data, field_inst in zip(data_cols, self.fields):
+            field_inst.validate_data(data)
+
+    @loggerinfo_push_pop('Validating field data')
+    def report(self):
+        """ The validate_data_rows method accumulates logging messages
+        individual fields. This method causes these field logs to be 
+        emitted and then carries out final checks and reporting across
+        all of the field data.
+        """
+
+        for fld in self.fields:
+            fld.report()
         
-        # Now checking the data itself.
-        if True:
-            # Check if there is anything below the descriptors
-            if len(first_column_rle) == 1:
-                if is_blank(sheet_meta['external']):
-                    LOGGER.error('No data found below field descriptors.')
-                else:
-                    LOGGER.info('Data table description associated with '
-                                'external file {external}'.format(**sheet_meta))
 
-            elif len(first_column_rle) == 2:
-
-                if first_column_rle[1][0] == xlrd.XL_CELL_NUMBER:
-                    # If there are numbers, check they are continuous
-                    row_numbers = first_column[first_column_rle[0][1]:]
-                    ideal = [float(i) for i in range(1, len(row_numbers) + 1)]
-                    if row_numbers != ideal:
-                        LOGGER.error("Row numbers not consecutive or do not start with 1")
-                else:
-                    LOGGER.error("Row numbers missing below field descriptors")
-
-            elif len(first_column_rle) == 3:
-                n_terminal_blanks = dwsh.max_row - first_column_rle[0][1] - first_column_rle[1][1]
-                row_range = list(range(dwsh.max_row - 1, (dwsh.max_row - 1) - n_terminal_blanks, - 1))
-                for check_row in row_range:
-                    if all(is_blank(val) for val in worksheet.row_values(check_row)):
-                        dwsh.max_row -= 1
-                    else:
-                        LOGGER.error('Un-numbered rows at end of worksheet contain data')
-                        break
-
-        # report on detected size
-        dwsh.n_data_row = dwsh.max_row - dwsh.field_name_row
-        LOGGER.info('Worksheet contains {n_d} descriptors, {o.n_data_row} data rows and '
-                    '{n_f} fields'.format(o=dwsh, n_d=len(dwsh.descriptors), n_f=dwsh.max_col - 1),
-                    extra={'indent_after': 2})
-
- 
-        # check the data in each field against the metadata
-        for meta in metadata:
-            # read the values and check them against the metadata
-            data = worksheet.col(meta['col_idx'], dwsh.field_name_row, dwsh.max_row)
-            self.check_field(dwsh, meta, data)
-
-        # add the new DataWorksheet into the Dataset
-        self.dataworksheets.append(dwsh)
+        if not self.row_numbers_sequential:
+            LOGGER.error("Row numbers not consecutive or do not start with 1")
+        
+         # report on detected size
+        LOGGER.info(f"Worksheet '{self.name}' contains {len(self.descriptors)} descriptors, "
+                    f"{self.n_row} data rows and {self.n_fields} fields")
 
         # reporting
-        n_errors = CH.counters['ERROR'] - start_errors
+        n_errors = CH.counters['ERROR'] - self.start_errors
         if n_errors > 0:
-            LOGGER.info('Dataframe contains {} errors'.format(n_errors),
-                        extra={'indent_before': 1})
+            LOGGER.info(f'Dataframe contains {n_errors} errors')
         else:
-            LOGGER.info('Dataframe formatted correctly',
-                        extra={'indent_before': 1})
+            LOGGER.info('Dataframe formatted correctly')
+
+
+def load_dataworksheet(worksheet: worksheet, chunksize=1000) -> DataWorksheet:
+
+
+
+    # TODO - openpyxl read-only mode provides row by row data access and used lazy
+    # loading to reduce memory usage. Scanning all of a column will need to
+    # load all data (which the old implementation using xlrd did, but which
+    # we might be also improve to reduce memory overhead by chunking large sheets).
+    # Either way, should use row by row ingestion.
+
+
+    # get the  data dimensions
+    max_col = worksheet.max_column
+    max_row = worksheet.max_row
+
+    # trap completely empty worksheets
+    if max_row == 0:
+        LOGGER.error('Worksheet is empty')
+        return
+
+    # Read the field metadata first: 
+    # - There should be rows starting with a string and then rows starting with
+    #   a number, or a blank at the end of a column.
+    # 
+    ws_rows = self.worksheet.iter_rows(values_only=True)
+
+
+    row_sample = len(MANDATORY_DESCRIPTORS) + len(OPTIONAL_DESCRIPTORS) + 10
+    
+    field_meta = [r for r in ws_rows]
+    
+    # Get the sequence of column types
+    first_column_types = [type(v[0]) for v in field_meta]
+    first_column_rle = [(v, len(list(g))) for v, g in groupby(first_column_types, None)]
+    first_column_type_seq = [v[0] for v in first_column_rle]
+
+    # Forbid anything except a narrow set of type sequences: 
+    # * descriptor only, 
+    # * descriptors + row numbers, 
+    # * descriptors + blanks, and
+    # * descriptors + row numbers + blanks. 
+    #
+    # Basically strings, then maybe integers. However, terminal blanks
+    # probably indicate unnumbered data rows, so those are allowed through
+    # for checking later.
+    if first_column_type_seq == [str]:
+        LOGGER.error('Cannot parse data: Column A appears to contain '
+                        f'more than {row_sample} decriptor names.')
+        return
+    elif first_column_type_seq not in ([str],
+                                        [str, int],
+                                        [str, type(None)],
+                                        [str, int, type(None)]):
+        LOGGER.error('Cannot parse data: Column A must contain a set of '
+                        'field descriptors and then row numbers')
+        return
+
+    # Reduce to meta, check descriptors and convert to field dictionaries
+    n_field_meta = first_column_rle[0][1]
+    field_meta = [field_meta[i] for i in range(n_field_meta)]
+    self.field_name_row = n_field_meta
+
+    # Now checking the data itself.
+    if True:
+        # Check if there is anything below the descriptors
+        if len(first_column_rle) == 1:
+            if is_blank(sheet_meta['external']):
+                LOGGER.error('No data found below field descriptors.')
+            else:
+                LOGGER.info('Data table description associated with '
+                            'external file {external}'.format(**sheet_meta))
+
+        elif len(first_column_rle) == 2:
+
+            if first_column_rle[1][0] == xlrd.XL_CELL_NUMBER:
+                # If there are numbers, check they are continuous
+                row_numbers = first_column[first_column_rle[0][1]:]
+                ideal = [float(i) for i in range(1, len(row_numbers) + 1)]
+                if row_numbers != ideal:
+                    LOGGER.error("Row numbers not consecutive or do not start with 1")
+            else:
+                LOGGER.error("Row numbers missing below field descriptors")
+
+        elif len(first_column_rle) == 3:
+            n_terminal_blanks = dwsh.max_row - first_column_rle[0][1] - first_column_rle[1][1]
+            row_range = list(range(dwsh.max_row - 1, (dwsh.max_row - 1) - n_terminal_blanks, - 1))
+            for check_row in row_range:
+                if all(is_blank(val) for val in worksheet.row_values(check_row)):
+                    dwsh.max_row -= 1
+                else:
+                    LOGGER.error('Un-numbered rows at end of worksheet contain data')
+                    break
+
+    # report on detected size
+    dwsh.n_data_row = dwsh.max_row - dwsh.field_name_row
+    LOGGER.info('Worksheet contains {n_d} descriptors, {o.n_data_row} data rows and '
+                '{n_f} fields'.format(o=dwsh, n_d=len(dwsh.descriptors), n_f=dwsh.max_col - 1),
+                extra={'indent_after': 2})
+
+
+    # check the data in each field against the metadata
+    for meta in metadata:
+        # read the values and check them against the metadata
+        data = worksheet.col(meta['col_idx'], dwsh.field_name_row, dwsh.max_row)
+        self.check_field(dwsh, meta, data)
+
+    # add the new DataWorksheet into the Dataset
+    self.dataworksheets.append(dwsh)
+
+    # reporting
+    n_errors = CH.counters['ERROR'] - start_errors
+    if n_errors > 0:
+        LOGGER.info('Dataframe contains {} errors'.format(n_errors),
+                    extra={'indent_before': 1})
+    else:
+        LOGGER.info('Dataframe formatted correctly',
+                    extra={'indent_before': 1})
+
 
 
 class BaseField:
@@ -899,45 +1007,6 @@ class GeoField(BaseField):
                 self.dataset.longitudinal_extent.update([self.min, self.max])
 
 
-
-def check_field_geo(self, meta, data, which='latitude'):
-
-    """
-    Checks geographic coordinates. It also automatically updates
-    the geographic extent of the dataset.
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values
-        which: One of latitude or longitude
-    """
-
-    # Are the values represented as decimal degrees - numeric.
-    nums = [dt for dt in data if isinstance(dt, float)]
-
-    if len(nums) < len(data):
-        LOGGER.error('Field contains non-numeric data')
-        if any([RE_DMS.search(str(dt)) for dt in data]):
-            LOGGER.warn('Possible degrees minutes and seconds formatting? Use decimal degrees')
-
-    # Check the locations
-    if len(nums):
-        min_geo = float(min(nums))
-        max_geo = float(max(nums))
-        extent = (min_geo, max_geo)
-        valid = self.validate_geo_extent(extent, which)
-
-        if valid:
-            # update the field metadata and the dataset extent
-            meta['range'] = extent
-            # Look up the extent name to update and then update it
-            which_extent = {'latitude': 'latitudinal_extent',
-                            'longitude': 'longitudinal_extent'}
-            self.update_extent(extent, float, which_extent[which])
-
-
-
-
-
 class DatetimeField(BaseField):
 
     field_types = ('date', 'time', 'datetime')
@@ -1040,8 +1109,7 @@ class DatetimeField(BaseField):
                 self.update_extent(extent, datetime.datetime, 'temporal_extent')
 
 
-
-def check_field_abundance(self, meta, data, taxa_fields):
+class AbundanceField(BaseField):
 
     """
     Checks abundance type data, reporting to the Messages instance.
@@ -1051,20 +1119,34 @@ def check_field_abundance(self, meta, data, taxa_fields):
         taxa_fields: A list of Taxa fields in this worksheet.
     """
 
-    # check the required descriptors
-    self._check_meta(meta, 'method')
-    self._check_taxon_meta(meta, taxa_fields)
 
-    # Can still check values are numeric, whatever happens above.
-    # We're not going to insist on integers here - could be mean counts.
-    nums = [dt.value for dt in data if dt.ctype == xlrd.XL_CELL_NUMBER]
+    field_types = ('abundance',)
+    required_descriptors = MANDATORY_DESCRIPTORS.union(['method', 'units'])
 
-    if len(nums) < len(data):
-        LOGGER.error('Field contains non-numeric data')
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, 
+                 taxa: Taxa = None, locations: Locations = None) -> None:
+        
+        super().__init__(meta, dwsh, dataset, taxa, locations)
 
-    # update the field metadata if there is any data.
-    if len(nums):
-        meta['range'] = (min(nums), max(nums))
+        # check the required descriptors
+        self._check_meta(meta, 'method')
+        self._check_taxon_meta(meta, taxa_fields)
+
+
+    def validate_data(self, data: list, **kwargs):
+
+        return super().validate_data(data, **kwargs)
+
+        # Can still check values are numeric, whatever happens above.
+        # We're not going to insist on integers here - could be mean counts.
+        nums = [dt.value for dt in data if dt.ctype == xlrd.XL_CELL_NUMBER]
+
+        if len(nums) < len(data):
+            LOGGER.error('Field contains non-numeric data')
+
+        # update the field metadata if there is any data.
+        if len(nums):
+            meta['range'] = (min(nums), max(nums))
 
 
 
@@ -1112,39 +1194,6 @@ def check_field_interaction(self, meta, data, taxa_fields, which='categorical'):
     elif which == 'numeric':
         self.check_field_numeric(meta, data)
 
-def check_field_geo(self, meta, data, which='latitude'):
-
-    """
-    Checks geographic coordinates. It also automatically updates
-    the geographic extent of the dataset.
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values
-        which: One of latitude or longitude
-    """
-
-    # Are the values represented as decimal degrees - numeric.
-    nums = [dt for dt in data if isinstance(dt, float)]
-
-    if len(nums) < len(data):
-        LOGGER.error('Field contains non-numeric data')
-        if any([RE_DMS.search(str(dt)) for dt in data]):
-            LOGGER.warn('Possible degrees minutes and seconds formatting? Use decimal degrees')
-
-    # Check the locations
-    if len(nums):
-        min_geo = float(min(nums))
-        max_geo = float(max(nums))
-        extent = (min_geo, max_geo)
-        valid = self.validate_geo_extent(extent, which)
-
-        if valid:
-            # update the field metadata and the dataset extent
-            meta['range'] = extent
-            # Look up the extent name to update and then update it
-            which_extent = {'latitude': 'latitudinal_extent',
-                            'longitude': 'longitudinal_extent'}
-            self.update_extent(extent, float, which_extent[which])
 
 def check_field_file(self, meta, data):
     """
