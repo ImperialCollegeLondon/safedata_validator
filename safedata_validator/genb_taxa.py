@@ -22,7 +22,11 @@ that stored in GBIF. When a conflict arises the user will be informed and asked
 to reduce the level of taxonomic detail they provide to the point where GenBank
 and GBIF are in agreement.
 
-DETAILS OF STUFF DEFINED.
+The MicTaxon dataclass is used to store data about a taxon entry in a dataset. It
+is initialised with user data and then the RemoteNCBIValidator class can be used
+to update a Taxon object with the result of NCBI (GenBank) validation. Further
+information (e.g. synonymus names) is also extract from the remote database, in
+order to help with the next validation step.
 
 FURTHER DETAILS OF STUFF DEFINED.
 
@@ -50,9 +54,8 @@ class NCBIError(Exception):
 # Then tell user that they have to contract their taxonomic specification to this levels
 
 # QUESTIONS FOR DAVID
-# WHERE SHOULD WARNINGS BE SENT TO? HALF SORTED THIS, BUT STILL NEED TO WORK OUT THE LOGGER
 # WHAT SHOULD WE DO ABOUT SUPERKINGDOM, DOMAIN, KINGDOM ISSUE?
-# DO WE WANT A LocalNCBIValidator?
+# DO WE WANT A LocalNCBIValidator? IS THIS EVEN POSSIBLE?
 # HOW DO I ACTUALLY SET UP TESTING?
 # CAN/SHOULD WE SET UP AN EMAIL?
 # SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
@@ -97,13 +100,13 @@ class MicTaxon:
 
 @enforce_types
 class RemoteNCBIValidator:
-    # ADD MORE COMMENTS HERE AS AND WHEN I FIGURE THEM OUT
     """This provides a validate method for a MicrobeTaxon using various online
     NCBI APIs. This doesn't need an __init__ method and just contains methods.
     """
     # Functionality to find taxa information from genbank ID
     def id_lookup(self, nnme: str, genbank_id: int):
-        """Method to return full taxonomic information from a GenBank ID.
+        """Method to return full taxonomic information from a GenBank ID. This
+        includes details of any potential synonymus names.
 
         Params:
             nnme: A nickname to identify the taxon
