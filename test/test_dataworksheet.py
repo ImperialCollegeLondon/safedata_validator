@@ -1,8 +1,8 @@
 from collections import OrderedDict
-from plistlib import load
 import pytest
 from logging import CRITICAL, ERROR, WARNING, INFO
 
+import openpyxl
 from safedata_validator.field import DataWorksheet
 
 
@@ -120,13 +120,17 @@ def test_DataWorksheet_validate_field_meta(caplog, fixture_dataworksheet, field_
          [2, 1, 2, 3],
          [3, 1, 2, 3], ],
         ( (INFO, 'Validating field metadata'),
-          (ERROR, 'Data rows of unequal length - cannot validate'),)),
+          (CRITICAL, 'Data rows of unequal length - cannot validate'),)),
       ( True,
         [[1, 1, 2, 3, 4],
          [2, 1, 2, 3, 4],
          [3, 1, 2, 3, 4], ],
         ( (INFO, 'Validating field metadata'),
-          (ERROR, 'Data rows not of same length as field metadata - cannot validate'),)),
+          (CRITICAL, 'Data rows not of same length as field metadata - cannot validate'),)),
+      ( True,
+        [],
+        ( (INFO, 'Validating field metadata'),
+          (CRITICAL, "Empty data_rows passed to validate_data_rows"),)),
     ]
 )
 def test_DataWorksheet_validate_data_rows(caplog, fixture_dataworksheet, fixture_field_meta,
@@ -149,42 +153,140 @@ def test_DataWorksheet_validate_data_rows(caplog, fixture_dataworksheet, fixture
 
 
 @pytest.mark.parametrize(
-    'data_rows,expected_log',
+    'data_rows,populate_external,expected_log',
     [
       ( [[1, 1, 2, 3],
          [2, 1, 2, 3],
          [3, 1, 2, 3], ],
+         False,
         ( (INFO, "Validating field data"),
           (INFO, "Checking Column a"),
           (INFO, "Checking Column b"),
           (INFO, "Checking Column c"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 0 data rows and 3 fields"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
           (INFO, "Dataframe formatted correctly"))),
+      ( [],
+        False,
+        ( (INFO, "Validating field data"),
+          (ERROR, "No data passed for validation"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 0 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),
+      ( [],
+        True,
+        ( (INFO, "Validating field data"),
+          (INFO, "Data table description associated with external file"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 0 data rows and 3 fields"),
+          (INFO, "Dataframe formatted correctly"))),      
       ( [[11, 1, 2, 3],
          [12, 1, 2, 3],
          [13, 1, 2, 3], ],
+        False,
         ( (INFO, "Validating field data"),
           (INFO, "Checking Column a"),
           (INFO, "Checking Column b"),
           (INFO, "Checking Column c"),
           (ERROR, "Row numbers not consecutive or do not start with 1"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 0 data rows and 3 fields"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
           (INFO, "Dataframe contains 1 errors"))),
     ]
 )
 def test_DataWorksheet_report(caplog, fixture_dataworksheet, fixture_field_meta,
-                              data_rows, expected_log):
+                              data_rows, populate_external, expected_log):
     """Testing report level errors 
       - emission of field errors and
       - dataset level issues
     """
     
+    if populate_external:
+        fixture_dataworksheet.external = "file_provided.sql"
+
     fixture_dataworksheet.validate_field_meta(fixture_field_meta)
     caplog.clear()
 
-    fixture_dataworksheet.validate_data_rows(data_rows)
+    if data_rows:
+        fixture_dataworksheet.validate_data_rows(data_rows)
+    
     fixture_dataworksheet.report()
 
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+
+@pytest.mark.parametrize(
+    'data_rows,populate_external,expected_log',
+    [
+      ( [[1, 1, 2, 3],
+         [2, 1, 2, 3],
+         [3, 1, 2, 3], ],
+         False,
+        ( (INFO, "Loading from worksheet"),
+          (INFO, "Validating field metadata"),
+          (INFO, "Validating field data"),
+          (INFO, "Checking Column a"),
+          (INFO, "Checking Column b"),
+          (INFO, "Checking Column c"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Dataframe formatted correctly"))),
+      ( [],
+        False,
+        ( (INFO, "Loading from worksheet"),
+          (INFO, "Validating field metadata"),
+          (INFO, "Validating field data"),
+          (ERROR, "No data passed for validation"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 0 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),
+      ( [],
+        True,
+        ( (INFO, "Loading from worksheet"),
+          (INFO, "Validating field metadata"),
+          (INFO, "Validating field data"),
+          (INFO, "Data table description associated with external file"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 0 data rows and 3 fields"),
+          (INFO, "Dataframe formatted correctly"))),
+      ( [[11, 1, 2, 3],
+         [12, 1, 2, 3],
+         [13, 1, 2, 3], ],
+        False,
+        ( (INFO, "Loading from worksheet"),
+          (INFO, "Validating field metadata"),
+          (INFO, "Validating field data"),
+          (INFO, "Checking Column a"),
+          (INFO, "Checking Column b"),
+          (INFO, "Checking Column c"),
+          (ERROR, "Row numbers not consecutive or do not start with 1"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),
+    ]
+)
+def test_DataWorksheet_load_from_worksheet(caplog, fixture_dataworksheet, fixture_field_meta,
+                                           data_rows, populate_external, expected_log):
+    """Testing basics of load_from_worksheet method on programatically created
+    worksheet object
+    """
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+
+    # Add field meta rows
+    field_meta = [[ky] + vl for ky, vl in fixture_field_meta.items()]
+    for rw in field_meta:
+        ws.append(rw )
+
+    # Add data
+    for rw in data_rows:
+        ws.append(rw )
+
+    # Try loading it
+    if populate_external:
+        fixture_dataworksheet.external = "file_provided.sql"
+
+    fixture_dataworksheet.load_from_worksheet(ws)
+    
     assert len(expected_log) == len(caplog.records)
 
     assert all([exp[0] == rec.levelno 
