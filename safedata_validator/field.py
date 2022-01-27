@@ -1,4 +1,3 @@
-from cmath import exp
 from itertools import groupby, islice
 from collections import OrderedDict
 from logging import ERROR, WARNING, INFO
@@ -99,6 +98,8 @@ class DataWorksheet:
         self.n_row = 0
         self.current_row = 1
         self.row_numbers_sequential = True
+        self.row_numbers_missing = False
+        self.row_numbers_noninteger = False
         self.start_errors = CH.counters['ERROR']
 
     @loggerinfo_push_pop('Validating field metadata')
@@ -214,11 +215,24 @@ class DataWorksheet:
         data_cols = list(zip(*data_rows))
         row_numbers = data_cols.pop(0)
 
-        # Check the row numbering - skip if this has already failed.
-        if self.row_numbers_sequential:
-            expected_numbers = tuple(range(self.current_row, 
+        # Check for bad values (blanks, non integers) in row numbers
+        row_numbers = IsNotBlank(row_numbers, keep_failed=False)
+
+        if not row_numbers:
+            self.row_numbers_missing = True
+        
+        row_numbers = row_numbers.values
+        
+        if any([not isinstance(vl, int) for vl in row_numbers]):
+            self.row_numbers_noninteger = True
+        
+        # Check the row numbering - skip if this has already failed or
+        # the row numbers have already included None or non-integers
+        if self.row_numbers_sequential and not (self.row_numbers_noninteger or self.row_numbers_missing):
+            expected_numbers = list(range(self.current_row, 
                                            self.current_row + len(row_numbers)))
-            
+            self.current_row += len(row_numbers)
+
             if row_numbers != expected_numbers:
                 self.row_numbers_sequential = False
         else:
@@ -246,7 +260,14 @@ class DataWorksheet:
             for fld in self.fields:
                 fld.report()
 
-        if not self.row_numbers_sequential:
+        # Report on row numbering
+        if self.row_numbers_missing:
+            LOGGER.error("Missing row numbers in data")
+        
+        if self.row_numbers_noninteger:
+            LOGGER.error("Row numbers contain non-integer values")
+
+        if not (self.row_numbers_noninteger or self.row_numbers_missing) and not self.row_numbers_sequential:
             LOGGER.error("Row numbers not consecutive or do not start with 1")
         
          # report on detected size

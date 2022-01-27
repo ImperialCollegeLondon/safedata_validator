@@ -19,7 +19,7 @@ def fixture_field_meta():
 
 
 @pytest.fixture()
-def fixture_dataworksheet(fixture_field_meta):
+def fixture_dataworksheet():
     """field_meta object for use across tests
     """
     
@@ -176,7 +176,7 @@ def test_DataWorksheet_validate_data_rows(caplog, fixture_dataworksheet, fixture
         ( (INFO, "Validating field data"),
           (INFO, "Data table description associated with external file"),
           (INFO, "Worksheet 'DF' contains 6 descriptors, 0 data rows and 3 fields"),
-          (INFO, "Dataframe formatted correctly"))),      
+          (INFO, "Dataframe formatted correctly"))),
       ( [[11, 1, 2, 3],
          [12, 1, 2, 3],
          [13, 1, 2, 3], ],
@@ -186,6 +186,28 @@ def test_DataWorksheet_validate_data_rows(caplog, fixture_dataworksheet, fixture
           (INFO, "Checking Column b"),
           (INFO, "Checking Column c"),
           (ERROR, "Row numbers not consecutive or do not start with 1"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),
+      ( [[1, 1, 2, 3],
+         [2, 1, 2, 3],
+         [None, 1, 2, 3], ],
+        False,
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking Column a"),
+          (INFO, "Checking Column b"),
+          (INFO, "Checking Column c"),
+          (ERROR, "Missing row numbers in data"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),
+      ( [[1, 1, 2, 3],
+         [2, 1, 2, 3],
+         ['3', 1, 2, 3], ],
+        False,
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking Column a"),
+          (INFO, "Checking Column b"),
+          (INFO, "Checking Column c"),
+          (ERROR, "Row numbers contain non-integer values"),
           (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
           (INFO, "Dataframe contains 1 errors"))),
     ]
@@ -215,6 +237,58 @@ def test_DataWorksheet_report(caplog, fixture_dataworksheet, fixture_field_meta,
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
 
+# TODO - think about the _order_ of different rownumber errors and which 
+#        get reported when: 1,2,3,4,5,6,9,None,None - both non_seq and missing 
+#        useful information for user
+
+@pytest.mark.parametrize(
+    'data_rows,expected_log',
+    [
+      ( [ [[1, 1, 2, 3],
+           [2, 1, 2, 3],
+           [3, 1, 2, 3], ],
+          [[4, 1, 2, 3],
+           [5, 1, 2, 3],
+           [6, 1, 2, 3], ]],
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking Column a"),
+          (INFO, "Checking Column b"),
+          (INFO, "Checking Column c"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 6 data rows and 3 fields"),
+          (INFO, "Dataframe formatted correctly"))),
+      ( [ [[1, 1, 2, 3],
+           [2, 1, 2, 3],
+           [3, 1, 2, 3], ],
+          [[7, 1, 2, 3],
+           [8, 1, 2, 3],
+           [9, 1, 2, 3], ]],
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking Column a"),
+          (INFO, "Checking Column b"),
+          (INFO, "Checking Column c"),
+          (ERROR, "Row numbers not consecutive or do not start with 1"),
+          (INFO, "Worksheet 'DF' contains 6 descriptors, 6 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),    ]
+)
+def test_DataWorksheet_report_multi_load(caplog, fixture_dataworksheet, fixture_field_meta,
+                                         data_rows, expected_log):
+    """Testing report level errors when more than one set of data loaded
+    """
+    
+    fixture_dataworksheet.validate_field_meta(fixture_field_meta)
+    caplog.clear()
+
+    for chunk in data_rows:
+        fixture_dataworksheet.validate_data_rows(chunk)
+    
+    fixture_dataworksheet.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
 
 
 @pytest.mark.parametrize(
@@ -269,6 +343,7 @@ def test_DataWorksheet_load_from_worksheet(caplog, fixture_dataworksheet, fixtur
     worksheet object
     """
     
+    # Create a worksheet programatically
     wb = openpyxl.Workbook()
     ws = wb.active
 
@@ -281,10 +356,11 @@ def test_DataWorksheet_load_from_worksheet(caplog, fixture_dataworksheet, fixtur
     for rw in data_rows:
         ws.append(rw )
 
-    # Try loading it
+    # Test empty worksheet handling
     if populate_external:
         fixture_dataworksheet.external = "file_provided.sql"
 
+    # Try loading worksheet
     fixture_dataworksheet.load_from_worksheet(ws)
     
     assert len(expected_log) == len(caplog.records)
