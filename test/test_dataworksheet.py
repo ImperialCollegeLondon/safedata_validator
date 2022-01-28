@@ -5,32 +5,6 @@ from logging import CRITICAL, ERROR, WARNING, INFO
 import openpyxl
 from safedata_validator.field import DataWorksheet
 
-
-@pytest.fixture()
-def fixture_field_meta():
-    """field_meta object for use across tests
-    """
-    
-    return OrderedDict(field_type = ['numeric', 'numeric', 'numeric'],
-                       description = ['a', 'b', 'c'],
-                       units = ['a', 'b', 'c'],
-                       method = ['a', 'b', 'c'],
-                       field_name = ['a', 'b', 'c'])
-
-
-@pytest.fixture()
-def fixture_dataworksheet():
-    """field_meta object for use across tests
-    """
-    
-    dws = DataWorksheet({'name': 'DF',
-                         'title': 'My data table',
-                         'description': 'This is a test data worksheet',
-                         'external': None})
-
-    return dws
-
-
 @pytest.mark.parametrize(
     'sheet_meta,expected_log',
     [
@@ -369,6 +343,5 @@ def test_DataWorksheet_load_from_worksheet(caplog, fixture_dataworksheet, fixtur
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
-
 
 
