@@ -5,7 +5,7 @@ from openpyxl import worksheet
 from openpyxl.utils import get_column_letter
 from typing import List
 
-from safedata_validator.validators import (IsNotBlank, IsNotExcelError, IsNotPadded,
+from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError, IsNotPadded,
                                            HasDuplicates, IsNotNA, IsNumber, 
                                            IsNotNumericString, IsString, IsLocName,
                                            blank_value, valid_r_name, RE_DMS)
@@ -422,9 +422,6 @@ class DataWorksheet:
                         break
 
 
-
-
-
 class BaseField:
 
     # Class instances describe the field_types handled by the class
@@ -516,9 +513,8 @@ class BaseField:
                       "Common errors are spaces and non-alphanumeric "
                       "characters other than underscore and full stop")
 
-        # TODO - reimplement these two class attributes and steps as a single
-        #        subclass specific extra meta method stub (_check_meta_extra?)
-        #        that can be overloaded as required by subclasses?
+        # TODO - rethink implementation? Quite specific behaviour unique to 
+        #        some fields, so could implement as overloaded extra stub.
         if self.check_taxon_meta:
             self._check_taxon_meta()
         
@@ -538,6 +534,7 @@ class BaseField:
         Args:
             meta: A dictionary of field metadata descriptors
             descriptor: The name of the descriptor to check.
+        
         Returns:
             A boolean, with True showing no problems and False showing
             that warnings occurred.
@@ -563,106 +560,143 @@ class BaseField:
         else:
             return True
 
-    def _check_taxon_meta(self, taxa_fields):
+    def _check_taxon_meta(self):
 
         """
-        Checks the taxonomic metadata of abundance and trait fields.
-        This is more involved that the simple _check_meta(), because
-        of the option to provide taxon_name or taxon_field descriptors
-        Args:
-            meta: A dictionary of metadata descriptors for the field
-            taxa_fields: A list of Taxa fields in this worksheet.
+        Checks the taxonomic metadata of abundance and trait fields. This is
+        more involved that the simple _check_meta(), because of the option to
+        provide taxon_name or taxon_field descriptors.
+        
         Returns:
-            A boolean, with True showing no problems and False showing
-            that warnings occurred.
+            A boolean, with True showing no problems and False showing that
+            warnings occurred.
         """
 
         # Are taxon_name and taxon_field provided and not blank: note use of
         # 'and' rather than '&' to allow missing descriptors to short cut
 
-        tx_nm_prov = ('taxon_name' in self.meta) and (not is_blank(self.field_meta['taxon_name']))
-        tx_fd_prov = ('taxon_field' in self.field_meta) and (not is_blank(self.field_meta['taxon_field']))
+        tx_nm = self.meta.get('taxon_name')
+        tx_fd = self.meta.get('taxon_field')
+        tx_nm_prov = not blank_value(tx_nm)
+        tx_fd_prov = not blank_value(tx_fd)
 
         if tx_nm_prov and tx_fd_prov:
             LOGGER.error('Taxon name and taxon field both provided, use one only')
             return False
-        elif tx_nm_prov and meta['taxon_name'] not in self.taxon_names:
-            LOGGER.error('Taxon name not found in the Taxa worksheet')
-            return False
-        elif tx_fd_prov and meta['taxon_field'] not in taxa_fields:
-            LOGGER.error("Taxon field not found in this worksheet")
-            return False
         elif not tx_nm_prov and not tx_fd_prov:
             LOGGER.error("One of taxon name or taxon field must be provided")
             return False
+        elif tx_nm_prov and self.taxa is None:
+            LOGGER.error('Taxon name provided but no taxa loaded')
+            return False
+        elif tx_nm_prov and tx_nm not in self.taxa.taxon_names:
+            LOGGER.error('Taxon name not found in the Taxa worksheet')
+            return False
+        elif tx_nm_prov:
+            self.taxa.taxon_names_used.add(tx_nm)
+            return True
+        elif tx_fd_prov and self.dwsh is None:
+            LOGGER.critical(f"Taxon field provided but no dataworksheet provided for this field: {tx_fd}")
+            return False
+        elif tx_fd_prov and tx_fd not in self.dwsh.taxa_fields:
+            LOGGER.error(f"Taxon field not found in this worksheet: {tx_fd}")
+            return False
         else:
-            if tx_nm_prov:
-                self.taxon_names_used.update([meta['taxon_name']])
             return True
 
-    def _check_interaction_meta(self, taxa_fields):
+    def _check_interaction_meta(self):
 
         """
-        Checks the taxonomic metadata of interaction fields.
-        This is more involved that the simple _check_meta(), because
-        of the option to provide taxon_name or taxon_field descriptors
-        describing at least two taxonomic identifiers.
+        Checks the taxonomic metadata of interaction fields. This is more
+        involved that the simple _check_meta(), because of the option to provide
+        taxon_name or taxon_field descriptors describing at least two taxonomic
+        identifiers.
+
         Args:
             meta: A dictionary of metadata descriptors for the field
             taxa_fields: A list of Taxa fields in this worksheet.
+        
         Returns:
-            A boolean, with True showing no problems and False showing
-            that warnings occurred.
+            A boolean, with True showing no problems and False showing that
+            warnings occurred.
         """
 
-        # Are interaction_name and/or interaction_field provided and not blank:
-        #  note use of 'and' rather than '&' to allow missing descriptors to short cut
+        # TODO - currently no checking for descriptions being present in
+        #        the interaction information. Not sure how many old datasets
+        #        would be affected, but this would be good to include.
 
-        iact_nm_prov = ('interaction_name' in meta) and (not is_blank(meta['interaction_name']))
-        iact_fd_prov = ('interaction_field' in meta) and (not is_blank(meta['interaction_field']))
+        # Are interaction_name and/or interaction_field provided and not blank
+        iact_nm = self.meta.get('interaction_name')
+        iact_fd = self.meta.get('interaction_field')
+        iact_nm_prov = not blank_value(iact_nm)
+        iact_fd_prov = not blank_value(iact_fd)
 
         if not iact_nm_prov and not iact_fd_prov:
             LOGGER.error("At least one of interaction name or interaction field must be provided")
             return False
-        else:
-            if iact_nm_prov:
-                # get the taxon names and descriptions from interaction name providers
-                int_nm_lab, int_nm_desc = self._parse_levels(meta['interaction_name'])
-                # add names to used taxa
-                self.taxon_names_used.update(int_nm_lab)
-                # check they are found
-                if not all([lab in self.taxon_names for lab in int_nm_lab]):
-                    LOGGER.error('Unknown taxa in interaction_name descriptor')
-                    nm_check = False
-                else:
+        elif iact_nm_prov and self.taxa is None:
+            LOGGER.error('Interaction name provided but no taxa loaded')
+            return False
+        elif iact_fd_prov and self.dwsh is None:
+            LOGGER.critical(f"Interaction field provided but no dataworksheet provided for this field: {iact_fd}")
+            return False
 
-                    nm_check = True
+        if iact_nm_prov:
+            # get the taxon names and descriptions from interaction name providers
+            iact_nm_lab, iact_nm_desc = self._parse_levels(iact_nm)
+
+            # add names to used taxa
+            self.taxa.taxon_names_used.update(iact_nm_lab)
+
+            # check they are found
+            iact_nm_lab = IsInSet(iact_nm_lab, self.taxa.taxon_names)
+
+            if not iact_nm_lab:
+                LOGGER.error('Unknown taxa in interaction_name descriptor',
+                             extra={'join': iact_nm_lab.failed})
+                nm_check = False
             else:
-                int_nm_lab, int_nm_desc = [(), ()]
+
                 nm_check = True
+            
+            iact_nm_lab = iact_nm_lab.values
+        else:
+            iact_nm_lab = []
+            iact_nm_desc = ()
+            nm_check = True
 
-            if iact_fd_prov:
-                # check any field labels match to known taxon fields
-                int_fd_lab, int_fd_desc = self._parse_levels(meta['interaction_field'])
-                if not all([lab in taxa_fields for lab in int_fd_lab]):
-                    LOGGER.error('Unknown taxon fields in interaction_field descriptor')
-                    fd_check = False
-                else:
-                    fd_check = True
+        if iact_fd_prov:
+            # check any field labels match to known taxon fields
+            iact_fd_lab, iact_fd_desc = self._parse_levels(iact_fd)
+
+            iact_fd_lab = IsInSet(iact_fd_lab, self.dwsh.taxa_fields)
+            if not iact_fd_lab:
+                LOGGER.error('Unknown taxon fields in interaction_field descriptor',
+                             extra={'join': iact_fd_lab.failed})
+                fd_check = False
             else:
-                int_fd_lab, int_fd_desc = [(), ()]
                 fd_check = True
+            
+            iact_fd_lab = iact_fd_lab.values
+        else:
+            iact_fd_lab = []
+            iact_fd_desc = ()
+            fd_check = True
 
-            if len(int_nm_lab + int_fd_lab) < 2:
-                LOGGER.error('At least two interacting taxon labels or fields must be identified')
-                num_check = False
-            else:
-                num_check = True
+        if len(iact_nm_lab + iact_fd_lab) < 2:
+            LOGGER.error('At least two interacting taxon labels or fields must be identified')
+            num_check = False
+        else:
+            num_check = True
 
-            if nm_check and fd_check and num_check:
-                return True
-            else:
-                return False
+        all_desc = iact_nm_desc + iact_fd_desc
+        if None in all_desc:
+            LOGGER.warning('Label descriptions for interacting taxa incomplete or missing')
+
+        if nm_check and fd_check and num_check:
+            return True
+        else:
+            return False
 
     def _parse_levels(self, txt):
         """
@@ -717,13 +751,32 @@ class BaseField:
 
         return level_labels, level_desc
 
+    @classmethod
+    def field_type_map(cls):
+        """This helper function returns a dictionary that maps field types for the
+        a Field class and all nested subclasses to the class that handles them"""
+
+        field_type_map = {}
+
+        # Create a stack starting with the calling class
+        classes = cls.__subclasses__() 
+
+        # Pop subclasses while the stack is not empty
+        while classes:
+            # Get a field class
+            current_field_class = classes.pop(0)
+
+            # Add any subclasses from that class
+            classes.extend(current_field_class.__subclasses__())
+            
+            # Extend the field map
+            for ftype in current_field_class.field_types:
+                field_type_map.update({ftype: current_field_class})
+
+        return field_type_map
 
 
-
-
-
-
-        # run consistency checks where needed and trap unknown field types
+        # run consistency checks where needed and trap unknown field types if
         if field_type == 'date':
             self.check_field_datetime(meta, data, which='date')
         elif field_type == 'datetime':
@@ -741,26 +794,30 @@ class BaseField:
         elif field_type == 'abundance':
             self.check_field_abundance(meta, data, dwsh.taxa_fields)
         elif field_type in ['categorical trait', 'ordered categorical trait']:
-            self.check_field_trait(meta, data, dwsh.taxa_fields, which='categorical')
+            self.check_field_trait(meta, data, dwsh.taxa_fields,
+            which='categorical')
         elif field_type == 'numeric trait':
-            self.check_field_trait(meta, data, dwsh.taxa_fields, which='numeric')
+            self.check_field_trait(meta, data, dwsh.taxa_fields,
+            which='numeric')
         elif field_type in ['categorical interaction', 'ordered categorical interaction']:
-            self.check_field_interaction(meta, data, dwsh.taxa_fields, which='categorical')
+            self.check_field_interaction(meta, data, dwsh.taxa_fields,
+            which='categorical')
         elif field_type == 'numeric interaction':
-            self.check_field_interaction(meta, data, dwsh.taxa_fields, which='numeric')
+            self.check_field_interaction(meta, data, dwsh.taxa_fields,
+            which='numeric')
         elif field_type == 'latitude':
-            # check field geo expects values in data not xlrd.Cell
-            data = [dt.value for dt in data]
+            # check field geo expects values in data not xlrd.Cell 
+            data = [dt.value for dt in data] 
             self.check_field_geo(meta, data, which='latitude')
         elif field_type == 'longitude':
             # check field geo expects values in data not xlrd.Cell
-            data = [dt.value for dt in data]
+            data = [dt.value for dt in data] 
             self.check_field_geo(meta, data, which='longitude')
         elif field_type == 'file':
-            data = [dt.value for dt in data]
+            data = [dt.value for dt in data] 
             self.check_field_file(meta, data)
         elif field_type in ['replicate', 'id']:
-            # We've looked for missing data, no other constraints.
+            # We've looked for missing data, no other constraints. 
             pass
         elif field_type == 'comments':
             pass
@@ -1062,6 +1119,78 @@ class GeoField(BaseField):
                 self.dataset.longitudinal_extent.update([self.min, self.max])
 
 
+class NumericTaxonField(NumericField):
+
+    """Checks abundance and numeric trait fields, which are just  NumericFields
+    with taxon reporting requirements turned on."""
+
+    # BREAKING CHANGE - abundance did not previosly require 'units' as metadata,
+    # which is stupid in retrospect. Individuals? Individuals per m2? Individuals
+    # per hour? I do not know how many existing datasets will fall foul of this.
+
+    field_types = ('abundance', 'numeric trait')
+    check_taxon_meta = True
+
+
+class CategoricalTaxonField(CategoricalField):
+
+    """Checks categorical trait fields, which are just CategoricalFields
+    with taxon reporting requirements turned on."""
+
+    field_types = ('categorical trait')
+    check_taxon_meta = True
+
+
+class NumericInteractionField(NumericField):
+
+    """Checks numeric interaction fields, which are just  NumericFields
+    with interaction reporting requirements turned on."""
+
+    field_types = ('numeric interaction')
+    check_interaction_meta = True
+
+
+class CategoricalInteractionField(CategoricalField):
+
+    """Checks categorical interaction fields, which are just CategoricalFields
+    with interaction reporting requirements turned on."""
+
+    field_types = ('categorical interaction')
+    check_interaction_meta = True
+
+
+
+
+
+
+
+def check_field_file(self, meta, data):
+    """
+    Checks file fields. The data values need to match to an external file
+    or can be contained within an archive file provided in the 'file_container'
+    descriptor.
+    Args:
+        meta: A dictionary of metadata descriptors for the field
+        data: A list of data values
+    """
+    
+    if self.external_files is None:
+        LOGGER.error('No external files listed in Summary')
+        return
+    
+    external_names = {ex['file'] for ex in self.external_files}
+
+    if 'file_container' in meta and meta['file_container'] is not None:
+        if meta['file_container'] not in external_names:
+            LOGGER.error(
+                "Field file_container value not found in external files: {}".format(meta['file_container']))
+    else:
+        missing_files = set(data) - external_names
+        if missing_files:
+            LOGGER.error("Field contains files not listed in external files: ",
+                            extra={'join': missing_files})
+
+
 class DatetimeField(BaseField):
 
     field_types = ('date', 'time', 'datetime')
@@ -1162,116 +1291,3 @@ class DatetimeField(BaseField):
             meta['range'] = extent
             if which in ['date', 'datetime']:
                 self.update_extent(extent, datetime.datetime, 'temporal_extent')
-
-
-class AbundanceField(BaseField):
-
-    """
-    Checks abundance type data, reporting to the Messages instance.
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values, allegedly numeric
-        taxa_fields: A list of Taxa fields in this worksheet.
-    """
-
-
-    field_types = ('abundance',)
-    required_descriptors = MANDATORY_DESCRIPTORS.union(['method', 'units'])
-
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, 
-                 taxa: Taxa = None, locations: Locations = None) -> None:
-        
-        super().__init__(meta, dwsh, dataset, taxa, locations)
-
-        # check the required descriptors
-        self._check_meta(meta, 'method')
-        self._check_taxon_meta(meta, taxa_fields)
-
-
-    def validate_data(self, data: list, **kwargs):
-
-        return super().validate_data(data, **kwargs)
-
-        # Can still check values are numeric, whatever happens above.
-        # We're not going to insist on integers here - could be mean counts.
-        nums = [dt.value for dt in data if dt.ctype == xlrd.XL_CELL_NUMBER]
-
-        if len(nums) < len(data):
-            LOGGER.error('Field contains non-numeric data')
-
-        # update the field metadata if there is any data.
-        if len(nums):
-            meta['range'] = (min(nums), max(nums))
-
-
-
-def check_field_trait(self, meta, data, taxa_fields, which='categorical'):
-
-    """
-    Checks trait type data and reports to the Messages instance. Just a wrapper
-    to check that a valid taxon has been provided before handing off to
-    check_field_categorical or check_field_numeric
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values, allegedly numeric
-        taxa_fields: A list of Taxa fields in this worksheet.
-        which: The type of trait data in the field
-    """
-
-    # Check required descriptors
-    self._check_taxon_meta(meta, taxa_fields)
-
-    # Regardless of the outcome of the meta checks, check the contents:
-    if which == 'categorical':
-        self.check_field_categorical(meta, data)
-    elif which == 'numeric':
-        self.check_field_numeric(meta, data)
-
-def check_field_interaction(self, meta, data, taxa_fields, which='categorical'):
-
-    """
-    Checks interaction type data and reports to the Messages instance.
-    Just a wrapper to check that intercating taxa have been identified
-    before handing off to check_field_categorical or check_field_numeric
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values, allegedly numeric
-        taxa_fields: A list of Taxa fields in this worksheet.
-        which: The type of trait data in the field
-    """
-
-    # Check required descriptors
-    self._check_interaction_meta(meta, taxa_fields)
-
-    # Regardless of the outcome of the meta checks, check the contents:
-    if which == 'categorical':
-        self.check_field_categorical(meta, data)
-    elif which == 'numeric':
-        self.check_field_numeric(meta, data)
-
-
-def check_field_file(self, meta, data):
-    """
-    Checks file fields. The data values need to match to an external file
-    or can be contained within an archive file provided in the 'file_container'
-    descriptor.
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values
-    """
-    
-    if self.external_files is None:
-        LOGGER.error('No external files listed in Summary')
-        return
-    
-    external_names = {ex['file'] for ex in self.external_files}
-
-    if 'file_container' in meta and meta['file_container'] is not None:
-        if meta['file_container'] not in external_names:
-            LOGGER.error(
-                "Field file_container value not found in external files: {}".format(meta['file_container']))
-    else:
-        missing_files = set(data) - external_names
-        if missing_files:
-            LOGGER.error("Field contains files not listed in external files: ",
-                            extra={'join': missing_files})

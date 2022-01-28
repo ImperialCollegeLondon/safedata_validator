@@ -1,12 +1,16 @@
+from collections import OrderedDict
 import pytest
-from logging import ERROR, WARNING, INFO
+from logging import CRITICAL, ERROR, WARNING, INFO
 import datetime
 
-from safedata_validator.field import (BaseField, CategoricalField, GeoField, NumericField,
-                                      TaxaField, LocationsField)
+from safedata_validator.field import (BaseField, CategoricalField, GeoField, 
+                                      NumericField, TaxaField, LocationsField, 
+                                      NumericTaxonField, CategoricalTaxonField,
+                                      NumericInteractionField, CategoricalInteractionField,
+                                      DataWorksheet)
+from test.conftest import fixture_taxa
 
-
-# Checking the helper methods
+# Checking the helper and private methods
 
 @pytest.mark.parametrize(
     'data, exp_log, exp_levels, exp_desc',
@@ -54,7 +58,7 @@ def test_parse_levels(caplog, data, exp_log, exp_levels, exp_desc):
 
     fld = BaseField({'field_name': 'testy',
                      'description': 'a test',
-                      'field_type': 'irrelevant for this test'})
+                     'field_type': 'irrelevant for this test'})
     
     obs_lev, obs_desc = fld._parse_levels(data)
     fld.report()
@@ -71,6 +75,160 @@ def test_parse_levels(caplog, data, exp_log, exp_levels, exp_desc):
 
     assert len(obs_desc) == len(exp_desc)
     assert all([do == de for do, de in zip(obs_desc, exp_desc)])
+
+
+@pytest.mark.parametrize(
+    'tx_meta, has_taxa_object, has_dwsh_object, expected_log',
+    [
+      ( dict(taxon_name='foo', taxon_field='bar'),
+        False, False,
+        ( (ERROR, "Taxon name and taxon field both provided, use one only"),)),
+      ( dict(),
+        False, False,
+        ( (ERROR, "One of taxon name or taxon field must be provided"),)),
+      ( dict(taxon_name='foo'),
+        False, False,
+        ( (ERROR, "Taxon name provided but no taxa loaded"),)),
+      ( dict(taxon_name='foo'),
+        True, False,
+        ( (ERROR, "Taxon name not found in the Taxa worksheet"),)),
+      ( dict(taxon_name='C_born'),
+        True, False,
+        tuple()),
+      ( dict(taxon_field='not_provided'),
+        False, False,
+        ( (CRITICAL, "Taxon field provided but no dataworksheet provided for this field"),)),
+      ( dict(taxon_field='not_provided'),
+        False, True,
+        ( (ERROR, "Taxon field not found in this worksheet"),)),
+      ( dict(taxon_field='my_taxon_field'),
+        False, True,
+        tuple()),
+    ] 
+)
+def test_check_taxon_meta(caplog, fixture_taxa,
+                          tx_meta, has_taxa_object, has_dwsh_object, expected_log):
+    """Testing the use of the BaseField._check_taxon_meta() method
+    """
+    
+    # Set up what information is available for taxon field validation
+    tx_obj = fixture_taxa if has_taxa_object else None
+    dwsh = DataWorksheet({'name': 'DF',
+                          'title': 'My data table',
+                          'description': 'This is a test data worksheet'})
+    dwsh.taxa_fields = ['my_taxon_field']
+    dwsh_obj = dwsh if has_dwsh_object else None
+
+    # Technically, this violates the field_name last requirement, but that is
+    # enforced at the dataworksheet level, not the field level. 
+    field_meta = OrderedDict(field_type = 'numeric',
+                             description = 'description',
+                             field_name = 'field')
+    field_meta.update(tx_meta)
+    
+    fld = BaseField(field_meta,
+                    taxa = tx_obj,
+                    dwsh = dwsh_obj)
+
+    caplog.clear()
+
+    # Test the logging from this private method.
+    fld._check_taxon_meta()
+    
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+@pytest.mark.parametrize(
+    'iact_meta, has_taxa_object, has_dwsh_object, expected_log',
+    [
+      ( dict(),
+        False, False,
+        ( (ERROR, "At least one of interaction name or interaction field must be provided"),)),
+      ( dict(interaction_name='foo:predator'),
+        False, False,
+        ( (ERROR, "Interaction name provided but no taxa loaded"),)),
+      ( dict(interaction_name='foo:predator'),
+        True, False,
+        ( (ERROR, "Unknown taxa in interaction_name descriptor"),
+          (ERROR, "At least two interacting taxon labels or fields must be identified"))),
+      ( dict(interaction_name='C_born:predator'),
+        True, False,
+        ( (ERROR, "At least two interacting taxon labels or fields must be identified"),)),
+      ( dict(interaction_name='C_born:predator;V_salv:prey'),  # Biologically not very plausible
+        True, False,
+        tuple()),
+      ( dict(interaction_field='not_provided:predator'),
+        False, False,
+        ( (CRITICAL, "Interaction field provided but no dataworksheet provided for this field"),)),
+      ( dict(interaction_field='foo:predator'),
+        False, True,
+        ( (ERROR, "Unknown taxon fields in interaction_field descriptor"),
+          (ERROR, "At least two interacting taxon labels or fields must be identified"))),
+      ( dict(interaction_field='predator:eats things'),
+        False, True,
+        ( (ERROR, "At least two interacting taxon labels or fields must be identified"), )),
+      ( dict(interaction_field='predator:eats things;prey:gets eaten'),
+        False, True,
+        tuple()),
+      ( dict(interaction_field='predator:eats things', 
+             interaction_name='C_born:prey'),
+        True, True,
+        tuple()),
+      ( dict(interaction_field='predator:eats things;prey:gets eaten', 
+             interaction_name='C_born:decomposer'),  # Tritrophic example
+        True, True,
+        tuple()),
+      ( dict(interaction_name='C_born;V_salv'),  
+        True, False,
+        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
+      ( dict(interaction_field='predator;prey'),  
+        False, True,
+        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
+      ( dict(interaction_field='predator', 
+             interaction_name='C_born'),
+        True, True,
+        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
+    ] 
+)
+def test_check_interaction_meta(caplog, fixture_taxa,
+                                iact_meta, has_taxa_object, has_dwsh_object, expected_log):
+    """Testing the use of the BaseField._check_interaction_meta() method
+    """
+    
+    # Set up what information is available for taxon field validation
+    tx_obj = fixture_taxa if has_taxa_object else None
+    dwsh = DataWorksheet({'name': 'DF',
+                          'title': 'My data table',
+                          'description': 'This is a test data worksheet'})
+    dwsh.taxa_fields = ['predator', 'prey']
+    dwsh_obj = dwsh if has_dwsh_object else None
+
+    # Technically, this violates the field_name last requirement, but that is
+    # enforced at the dataworksheet level, not the field level. 
+    field_meta = OrderedDict(field_type = 'numeric',
+                             description = 'description',
+                             field_name = 'field')
+    field_meta.update(iact_meta)
+    
+    fld = BaseField(field_meta,
+                    taxa = tx_obj,
+                    dwsh = dwsh_obj)
+
+    caplog.clear()
+
+    # Test the logging from this private method.
+    fld._check_interaction_meta()
+    
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
 
 # BaseField behaviour
 
@@ -172,40 +330,216 @@ def test_BaseField_validate_data(caplog, data, expected_log):
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
 
-# NumericField - has BaseField init, just test overloaded validate_data
+# NumericField and derived classes
+# - NumericField itself has BaseField init, just test overloaded validate_data 
+# - Can reuse the same data to also check taxon and interaction classes
+#   inheriting from NumericField for validate_data.
+# - The __init__ testing duplicates testing of private methods above but this is
+#   so that I can be sure the  class inheritance works as expected
 
-@pytest.mark.parametrize(
-    'data, expected_log',
+
+@pytest.mark.parametrize('tx_meta, has_taxa_object, has_dwsh_object, expected_log',
     [
-     ([1, 2, 3, 4, 5, 6, 7, 8, 9], 
-      ((INFO, "Checking Column tree_height"),)),
-     ([1, 'NA', 3, 4, 5, 6, 'NA', 8, 9], 
-      ((INFO, "Checking Column tree_height"),
-       (WARNING, "2 / 9 values missing"))),
-     ([1, None, 3, 4, 5, 6, '   ', 8, 9], 
-      ((INFO, "Checking Column tree_height"),
-       (ERROR, "2 cells are blank or contain only whitespace text"))),
-     ([1, 2, 3, 4, '#REF!', 6, '#N/A', 8, 9], 
-      ((INFO, "Checking Column tree_height"),
-       (ERROR, "2 cells contain Excel formula errors"))),
-     ([1, 2, 3, 4, 'wrong_type', 6, 7, 8, 9], 
-      ((INFO, "Checking Column tree_height"),
-       (ERROR, "Cells contain non-numeric values"))),
-     ([1, 2, 'NA', 4, 'wrong_type', 6, None, 8, 9], 
-      ((INFO, "Checking Column tree_height"),
-       (ERROR, "Cells contain non-numeric values"), 
-       (WARNING, "1 / 9 values missing"),
-       (ERROR, "1 cells are blank or contain only whitespace text"))),
-    ])
-def test_NumericField_validate_data(caplog, data, expected_log):
-    """Testing behaviour of the NumericField class in using _validate_data
+      ( dict(taxon_name='foo', taxon_field='bar'),
+        False, False,
+        ((ERROR, "Taxon name and taxon field both provided, use one only"),)),
+      ( dict(),
+        False, False,
+        ( (ERROR, "One of taxon name or taxon field must be provided"),)),
+      ( dict(taxon_name='foo'),
+        False, False,
+        ( (ERROR, "Taxon name provided but no taxa loaded"),)),
+      ( dict(taxon_name='foo'),
+        True, False,
+        ( (ERROR, "Taxon name not found in the Taxa worksheet"),)),
+      ( dict(taxon_name='C_born'),
+        True, False,
+        tuple()),
+      ( dict(taxon_field='not_provided'),
+        False, False,
+        ( (CRITICAL, "Taxon field provided but no dataworksheet provided for this field"),)),
+      ( dict(taxon_field='not_provided'),
+        False, True,
+        ( (ERROR, "Taxon field not found in this worksheet"),)),
+      ( dict(taxon_field='my_taxon_field'),
+        False, True,
+        tuple()),
+    ]
+  )
+def test_NumericTaxonField_init(caplog, fixture_taxa, 
+                                tx_meta, has_taxa_object, has_dwsh_object, expected_log):
+    """Testing behaviour of the NumericTaxonField class in using _validate_data
     """
 
-    fld = NumericField({'field_type': 'numeric',
-                        'description': 'Tree height',
-                        'field_name': 'tree_height',
-                        'method': 'looking',
-                        'units': 'metres'}, None)
+    # Set up what information is available for taxon field validation
+    tx_obj = fixture_taxa if has_taxa_object else None
+    dwsh = DataWorksheet({'name': 'DF',
+                          'title': 'My data table',
+                          'description': 'This is a test data worksheet'})
+    dwsh.taxa_fields = ['my_taxon_field']
+    dwsh_obj = dwsh if has_dwsh_object else None
+
+    caplog.clear()
+
+    meta = {'field_type': 'abundance',
+            'description': 'Number of ants',
+            'field_name': 'ant_count',
+            'method': 'quadrat',
+            'units': 'individuals per m2'}
+    
+    meta.update(tx_meta)
+
+    fld = NumericTaxonField(meta,
+                            taxa = tx_obj,
+                            dwsh = dwsh_obj)
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize('iact_meta, has_taxa_object, has_dwsh_object, expected_log',
+    [
+      ( dict(),
+        False, False,
+        ( (ERROR, "At least one of interaction name or interaction field must be provided"),)),
+      ( dict(interaction_name='foo:predator'),
+        False, False,
+        ( (ERROR, "Interaction name provided but no taxa loaded"),)),
+      ( dict(interaction_name='foo:predator'),
+        True, False,
+        ( (ERROR, "Unknown taxa in interaction_name descriptor"),
+          (ERROR, "At least two interacting taxon labels or fields must be identified"))),
+      ( dict(interaction_name='C_born:predator'),
+        True, False,
+        ( (ERROR, "At least two interacting taxon labels or fields must be identified"),)),
+      ( dict(interaction_name='C_born:predator;V_salv:prey'),  # Biologically not very plausible
+        True, False,
+        tuple()),
+      ( dict(interaction_field='not_provided:predator'),
+        False, False,
+        ( (CRITICAL, "Interaction field provided but no dataworksheet provided for this field"),)),
+      ( dict(interaction_field='foo:predator'),
+        False, True,
+        ( (ERROR, "Unknown taxon fields in interaction_field descriptor"),
+          (ERROR, "At least two interacting taxon labels or fields must be identified"))),
+      ( dict(interaction_field='predator:eats things'),
+        False, True,
+        ( (ERROR, "At least two interacting taxon labels or fields must be identified"), )),
+      ( dict(interaction_field='predator:eats things;prey:gets eaten'),
+        False, True,
+        tuple()),
+      ( dict(interaction_field='predator:eats things', 
+             interaction_name='C_born:prey'),
+        True, True,
+        tuple()),
+      ( dict(interaction_field='predator:eats things;prey:gets eaten', 
+             interaction_name='C_born:decomposer'),  # Tritrophic example
+        True, True,
+        tuple()),
+      ( dict(interaction_name='C_born;V_salv'),  
+        True, False,
+        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
+      ( dict(interaction_field='predator;prey'),  
+        False, True,
+        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
+      ( dict(interaction_field='predator', 
+             interaction_name='C_born'),
+        True, True,
+        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
+    ] 
+)
+def test_NumericInteractionField_init(caplog, fixture_taxa,
+                                      iact_meta, has_taxa_object, has_dwsh_object, expected_log):
+    """Testing the use of the NumericInteractionField init
+    """
+    
+    # Set up what information is available for taxon field validation
+    tx_obj = fixture_taxa if has_taxa_object else None
+    dwsh = DataWorksheet({'name': 'DF',
+                          'title': 'My data table',
+                          'description': 'This is a test data worksheet'})
+    dwsh.taxa_fields = ['predator', 'prey']
+    dwsh_obj = dwsh if has_dwsh_object else None
+
+    # Technically, this violates the field_name last requirement, but that is
+    # enforced at the dataworksheet level, not the field level. 
+    field_meta = OrderedDict(field_type = 'numeric',
+                             description = 'description',
+                             field_name = 'field')
+    field_meta.update(iact_meta)
+
+    caplog.clear()
+
+    # Test the __init__ method
+    fld = NumericInteractionField(field_meta,
+                                  taxa = tx_obj,
+                                  dwsh = dwsh_obj)
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize('data, expected_log',
+    [
+      ( [1, 2, 3, 4, 5, 6, 7, 8, 9], 
+        ( (INFO, "Checking Column num_data"),)),
+      ( [1, 'NA', 3, 4, 5, 6, 'NA', 8, 9], 
+        ( (INFO, "Checking Column num_data"),
+          (WARNING, "2 / 9 values missing"))),
+      ( [1, None, 3, 4, 5, 6, '   ', 8, 9], 
+        ( (INFO, "Checking Column num_data"),
+          (ERROR, "2 cells are blank or contain only whitespace text"))),
+     (  [1, 2, 3, 4, '#REF!', 6, '#N/A', 8, 9], 
+        ( (INFO, "Checking Column num_data"),
+          (ERROR, "2 cells contain Excel formula errors"))),
+     (  [1, 2, 3, 4, 'wrong_type', 6, 7, 8, 9], 
+        ( (INFO, "Checking Column num_data"),
+          (ERROR, "Cells contain non-numeric values"))),
+     (  [1, 2, 'NA', 4, 'wrong_type', 6, None, 8, 9], 
+        ( (INFO, "Checking Column num_data"),
+          (ERROR, "Cells contain non-numeric values"), 
+          (WARNING, "1 / 9 values missing"),
+          (ERROR, "1 cells are blank or contain only whitespace text"))),
+    ]
+  )
+@pytest.mark.parametrize('test_class, field_meta', 
+  [ ( NumericField, 
+      {'field_type': 'numeric',
+       'description': 'Tree height',
+       'field_name': 'num_data',
+       'method': 'looking',
+       'units': 'metres'}),
+    ( NumericTaxonField,
+      {'field_type': 'abundance',
+       'description': 'Number of ants',
+       'field_name': 'num_data',
+       'method': 'quadrat',
+       'units': 'individuals per m2',
+       'taxon_name': 'C_born'}),
+    ( NumericInteractionField,
+      {'field_type': 'numeric interaction',
+       'description': 'Number of prey eaten',
+       'field_name': 'num_data',
+       'method': 'cage experiment',
+       'units': 'individuals per hour',
+       'interaction_name': 'C_born:prey;V_salv:predator'}),
+  ]
+)
+def test_NumericField_validate_data(caplog, fixture_taxa, test_class, field_meta,
+                                         data, expected_log):
+    """Testing behaviour of the NumericField and subclasses in using _validate_data
+    """
+    
+    # Create and instance of the required class
+    fld = test_class(field_meta, taxa = fixture_taxa)
     
     fld.validate_data(data)
     fld.report()
@@ -217,10 +551,15 @@ def test_NumericField_validate_data(caplog, data, expected_log):
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
 
-# CategoricalField - check init and validate_data (overloaded report just emits messages)
 
-@pytest.mark.parametrize(
-    'field_meta, expected_log',
+# CategoricalField and derived classes
+# - Can reuse the same data to also check taxon and interaction classes
+#   inheriting from CategoricalField for validate_data.
+# - The __init__ testing duplicates testing of private methods above but this is
+#   so that I can be sure the  class inheritance works as expected
+
+
+@pytest.mark.parametrize('field_meta, expected_log',
     [
      ({'field_type': 'categorical',
        'description': 'a factor',
@@ -273,44 +612,210 @@ def test_CategoricalField_init(caplog, field_meta, expected_log):
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
 
-@pytest.mark.parametrize(
-    'data, expected_log',
+
+@pytest.mark.parametrize('tx_meta, has_taxa_object, has_dwsh_object, expected_log',
+    [
+      ( dict(taxon_name='foo', taxon_field='bar'),
+        False, False,
+        ((ERROR, "Taxon name and taxon field both provided, use one only"),)),
+      ( dict(),
+        False, False,
+        ( (ERROR, "One of taxon name or taxon field must be provided"),)),
+      ( dict(taxon_name='foo'),
+        False, False,
+        ( (ERROR, "Taxon name provided but no taxa loaded"),)),
+      ( dict(taxon_name='foo'),
+        True, False,
+        ( (ERROR, "Taxon name not found in the Taxa worksheet"),)),
+      ( dict(taxon_name='C_born'),
+        True, False,
+        tuple()),
+      ( dict(taxon_field='not_provided'),
+        False, False,
+        ( (CRITICAL, "Taxon field provided but no dataworksheet provided for this field"),)),
+      ( dict(taxon_field='not_provided'),
+        False, True,
+        ( (ERROR, "Taxon field not found in this worksheet"),)),
+      ( dict(taxon_field='my_taxon_field'),
+        False, True,
+        tuple()),
+    ]
+  )
+def test_CategoricalTaxonField_init(caplog, fixture_taxa,
+                                    tx_meta, has_taxa_object, has_dwsh_object, expected_log):
+    """Testing behaviour of the NumericTaxonField class in using _validate_data
+    """
+
+    # Set up what information is available for taxon field validation
+    tx_obj = fixture_taxa if has_taxa_object else None
+    dwsh = DataWorksheet({'name': 'DF',
+                          'title': 'My data table',
+                          'description': 'This is a test data worksheet'})
+    dwsh.taxa_fields = ['my_taxon_field']
+    dwsh_obj = dwsh if has_dwsh_object else None
+
+    caplog.clear()
+
+    meta = {'field_type': 'categorical trait',
+            'description': 'ant colours',
+            'field_name': 'ant_colour',
+            'levels': 'level1:level2'}
+    
+    meta.update(tx_meta)
+
+    fld = CategoricalTaxonField(meta,
+                                taxa = tx_obj,
+                                dwsh = dwsh_obj)
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize('iact_meta, has_taxa_object, has_dwsh_object, expected_log',
+    [
+      ( dict(),
+        False, False,
+        ( (ERROR, "At least one of interaction name or interaction field must be provided"),)),
+      ( dict(interaction_name='foo:predator'),
+        False, False,
+        ( (ERROR, "Interaction name provided but no taxa loaded"),)),
+      ( dict(interaction_name='foo:predator'),
+        True, False,
+        ( (ERROR, "Unknown taxa in interaction_name descriptor"),
+          (ERROR, "At least two interacting taxon labels or fields must be identified"))),
+      ( dict(interaction_name='C_born:predator'),
+        True, False,
+        ( (ERROR, "At least two interacting taxon labels or fields must be identified"),)),
+      ( dict(interaction_name='C_born:predator;V_salv:prey'),  # Biologically not very plausible
+        True, False,
+        tuple()),
+      ( dict(interaction_field='not_provided:predator'),
+        False, False,
+        ( (CRITICAL, "Interaction field provided but no dataworksheet provided for this field"),)),
+      ( dict(interaction_field='foo:predator'),
+        False, True,
+        ( (ERROR, "Unknown taxon fields in interaction_field descriptor"),
+          (ERROR, "At least two interacting taxon labels or fields must be identified"))),
+      ( dict(interaction_field='predator:eats things'),
+        False, True,
+        ( (ERROR, "At least two interacting taxon labels or fields must be identified"), )),
+      ( dict(interaction_field='predator:eats things;prey:gets eaten'),
+        False, True,
+        tuple()),
+      ( dict(interaction_field='predator:eats things', 
+             interaction_name='C_born:prey'),
+        True, True,
+        tuple()),
+      ( dict(interaction_field='predator:eats things;prey:gets eaten', 
+             interaction_name='C_born:decomposer'),  # Tritrophic example
+        True, True,
+        tuple()),
+      ( dict(interaction_name='C_born;V_salv'),  
+        True, False,
+        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
+      ( dict(interaction_field='predator;prey'),  
+        False, True,
+        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
+      ( dict(interaction_field='predator', 
+             interaction_name='C_born'),
+        True, True,
+        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
+    ] 
+)
+def test_CategoricalInteractionField_init(caplog, fixture_taxa,
+                                          iact_meta, has_taxa_object, has_dwsh_object, expected_log):
+    """Testing the use of the CategoricalInteractionField init
+    """
+    
+    # Set up what information is available for taxon field validation
+    tx_obj = fixture_taxa if has_taxa_object else None
+    dwsh = DataWorksheet({'name': 'DF',
+                          'title': 'My data table',
+                          'description': 'This is a test data worksheet'})
+    dwsh.taxa_fields = ['predator', 'prey']
+    dwsh_obj = dwsh if has_dwsh_object else None
+
+    # Technically, this violates the field_name last requirement, but that is
+    # enforced at the dataworksheet level, not the field level. 
+    field_meta = {'field_type': 'categorical interaction',
+                  'description': 'outcome of competition',
+                  'field_name': 'factor_data',
+                  'levels': 'level1;level2'}
+    field_meta.update(iact_meta)
+
+    caplog.clear()
+
+    # Test the __init__ method
+    fld = NumericInteractionField(field_meta,
+                                  taxa = tx_obj,
+                                  dwsh = dwsh_obj)
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize('data, expected_log',
     [
      (['level1', 'level2', 'level1', 'level2', 'level1', 'level2'], 
-      ((INFO, "Checking Column factor1"),)),
+      ((INFO, "Checking Column factor_data"),)),
      (['level1', 'NA', 'level1', 'level2', 'NA', 'level2'], 
-      ((INFO, "Checking Column factor1"),
+      ((INFO, "Checking Column factor_data"),
        (WARNING, "2 / 6 values missing"))),
      (['level1', '    ', 'level1', 'level2', None, 'level2'], 
-      ((INFO, "Checking Column factor1"),
+      ((INFO, "Checking Column factor_data"),
        (ERROR, "2 cells are blank or contain only whitespace text"))),
      (['level1', '#REF!', 'level1', '#N/A', 'level1', 'level2'], 
-      ((INFO, "Checking Column factor1"),
+      ((INFO, "Checking Column factor_data"),
        (ERROR, "2 cells contain Excel formula errors"))),
      (['level1', 'level2', 'level1', 1234, 'level1', 'level2'], 
-      ((INFO, "Checking Column factor1"),
+      ((INFO, "Checking Column factor_data"),
        (ERROR, "Cells contain non-text values"))),
      (['level1', 'level2', 'NA', None, 1234, 'level2'], 
-      ((INFO, "Checking Column factor1"),
+      ((INFO, "Checking Column factor_data"),
        (ERROR, "Cells contain non-text values"), 
        (WARNING, "1 / 6 values missing"),
        (ERROR, "1 cells are blank or contain only whitespace text"))),
      (['level1', 'level2', 'level3', 'level2', 'level1', 'level2'], 
-      ((INFO, "Checking Column factor1"),
+      ((INFO, "Checking Column factor_data"),
        (ERROR, "Categories found in data missing from levels descriptor"))),
      (['level1', 'level1', 'level1', 'level1', 'level1', 'level1'], 
-      ((INFO, "Checking Column factor1"),
+      ((INFO, "Checking Column factor_data"),
        (ERROR, "Categories found in levels descriptor not used in data"))),
     ])
-def test_CategoricalField_validate_data(caplog, data, expected_log):
+@pytest.mark.parametrize('test_class, field_meta', 
+  [ ( CategoricalField, 
+      {'field_type': 'categorical',
+       'description': 'a factor',
+       'field_name': 'factor_data',
+       'levels': 'level1;level2;'}),
+    ( CategoricalTaxonField,
+      {'field_type': 'categorical trait',
+       'description': 'ant colours',
+       'field_name': 'factor_data',
+       'levels': 'level1;level2',
+       'taxon_name': 'C_born'}),
+    ( CategoricalInteractionField,
+      {'field_type': 'categorical interaction',
+       'description': 'outcome of competition',
+       'field_name': 'factor_data',
+       'levels': 'level1;level2',
+       'interaction_name': 'C_born:competitor 1;V_salv:competitor 2'}),
+  ]
+)
+def test_CategoricalField_validate_data(caplog, fixture_taxa, 
+                                        test_class, field_meta, data, expected_log):
     """Testing behaviour of the CategoricalField class in using validate_data
     """
 
-    fld = CategoricalField({'field_type': 'categorical',
-                            'description': 'a factor',
-                            'field_name': 'factor1',
-                            'levels': 'level1;level2;',
-                            'col_idx': 1}, None)
+    fld = test_class(field_meta, taxa=fixture_taxa)
 
     fld.validate_data(data)
     fld.report()
@@ -355,6 +860,9 @@ def test_TaxaField_init(caplog, fixture_taxa, provide_taxa_instance, expected_lo
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
+
+
+
 
 
 @pytest.mark.parametrize(
@@ -536,224 +1044,3 @@ def test_GeoField_validate_data(caplog, fixture_dataset, data, expected_log, whi
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
-
-# Abundance fields
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-[
- {'field_type': 'date',
-  'description': 'Collection date',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': 'Date',
-  'col_idx': 2},
- {'field_type': 'latitude',
-  'description': 'GPS Lat for sample point',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': 'Latitude',
-  'col_idx': 3},
- {'field_type': 'longitude',
-  'description': 'GPS Long for sample point',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': 'Longitude',
-  'col_idx': 4},
- {'field_type': 'replicate',
-  'description': 'Four replicates',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': 'QuadratNumber',
-  'col_idx': 5},
- {'field_type': 'numeric',
-  'description': 'Something',
-  'method': 'Presence/absence of something',
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': 'binary',
-  'field_name': 'Status',
-  'col_idx': 6},
- {'field_type': 'categorical',
-  'description': 'Something else',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': 'A:Treatment A;B:Treatment B;C:Treatment C;',
-  'units': None,
-  'field_name': 'Treat',
-  'col_idx': 7},
- {'field_type': 'categorical',
-  'description': 'Something else',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': 'G:Level G;V:Level V',
-  'units': None,
-  'field_name': 'Level',
-  'col_idx': 8},
- {'field_type': 'categorical',
-  'description': 'Something else',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': 'D:Day;N:Night',
-  'units': None,
-  'field_name': 'Time',
-  'col_idx': 9},
- {'field_type': 'numeric',
-  'description': 'Something else',
-  'method': 'Bucket',
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': 'mm',
-  'field_name': 'Rain',
-  'col_idx': 10},
- {'field_type': 'numeric',
-  'description': 'Something else',
-  'method': 'Count',
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': 'count',
-  'field_name': 'Group',
-  'col_idx': 11},
- {'field_type': 'time',
-  'description': 'A time',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': 'Obs_Time',
-  'col_idx': 12},
- {'field_type': 'datetime',
-  'description': 'A date time field',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': 'Datetime',
-  'col_idx': 13},
- {'field_type': 'taxa',
-  'description': 'The taxon studied',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': 'Taxon',
-  'col_idx': 14},
- {'field_type': 'id',
-  'description': 'Pit tags for the ants',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': 'TagNumber',
-  'col_idx': 15},
- {'field_type': 'abundance',
-  'description': 'The species abundance',
-  'method': '50 by 50 cm quadrat',
-  'taxon_field': 'Taxon',
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': 'Species_count',
-  'col_idx': 16},
- {'field_type': 'numeric trait',
-  'description': 'The average individual mass',
-  'method': 'Average mass of a sample of 10 individual',
-  'taxon_field': 'Taxon',
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': 'milligrams',
-  'field_name': 'Ant_mass',
-  'col_idx': 17},
- {'field_type': 'ordered categorical trait',
-  'description': 'The caset of the individuals weighed',
-  'method': None,
-  'taxon_field': 'Taxon',
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': 'Worker;Soldier;Drone;Queen',
-  'units': None,
-  'field_name': 'Caste',
-  'col_idx': 18},
- {'field_type': 'numeric interaction',
-  'description': 'Consumption of ants by lizards',
-  'method': 'Number observed eaten in half hour observation',
-  'taxon_field': None,
-  'interaction_name': 'Water monitor:predator',
-  'interaction_field': 'Taxon:prey',
-  'levels': None,
-  'units': 'count',
-  'field_name': 'Lizard_predation',
-  'col_idx': 19},
- {'field_type': 'comments',
-  'description': 'My comments',
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': 'Comments',
-  'col_idx': 20},
- {'field_type': None,
-  'description': None,
-  'method': None,
-  'taxon_field': None,
-  'interaction_name': None,
-  'interaction_field': None,
-  'levels': None,
-  'units': None,
-  'field_name': None,
-  'col_idx': 21}]
