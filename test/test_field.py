@@ -336,7 +336,8 @@ def test_BaseField_validate_data(caplog, data, expected_log):
 #   inheriting from NumericField for validate_data.
 # - The __init__ testing duplicates testing of private methods above but this is
 #   so that I can be sure the  class inheritance works as expected
-
+# - Can also reuse the __init__ testing for Numeric and Categorical versions
+#   of Taxon/Interaction classes.
 
 @pytest.mark.parametrize('tx_meta, has_taxa_object, has_dwsh_object, expected_log',
     [
@@ -366,10 +367,24 @@ def test_BaseField_validate_data(caplog, data, expected_log):
         tuple()),
     ]
   )
-def test_NumericTaxonField_init(caplog, fixture_taxa, 
+@pytest.mark.parametrize('test_class, field_meta', 
+  [ ( NumericTaxonField,
+      {'field_type': 'abundance',
+       'description': 'Number of ants',
+       'field_name': 'num_data',
+       'method': 'quadrat',
+       'units': 'individuals per m2'}),
+    ( CategoricalTaxonField,
+      {'field_type': 'categorical trait',
+       'description': 'ant colours',
+       'field_name': 'ant_colour',
+       'levels': 'level1:level2'}),
+  ]
+)
+def test_CatNumTaxonField_init(caplog, fixture_taxa, test_class, field_meta,
                                 tx_meta, has_taxa_object, has_dwsh_object, expected_log):
-    """Testing behaviour of the NumericTaxonField class in using _validate_data
-    """
+    """Testing behaviour of the NumericTaxonField and CategoricalTaxonField
+    classes in using __init__"""
 
     # Set up what information is available for taxon field validation
     tx_obj = fixture_taxa if has_taxa_object else None
@@ -381,17 +396,11 @@ def test_NumericTaxonField_init(caplog, fixture_taxa,
 
     caplog.clear()
 
-    meta = {'field_type': 'abundance',
-            'description': 'Number of ants',
-            'field_name': 'ant_count',
-            'method': 'quadrat',
-            'units': 'individuals per m2'}
-    
-    meta.update(tx_meta)
+    # Do not directly modify the parameterised value - changes for all tests.
+    field_meta = field_meta.copy()
+    field_meta.update(tx_meta)
 
-    fld = NumericTaxonField(meta,
-                            taxa = tx_obj,
-                            dwsh = dwsh_obj)
+    fld = test_class(field_meta, taxa = tx_obj, dwsh = dwsh_obj)
 
     assert len(expected_log) == len(caplog.records)
 
@@ -452,11 +461,25 @@ def test_NumericTaxonField_init(caplog, fixture_taxa,
         ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
     ] 
 )
-def test_NumericInteractionField_init(caplog, fixture_taxa,
-                                      iact_meta, has_taxa_object, has_dwsh_object, expected_log):
-    """Testing the use of the NumericInteractionField init
-    """
-    
+@pytest.mark.parametrize('test_class, field_meta', 
+  [ ( NumericInteractionField,
+      {'field_type': 'numeric interaction',
+       'description': 'Number of prey eaten',
+       'field_name': 'num_data',
+       'method': 'cage experiment',
+       'units': 'individuals per hour'}),
+    ( CategoricalInteractionField,
+      {'field_type': 'categorical interaction',
+       'description': 'outcome of competition',
+       'field_name': 'factor_data',
+       'levels': 'level1;level2'}),
+  ]
+)
+def test_CatNumInteractionField_init(caplog, fixture_taxa, test_class, field_meta,
+                                     iact_meta, has_taxa_object, has_dwsh_object, expected_log):
+    """Testing behaviour of the NumericInteractionField and 
+    CategoricalInteractionField classes in using __init__"""
+
     # Set up what information is available for taxon field validation
     tx_obj = fixture_taxa if has_taxa_object else None
     dwsh = DataWorksheet({'name': 'DF',
@@ -465,19 +488,14 @@ def test_NumericInteractionField_init(caplog, fixture_taxa,
     dwsh.taxa_fields = ['predator', 'prey']
     dwsh_obj = dwsh if has_dwsh_object else None
 
-    # Technically, this violates the field_name last requirement, but that is
-    # enforced at the dataworksheet level, not the field level. 
-    field_meta = OrderedDict(field_type = 'numeric',
-                             description = 'description',
-                             field_name = 'field')
+    # Do not directly modify the parameterised value - changes for all tests.
+    field_meta = field_meta.copy()
     field_meta.update(iact_meta)
 
     caplog.clear()
 
     # Test the __init__ method
-    fld = NumericInteractionField(field_meta,
-                                  taxa = tx_obj,
-                                  dwsh = dwsh_obj)
+    fld = test_class(field_meta, taxa = tx_obj, dwsh = dwsh_obj)
 
     assert len(expected_log) == len(caplog.records)
 
@@ -533,7 +551,7 @@ def test_NumericInteractionField_init(caplog, fixture_taxa,
        'interaction_name': 'C_born:prey;V_salv:predator'}),
   ]
 )
-def test_NumericField_validate_data(caplog, fixture_taxa, test_class, field_meta,
+def test_NumericField_and_subclasses_validate_data(caplog, fixture_taxa, test_class, field_meta,
                                          data, expected_log):
     """Testing behaviour of the NumericField and subclasses in using _validate_data
     """
@@ -555,9 +573,6 @@ def test_NumericField_validate_data(caplog, fixture_taxa, test_class, field_meta
 # CategoricalField and derived classes
 # - Can reuse the same data to also check taxon and interaction classes
 #   inheriting from CategoricalField for validate_data.
-# - The __init__ testing duplicates testing of private methods above but this is
-#   so that I can be sure the  class inheritance works as expected
-
 
 @pytest.mark.parametrize('field_meta, expected_log',
     [
@@ -605,155 +620,6 @@ def test_CategoricalField_init(caplog, field_meta, expected_log):
     fld = CategoricalField(field_meta, None)
     fld.report()
     
-    assert len(expected_log) == len(caplog.records)
-
-    assert all([exp[0] == rec.levelno 
-                for exp, rec in zip(expected_log, caplog.records)])
-    assert all([exp[1] in rec.message
-                for exp, rec in zip(expected_log, caplog.records)])
-
-
-@pytest.mark.parametrize('tx_meta, has_taxa_object, has_dwsh_object, expected_log',
-    [
-      ( dict(taxon_name='foo', taxon_field='bar'),
-        False, False,
-        ((ERROR, "Taxon name and taxon field both provided, use one only"),)),
-      ( dict(),
-        False, False,
-        ( (ERROR, "One of taxon name or taxon field must be provided"),)),
-      ( dict(taxon_name='foo'),
-        False, False,
-        ( (ERROR, "Taxon name provided but no taxa loaded"),)),
-      ( dict(taxon_name='foo'),
-        True, False,
-        ( (ERROR, "Taxon name not found in the Taxa worksheet"),)),
-      ( dict(taxon_name='C_born'),
-        True, False,
-        tuple()),
-      ( dict(taxon_field='not_provided'),
-        False, False,
-        ( (CRITICAL, "Taxon field provided but no dataworksheet provided for this field"),)),
-      ( dict(taxon_field='not_provided'),
-        False, True,
-        ( (ERROR, "Taxon field not found in this worksheet"),)),
-      ( dict(taxon_field='my_taxon_field'),
-        False, True,
-        tuple()),
-    ]
-  )
-def test_CategoricalTaxonField_init(caplog, fixture_taxa,
-                                    tx_meta, has_taxa_object, has_dwsh_object, expected_log):
-    """Testing behaviour of the NumericTaxonField class in using _validate_data
-    """
-
-    # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
-    dwsh = DataWorksheet({'name': 'DF',
-                          'title': 'My data table',
-                          'description': 'This is a test data worksheet'})
-    dwsh.taxa_fields = ['my_taxon_field']
-    dwsh_obj = dwsh if has_dwsh_object else None
-
-    caplog.clear()
-
-    meta = {'field_type': 'categorical trait',
-            'description': 'ant colours',
-            'field_name': 'ant_colour',
-            'levels': 'level1:level2'}
-    
-    meta.update(tx_meta)
-
-    fld = CategoricalTaxonField(meta,
-                                taxa = tx_obj,
-                                dwsh = dwsh_obj)
-
-    assert len(expected_log) == len(caplog.records)
-
-    assert all([exp[0] == rec.levelno 
-                for exp, rec in zip(expected_log, caplog.records)])
-    assert all([exp[1] in rec.message
-                for exp, rec in zip(expected_log, caplog.records)])
-
-
-@pytest.mark.parametrize('iact_meta, has_taxa_object, has_dwsh_object, expected_log',
-    [
-      ( dict(),
-        False, False,
-        ( (ERROR, "At least one of interaction name or interaction field must be provided"),)),
-      ( dict(interaction_name='foo:predator'),
-        False, False,
-        ( (ERROR, "Interaction name provided but no taxa loaded"),)),
-      ( dict(interaction_name='foo:predator'),
-        True, False,
-        ( (ERROR, "Unknown taxa in interaction_name descriptor"),
-          (ERROR, "At least two interacting taxon labels or fields must be identified"))),
-      ( dict(interaction_name='C_born:predator'),
-        True, False,
-        ( (ERROR, "At least two interacting taxon labels or fields must be identified"),)),
-      ( dict(interaction_name='C_born:predator;V_salv:prey'),  # Biologically not very plausible
-        True, False,
-        tuple()),
-      ( dict(interaction_field='not_provided:predator'),
-        False, False,
-        ( (CRITICAL, "Interaction field provided but no dataworksheet provided for this field"),)),
-      ( dict(interaction_field='foo:predator'),
-        False, True,
-        ( (ERROR, "Unknown taxon fields in interaction_field descriptor"),
-          (ERROR, "At least two interacting taxon labels or fields must be identified"))),
-      ( dict(interaction_field='predator:eats things'),
-        False, True,
-        ( (ERROR, "At least two interacting taxon labels or fields must be identified"), )),
-      ( dict(interaction_field='predator:eats things;prey:gets eaten'),
-        False, True,
-        tuple()),
-      ( dict(interaction_field='predator:eats things', 
-             interaction_name='C_born:prey'),
-        True, True,
-        tuple()),
-      ( dict(interaction_field='predator:eats things;prey:gets eaten', 
-             interaction_name='C_born:decomposer'),  # Tritrophic example
-        True, True,
-        tuple()),
-      ( dict(interaction_name='C_born;V_salv'),  
-        True, False,
-        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
-      ( dict(interaction_field='predator;prey'),  
-        False, True,
-        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
-      ( dict(interaction_field='predator', 
-             interaction_name='C_born'),
-        True, True,
-        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
-    ] 
-)
-def test_CategoricalInteractionField_init(caplog, fixture_taxa,
-                                          iact_meta, has_taxa_object, has_dwsh_object, expected_log):
-    """Testing the use of the CategoricalInteractionField init
-    """
-    
-    # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
-    dwsh = DataWorksheet({'name': 'DF',
-                          'title': 'My data table',
-                          'description': 'This is a test data worksheet'})
-    dwsh.taxa_fields = ['predator', 'prey']
-    dwsh_obj = dwsh if has_dwsh_object else None
-
-    # Technically, this violates the field_name last requirement, but that is
-    # enforced at the dataworksheet level, not the field level. 
-    field_meta = {'field_type': 'categorical interaction',
-                  'description': 'outcome of competition',
-                  'field_name': 'factor_data',
-                  'levels': 'level1;level2'}
-    field_meta.update(iact_meta)
-
-    caplog.clear()
-
-    # Test the __init__ method
-    fld = NumericInteractionField(field_meta,
-                                  taxa = tx_obj,
-                                  dwsh = dwsh_obj)
-
     assert len(expected_log) == len(caplog.records)
 
     assert all([exp[0] == rec.levelno 
@@ -810,7 +676,7 @@ def test_CategoricalInteractionField_init(caplog, fixture_taxa,
        'interaction_name': 'C_born:competitor 1;V_salv:competitor 2'}),
   ]
 )
-def test_CategoricalField_validate_data(caplog, fixture_taxa, 
+def test_CategoricalField_and_subclasses_validate_data(caplog, fixture_taxa, 
                                         test_class, field_meta, data, expected_log):
     """Testing behaviour of the CategoricalField class in using validate_data
     """
@@ -860,9 +726,6 @@ def test_TaxaField_init(caplog, fixture_taxa, provide_taxa_instance, expected_lo
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
-
-
-
 
 
 @pytest.mark.parametrize(
