@@ -9,9 +9,11 @@ from safedata_validator.logger import (CH, FORMATTER, LOGGER,
                                        loggerinfo_push_pop)
 
 # CHANGE THIS TO A PURPOSE DEFINED EMAIL AT SOMEPOINT
+# MAYBE ADD TO RESOURCE FILE, AS A CHECK THAT USER HAS PROVIDED ONE
 Entrez.email = "jc2017@ic.ac.uk"
 
 # Extended version of backbone ranks to capture superkingdoms
+# WILL NEED THOUGHT ABOUT THE MAPPING
 BACKBONE_RANKS_EX = ['superkingdom', 'kingdom', 'phylum', 'class', 'order',
                     'family', 'genus', 'species', 'subspecies']
 
@@ -22,7 +24,7 @@ that stored in GBIF. When a conflict arises the user will be informed and asked
 to reduce the level of taxonomic detail they provide to the point where GenBank
 and GBIF are in agreement.
 
-The MicTaxon dataclass is used to store data about a taxon entry in a dataset. It
+The NCBITaxon dataclass is used to store data about a taxon entry in a dataset. It
 is initialised with user data and then the RemoteNCBIValidator class can be used
 to update a Taxon object with the result of NCBI (GenBank) validation. Further
 information (e.g. synonymus names) is also extract from the remote database, in
@@ -44,8 +46,6 @@ class NCBIError(Exception):
         self.message = message
         super().__init__(self.message)
 
-# TODO - Make sure that docstrings are properly written out
-
 # TODO - Unit testing, work out how I set up unit tests. Probably best begun early
 # Worth asking David how to do this if I can't work it out myself
 
@@ -53,16 +53,33 @@ class NCBIError(Exception):
 # So check if taxa provided exists if GBIF, if not check up hierachy until one that does is found
 # Then tell user that they have to contract their taxonomic specification to this levels
 
+# TODO - Link NCBI and GBIF steps
+# Some kind of higher level function that links NCBI functions with GBIF functions
+# into a coherent whole.
+
+# TODO - Correctly read in xslx data
+# Lot of this has already been written by David, main thing is that I will have
+# to decide on the formatting, like what data are we taking in.
+
+# TODO - Think about data output
+# Does this make a GBIF compatible csv (or xslx) file?
+# Or does it just validate that the provided data is GBIF compatible?
+
+# POTENTIAL - Take steps to increase the speed
+# Could involve using an api to speed up entrez
+# Or alternatively by downloading the relevant part of NCBI's database and
+# running the validation locally
+
+# TODO - Modify the resource file to ask the user to provide an email address
+# This should only be done if the user actually wants to use this module as it
+# isn't need elsewhere (as far as I know)
+
 # QUESTIONS FOR DAVID
-# WHAT SHOULD WE DO ABOUT SUPERKINGDOM, DOMAIN, KINGDOM ISSUE?
-# DO WE WANT A LocalNCBIValidator? IS THIS EVEN POSSIBLE?
-# HOW DO I ACTUALLY SET UP TESTING?
-# CAN/SHOULD WE SET UP AN EMAIL?
 # SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
 
 @enforce_types
 @dataclasses.dataclass
-class MicTaxon:
+class NCBITaxon:
     """Holds taxonomic information from a user on a microbial taxa. This can be
     populated using NCBI GenBank validation.
 
@@ -74,7 +91,7 @@ class MicTaxon:
     instance is created.
         * diverg: does the GenBank ID and stored taxa info diverge, and if so how?
         * synonyms: list of synonymus names for the taxa
-        * superseed: Is supplied taxon name/ID still the accepted usage
+        * superseed: is supplied taxon name/ID still the accepted usage
     """
 
     # Init properties
@@ -351,6 +368,7 @@ class RemoteNCBIValidator:
         return mtaxon
 
 
+# THIS IS SOMEWHAT LIKE THE STRUCTURE THAT DAVID SUGGESTED FOR UNIT TESTING
 # Make validator
 val = RemoteNCBIValidator()
 # E coli (562)
