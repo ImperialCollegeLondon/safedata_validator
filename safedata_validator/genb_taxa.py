@@ -130,7 +130,7 @@ class RemoteNCBIValidator:
             genbank_id: An integer
 
         Returns:
-            A MicTaxon object
+            A NCBITaxon object
         """
 
         if not isinstance(genbank_id, int):
@@ -218,7 +218,7 @@ class RemoteNCBIValidator:
             red_taxa[f"{BACKBONE_RANKS_EX[rnk]}"] = tax_dic["ScientificName"]
 
         # Create and populate microbial taxon
-        mtaxon = MicTaxon(name=nnme,genbank_id=genbank_id,taxa_hier=red_taxa)
+        mtaxon = NCBITaxon(name=nnme,genbank_id=genbank_id,taxa_hier=red_taxa)
 
         # Check for non-backbone rank cases
         if valid == False:
@@ -244,7 +244,7 @@ class RemoteNCBIValidator:
     # New function to read in taxa information
     def taxa_search(self, nnme: str, taxa: dict):
         """Method that takes in taxonomic information, and finds the corresponding
-        genbank ID. This genbank ID is then used to generate a MicTaxon object,
+        genbank ID. This genbank ID is then used to generate a NCBITaxon object,
         which is returned. This function also makes use of parent taxa information
         to distinguish between ambigious taxa names.
 
@@ -252,7 +252,7 @@ class RemoteNCBIValidator:
             taxa: A dictonary containing taxonomic information
 
         Returns:
-            A MicTaxon object
+            A NCBITaxon object
         """
 
         # Find last dictonary key
@@ -278,7 +278,7 @@ class RemoteNCBIValidator:
         if c == 1:
             # Find taxa ID as single entry in the list
             tID = int(record['IdList'][0])
-            # Use ID lookup function to find generate as a MicTaxon object
+            # Use ID lookup function to find generate as a NCBITaxon object
             mtaxon = self.id_lookup(nnme,tID)
         # Catch cases where no record is found
         elif c == 0:
@@ -319,7 +319,7 @@ class RemoteNCBIValidator:
                 else:
                     # Find parent taxa ID as single entry in the list
                     pID = int(p_record['IdList'][0])
-                    # Then use ID lookup function to find generate as a MicTaxon object
+                    # Then use ID lookup function to find generate as a NCBITaxon object
                     ptaxon = self.id_lookup("parent",pID)
 
                 # Save parent taxa rank and name
@@ -350,7 +350,7 @@ class RemoteNCBIValidator:
                 else:
                     # Find index corresponding to correct child taxa
                     tID = int(record['IdList'][child.index(True)])
-                    # Use ID lookup function to find generate as a MicTaxon object
+                    # Use ID lookup function to find generate as a NCBITaxon object
                     mtaxon = self.id_lookup(nnme,tID)
 
         # Check if taxonomic rank supplied is used
