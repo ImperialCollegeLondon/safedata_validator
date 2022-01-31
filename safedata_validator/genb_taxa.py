@@ -76,6 +76,7 @@ class NCBIError(Exception):
 
 # QUESTIONS FOR DAVID
 # SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
+# WHY DOES ONLY python -m pytest WORK AND NOT pytest? IS THIS CONSEQUENTIAL?
 
 @enforce_types
 @dataclasses.dataclass
@@ -110,6 +111,14 @@ class NCBITaxon:
             if isinstance(self.genbank_id, float) and not self.genbank_id.is_integer():
                 raise ValueError('GenBank Id is not an integer')
             self.genbank_id = int(self.genbank_id)
+
+        if self.taxa_hier is not None:
+            if len(self.taxa_hier) == 0:
+                raise ValueError('Taxa hierarchy dictonary empty')
+            elif all(isinstance(x,str) for x in self.taxa_hier.keys()) == False:
+                raise ValueError('Not all taxa dictionary keys are strings')
+            elif all(isinstance(x,str) for x in self.taxa_hier.values()) == False:
+                raise ValueError('Not all taxa dictionary values are strings')
 
         self.diverg = None
         self.synonyms = []
@@ -403,7 +412,7 @@ d14 = {'genus': 'Tenacibaculum', 'species': 'Tenacibaculum maritimum'}
 d15 = {'genus': 'Cytophaga', 'species': 'Cytophaga marina'}
 # Maybe find synonym of this one to test as well
 # Then test output of taxa search
-test = val.taxa_search("Nickname",d15)
+# test = val.taxa_search("Nickname",d15)
 # Search for ID
 # test = val.id_lookup("Nickname",1000)
-print(test)
+# print(test)
