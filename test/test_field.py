@@ -1,14 +1,14 @@
 from collections import OrderedDict
 import pytest
 from logging import CRITICAL, ERROR, WARNING, INFO
-import datetime
+from datetime import datetime, time, date
 
-from safedata_validator.field import (BaseField, CategoricalField, GeoField, 
+from safedata_validator.field import (BaseField, CommentField, CategoricalField, GeoField, 
                                       NumericField, TaxaField, LocationsField, 
                                       NumericTaxonField, CategoricalTaxonField,
                                       NumericInteractionField, CategoricalInteractionField,
+                                      TimeField, DatetimeField,
                                       DataWorksheet)
-from test.conftest import fixture_taxa
 
 # Checking the helper and private methods
 
@@ -329,6 +329,35 @@ def test_BaseField_validate_data(caplog, data, expected_log):
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
+
+
+# Comments field
+
+@pytest.mark.parametrize(
+    'data, expected_log',
+    [
+     ([1, 2, 3, 4, 5, 6, 7, 8, 9], 
+      ((INFO, "Checking Column comments"),)),
+     (['Any', None, None, 'old', 5, 'rubbish', None, 'is', 'fine'], 
+      ((INFO, "Checking Column comments"),)),
+       ])
+def test_CommentField_validate_data(caplog, data, expected_log):
+    """Testing behaviour of the CommentsField class in using _validate_data
+    """
+
+    fld = CommentField({'field_type': 'comments',
+                         'description': 'my comments',
+                         'field_name': 'comments'})
+    
+    fld.validate_data(data)
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+               for exp, rec in zip(expected_log, caplog.records)])
 
 # NumericField and derived classes
 # - NumericField itself has BaseField init, just test overloaded validate_data 
@@ -804,7 +833,7 @@ def test_LocationsField_init(caplog, fixture_locations, provide_loc_instance, ex
       ( ['A_1', 'A_2', 1, 'A_2', 'A_1', 2], 
         ((INFO, "Checking Column locations"),)),
       # Bad data
-      ( ['A_1', 'A_2', 16.2, 'A_2', 'A_1', datetime.datetime.now()], 
+      ( ['A_1', 'A_2', 16.2, 'A_2', 'A_1', datetime.now()], 
         ((INFO, "Checking Column locations"),
          (ERROR, "Cells contain invalid location values"))),
       ( [], 
@@ -868,28 +897,51 @@ def test_GeoField_init(caplog, fixture_dataset, provide_ds_instance, expected_lo
 
 
 @pytest.mark.parametrize(
-    'data, expected_log',
+    'which,data, expected_log',
     [ # Good data
-      ( [1,2,3,4,5,6], 
+      ( 'latitude', 
+        [1,2,3,4,5,6], 
+        ( (INFO, "Checking Column geocoords"),)),
+      ( 'longitude', 
+        [111, 112, 113, 114, 115, 116], 
         ( (INFO, "Checking Column geocoords"),)),
       # Bad inputs
-      ( [1,'2',3,4,5,6], 
+      ( 'latitude', 
+        [1,'2',3,4,5,6], 
         ( (INFO, "Checking Column geocoords"),
           (ERROR, 'Field contains non-numeric data'))),
-      ( [1,'2°',3,4,5,6], 
+      ( 'longitude', 
+        [111, "112", 113, 114, 115, 116], 
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'Field contains non-numeric data'))),
+      ( 'latitude', 
+        [1,'2°',3,4,5,6], 
         ( (INFO, "Checking Column geocoords"),
           (ERROR, 'Field contains non-numeric data'),
           (WARNING, 'Possible degrees minutes and seconds formatting?'))),
-      ( [1,2,3,4,5,600], 
+      ( 'longitude', 
+        [111, "112°", 113, 114, 115, 116], 
         ( (INFO, "Checking Column geocoords"),
-          (ERROR, 'Values range (1, 600) exceeds hard bounds'))),
-      ( [1,2,3,4,5,60], 
+          (ERROR, 'Field contains non-numeric data'),
+          (WARNING, 'Possible degrees minutes and seconds formatting?'))),
+      ( 'latitude', 
+        [1,2,3,4,5,600], 
         ( (INFO, "Checking Column geocoords"),
-          (WARNING, 'Values range (1, 60) exceeds soft bounds'))),
+          (ERROR, 'exceeds hard bounds'))),
+      ( 'longitude', 
+        [-200,2,3,4,5,600], 
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'exceeds hard bounds'))),
+      ( 'latitude', 
+        [1,2,3,4,5,60], 
+        ( (INFO, "Checking Column geocoords"),
+          (WARNING, 'exceeds soft bounds'))),
+      ( 'longitude', 
+        [111,112,113,114,115,160], 
+        ( (INFO, "Checking Column geocoords"),
+          (WARNING, 'exceeds soft bounds'))),
     ])
-@pytest.mark.parametrize(
-    'which', ['latitude', 'longitude'])
-def test_GeoField_validate_data(caplog, fixture_dataset, data, expected_log, which):
+def test_GeoField_validate_data(caplog, fixture_dataset, which, data, expected_log):
     """Testing behaviour of the TaxaField class in using validate_data
     """
 
@@ -907,3 +959,243 @@ def test_GeoField_validate_data(caplog, fixture_dataset, data, expected_log, whi
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize(
+    'data, expected_log',
+    [ # Good data
+      ( [ [time(11,12),time(11,12),time(11,12),time(11,12),time(11,12)],], 
+        ( (INFO, "Checking Column time"),)),
+      ( [ ["11:12:13","11:12:13","11:12:13","11:12:13","11:12:13"],], 
+        ( (INFO, "Checking Column time"),)),
+      ( [ ["111213","1112","111213.2","11:12:13","11:12:13"],],  # Different ISO8601 string formats
+        ( (INFO, "Checking Column time"),)),
+      # Bad inputs
+      ( [ [time(11,12),time(11,12),"11:12:13","11:12:13","11:12:13"],], 
+        ( (INFO, "Checking Column time"),
+          (ERROR, "Time data mixes ISO string and time formatted rows"),)),
+      ( [ [time(11,12),time(11,12), 1, 2, 3],], 
+        ( (INFO, "Checking Column time"),
+          (ERROR, "Time data include values neither ISO string nor time formatted"),)),
+      ( [ ["11twelve13","11:12:13","11/12/13","11:12:13","11:12:13"],], 
+        ( (INFO, "Checking Column time"),
+          (ERROR, "ISO time strings contain badly formatted values"),)),
+      ( [ [time(11,12),time(11,12),time(11,12),time(11,12),time(11,12)],
+          ["11:12:13","11:12:13","11:12:13","11:12:13","11:12:13"],], 
+        ( (INFO, "Checking Column time"),
+          (ERROR, "Time data mixes ISO string and time formatted rows"),)),
+      ( [ [time(11,12),time(11,12),time(11,12),time(11,12),time(11,12)],
+          [1, 2, "11:12:13","11:12:13","11:12:13"],], 
+        ( (INFO, "Checking Column time"),
+          (ERROR, "Time data include values neither ISO string nor time formatted"),)),
+    ])
+def test_TimeField_validate_data(caplog, data, expected_log):
+    """Testing behaviour of the TaxaField class in using validate_data
+    """
+
+    fld = TimeField({'field_name': 'time',
+                    'field_type': 'time',
+                    'description': 'time'})
+
+    for d in data:
+        fld.validate_data(d)
+  
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize(
+    'field_type, data, expected_log',
+    [ # Good data
+      ( 'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           datetime(2022, 1, 6),datetime(2022, 1, 6)],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( 'date',
+        [ ["2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", ],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( 'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12)],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( 'datetime',
+        [ ["2022-01-06 11:12", "2022-01-06 11:12", "2022-01-06 11:12",
+           "2022-01-06 11:12", "2022-01-06 11:12"],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      # Bad data - mixed inputs
+      ( 'datetime',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           datetime(2022, 1, 6),datetime(2022, 1, 6)],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (WARNING, "Field is of type datetime, but only reports dates"))),
+      ( 'date',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12)],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Field is of type date, but includes time data"))),
+      ( 'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           "2022-01-06 11:12", "2022-01-06 11:12"],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data mixes ISO string and time formatted rows"),)),
+      ( 'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           "2022-01-06", "2022-01-06"],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data mixes ISO string and time formatted rows"),)),
+      ( 'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           datetime(2022, 1, 6),datetime(2022, 1, 6)],
+          ["2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06"],
+        ], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data mixes ISO string and time formatted rows"),)),
+      ( 'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12)],
+          ["2022-01-06 11:12", "2022-01-06 11:12", "2022-01-06 11:12",
+           "2022-01-06 11:12", "2022-01-06 11:12"],
+        ], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data mixes ISO string and time formatted rows"),)),
+      # Bad data - bad classes
+      ( 'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           1, 2],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data include values neither ISO string nor time formatted"))),
+      ( 'date',
+        [ ["2022-01-06", "2022-01-06", "2022-01-06", 1, 2],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data include values neither ISO string nor time formatted"))),
+      ( 'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           1, 2],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data include values neither ISO string nor time formatted"))),
+      ( 'datetime',
+        [ ["2022-01-06 11:12", "2022-01-06 11:12", "2022-01-06 11:12",
+           1, 2],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data include values neither ISO string nor time formatted"))),
+      # Bad data - string formats
+      ( 'date',
+        [ ["2022-01-06", "2022/01/06", "2022-01-06", "20220106", "2022-01-06", ],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "ISO datetime strings contain badly formatted values"))),
+      ( 'datetime',
+        [ ["2022-01-06 11:12", "2022/01/06 11:12", "2022-01-06 11:12",
+           "20220106 11:12", "2022-01-06 11:12"],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "ISO datetime strings contain badly formatted values"))),
+    ])
+def test_DatetimeField_validate_data(caplog, fixture_dataset, field_type, data, expected_log):
+    """Testing behaviour of the TaxaField class in using validate_data
+    """
+
+    fld = DatetimeField({'field_name': 'datetimetest',
+                         'field_type': field_type,
+                         'description': 'time'},
+                         dataset=fixture_dataset)
+
+    for d in data:
+        fld.validate_data(d)
+  
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+
+@pytest.mark.parametrize(
+    'provide_dataset,field_type, data, expected_log',
+    [ # Good data - no dataset
+      ( False, 
+        'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           datetime(2022, 1, 6),datetime(2022, 1, 6)],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "No dataset object provided - cannot update extents"))),
+      ( False, 
+        'date',
+        [ ["2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", ],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "No dataset object provided - cannot update extents"))),
+      ( False, 
+        'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12)],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "No dataset object provided - cannot update extents"))),
+      ( False, 
+        'datetime',
+        [ ["2022-01-06 11:12", "2022-01-06 11:12", "2022-01-06 11:12",
+           "2022-01-06 11:12", "2022-01-06 11:12"],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "No dataset object provided - cannot update extents"))),
+      # Good data - with dataset
+      ( True,
+        'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           datetime(2022, 1, 6),datetime(2022, 1, 6)],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( True,
+        'date',
+        [ ["2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", ],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( True,
+        'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12)],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( True,
+        'datetime',
+        [ ["2022-01-06 11:12", "2022-01-06 11:12", "2022-01-06 11:12",
+           "2022-01-06 11:12", "2022-01-06 11:12"],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+    ])
+
+def test_DatetimeField_extent(caplog, fixture_dataset, provide_dataset, field_type, data, 
+                              expected_log):
+    """Testing behaviour of the TaxaField class in using validate_data
+    """
+
+    if provide_dataset:
+      ds = fixture_dataset
+    else:
+      ds = None
+
+    fld = DatetimeField({'field_name': 'datetimetest',
+                         'field_type': field_type,
+                         'description': 'time'},
+                         dataset=ds)
+
+    for d in data:
+        fld.validate_data(d)
+  
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+    if provide_dataset and field_type == 'date':
+        assert fixture_dataset.temporal_extent.extent[0] == date(2022, 1, 6)
+        assert fixture_dataset.temporal_extent.extent[1] == date(2022, 1, 6)
+    if provide_dataset and field_type == 'datetime':
+        assert fixture_dataset.temporal_extent.extent[0] == date(2022, 1, 6)
+        assert fixture_dataset.temporal_extent.extent[1] == date(2022, 1, 6)

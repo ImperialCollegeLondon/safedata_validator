@@ -1,8 +1,10 @@
+import datetime
 from itertools import groupby, islice
 from collections import OrderedDict
 from logging import ERROR, WARNING, INFO
 from openpyxl import worksheet
 from openpyxl.utils import get_column_letter
+from dateutil import parser
 from typing import List
 
 from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError, IsNotPadded,
@@ -826,7 +828,7 @@ class BaseField:
         else:
             LOGGER.error('Unknown field type {field_type}'.format(**meta))
 
-    def validate_data(self, data: list, **kwargs):
+    def validate_data(self, data: list):
         """Validates a list of data provided for a field. 
 
         This method runs the common shared validation and returns the cleaned
@@ -836,8 +838,11 @@ class BaseField:
         testing. In this case using the following ensures that only the data
         that passes the common checks is subjected to extra testing:
 
-            data = super().validate_data(data, **kwargs)
+            data = super().validate_data(data)
         """
+        
+        if self.no_validation:
+            return
 
         # TODO - handle blank columns/metadata at Dataworksheet level? -etc.
         # # Skip any field with no user provided metadata or data
@@ -903,6 +908,12 @@ class BaseField:
             LOGGER.error(f'{self.n_excel_error} cells contain Excel formula errors')
 
 
+class CommentField(BaseField):
+
+    field_types = ('comments', )
+    no_validation = True
+
+
 class NumericField(BaseField):
     """
     Subclass of BaseField to check for numeric data
@@ -910,9 +921,9 @@ class NumericField(BaseField):
     field_types = ('numeric',)
     required_descriptors = MANDATORY_DESCRIPTORS.union(['method', 'units'])
 
-    def validate_data(self, data: list, **kwargs):
+    def validate_data(self, data: list):
         
-        data = super().validate_data(data, **kwargs)
+        data = super().validate_data(data)
         
         numeric = IsNumber(data)
 
@@ -941,9 +952,9 @@ class CategoricalField(BaseField):
             level_labels, level_desc = self._parse_levels(levels)
             self.level_labels = set(level_labels)
 
-    def validate_data(self, data: list, **kwargs):
+    def validate_data(self, data: list):
 
-        data = super().validate_data(data, **kwargs)
+        data = super().validate_data(data)
 
         # Now look for consistency: get the unique values reported in the
         # data, convert to unicode to handle checking of numeric labels and
@@ -986,9 +997,9 @@ class TaxaField(BaseField):
         
         self.taxa_found = set()
     
-    def validate_data(self, data: list, **kwargs):
+    def validate_data(self, data: list):
 
-        data = super().validate_data(data, **kwargs)
+        data = super().validate_data(data)
 
         data = IsString(data, keep_failed=False)
 
@@ -1035,9 +1046,9 @@ class LocationsField(BaseField):
         
         self.locations_found = set()
     
-    def validate_data(self, data: list, **kwargs):
+    def validate_data(self, data: list):
 
-        data = super().validate_data(data, **kwargs)
+        data = super().validate_data(data)
 
         data = IsLocName(data, keep_failed=False)
 
@@ -1085,12 +1096,12 @@ class GeoField(BaseField):
         self.min = None
         self.max = None
         
-    def validate_data(self, data: list, **kwargs):
+    def validate_data(self, data: list):
         """Testing of the data range is deferred to report() to avoid
         triggering logging from the Extent objects until data loading is
         completed
         """
-        data = super().validate_data(data, **kwargs)
+        data = super().validate_data(data)
 
         data = IsNumber(data, keep_failed=False)
 
@@ -1137,7 +1148,7 @@ class CategoricalTaxonField(CategoricalField):
     """Checks categorical trait fields, which are just CategoricalFields
     with taxon reporting requirements turned on."""
 
-    field_types = ('categorical trait')
+    field_types = ('categorical trait',)
     check_taxon_meta = True
 
 
@@ -1146,7 +1157,7 @@ class NumericInteractionField(NumericField):
     """Checks numeric interaction fields, which are just  NumericFields
     with interaction reporting requirements turned on."""
 
-    field_types = ('numeric interaction')
+    field_types = ('numeric interaction', )
     check_interaction_meta = True
 
 
@@ -1155,139 +1166,269 @@ class CategoricalInteractionField(CategoricalField):
     """Checks categorical interaction fields, which are just CategoricalFields
     with interaction reporting requirements turned on."""
 
-    field_types = ('categorical interaction')
+    field_types = ('categorical interaction', )
     check_interaction_meta = True
 
 
+class TimeField(BaseField):
 
-
-
-
-
-def check_field_file(self, meta, data):
     """
-    Checks file fields. The data values need to match to an external file
-    or can be contained within an archive file provided in the 'file_container'
-    descriptor.
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values
-    """
-    
-    if self.external_files is None:
-        LOGGER.error('No external files listed in Summary')
-        return
-    
-    external_names = {ex['file'] for ex in self.external_files}
+    Time field validation is primarily about checking the consistency of the
+    provided data. The function accepts either as ISO strings in a consistent
+    time format or datetime.time objects. The parsing of timestrings follows
+    ISO8601, which includes quite a range of valid inputs: '11:12:13' and
+    '111213' are both valid.
 
-    if 'file_container' in meta and meta['file_container'] is not None:
-        if meta['file_container'] not in external_names:
-            LOGGER.error(
-                "Field file_container value not found in external files: {}".format(meta['file_container']))
-    else:
-        missing_files = set(data) - external_names
-        if missing_files:
-            LOGGER.error("Field contains files not listed in external files: ",
-                            extra={'join': missing_files})
+    One problem here is that - when stored as Excel datetime cells - dates and
+    times in Excel are poorly typed: essentially as a number with a meaning that
+    depends in part on the cell format. The openpyxl package returns
+    datetime.time objects for cells with time formats.
+    """
+
+    field_types = ('time', )
+
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+                 dataset: Dataset = None, taxa: Taxa = None, 
+                 locations: Locations = None) -> None:
+        
+        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+
+        # Defaults
+        self.first_data_class_set = None
+        self.consistent_class = True
+        self.expected_class = True
+
+        self.bad_strings = []
+        self.min = None 
+        self.max = None
+
+    def validate_data(self, data: list):
+        
+        data = super().validate_data(data)
+
+        # TODO: report row number of issues - problem of mismatch between
+        # self.n_rows (_all_ rows) and index in data (non-NA rows)
+
+        # Check for consistent class formatting, using first row. Do not try and
+        # validate further when data is not consistently formatted.
+        if self.consistent_class and self.expected_class:
+
+            cell_types = [type(dt) for dt in data]
+            cell_type_set = set(cell_types)
+
+            # Are all the values of expected types?
+            if not {datetime.time, str}.issuperset(cell_type_set):
+                self.expected_class = False
+                return
+            
+            # Are the values internally consistent and consistent with
+            # previously loaded data
+            if len(cell_type_set) > 1:
+                self.consistent_class = False
+                return
+            elif self.first_data_class_set is None:
+                self.first_data_class_set = cell_type_set
+            elif self.first_data_class_set != cell_type_set:
+                self.consistent_class = False
+                return
+        else:
+            return
+
+        # Value checking only happens while data are consistently formatted
+        # There is no need to check time objects passed in, just time formatted
+        # strings
+        if self.first_data_class_set == {str}:
+            
+            for val in data:
+                try:
+                    _ = parser.isoparser().parse_isotime(val)
+                except ValueError:
+                    self.bad_strings.append(val)
+            
+    
+    def report(self):
+        
+        super().report()
+
+        if not self.expected_class:
+            LOGGER.error('Time data include values neither ISO string nor time formatted')
+            return
+
+        if not self.consistent_class:
+            LOGGER.error('Time data mixes ISO string and time formatted rows')
+            return
+
+        if self.bad_strings:
+            LOGGER.error('ISO time strings contain badly formatted values: e.g.',
+                         extra={'join': self.bad_strings[:5]})
 
 
 class DatetimeField(BaseField):
 
-    field_types = ('date', 'time', 'datetime')
+    """
+    Date and datetime field validation is primarily about checking the
+    consistency of the provided data. The function accepts either as ISO strings
+    in a consistent datetime or date format or datetime.datetime objects. The
+    parsing of timestrings follows ISO8601, which includes quite a range of
+    valid inputs.
 
-    def ingest(self, data, which='datetime'):
+    One problem here is that - when stored as Excel datetime cells - dates and
+    times in Excel are poorly typed: essentially as a number with a meaning that
+    depends in part on the cell format. The openpyxl package returns
+    datetime.datetime objects for cells with datetime or date formats.
+    """
 
-        """
-        Checks for data consistency in date and datetime fields. Excel
-        doesn't distinguish, both are loaded as datetime.datetime objects
-        so we check that the values are compatible with the user provided
-        field type. Also handle datetimes provided as strings in common
-        ISO formats
-        Args:
-            meta: The field metadata, to be updated with the range
-            data: A list of data values, allegedly containing datetimes or dates
-            which: The datetime type to be checked for.
-        """
+    field_types = ('datetime', 'date')
 
-        # Check types and allow all xlrd.XL_CELL_DATE or all xlrd.XL_CELL_STRING
-        # but not a mix
-        cell_types = {dt.ctype for dt in data}
-        extent = None
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+                 dataset: Dataset = None, taxa: Taxa = None, 
+                 locations: Locations = None) -> None:
+        
+        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
 
-        if not data:
-            # Data is empty - external file description
-            pass
-        elif cell_types == {xlrd.XL_CELL_DATE}:
+        if self.dataset is None:
+            self._log('No dataset object provided - cannot update extents')
 
-            data = [dt.value for dt in data]
+        # Defaults
+        self.first_data_class_set = None
+        self.consistent_class = True
+        self.expected_class = True
+        self.all_midnight = True
 
-            # For date and time options, check decimal components
-            if which == 'date':
-                contains_time = [dt % 1 > 0 for dt in data]
-                if any(contains_time):
-                    LOGGER.error('Some values also contain time components')
+        self.bad_strings = []
+        self.min = None 
+        self.max = None
 
-            elif which == 'time':
-                contains_date = [1 <= dt for dt in data]
-                if any(contains_date):
-                    LOGGER.error('Some values also contain date components')
+    def validate_data(self, data: list):
+        
+        data = super().validate_data(data)
 
-            # For date containing options, check for actual dates and get extents
-            if which in ['date', 'datetime']:
-                if any(0.0 <= dt < 1.0 for dt in data):
-                    LOGGER.error('Some values _only_  contain time components')
+        # TODO: report row number of issues - problem of mismatch between
+        # self.n_rows (_all_ rows) and index in data (non-NA rows)
 
-            # get extents
-            if len(data):
-                extent = (xlrd.xldate_as_datetime(min(data), self.workbook.datemode),
-                            xlrd.xldate_as_datetime(max(data), self.workbook.datemode))
+        # Check for consistent class formatting, using first row. Do not try and
+        # validate further when data is not consistently formatted.
+        if self.consistent_class and self.expected_class:
 
-                if which == 'time':
-                    extent = tuple(vl.time() for vl in extent)
+            cell_types = [type(dt) for dt in data]
+            cell_type_set = set(cell_types)
 
-        elif cell_types == {xlrd.XL_CELL_TEXT}:
-
-            data = [dt.value for dt in data]
-
-            # internal function to check dates
-            def parse_datetime(dt, which='date'):
-                try:
-                    if which == 'time':
-                        dt = parser.isoparser().parse_isotime(dt)
-                    else:
-                        dt = parser.isoparse(dt)
-
-                    return dt, True
-                except ValueError:
-                    return dt, False
-
-            parsed_data = [parse_datetime(dt, which) for dt in data]
-            good_data = set((dt[0] for dt in parsed_data if dt[1]))
-            bad_data = set((dt[0] for dt in parsed_data if not dt[1]))
-
-            if len(good_data):
-                extent = (min(good_data), max(good_data))
-                # intentionally scrub out timezones - Excel dates don't have them and can't
-                # compare datetimes with mixed tzinfo status
-                extent = tuple(dt.replace(tzinfo=None) for dt in extent)
-
-            if len(bad_data):
-                LOGGER.error('Problem in parsing date/time strings: ', extra={'join': bad_data})
-
-        elif cell_types == {xlrd.XL_CELL_DATE, xlrd.XL_CELL_TEXT}:
-            first_cell_type = data[0].ctype
-            first_text = next(idx for idx, val in enumerate(data) if val.ctype != first_cell_type)
-            LOGGER.error('Field contains data with mixed test and date formatting. Use either Excel date formats or '
-                            'ISO formatted text. Note that text can look _exactly_ like an Excel date or '
-                            'time cell, you may need to copy the column and format as numbers to spot '
-                            'errors. The number of the first row with formatting not matching the first '
-                            'value is: ' + str(first_text))
-
+            # Are all the values of expected types?
+            if not {datetime.datetime, str}.issuperset(cell_type_set):
+                self.expected_class = False
+                return
+            
+            # Are the values internally consistent and consistent with
+            # previously loaded data
+            if len(cell_type_set) > 1:
+                self.consistent_class = False
+                return
+            elif self.first_data_class_set is None:
+                self.first_data_class_set = cell_type_set
+            elif self.first_data_class_set != cell_type_set:
+                self.consistent_class = False
+                return
         else:
-            LOGGER.error('Field contains cells formatted as neither text nor date')
+            return
 
-        # range and extent setting
-        if extent is not None:
-            meta['range'] = extent
-            if which in ['date', 'datetime']:
-                self.update_extent(extent, datetime.datetime, 'temporal_extent')
+        # Value checking only happens while data are consistently formatted
+        # Look for string formatting, but also presence/absence of non-zero
+        # time components.
+        midnight = datetime.time(0,0)
+
+        if self.first_data_class_set == {str}:
+            parsed_strings = []
+            for val in data:
+                try:
+                    val_parse = parser.isoparse(val)
+                    if val_parse.time() != midnight:
+                        self.all_midnight = False
+                    parsed_strings.append(val_parse)
+                except ValueError:
+                    self.bad_strings.append(val)
+            
+            # standardised to datetime objects
+            data = parsed_strings
+
+        elif self.first_data_class_set == {datetime.datetime}:
+
+            for val in data:
+                if val.time() != midnight:
+                    self.all_midnight = False
+
+        # Update range for extents
+        if self.min is None:
+            self.min = min(data)
+        else:
+            self.min = min([self.min] + data)
+        
+        if self.max is None:
+            self.max = min(data)
+        else:
+            self.max = max([self.max] + data)
+        
+    def report(self):
+        
+        super().report()
+
+        # INconsistent and bad data classes
+        if not self.expected_class:
+            LOGGER.error('Date or datetime data include values neither ISO string nor time formatted')
+            return
+
+        if not self.consistent_class:
+            LOGGER.error('Date or datetime data mixes ISO string and time formatted rows')
+            return
+
+        # Bad string formats
+        if self.bad_strings:
+            LOGGER.error('ISO datetime strings contain badly formatted values: e.g.',
+                         extra={'join': self.bad_strings[:5]})
+
+        # Datetime vs Date checking - Datetimes _could_ all be at midnight, so not an error
+        # but does look odd.
+        if self.meta['field_type'] == 'datetime' and self.all_midnight:
+            LOGGER.warning('Field is of type datetime, but only reports dates')
+        if self.meta['field_type'] == 'date' and not self.all_midnight:
+            LOGGER.error('Field is of type date, but includes time data')
+
+        # Update extent if possible - note that inheritance means that isinstance
+        # in extent.Extent is not succesfully testing for datetime.datetime rather
+        # than set datatype of datetime.date
+        if self.dataset is not None:
+            self.dataset.temporal_extent.update([self.min.date(), self.max.date()])
+
+
+class FileField(BaseField):
+
+    """
+    Checks file fields. The data values need to match to an external file or can
+    be contained within an archive file provided in the 'file_container'
+    descriptor.
+    """
+
+    field_types = ('datetime', 'date')
+
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+                 dataset: Dataset = None, taxa: Taxa = None, 
+                 locations: Locations = None) -> None:
+        
+        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+
+
+        if self.external_files is None:
+            LOGGER.error('No external files listed in Summary')
+            return
+        
+        external_names = {ex['file'] for ex in self.external_files}
+
+        if 'file_container' in meta and meta['file_container'] is not None:
+            if meta['file_container'] not in external_names:
+                LOGGER.error(
+                    "Field file_container value not found in external files: {}".format(meta['file_container']))
+        else:
+            missing_files = set(data) - external_names
+            if missing_files:
+                LOGGER.error("Field contains files not listed in external files: ",
+                                extra={'join': missing_files})
+
