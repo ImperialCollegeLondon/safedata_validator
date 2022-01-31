@@ -39,7 +39,7 @@ class Dataset:
         self.latitudinal_extent = Extent('latitudinal extent', (float, int),
                                          hard_bounds=(-90,90), soft_bounds=(-4, 8))
         self.longitudinal_extent = Extent('longitudinal extent', (float, int),
-                                          hard_bounds=(-180,180), soft_bounds=(-4, 8))
+                                          hard_bounds=(-180,180), soft_bounds=(108, 120))
 
     def load(self):
 

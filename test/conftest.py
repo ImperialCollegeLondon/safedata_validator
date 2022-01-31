@@ -1,14 +1,16 @@
-import pytest
 import os
+from collections import OrderedDict
 from requests.api import request
+
 import simplejson
 import openpyxl
+import pytest
 
 from safedata_validator.taxa import Taxa
 from safedata_validator.locations import Locations
 from safedata_validator.dataset import Dataset
 from safedata_validator.resources import Resources
-
+from safedata_validator.field import DataWorksheet
 
 """
 This file contains fixtures that will be available to all test suites.
@@ -115,8 +117,8 @@ def example_excel_files(request):
         return wb
 
 
-# Fixtures to provide Taxon, Locations, Dataset and Dataworksheet 
-# instances for testing
+# Fixtures to provide Taxon, Locations, Dataset, Dataworksheet 
+# and field meta objects for testing
 
 @pytest.fixture(scope='module')
 def fixture_taxa(resources_with_local_gbif):
@@ -164,3 +166,27 @@ def fixture_dataset(resources_with_local_gbif):
     
     return dataset
 
+
+@pytest.fixture(scope='module')
+def fixture_field_meta():
+    """field_meta object for use across tests
+    """
+    
+    return OrderedDict(field_type = ['numeric', 'numeric', 'numeric'],
+                       description = ['a', 'b', 'c'],
+                       units = ['a', 'b', 'c'],
+                       method = ['a', 'b', 'c'],
+                       field_name = ['a', 'b', 'c'])
+
+
+@pytest.fixture(scope='module')
+def fixture_dataworksheet():
+    """field_meta object for use across tests
+    """
+    
+    dws = DataWorksheet({'name': 'DF',
+                         'title': 'My data table',
+                         'description': 'This is a test data worksheet',
+                         'external': None})
+
+    return dws

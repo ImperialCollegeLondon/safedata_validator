@@ -1,11 +1,11 @@
-from itertools import groupby
+from itertools import groupby, islice
+from collections import OrderedDict
 from logging import ERROR, WARNING, INFO
-from typing import Iterable
-
 from openpyxl import worksheet
 from openpyxl.utils import get_column_letter
+from typing import List
 
-from safedata_validator.validators import (IsNotBlank, IsNotExcelError, IsNotPadded,
+from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError, IsNotPadded,
                                            HasDuplicates, IsNotNA, IsNumber, 
                                            IsNotNumericString, IsString, IsLocName,
                                            blank_value, valid_r_name, RE_DMS)
@@ -15,10 +15,10 @@ from safedata_validator.dataset import Dataset
 from safedata_validator.locations import Locations
 from safedata_validator.taxa import Taxa
 
-
 MANDATORY_DESCRIPTORS = {'field_type', 'description', 'field_name'}
 OPTIONAL_DESCRIPTORS = {'levels', 'method', 'units', 'taxon_name', 'taxon_field',
                         'interaction_name', 'interaction_field', 'file_container'}
+
 
 class DataWorksheet:
 
@@ -29,21 +29,34 @@ class DataWorksheet:
     wide resources, such as Locations, Taxa and Extents.
     """
 
-    def __init__(self, sheet_meta: dict, worksheet: worksheet, 
-                 dataset: Dataset = None) -> None:
+    @loggerinfo_push_pop('Checking data worksheet')
+    def __init__(self, 
+                 sheet_meta: dict,   # TODO Is this really needed by the object?
+                 taxa: Taxa = None,
+                 locations: Locations = None,
+                 dataset: Dataset = None,
+                 ) -> None:
         
         """
-        A method to load and check the formatting and content of a
-        data worksheet, turning the dictionary for this worksheet
-        in the dataset object into a DataWorksheet object.
+        This class is used to load and validate the formatting and content of a
+        data worksheet. Checking a DataWorksheet has the following workflow:
+
+        1) Create a DataWorksheet instance using the field metadata.
+        2) Use calls to the validate_data_rows method to pass in field
+           contents - this can be done repeatedly to handle chunked inputs.
+        3) Call the report method to obtain all of the logging associated 
+           with data validation and any final checks.
+
         Args:
             sheet_meta: The metadata dictionary for this worksheet from
                 the summary worksheet, containing the worksheet name, 
                 title and description and the names of any external files 
                 to be associated with this worksheet.
-            worksheet: The openpyxl Worksheet instance containing the data
-                to be validated.
-            dataset: A safedata_validator Dataset object containing 
+            field_meta: The field metadata as an OrderedDict - ordered from
+                top to bottom as they appear in the source file - keyed by
+                field descriptor with values as a list of field values for
+                that descriptor.
+            dataset: A safedata_validator Dataset object. 
             taxa: A safedata_validator Taxa instance for use in validating
                 taxon fields and traits
             locations: A safedata_validator Locations instance for use in
@@ -52,52 +65,298 @@ class DataWorksheet:
                 dataset level metadata like extents.
         """
 
-        # set defaults
+        # Set initial values
+        
+        # TODO - checks on sheetmeta 
         self.name = sheet_meta['name']
         self.description = sheet_meta['description']
         self.title = sheet_meta['title']
-        self.max_row = 0
-        self.max_col = 0
-        self.descriptors = None
-        self.taxa_fields = None
-        self.field_name_row = None
-        self.fields = []
-        self.external = None
-        self.worksheet = worksheet
-        self.dataset = dataset
-
         # For sheet meta with an external file, add in the external file name
-        if sheet_meta['external'] is not None:
-            self.external = sheet_meta['external']
+        self.external = sheet_meta.get('external')
 
-    def load(self, taxa, locations, summary):
+        # Links to reference objects for dataset level information, and taxa and
+        # location validation lists.
+        self.dataset = dataset
+        self.taxa = taxa
+        self.locations = locations
 
-        start_errors = CH.counters['ERROR']
-        LOGGER.info(f'Checking data worksheet {self.name}')
+        # set up a dictionary to map field types to BaseField subclasses
+        field_subclasses = BaseField.__subclasses__()
+        self.field_subclass_map = {}
+        for subc in field_subclasses:
+            self.field_subclass_map.update({ftype: subc for ftype in subc.field_types})
 
-        self._load_meta_and_size()
+        # Create the field meta attributes, populated using validate_field_meta
+        self.fields_loaded = False
+        self.field_meta = None
+        self.n_fields = None
+        self.n_descriptors = None
+        self.fields = None
+        self.taxa_fields = None
+
+        # Keep track of row numbering
+        self.n_row = 0
+        self.current_row = 1
+        self.row_numbers_sequential = True
+        self.row_numbers_missing = False
+        self.row_numbers_noninteger = False
+        self.start_errors = CH.counters['ERROR']
+
+    @loggerinfo_push_pop('Validating field metadata')
+    def validate_field_meta(self, field_meta: OrderedDict) -> List[dict]:
+        """This method is used to add and validate field_meta. The requirement
+        of an OrderedDict for field_meta is to check that the field name is the
+        last row in the metadata. A dict should by enough in Python 3.7+ where
+        insertion order is guaranteed, but OrderedDict is currently used to
+        cover 3.6 and to make the requirement explicit.
+        """
+
+        # Checking field_meta - TODO more checking of structure
+
+        # - Descriptors
+        # Clean off whitespace padding?
+        clean_descriptors = IsNotPadded(field_meta.keys())
+        if not clean_descriptors:
+            # Report whitespace padding and clean up tuples
+            LOGGER.error('Whitespace padding in descriptor names: ', 
+                         extra={'join': clean_descriptors.failed})
+            
+            # Order preserved in dict and validator
+            cleaned_entries = [(ky, val) for ky, val 
+                               in zip(clean_descriptors, field_meta.values())]
+            field_meta = OrderedDict(cleaned_entries)
+
+
+        # * Check for mandatory descriptors
+        mandatory_missing = set(MANDATORY_DESCRIPTORS).difference(field_meta.keys())
+        if mandatory_missing:
+            LOGGER.error('Mandatory field descriptors missing: ', 
+                         extra={'join': mandatory_missing})
+            return False, None
+
+        # * Expected descriptors - do _not_ preclude user defined descriptors
+        #   but warn about them to alert to typos.
+        unknown_descriptors = set(field_meta.keys()).difference(
+                                MANDATORY_DESCRIPTORS.union(OPTIONAL_DESCRIPTORS))
+        if unknown_descriptors:
+            LOGGER.warning('Unknown field descriptors:', 
+                           extra={'join': unknown_descriptors})
+
+        # * Check for field name as _last_ descriptor. This is primarily to
+        #   make it easy to read the dataframe - just skip the other descriptors
+        if list(field_meta.keys())[-1] != 'field_name':
+                LOGGER.error('Field_name row is not the last descriptor')
+        
+        # Repackage field metadata into a list of per field descriptor
+        # dictionaries, _importantly_ preserving the column order.
+        field_meta = [dict(zip(field_meta.keys(), val)) 
+                        for val in zip(*field_meta.values())]
+
+        # Insert column index
+        for idx, fld in enumerate(field_meta):
+            fld['col_idx'] = idx + 1
+        
+        # Check field names are unique. This doesn't cause as many problems as
+        # duplications in Taxa and Locations, which expect certain fields, so
+        # warn and continue. Ignore empty mandatory values - these are handled
+        # in field checking.
+        field_names = [fld['field_name'] for fld in field_meta 
+                       if fld['field_name'] is not None]
+        dupes = HasDuplicates(field_names)
+        if dupes:
+            LOGGER.error('Field names duplicated: ', 
+                         extra={'join': dupes.duplicated})
+
+        # Lowercase the field types
+        for fld in field_meta:
+            fld['field_type'] = None if fld['field_type'] is None else fld['field_type'].lower()
+
+        # Populate the instance variables
+        self.fields_loaded = True
+        self.field_meta = field_meta
+        self.n_fields = len(field_meta)
+        self.n_descriptors = len(field_meta[0].keys())
+
+        # Now initialise the Field objects using the mapping of field types
+        # to the BaseField subclasses
+        self.fields = [self.field_subclass_map[fd['field_type']](fd) 
+                       for fd in self.field_meta]
+
+        # get taxa field names for cross checking observation and trait data
+        self.taxa_fields = [fld['field_name'] for fld in self.field_meta 
+                            if fld['field_type'] == 'taxa']
+
+    def validate_data_rows(self, data_rows):
+        """Method to pass rows of data into the field checkers for a
+        dataworksheet. The data is expected to be as an list of rows
+        from a data file, with the first entry in each row being a row
+        number.
+        """
+        if not self.fields_loaded:
+            LOGGER.critical('No fields defined - use validate_field_meta')
+            return
+
+        # Check the lengths of the rows - this should log critical
+        # because it is likely to be a programming error, not a user error.
+        if len(data_rows) == 0:
+            LOGGER.critical('Empty data_rows passed to validate_data_rows')
+            return
+
+        row_lengths = set([len(rw) for rw in data_rows])
+        if len(row_lengths) != 1:
+            LOGGER.critical('Data rows of unequal length - cannot validate')
+            return
+        elif row_lengths.pop() != (self.n_fields + 1):
+            LOGGER.critical('Data rows not of same length as field metadata - cannot validate')
+            return
+
+        # Count the rows, then convert the values into columns and extract the row numbers
+        self.n_row += len(data_rows)
+        data_cols = list(zip(*data_rows))
+        row_numbers = data_cols.pop(0)
+
+        # Check for bad values (blanks, non integers) in row numbers
+        row_numbers = IsNotBlank(row_numbers, keep_failed=False)
+
+        if not row_numbers:
+            self.row_numbers_missing = True
+        
+        row_numbers = row_numbers.values
+        
+        if any([not isinstance(vl, int) for vl in row_numbers]):
+            self.row_numbers_noninteger = True
+        
+        # Check the row numbering - skip if this has already failed or
+        # the row numbers have already included None or non-integers
+        if self.row_numbers_sequential and not (self.row_numbers_noninteger or self.row_numbers_missing):
+            expected_numbers = list(range(self.current_row, 
+                                           self.current_row + len(row_numbers)))
+            self.current_row += len(row_numbers)
+
+            if row_numbers != expected_numbers:
+                self.row_numbers_sequential = False
+        else:
+            self.current_row += len(row_numbers)
+
+        # Now feed the sets of values into the Field validation
+        for data, field_inst in zip(data_cols, self.fields):
+            field_inst.validate_data(data)
+
+    @loggerinfo_push_pop('Validating field data')
+    def report(self):
+        """ The validate_data_rows method accumulates logging messages
+        individual fields. This method causes these field logs to be 
+        emitted and then carries out final checks and reporting across
+        all of the field data.
+        """
+        
+        if not self.n_row:
+            if self.external is None:
+                LOGGER.error('No data passed for validation.')
+            else:
+                LOGGER.info('Data table description associated with '
+                            f'external file {self.external}')
+        else:
+            for fld in self.fields:
+                fld.report()
+
+        # Report on row numbering
+        if self.row_numbers_missing:
+            LOGGER.error("Missing row numbers in data")
+        
+        if self.row_numbers_noninteger:
+            LOGGER.error("Row numbers contain non-integer values")
+
+        if not (self.row_numbers_noninteger or self.row_numbers_missing) and not self.row_numbers_sequential:
+            LOGGER.error("Row numbers not consecutive or do not start with 1")
+        
+         # report on detected size
+        LOGGER.info(f"Worksheet '{self.name}' contains {self.n_descriptors} descriptors, "
+                    f"{self.n_row} data rows and {self.n_fields} fields")
+
+        # reporting
+        n_errors = CH.counters['ERROR'] - self.start_errors
+        if n_errors > 0:
+            LOGGER.info(f'Dataframe contains {n_errors} errors')
+        else:
+            LOGGER.info('Dataframe formatted correctly')
+
+    @loggerinfo_push_pop('Loading from worksheet')
+    def load_from_worksheet(self, worksheet: worksheet, row_chunk_size=1000):
+        """Populate a Dataworksheet instance from an openpyxl worksheet
+        
+        This method takes a fresh Dataworksheet instance and populates the
+        details using the contents of a SAFE formatted Excel spreadsheet.
+
+        To keep memory requirements low, any data in the worksheet is validated
+        by loading sets of rows containing at most `row_chunk_size` rows. Note
+        that this will only actually reduce memory use for openpyxl
+        ReadOnlyWorksheets, as these load data on demand, but will still work
+        on standard Worksheets.
+
+        Args:
+            worksheet: 
+            row_chunk_size:
+        """
 
         # TODO - openpyxl read-only mode provides row by row data access and used lazy
         # loading to reduce memory usage. Scanning all of a column will need to
         # load all data (which the old implementation using xlrd did, but which
         # we might be also improve to reduce memory overhead by chunking large sheets).
         # Either way, should use row by row ingestion.
-        
-    def _load_meta_and_size(self):
 
-        # get the  data dimensions
-        self.max_col = self.worksheet.max_column
-        self.max_row = self.worksheet.max_row
+        if self.fields_loaded:
+            LOGGER.critical('Field metadata already loaded - use fresh instance.')
+            return
+
+        # get the data dimensions
+        max_row = worksheet.max_row
 
         # trap completely empty worksheets
-        if self.max_row == 0:
+        if max_row == 0:
             LOGGER.error('Worksheet is empty')
             return
 
-        # Read the field metadata first, using a set of rows that should sample well
-        # into any data present
+        # Read the field metadata first: 
+        # - There should be rows starting with a string and then rows starting with
+        #   a number, or a StopIteration at the end of the row iterator.
+        ws_rows = worksheet.iter_rows(values_only=True)
+        field_meta = []
+
+        # While there are rows and while they start with a string cell, collect
+        # field metadata
+        for row in ws_rows:
+            if isinstance(row[0], str):
+                field_meta.append(row)
+            else:
+                break
+
+
+        # Convert field meta to OrderedDict and validate
+        field_meta = OrderedDict(((rw[0], rw[1:]) for rw in field_meta))
+        self.validate_field_meta(field_meta)
+
+        # Get an iterator on the data rows
+        data_rows = worksheet.iter_rows(min_row=len(field_meta) + 1,
+                                        values_only=True)
+
+        # Load and validate chunks of data
+        n_chunks = ((max_row -  self.n_descriptors) // row_chunk_size) + 1
+        for chunk in range(n_chunks):
+            
+            # itertools.islice handles generators and StopIteration, and also
+            # trap empty slices
+            data = list(islice(data_rows, row_chunk_size))
+            if data:
+                self.validate_data_rows(data)
+        
+        # Finish up
+        self.report()
+
+    def _old_load_waste_code():
+        """Code from old version that may need to work back into new approach"""
         row_sample = len(MANDATORY_DESCRIPTORS) + len(OPTIONAL_DESCRIPTORS) + 10
-        ws_rows = self.worksheet.iter_rows(values_only=True, max_row=row_sample)
+        
         field_meta = [r for r in ws_rows]
         
         # Get the sequence of column types
@@ -116,95 +375,21 @@ class DataWorksheet:
         # for checking later.
         if first_column_type_seq == [str]:
             LOGGER.error('Cannot parse data: Column A appears to contain '
-                         f'more than {row_sample} decriptor names.')
+                            f'more than {row_sample} decriptor names.')
             return
         elif first_column_type_seq not in ([str],
-                                         [str, int],
-                                         [str, type(None)],
-                                         [str, int, type(None)]):
+                                            [str, int],
+                                            [str, type(None)],
+                                            [str, int, type(None)]):
             LOGGER.error('Cannot parse data: Column A must contain a set of '
-                         'field descriptors and then row numbers')
+                            'field descriptors and then row numbers')
             return
 
         # Reduce to meta, check descriptors and convert to field dictionaries
         n_field_meta = first_column_rle[0][1]
         field_meta = [field_meta[i] for i in range(n_field_meta)]
-        field_descriptors = [r[0] for r in field_meta]
-        
-        # Whitespace padding?
-        clean_descriptors = IsNotPadded(field_descriptors)
-        if not clean_descriptors:
-            # Report whitespace padding and clean up tuples
-            LOGGER.error('Whitespace padding in descriptor names: ', 
-                         extra={'join': clean_descriptors.failed})
-            
-            for idx, cln in enumerate(clean_descriptors):
-                field_meta[idx] = tuple([cln] + list(field_meta[idx][1:]))
-            
-            field_descriptors = clean_descriptors.values
-
-        # * Check for mandatory descriptors
-        mandatory_missing = set(MANDATORY_DESCRIPTORS).difference(field_descriptors)
-        if mandatory_missing:
-            LOGGER.error('Mandatory field descriptors missing: ', 
-                         extra={'join': mandatory_missing})
-            return
-
-        # * Expected descriptors - do _not_ preclude user defined descriptors
-        #   but warn about them to alert to typos.
-        unknown_descriptors = set(field_descriptors).difference(
-                                MANDATORY_DESCRIPTORS.union(OPTIONAL_DESCRIPTORS))
-        if unknown_descriptors:
-            LOGGER.warning('Unknown field descriptors:', 
-                           extra={'join': unknown_descriptors})
-
-        # * Check for field name as _last_ descriptor. This is a bit picky but
-        #   it is a historical restriction and makes the dataframe more
-        #   readable.
-        if field_descriptors[-1] != 'field_name':
-                LOGGER.error('Cannot parse data: field_name row is not the last descriptor')
-                return
-        
-        # Repackage field metadata into a list of per field descriptor
-        # dictionaries, dropping the first column containing descriptors names
         self.field_name_row = n_field_meta
-        field_meta = [dict(zip(field_descriptors, vals)) for vals in zip(*field_meta)]
-        del field_meta[0]
 
-        # Insert column index
-        for idx, fld in enumerate(field_meta):
-            fld['col_idx'] = idx + 1
-        
-        # Check field names are unique. This doesn't cause as many problems as
-        # duplications in Taxa and Locations, which expect certain fields, so
-        # warn and continue. Ignore missing mandatory values - these are handled
-        # in field checking.
-        field_names = [fld['field_name'] for fld in field_meta 
-                       if fld['field_name'] is not None]
-        dupes = HasDuplicates(field_names)
-        if dupes:
-            LOGGER.error('Field names duplicated: ', 
-                         extra={'join': dupes.duplicated})
-
-        # Lowercase the field types
-        for fld in field_meta:
-            fld['field_type'] = None if fld['field_type'] is None else fld['field_type'].lower()
-
-        # get taxa field names for cross checking observation and trait data
-        self.taxa_fields = [fld['field_name'] for fld in field_meta if fld['field_type'] == 'taxa']
-
-        self.fields = field_meta
-    
-        # set up a dictionary to map field types to BaseField subclasses
-        field_subclasses = BaseField.__subclasses__()
-        field_subclass_map = {}
-        for subc in field_subclasses:
-            field_subclass_map.update({ftype: subc for ftype in subc.field_types})
-
-    def check_data(taxa, locations, summary):
-
-
-        
         # Now checking the data itself.
         if True:
             # Check if there is anything below the descriptors
@@ -235,31 +420,6 @@ class DataWorksheet:
                     else:
                         LOGGER.error('Un-numbered rows at end of worksheet contain data')
                         break
-
-        # report on detected size
-        dwsh.n_data_row = dwsh.max_row - dwsh.field_name_row
-        LOGGER.info('Worksheet contains {n_d} descriptors, {o.n_data_row} data rows and '
-                    '{n_f} fields'.format(o=dwsh, n_d=len(dwsh.descriptors), n_f=dwsh.max_col - 1),
-                    extra={'indent_after': 2})
-
- 
-        # check the data in each field against the metadata
-        for meta in metadata:
-            # read the values and check them against the metadata
-            data = worksheet.col(meta['col_idx'], dwsh.field_name_row, dwsh.max_row)
-            self.check_field(dwsh, meta, data)
-
-        # add the new DataWorksheet into the Dataset
-        self.dataworksheets.append(dwsh)
-
-        # reporting
-        n_errors = CH.counters['ERROR'] - start_errors
-        if n_errors > 0:
-            LOGGER.info('Dataframe contains {} errors'.format(n_errors),
-                        extra={'indent_before': 1})
-        else:
-            LOGGER.info('Dataframe formatted correctly',
-                        extra={'indent_before': 1})
 
 
 class BaseField:
@@ -353,9 +513,8 @@ class BaseField:
                       "Common errors are spaces and non-alphanumeric "
                       "characters other than underscore and full stop")
 
-        # TODO - reimplement these two class attributes and steps as a single
-        #        subclass specific extra meta method stub (_check_meta_extra?)
-        #        that can be overloaded as required by subclasses?
+        # TODO - rethink implementation? Quite specific behaviour unique to 
+        #        some fields, so could implement as overloaded extra stub.
         if self.check_taxon_meta:
             self._check_taxon_meta()
         
@@ -375,6 +534,7 @@ class BaseField:
         Args:
             meta: A dictionary of field metadata descriptors
             descriptor: The name of the descriptor to check.
+        
         Returns:
             A boolean, with True showing no problems and False showing
             that warnings occurred.
@@ -400,106 +560,143 @@ class BaseField:
         else:
             return True
 
-    def _check_taxon_meta(self, taxa_fields):
+    def _check_taxon_meta(self):
 
         """
-        Checks the taxonomic metadata of abundance and trait fields.
-        This is more involved that the simple _check_meta(), because
-        of the option to provide taxon_name or taxon_field descriptors
-        Args:
-            meta: A dictionary of metadata descriptors for the field
-            taxa_fields: A list of Taxa fields in this worksheet.
+        Checks the taxonomic metadata of abundance and trait fields. This is
+        more involved that the simple _check_meta(), because of the option to
+        provide taxon_name or taxon_field descriptors.
+        
         Returns:
-            A boolean, with True showing no problems and False showing
-            that warnings occurred.
+            A boolean, with True showing no problems and False showing that
+            warnings occurred.
         """
 
         # Are taxon_name and taxon_field provided and not blank: note use of
         # 'and' rather than '&' to allow missing descriptors to short cut
 
-        tx_nm_prov = ('taxon_name' in self.meta) and (not is_blank(self.field_meta['taxon_name']))
-        tx_fd_prov = ('taxon_field' in self.field_meta) and (not is_blank(self.field_meta['taxon_field']))
+        tx_nm = self.meta.get('taxon_name')
+        tx_fd = self.meta.get('taxon_field')
+        tx_nm_prov = not blank_value(tx_nm)
+        tx_fd_prov = not blank_value(tx_fd)
 
         if tx_nm_prov and tx_fd_prov:
             LOGGER.error('Taxon name and taxon field both provided, use one only')
             return False
-        elif tx_nm_prov and meta['taxon_name'] not in self.taxon_names:
-            LOGGER.error('Taxon name not found in the Taxa worksheet')
-            return False
-        elif tx_fd_prov and meta['taxon_field'] not in taxa_fields:
-            LOGGER.error("Taxon field not found in this worksheet")
-            return False
         elif not tx_nm_prov and not tx_fd_prov:
             LOGGER.error("One of taxon name or taxon field must be provided")
             return False
+        elif tx_nm_prov and self.taxa is None:
+            LOGGER.error('Taxon name provided but no taxa loaded')
+            return False
+        elif tx_nm_prov and tx_nm not in self.taxa.taxon_names:
+            LOGGER.error('Taxon name not found in the Taxa worksheet')
+            return False
+        elif tx_nm_prov:
+            self.taxa.taxon_names_used.add(tx_nm)
+            return True
+        elif tx_fd_prov and self.dwsh is None:
+            LOGGER.critical(f"Taxon field provided but no dataworksheet provided for this field: {tx_fd}")
+            return False
+        elif tx_fd_prov and tx_fd not in self.dwsh.taxa_fields:
+            LOGGER.error(f"Taxon field not found in this worksheet: {tx_fd}")
+            return False
         else:
-            if tx_nm_prov:
-                self.taxon_names_used.update([meta['taxon_name']])
             return True
 
-    def _check_interaction_meta(self, taxa_fields):
+    def _check_interaction_meta(self):
 
         """
-        Checks the taxonomic metadata of interaction fields.
-        This is more involved that the simple _check_meta(), because
-        of the option to provide taxon_name or taxon_field descriptors
-        describing at least two taxonomic identifiers.
+        Checks the taxonomic metadata of interaction fields. This is more
+        involved that the simple _check_meta(), because of the option to provide
+        taxon_name or taxon_field descriptors describing at least two taxonomic
+        identifiers.
+
         Args:
             meta: A dictionary of metadata descriptors for the field
             taxa_fields: A list of Taxa fields in this worksheet.
+        
         Returns:
-            A boolean, with True showing no problems and False showing
-            that warnings occurred.
+            A boolean, with True showing no problems and False showing that
+            warnings occurred.
         """
 
-        # Are interaction_name and/or interaction_field provided and not blank:
-        #  note use of 'and' rather than '&' to allow missing descriptors to short cut
+        # TODO - currently no checking for descriptions being present in
+        #        the interaction information. Not sure how many old datasets
+        #        would be affected, but this would be good to include.
 
-        iact_nm_prov = ('interaction_name' in meta) and (not is_blank(meta['interaction_name']))
-        iact_fd_prov = ('interaction_field' in meta) and (not is_blank(meta['interaction_field']))
+        # Are interaction_name and/or interaction_field provided and not blank
+        iact_nm = self.meta.get('interaction_name')
+        iact_fd = self.meta.get('interaction_field')
+        iact_nm_prov = not blank_value(iact_nm)
+        iact_fd_prov = not blank_value(iact_fd)
 
         if not iact_nm_prov and not iact_fd_prov:
             LOGGER.error("At least one of interaction name or interaction field must be provided")
             return False
-        else:
-            if iact_nm_prov:
-                # get the taxon names and descriptions from interaction name providers
-                int_nm_lab, int_nm_desc = self._parse_levels(meta['interaction_name'])
-                # add names to used taxa
-                self.taxon_names_used.update(int_nm_lab)
-                # check they are found
-                if not all([lab in self.taxon_names for lab in int_nm_lab]):
-                    LOGGER.error('Unknown taxa in interaction_name descriptor')
-                    nm_check = False
-                else:
+        elif iact_nm_prov and self.taxa is None:
+            LOGGER.error('Interaction name provided but no taxa loaded')
+            return False
+        elif iact_fd_prov and self.dwsh is None:
+            LOGGER.critical(f"Interaction field provided but no dataworksheet provided for this field: {iact_fd}")
+            return False
 
-                    nm_check = True
+        if iact_nm_prov:
+            # get the taxon names and descriptions from interaction name providers
+            iact_nm_lab, iact_nm_desc = self._parse_levels(iact_nm)
+
+            # add names to used taxa
+            self.taxa.taxon_names_used.update(iact_nm_lab)
+
+            # check they are found
+            iact_nm_lab = IsInSet(iact_nm_lab, self.taxa.taxon_names)
+
+            if not iact_nm_lab:
+                LOGGER.error('Unknown taxa in interaction_name descriptor',
+                             extra={'join': iact_nm_lab.failed})
+                nm_check = False
             else:
-                int_nm_lab, int_nm_desc = [(), ()]
+
                 nm_check = True
+            
+            iact_nm_lab = iact_nm_lab.values
+        else:
+            iact_nm_lab = []
+            iact_nm_desc = ()
+            nm_check = True
 
-            if iact_fd_prov:
-                # check any field labels match to known taxon fields
-                int_fd_lab, int_fd_desc = self._parse_levels(meta['interaction_field'])
-                if not all([lab in taxa_fields for lab in int_fd_lab]):
-                    LOGGER.error('Unknown taxon fields in interaction_field descriptor')
-                    fd_check = False
-                else:
-                    fd_check = True
+        if iact_fd_prov:
+            # check any field labels match to known taxon fields
+            iact_fd_lab, iact_fd_desc = self._parse_levels(iact_fd)
+
+            iact_fd_lab = IsInSet(iact_fd_lab, self.dwsh.taxa_fields)
+            if not iact_fd_lab:
+                LOGGER.error('Unknown taxon fields in interaction_field descriptor',
+                             extra={'join': iact_fd_lab.failed})
+                fd_check = False
             else:
-                int_fd_lab, int_fd_desc = [(), ()]
                 fd_check = True
+            
+            iact_fd_lab = iact_fd_lab.values
+        else:
+            iact_fd_lab = []
+            iact_fd_desc = ()
+            fd_check = True
 
-            if len(int_nm_lab + int_fd_lab) < 2:
-                LOGGER.error('At least two interacting taxon labels or fields must be identified')
-                num_check = False
-            else:
-                num_check = True
+        if len(iact_nm_lab + iact_fd_lab) < 2:
+            LOGGER.error('At least two interacting taxon labels or fields must be identified')
+            num_check = False
+        else:
+            num_check = True
 
-            if nm_check and fd_check and num_check:
-                return True
-            else:
-                return False
+        all_desc = iact_nm_desc + iact_fd_desc
+        if None in all_desc:
+            LOGGER.warning('Label descriptions for interacting taxa incomplete or missing')
+
+        if nm_check and fd_check and num_check:
+            return True
+        else:
+            return False
 
     def _parse_levels(self, txt):
         """
@@ -554,13 +751,32 @@ class BaseField:
 
         return level_labels, level_desc
 
+    @classmethod
+    def field_type_map(cls):
+        """This helper function returns a dictionary that maps field types for the
+        a Field class and all nested subclasses to the class that handles them"""
+
+        field_type_map = {}
+
+        # Create a stack starting with the calling class
+        classes = cls.__subclasses__() 
+
+        # Pop subclasses while the stack is not empty
+        while classes:
+            # Get a field class
+            current_field_class = classes.pop(0)
+
+            # Add any subclasses from that class
+            classes.extend(current_field_class.__subclasses__())
+            
+            # Extend the field map
+            for ftype in current_field_class.field_types:
+                field_type_map.update({ftype: current_field_class})
+
+        return field_type_map
 
 
-
-
-
-
-        # run consistency checks where needed and trap unknown field types
+        # run consistency checks where needed and trap unknown field types if
         if field_type == 'date':
             self.check_field_datetime(meta, data, which='date')
         elif field_type == 'datetime':
@@ -578,26 +794,30 @@ class BaseField:
         elif field_type == 'abundance':
             self.check_field_abundance(meta, data, dwsh.taxa_fields)
         elif field_type in ['categorical trait', 'ordered categorical trait']:
-            self.check_field_trait(meta, data, dwsh.taxa_fields, which='categorical')
+            self.check_field_trait(meta, data, dwsh.taxa_fields,
+            which='categorical')
         elif field_type == 'numeric trait':
-            self.check_field_trait(meta, data, dwsh.taxa_fields, which='numeric')
+            self.check_field_trait(meta, data, dwsh.taxa_fields,
+            which='numeric')
         elif field_type in ['categorical interaction', 'ordered categorical interaction']:
-            self.check_field_interaction(meta, data, dwsh.taxa_fields, which='categorical')
+            self.check_field_interaction(meta, data, dwsh.taxa_fields,
+            which='categorical')
         elif field_type == 'numeric interaction':
-            self.check_field_interaction(meta, data, dwsh.taxa_fields, which='numeric')
+            self.check_field_interaction(meta, data, dwsh.taxa_fields,
+            which='numeric')
         elif field_type == 'latitude':
-            # check field geo expects values in data not xlrd.Cell
-            data = [dt.value for dt in data]
+            # check field geo expects values in data not xlrd.Cell 
+            data = [dt.value for dt in data] 
             self.check_field_geo(meta, data, which='latitude')
         elif field_type == 'longitude':
             # check field geo expects values in data not xlrd.Cell
-            data = [dt.value for dt in data]
+            data = [dt.value for dt in data] 
             self.check_field_geo(meta, data, which='longitude')
         elif field_type == 'file':
-            data = [dt.value for dt in data]
+            data = [dt.value for dt in data] 
             self.check_field_file(meta, data)
         elif field_type in ['replicate', 'id']:
-            # We've looked for missing data, no other constraints.
+            # We've looked for missing data, no other constraints. 
             pass
         elif field_type == 'comments':
             pass
@@ -899,43 +1119,76 @@ class GeoField(BaseField):
                 self.dataset.longitudinal_extent.update([self.min, self.max])
 
 
+class NumericTaxonField(NumericField):
 
-def check_field_geo(self, meta, data, which='latitude'):
+    """Checks abundance and numeric trait fields, which are just  NumericFields
+    with taxon reporting requirements turned on."""
 
+    # BREAKING CHANGE - abundance did not previosly require 'units' as metadata,
+    # which is stupid in retrospect. Individuals? Individuals per m2? Individuals
+    # per hour? I do not know how many existing datasets will fall foul of this.
+
+    field_types = ('abundance', 'numeric trait')
+    check_taxon_meta = True
+
+
+class CategoricalTaxonField(CategoricalField):
+
+    """Checks categorical trait fields, which are just CategoricalFields
+    with taxon reporting requirements turned on."""
+
+    field_types = ('categorical trait')
+    check_taxon_meta = True
+
+
+class NumericInteractionField(NumericField):
+
+    """Checks numeric interaction fields, which are just  NumericFields
+    with interaction reporting requirements turned on."""
+
+    field_types = ('numeric interaction')
+    check_interaction_meta = True
+
+
+class CategoricalInteractionField(CategoricalField):
+
+    """Checks categorical interaction fields, which are just CategoricalFields
+    with interaction reporting requirements turned on."""
+
+    field_types = ('categorical interaction')
+    check_interaction_meta = True
+
+
+
+
+
+
+
+def check_field_file(self, meta, data):
     """
-    Checks geographic coordinates. It also automatically updates
-    the geographic extent of the dataset.
+    Checks file fields. The data values need to match to an external file
+    or can be contained within an archive file provided in the 'file_container'
+    descriptor.
     Args:
         meta: A dictionary of metadata descriptors for the field
         data: A list of data values
-        which: One of latitude or longitude
     """
+    
+    if self.external_files is None:
+        LOGGER.error('No external files listed in Summary')
+        return
+    
+    external_names = {ex['file'] for ex in self.external_files}
 
-    # Are the values represented as decimal degrees - numeric.
-    nums = [dt for dt in data if isinstance(dt, float)]
-
-    if len(nums) < len(data):
-        LOGGER.error('Field contains non-numeric data')
-        if any([RE_DMS.search(str(dt)) for dt in data]):
-            LOGGER.warn('Possible degrees minutes and seconds formatting? Use decimal degrees')
-
-    # Check the locations
-    if len(nums):
-        min_geo = float(min(nums))
-        max_geo = float(max(nums))
-        extent = (min_geo, max_geo)
-        valid = self.validate_geo_extent(extent, which)
-
-        if valid:
-            # update the field metadata and the dataset extent
-            meta['range'] = extent
-            # Look up the extent name to update and then update it
-            which_extent = {'latitude': 'latitudinal_extent',
-                            'longitude': 'longitudinal_extent'}
-            self.update_extent(extent, float, which_extent[which])
-
-
-
+    if 'file_container' in meta and meta['file_container'] is not None:
+        if meta['file_container'] not in external_names:
+            LOGGER.error(
+                "Field file_container value not found in external files: {}".format(meta['file_container']))
+    else:
+        missing_files = set(data) - external_names
+        if missing_files:
+            LOGGER.error("Field contains files not listed in external files: ",
+                            extra={'join': missing_files})
 
 
 class DatetimeField(BaseField):
@@ -1038,136 +1291,3 @@ class DatetimeField(BaseField):
             meta['range'] = extent
             if which in ['date', 'datetime']:
                 self.update_extent(extent, datetime.datetime, 'temporal_extent')
-
-
-
-def check_field_abundance(self, meta, data, taxa_fields):
-
-    """
-    Checks abundance type data, reporting to the Messages instance.
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values, allegedly numeric
-        taxa_fields: A list of Taxa fields in this worksheet.
-    """
-
-    # check the required descriptors
-    self._check_meta(meta, 'method')
-    self._check_taxon_meta(meta, taxa_fields)
-
-    # Can still check values are numeric, whatever happens above.
-    # We're not going to insist on integers here - could be mean counts.
-    nums = [dt.value for dt in data if dt.ctype == xlrd.XL_CELL_NUMBER]
-
-    if len(nums) < len(data):
-        LOGGER.error('Field contains non-numeric data')
-
-    # update the field metadata if there is any data.
-    if len(nums):
-        meta['range'] = (min(nums), max(nums))
-
-
-
-def check_field_trait(self, meta, data, taxa_fields, which='categorical'):
-
-    """
-    Checks trait type data and reports to the Messages instance. Just a wrapper
-    to check that a valid taxon has been provided before handing off to
-    check_field_categorical or check_field_numeric
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values, allegedly numeric
-        taxa_fields: A list of Taxa fields in this worksheet.
-        which: The type of trait data in the field
-    """
-
-    # Check required descriptors
-    self._check_taxon_meta(meta, taxa_fields)
-
-    # Regardless of the outcome of the meta checks, check the contents:
-    if which == 'categorical':
-        self.check_field_categorical(meta, data)
-    elif which == 'numeric':
-        self.check_field_numeric(meta, data)
-
-def check_field_interaction(self, meta, data, taxa_fields, which='categorical'):
-
-    """
-    Checks interaction type data and reports to the Messages instance.
-    Just a wrapper to check that intercating taxa have been identified
-    before handing off to check_field_categorical or check_field_numeric
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values, allegedly numeric
-        taxa_fields: A list of Taxa fields in this worksheet.
-        which: The type of trait data in the field
-    """
-
-    # Check required descriptors
-    self._check_interaction_meta(meta, taxa_fields)
-
-    # Regardless of the outcome of the meta checks, check the contents:
-    if which == 'categorical':
-        self.check_field_categorical(meta, data)
-    elif which == 'numeric':
-        self.check_field_numeric(meta, data)
-
-def check_field_geo(self, meta, data, which='latitude'):
-
-    """
-    Checks geographic coordinates. It also automatically updates
-    the geographic extent of the dataset.
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values
-        which: One of latitude or longitude
-    """
-
-    # Are the values represented as decimal degrees - numeric.
-    nums = [dt for dt in data if isinstance(dt, float)]
-
-    if len(nums) < len(data):
-        LOGGER.error('Field contains non-numeric data')
-        if any([RE_DMS.search(str(dt)) for dt in data]):
-            LOGGER.warn('Possible degrees minutes and seconds formatting? Use decimal degrees')
-
-    # Check the locations
-    if len(nums):
-        min_geo = float(min(nums))
-        max_geo = float(max(nums))
-        extent = (min_geo, max_geo)
-        valid = self.validate_geo_extent(extent, which)
-
-        if valid:
-            # update the field metadata and the dataset extent
-            meta['range'] = extent
-            # Look up the extent name to update and then update it
-            which_extent = {'latitude': 'latitudinal_extent',
-                            'longitude': 'longitudinal_extent'}
-            self.update_extent(extent, float, which_extent[which])
-
-def check_field_file(self, meta, data):
-    """
-    Checks file fields. The data values need to match to an external file
-    or can be contained within an archive file provided in the 'file_container'
-    descriptor.
-    Args:
-        meta: A dictionary of metadata descriptors for the field
-        data: A list of data values
-    """
-    
-    if self.external_files is None:
-        LOGGER.error('No external files listed in Summary')
-        return
-    
-    external_names = {ex['file'] for ex in self.external_files}
-
-    if 'file_container' in meta and meta['file_container'] is not None:
-        if meta['file_container'] not in external_names:
-            LOGGER.error(
-                "Field file_container value not found in external files: {}".format(meta['file_container']))
-    else:
-        missing_files = set(data) - external_names
-        if missing_files:
-            LOGGER.error("Field contains files not listed in external files: ",
-                            extra={'join': missing_files})

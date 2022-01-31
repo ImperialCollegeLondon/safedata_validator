@@ -2,7 +2,6 @@ import re
 from numbers import Number
 from collections import Counter
 from collections.abc import Iterable
-import openpyxl
 from typing import Any
 
 from safedata_validator import NA_type
@@ -24,6 +23,8 @@ RE_R_ELLIPSIS = re.compile(r'^\\.{2}[0-9]+$|^\\.{3}$')
 RE_R_NAME_CHARS = re.compile(r'^[\w\.]+$')
 RE_R_NAME_BAD_START = re.compile(r'^_|^\\.[0-9]')
 
+# String values returned by openpyxl for errors when worksheets opened using
+# data_only=True 
 EXCEL_ERRORS = set(["#DIV/0!", "#NAME?", "#N/A", "#NUM!", "#VALUE!", 
                     "#REF!",  "#NULL!", "#SPILL!", "#CALC!"])
 
@@ -165,6 +166,7 @@ class IsNotNumericString(Filter):
     def rfunc(val):
         return val
 
+
 class IsLocName(Filter):
 
     @staticmethod
@@ -238,6 +240,7 @@ class IsNotNA(Filter):
     def rfunc(val):
         return val
 
+
 class IsNotExcelError(Filter):
 
     @staticmethod
@@ -247,6 +250,7 @@ class IsNotExcelError(Filter):
     @staticmethod
     def rfunc(val):
         return val
+
 
 class IsLower(Filter):
 
@@ -302,6 +306,44 @@ class HasDuplicates:
 
     def __repr__(self):
         return str(bool(len(self.duplicated)))
+
+
+class IsInSet:
+
+    def __init__(self, values, test_set):
+        """Test whether all values are found in test_set.
+
+        Args:
+            values: An iterable of values to be filtered
+            test_set: Another iterable containing accepted values
+
+        Attributes:
+            failed: A list of failing values
+            values: An iterable of values found in set
+        """
+
+        self.failed = []
+        self.test_set = test_set
+        self.values = [v for v in self._filter(values)]
+
+    def _filter(self, values):
+
+        for val in values:
+            if val in self.test_set:
+                yield val
+            else:
+                self.failed.append(val)
+
+    def __bool__(self):
+        return not self.failed
+
+    def __repr__(self):
+        return str(not self.failed)
+
+    def __iter__(self):
+        yield from self.values
+
+
 
 # INFO - pandas has Excel reading including vectorised string operations?
 #        It uses openpyxl for xlsx but doesn't seem to use the memory optimised

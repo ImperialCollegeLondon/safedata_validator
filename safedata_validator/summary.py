@@ -107,6 +107,7 @@ class Summary:
         self.funders = None
         self.keywords = None
         self.temporal_extent = Extent('temporal extent', datetime.date)
+        # TODO - take these bounds from Resources
         self.latitudinal_extent = Extent('latitudinal extent', (float, int),
                                          hard_bounds=(-90,90), soft_bounds=(-4, 8))
         self.longitudinal_extent = Extent('longitudinal extent', (float, int),
