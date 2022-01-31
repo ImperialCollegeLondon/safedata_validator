@@ -778,56 +778,6 @@ class BaseField:
         return field_type_map
 
 
-        # run consistency checks where needed and trap unknown field types if
-        if field_type == 'date':
-            self.check_field_datetime(meta, data, which='date')
-        elif field_type == 'datetime':
-            self.check_field_datetime(meta, data, which='datetime')
-        elif field_type == 'time':
-            self.check_field_datetime(meta, data, which='time')
-        elif field_type == 'taxa':
-            self.check_field_taxa(data)
-        elif field_type == 'location':
-            self.check_field_locations(data)
-        elif field_type in ['categorical', 'ordered categorical']:
-            self.check_field_categorical(meta, data)
-        elif field_type == 'numeric':
-            self.check_field_numeric(meta, data)
-        elif field_type == 'abundance':
-            self.check_field_abundance(meta, data, dwsh.taxa_fields)
-        elif field_type in ['categorical trait', 'ordered categorical trait']:
-            self.check_field_trait(meta, data, dwsh.taxa_fields,
-            which='categorical')
-        elif field_type == 'numeric trait':
-            self.check_field_trait(meta, data, dwsh.taxa_fields,
-            which='numeric')
-        elif field_type in ['categorical interaction', 'ordered categorical interaction']:
-            self.check_field_interaction(meta, data, dwsh.taxa_fields,
-            which='categorical')
-        elif field_type == 'numeric interaction':
-            self.check_field_interaction(meta, data, dwsh.taxa_fields,
-            which='numeric')
-        elif field_type == 'latitude':
-            # check field geo expects values in data not xlrd.Cell 
-            data = [dt.value for dt in data] 
-            self.check_field_geo(meta, data, which='latitude')
-        elif field_type == 'longitude':
-            # check field geo expects values in data not xlrd.Cell
-            data = [dt.value for dt in data] 
-            self.check_field_geo(meta, data, which='longitude')
-        elif field_type == 'file':
-            data = [dt.value for dt in data] 
-            self.check_field_file(meta, data)
-        elif field_type in ['replicate', 'id']:
-            # We've looked for missing data, no other constraints. 
-            pass
-        elif field_type == 'comments':
-            pass
-        elif field_type is None:
-            LOGGER.error('Field type is empty')
-        else:
-            LOGGER.error('Unknown field type {field_type}'.format(**meta))
-
     def validate_data(self, data: list):
         """Validates a list of data provided for a field. 
 
@@ -912,6 +862,11 @@ class CommentField(BaseField):
 
     field_types = ('comments', )
     no_validation = True
+
+
+class ReplicateField(BaseField):
+
+    field_types = ('replicate', 'id')
 
 
 class NumericField(BaseField):

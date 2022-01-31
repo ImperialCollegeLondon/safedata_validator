@@ -1,9 +1,11 @@
 from collections import OrderedDict
+from curses import ERR
 import pytest
 from logging import CRITICAL, ERROR, WARNING, INFO
 from datetime import datetime, time, date
 
-from safedata_validator.field import (BaseField, CommentField, CategoricalField, GeoField, 
+from safedata_validator.field import (BaseField, CommentField, ReplicateField, 
+                                      CategoricalField, GeoField, 
                                       NumericField, TaxaField, LocationsField, 
                                       NumericTaxonField, CategoricalTaxonField,
                                       NumericInteractionField, CategoricalInteractionField,
@@ -358,6 +360,45 @@ def test_CommentField_validate_data(caplog, data, expected_log):
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                for exp, rec in zip(expected_log, caplog.records)])
+
+# Replicate and ID field
+
+
+@pytest.mark.parametrize(
+  'data, expected_log',
+  [
+    ( [1, 2, 3, 4, 5, 6, 7, 8, 9], 
+      ( (INFO, "Checking Column replicate"),)),
+    ( ['Any', 'old', 5, 'rubbish', 'is', 'fine', 'including', 'NA'], 
+      ( (INFO, "Checking Column replicate"),
+        (WARNING, "1 / 8 values missing"))),
+    ( ['Any', 'old', 5, 'rubbish', 'is', 'fine', None, 'but not missing cells'], 
+      ( (INFO, "Checking Column replicate"),
+        (ERROR, "1 cells are blank or contain only whitespace text"))),
+    ( ['Any', 'old', 5, 'rubbish', 'is', 'fine', '  ', 'but not missing or empty string cells'], 
+      ( (INFO, "Checking Column replicate"),
+        (ERROR, "1 cells are blank or contain only whitespace text"))),
+       ])
+def test_ReplicateField_validate_data(caplog, data, expected_log):
+    """Testing behaviour of the CommentsField class in using _validate_data
+    """
+
+    fld = ReplicateField({'field_type': 'replicate',
+                          'description': 'my comments',
+                          'field_name': 'replicate'})
+    
+    fld.validate_data(data)
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+               for exp, rec in zip(expected_log, caplog.records)])
+
+
+
 
 # NumericField and derived classes
 # - NumericField itself has BaseField init, just test overloaded validate_data 
