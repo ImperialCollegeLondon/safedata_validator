@@ -9,7 +9,7 @@ from safedata_validator.field import (BaseField, CommentField, ReplicateField,
                                       NumericTaxonField, CategoricalTaxonField,
                                       NumericInteractionField, 
                                       CategoricalInteractionField,
-                                      TimeField, DatetimeField,
+                                      TimeField, DatetimeField, EmptyField,
                                       DataWorksheet)
 
 
@@ -1322,6 +1322,91 @@ def test_FileField_validate_data(caplog, fixture_dataset,
     fixture_dataset.summary.external_files = [{'file': 'extfile1.sql'}, {'file': 'extfile2.zip'}]
 
     fld = FileField(field_meta, dataset=fixture_dataset)
+    fld.validate_data(data)
+    fld.report()
+    
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+
+@pytest.mark.parametrize(
+    'provide_dataset, use_file_container, external_files, expected_log',
+    [ ( False, False,
+        [],
+        ( (INFO, 'Checking Column file'),
+          (CRITICAL, 'No Summary instance provided - cannot check file fields'),)),
+      ( True, False,
+        [],
+        ( (INFO, 'Checking Column file'),
+          (ERROR, 'No external files listed in Summary'),)),
+      ( False, True, # Never gets to filename checking
+        [{'file': 'extfile1.sql'}, {'file': 'extfile2.zip'}],
+        ( (INFO, 'Checking Column file'),
+          (CRITICAL, 'No Summary instance provided - cannot check file fields'),)),
+      ( True, True,
+        [{'file': 'extfile4.sql'}, {'file': 'extfile6.zip'}],
+        ( (INFO, 'Checking Column file'),
+          (ERROR, 'Field file_container value not found in external files'),)),
+      ( True, True, 
+        [{'file': 'extfile1.sql'}, {'file': 'extfile2.zip'}],
+        ( (INFO, 'Checking Column file'),)),
+])
+def test_FileField_init(caplog, fixture_dataset, 
+                        provide_dataset, use_file_container, external_files, expected_log):
+    """Testing behaviour of the FileField class in using init
+    """
+
+    if provide_dataset:
+        ds = fixture_dataset
+    else:
+        ds = None
+    
+    field_meta = {'field_name': 'file',
+                  'field_type': 'file',
+                  'description': 'file'}
+
+    if use_file_container:
+        field_meta['file_container'] = 'extfile1.sql'
+
+    if provide_dataset and external_files:
+        ds.summary.external_files = external_files
+
+    fld = FileField(field_meta, dataset=ds)
+    fld.report()
+    
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize(
+    'data, expected_log',
+    [ ( [None, None, None, None, None, None, None, None, None],
+        tuple()),
+      ( [None, None, None, None, '    ', None, '   \t', None, None],
+        tuple()),
+      ( [None, None, 1, None, '    ', None, '   \t', None, None],
+        ( (INFO, 'Checking field Column X'),
+          (ERROR, 'Trailing field with no descriptors contains data.'))),
+])
+def test_EmptyField_validate_data(caplog, fixture_dataset, 
+                                  data, expected_log):
+    """Testing behaviour of the EmptyField class in using validate_data
+    """
+
+    field_meta = {'field_name': 'Column X',
+                  'field_type': None,
+                  'description': None}
+
+    fld = EmptyField(field_meta)
     fld.validate_data(data)
     fld.report()
     

@@ -497,15 +497,8 @@ class BaseField:
         self.bad_values = []
         self.bad_rows = [] # TODO check on implementation of this
 
-        # field_name in meta is guaranteed by Dataset loading so 
-        # use this to get a reporting name or sub in a column letter
-        # _check_meta then reports on bad values.
-        if blank_value(self.meta['field_name']):
-            field_name = get_column_letter(self.meta['col_idx'])
-        else:
-            field_name = str(self.meta['field_name'])
-
-        self._log(f'Checking Column {field_name}', INFO)
+        # Dataworksheet handles subbing in missing names with a column letter
+        self.field_name = str(self.meta['field_name'])
 
         # Now check required descriptors - values are present, non-blank and 
         # are unpadded strings (currently all descriptors are strings).
@@ -514,8 +507,8 @@ class BaseField:
         
         # Specific check that field name is valid - the column letter codes are always
         # valid, so missing names won't trigger this.
-        if not valid_r_name(field_name):
-            self._log(f"Field name is not valid: {repr(field_name)}. "
+        if not valid_r_name(self.field_name):
+            self._log(f"Field name is not valid: {repr(self.field_name)}. "
                       "Common errors are spaces and non-alphanumeric "
                       "characters other than underscore and full stop")
 
@@ -587,28 +580,29 @@ class BaseField:
         tx_fd_prov = not blank_value(tx_fd)
 
         if tx_nm_prov and tx_fd_prov:
-            LOGGER.error('Taxon name and taxon field both provided, use one only')
+            self._log('Taxon name and taxon field both provided, use one only')
             return False
         elif not tx_nm_prov and not tx_fd_prov:
-            LOGGER.error("One of taxon name or taxon field must be provided")
+            self._log("One of taxon name or taxon field must be provided")
             return False
         elif tx_nm_prov and self.taxa is None:
-            LOGGER.critical('Taxon name provided but no Taxa instance available')
+            self._log('Taxon name provided but no Taxa instance available', CRITICAL)
             return False
         elif tx_nm_prov and self.taxa.is_empty:
-            LOGGER.error('Taxon name provided but no taxa loaded')
+            self._log('Taxon name provided but no taxa loaded')
             return False
         elif tx_nm_prov and tx_nm not in self.taxa.taxon_names:
-            LOGGER.error('Taxon name not found in the Taxa worksheet')
+            self._log('Taxon name not found in the Taxa worksheet')
             return False
         elif tx_nm_prov:
             self.taxa.taxon_names_used.add(tx_nm)
             return True
         elif tx_fd_prov and self.dwsh is None:
-            LOGGER.critical(f"Taxon field provided but no dataworksheet provided for this field: {tx_fd}")
+            self._log(f"Taxon field provided but no dataworksheet provided for this field: {tx_fd}",
+                      CRITICAL)
             return False
         elif tx_fd_prov and tx_fd not in self.dwsh.taxa_fields:
-            LOGGER.error(f"Taxon field not found in this worksheet: {tx_fd}")
+            self._log(f"Taxon field not found in this worksheet: {tx_fd}")
             return False
         else:
             return True
@@ -641,16 +635,17 @@ class BaseField:
         iact_fd_prov = not blank_value(iact_fd)
 
         if not iact_nm_prov and not iact_fd_prov:
-            LOGGER.error("At least one of interaction name or interaction field must be provided")
+            self._log("At least one of interaction name or interaction field must be provided")
             return False
         elif iact_nm_prov and self.taxa is None:
-            LOGGER.critical('Interaction name provided but no Taxa instance available')
+            self._log('Interaction name provided but no Taxa instance available', CRITICAL)
             return False
         elif iact_nm_prov and self.taxa.is_empty:
-            LOGGER.error('Interaction name provided but no taxa loaded')
+            self._log('Interaction name provided but no taxa loaded')
             return False
         elif iact_fd_prov and self.dwsh is None:
-            LOGGER.critical(f"Interaction field provided but no dataworksheet provided for this field: {iact_fd}")
+            self._log(f"Interaction field provided but no dataworksheet provided for this field: {iact_fd}",
+                      CRITICAL)
             return False
 
         if iact_nm_prov:
@@ -664,8 +659,8 @@ class BaseField:
             iact_nm_lab = IsInSet(iact_nm_lab, self.taxa.taxon_names)
 
             if not iact_nm_lab:
-                LOGGER.error('Unknown taxa in interaction_name descriptor',
-                             extra={'join': iact_nm_lab.failed})
+                self._log('Unknown taxa in interaction_name descriptor',
+                          extra={'join': iact_nm_lab.failed})
                 nm_check = False
             else:
 
@@ -683,8 +678,8 @@ class BaseField:
 
             iact_fd_lab = IsInSet(iact_fd_lab, self.dwsh.taxa_fields)
             if not iact_fd_lab:
-                LOGGER.error('Unknown taxon fields in interaction_field descriptor',
-                             extra={'join': iact_fd_lab.failed})
+                self._log('Unknown taxon fields in interaction_field descriptor',
+                          extra={'join': iact_fd_lab.failed})
                 fd_check = False
             else:
                 fd_check = True
@@ -696,14 +691,15 @@ class BaseField:
             fd_check = True
 
         if len(iact_nm_lab + iact_fd_lab) < 2:
-            LOGGER.error('At least two interacting taxon labels or fields must be identified')
+            self._log('At least two interacting taxon labels or fields must be identified')
             num_check = False
         else:
             num_check = True
 
         all_desc = iact_nm_desc + iact_fd_desc
         if None in all_desc:
-            LOGGER.warning('Label descriptions for interacting taxa incomplete or missing')
+            self._log('Label descriptions for interacting taxa incomplete or missing', 
+                      WARNING)
 
         if nm_check and fd_check and num_check:
             return True
@@ -850,6 +846,11 @@ class BaseField:
         of a field instance and data validation. The method also contains any final
         checking of data values across all validated data.
         """
+
+        LOGGER.info(f'Checking field {self.field_name}')
+
+        FORMATTER.push()
+
         # Emit the accumulated messages
         for log_level, msg in self.log_stack:
             LOGGER.log(log_level, msg)
@@ -866,6 +867,8 @@ class BaseField:
         # Report on excel error codes
         if self.n_excel_error:
             LOGGER.error(f'{self.n_excel_error} cells contain Excel formula errors')
+
+        FORMATTER.pop()
 
 
 class CommentField(BaseField):
@@ -975,8 +978,9 @@ class TaxaField(BaseField):
         if not data:
             self._log('Cells contain non-string values')
 
-        self.taxa_found.update(data)
-        self.taxa.taxon_names_used.update(data)
+        if self.taxa is not None:
+            self.taxa_found.update(data)
+            self.taxa.taxon_names_used.update(data)
     
     def report(self):
 
@@ -1030,8 +1034,9 @@ class LocationsField(BaseField):
         # representations as used in the locations
         data = [str(v) for v in data]
 
-        self.locations_found.update(data)
-        self.locations.locations_used.update(data)
+        if self.locations is not None:
+            self.locations_found.update(data)
+            self.locations.locations_used.update(data)
     
     def report(self):
 
@@ -1120,7 +1125,7 @@ class CategoricalTaxonField(CategoricalField):
     """Checks categorical trait fields, which are just CategoricalFields
     with taxon reporting requirements turned on."""
 
-    field_types = ('categorical trait',)
+    field_types = ('categorical trait', 'ordered categorical trait')
     check_taxon_meta = True
 
 
@@ -1377,7 +1382,7 @@ class FileField(BaseField):
     descriptor.
     """
 
-    field_types = ('datetime', 'date')
+    field_types = ('file',)
 
     def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
                  dataset: Dataset = None) -> None:
@@ -1424,5 +1429,32 @@ class FileField(BaseField):
         if self.unknown_file_names:
             LOGGER.error("Field contains external files not provided in Summary: ",
                          extra={'join': self.unknown_file_names})
+
+
+class EmptyField():
+    """This class mocks the interface of BaseField and is only used to keep
+    track of trailing empty fields in loaded field data. It does not inherit
+    from BaseField, so is never included in the BaseField.field_type_map."""
+
+    def __init__(self, meta: dict) -> None:
+        
+        self.field_name = meta['field_name']
+        self.empty = True
+
+    def validate_data(self, data):
+
+        blank = [blank_value(val) for val in data]
+
+        if not all(blank):
+            self.empty = False
+    
+    def report(self):
+
+        if not self.empty:
+            LOGGER.info(f'Checking field {self.field_name}')
+            FORMATTER.push()
+            LOGGER.error('Trailing field with no descriptors contains data.')
+            FORMATTER.pop()
+
 
 
