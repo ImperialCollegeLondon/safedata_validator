@@ -3,6 +3,7 @@ import dataclasses
 from Bio import Entrez
 
 import requests
+import urllib
 from enforce_typing import enforce_types
 
 from safedata_validator.logger import (CH, FORMATTER, LOGGER,
@@ -77,6 +78,7 @@ class NCBIError(Exception):
 # QUESTIONS FOR DAVID
 # SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
 # WHY DOES ONLY python -m pytest WORK AND NOT pytest? IS THIS CONSEQUENTIAL?
+# IS THERE A SENSIBLE WAY TO DUMMY CONNECTION ERRORS?
 
 @enforce_types
 @dataclasses.dataclass
@@ -109,7 +111,7 @@ class NCBITaxon:
 
         if self.genbank_id is not None:
             if isinstance(self.genbank_id, float) and not self.genbank_id.is_integer():
-                raise ValueError('GenBank Id is not an integer')
+                raise TypeError('GenBank Id is not an integer')
             self.genbank_id = int(self.genbank_id)
 
         if self.taxa_hier is not None:
@@ -156,12 +158,14 @@ class RemoteNCBIValidator:
             handle = Entrez.efetch(db="taxonomy",
                                    id=f"{genbank_id}",
                                    retmode="xml")
+            tax_dic = Entrez.read(handle)[0]
+            handle.close()
+        # And case where a connection can't be made to the remote server
         except urllib.error.HTTPError:
-            NCBIError('Connection error to remote server')
-
-        # Extract as a single dictonary and close
-        tax_dic = Entrez.read(handle)[0]
-        handle.close()
+            raise NCBIError('Connection error to remote server')
+        # Catch case where the index isn't found
+        except IndexError:
+            raise NCBIError("No entry found from ID, probably bad ID")
 
         # Then extract the lineage
         linx = tax_dic["LineageEx"]
@@ -192,6 +196,9 @@ class RemoteNCBIValidator:
                     vld_tax = True
                     # Add 1 to the rank as only including lineage in this case
                     rnk = r_ID + 1
+                    # Warn user that non-backbone rank has been supplied
+                    LOGGER.warning(f'{nnme} not of backbone rank, instead resolved '
+                                   f'to {BACKBONE_RANKS_EX[rnk-1]} level')
                 # Raise error once backbone ranks have been exhausted
                 elif r_ID < 1:
                     LOGGER.error(f'Taxon rank of {nnme} cannot be found in backbone')
@@ -412,7 +419,7 @@ d14 = {'genus': 'Tenacibaculum', 'species': 'Tenacibaculum maritimum'}
 d15 = {'genus': 'Cytophaga', 'species': 'Cytophaga marina'}
 # Maybe find synonym of this one to test as well
 # Then test output of taxa search
-# test = val.taxa_search("Nickname",d15)
+# test = val.taxa_search("Nickname",d2)
 # Search for ID
-# test = val.id_lookup("Nickname",1000)
+# test = val.id_lookup("Nickname",131221)
 # print(test)

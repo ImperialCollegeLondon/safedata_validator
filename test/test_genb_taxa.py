@@ -22,7 +22,7 @@ def validators():
       TypeError),
      # non-integer genbank_id
      (dict(name='Bombus bombus', genbank_id=3.141, taxa_hier={'genus': 'Morus'}),
-      ValueError),
+      TypeError),
      # string instead of dictonary
      (dict(name='Bombus bombus', genbank_id=3, taxa_hier="test"),
       TypeError),
@@ -78,6 +78,59 @@ def test_id_lookup(validators, test_input, expected):
 
     assert f_key == expected[4]
     assert fnd_tx.taxa_hier[f_key] == expected[5]
+
+# Now test that the search function logs errors correctly
+@pytest.mark.parametrize(
+    'test_input,expected_log_entries',
+      [(dict(nnme='E coli', genbank_id=562), # Fine so empty
+        ()),
+       (dict(nnme='Streptophytina', genbank_id=131221), # Non-backbone rank
+        (('WARNING', 'Streptophytina not of backbone rank, instead resolved to phylum level'),
+        )),
+       (dict(nnme='C marina', genbank_id=1000), # Non-backbone rank
+        (('WARNING', 'NCBI ID 1000 has been superseeded by ID 107401'),
+        ))
+       ])
+def test_validate_id_lookup(caplog, test_input, expected_log_entries, validators):
+    """This test checks the results of the function to generate NCBITaxon objects
+    by searching an ID logs the correct errors and warnings. At the moment this
+    for the Remote validator, but if a local validator is defined this should also
+    be checked against.
+
+    """
+
+    fnd_tx = validators.id_lookup(**test_input)
+    print(expected_log_entries)
+    print(caplog.records)
+
+    if len(expected_log_entries) != len(caplog.records):
+        pytest.fail('Incorrect number of log records emitted')
+
+    # Note that this implicitly asserts that the order of logging messages is correct too
+    for idx, log_rec in enumerate(caplog.records):
+        exp_rec = expected_log_entries[idx]
+        assert log_rec.levelname == exp_rec[0]
+        assert exp_rec[1] in log_rec.message
+
+# Third function that checks that id_lookup throws the appropriate errors
+@pytest.mark.parametrize(
+    'test_input,expected_exception',
+    [(None,  # no parameters
+      TypeError),
+     (dict(nnme='E coli', genbank_id='invalid_string'),  # a string
+      TypeError),
+     (dict(nnme=27, genbank_id=27),  # named using a number
+      TypeError),
+     (dict(nnme='E coli', genbank_id=-1),  # bad ID
+      ValueError),
+     (dict(nnme='E coli', genbank_id=100000000000000),  # bad ID
+      genb_taxa.NCBIError)])
+def test_id_lookup_errors(validators, test_input, expected_exception):
+    """This test checks validator.id_lookup inputs throw errors as expected
+    """
+
+    with pytest.raises(expected_exception):
+        _ = validators.id_lookup(**test_input)
 
 # Then do the same for the taxa serach function
 @pytest.mark.parametrize(
