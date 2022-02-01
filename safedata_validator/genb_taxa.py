@@ -258,24 +258,35 @@ class RemoteNCBIValidator:
         return mtaxon
 
     # New function to read in taxa information
-    def taxa_search(self, nnme: str, taxa: dict):
+    def taxa_search(self, nnme: str, taxah: dict):
         """Method that takes in taxonomic information, and finds the corresponding
         genbank ID. This genbank ID is then used to generate a NCBITaxon object,
         which is returned. This function also makes use of parent taxa information
         to distinguish between ambigious taxa names.
 
         Params:
-            taxa: A dictonary containing taxonomic information
+            taxah: A dictonary containing taxonomic information
 
         Returns:
             A NCBITaxon object
         """
 
+        if isinstance(taxah, dict) == False:
+            raise TypeError('Taxa hierarchy should be a dictonary')
+        elif all(isinstance(x,str) for x in taxah.keys()) == False:
+            raise ValueError('Not all taxa dictionary keys are strings')
+        elif all(isinstance(x,str) for x in taxah.values()) == False:
+            raise ValueError('Not all taxa dictionary values are strings')
+
+        # Warn user if no backbone ranks have been provided
+        if bool(set(taxah.keys()) & set(BACKBONE_RANKS_EX)) == False:
+            LOGGER.warning(f"No backbone ranks provided in {nnme}'s taxa hierarchy")
+
         # Find last dictonary key
-        f_key = list(taxa.keys())[-1]
+        f_key = list(taxah.keys())[-1]
 
         # Then find corresponding entry as a search term
-        s_term = taxa[f_key]
+        s_term = taxah[f_key]
 
         # Search the online database
         try:
@@ -302,16 +313,16 @@ class RemoteNCBIValidator:
             return
         else:
             # Check whether multiple taxonomic levels have been provided
-            if len(taxa) == 1:
+            if len(taxah) == 1:
                 # If not raise an error
                 LOGGER.error(f'Taxa {nnme} cannot be found using only one '
                              f'taxonomic level, more should be provided')
                 return
             else:
                 # Find second from last dictonary key
-                f_key = list(taxa.keys())[-2]
+                f_key = list(taxah.keys())[-2]
                 # Then find corresponding entry as a search term
-                s_term = taxa[f_key]
+                s_term = taxah[f_key]
 
                 # Then find details of this parent record
                 try:
@@ -372,54 +383,13 @@ class RemoteNCBIValidator:
         # Check if taxonomic rank supplied is used
         if mtaxon.diverg == None:
             # Find last dictonary key
-            f_key = list(taxa.keys())[-1]
+            f_key = list(taxah.keys())[-1]
             # Then check whether orginally supplied name is still used
-            if taxa[f_key] != mtaxon.taxa_hier[f_key]:
+            if taxah[f_key] != mtaxon.taxa_hier[f_key]:
                 # If not print a warning
-                LOGGER.warning(f'{taxa[f_key]} not accepted usage should be '
+                LOGGER.warning(f'{taxah[f_key]} not accepted usage should be '
                                f'{mtaxon.taxa_hier[f_key]} instead')
                 # And record the fact that usage is superseeded
                 mtaxon.superseed = True
 
         return mtaxon
-
-
-# THIS IS SOMEWHAT LIKE THE STRUCTURE THAT DAVID SUGGESTED FOR UNIT TESTING
-# Make validator
-val = RemoteNCBIValidator()
-# E coli (562)
-d1 = {'genus': 'Escherichia', 'species': 'Escherichia coli'}
-# Enterobacteria family (543)
-d2 = {'order': 'Enterobacterales', 'family': 'Enterobacteria'}
-# E coli strain (1444049)
-d3 = {'species': 'Escherichia coli', 'strain': 'Escherichia coli 1-110-08_S1_C1'}
-# Streptophytina subphylum (131221)
-d4 = {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}
-# Opisthokonta clade (33154)
-d5 = {'superkingdom': 'Eukaryota', 'clade': 'Opisthokonta'}
-# Vulpes vulpes (9627)
-d6 = {'genus': 'Vulpes', 'species': 'Vulpes vulpes'}
-# Morus (NA)
-d7 = {'genus': 'Morus'}
-# Moraceae morus (3497)
-d8 = {'family': 'Moraceae', 'genus': 'Morus'}
-# Sulidae morus (37577)
-d9 = {'family': 'Sulidae', 'genus': 'Morus'}
-# Chordata morus (NA)
-d10 = {'phylum': 'Chordata', 'genus': 'Morus'}
-# Eukaryota morus(NA)
-d11 = {'superkingdom': 'Eukaryota', 'genus': 'Morus'}
-# Microcopris hidakai (2602157)
-d12 = {'genus': 'Microcopris', 'species': 'Microcopris hidakai'}
-# Nonsense garbage (NA)
-d13 = {'genus': 'Nonsense', 'species': 'Nonsense garbage'}
-# Tenacibaculum maritimum (107401)
-d14 = {'genus': 'Tenacibaculum', 'species': 'Tenacibaculum maritimum'}
-# Cytophaga marina (1000)
-d15 = {'genus': 'Cytophaga', 'species': 'Cytophaga marina'}
-# Maybe find synonym of this one to test as well
-# Then test output of taxa search
-# test = val.taxa_search("Nickname",d2)
-# Search for ID
-# test = val.id_lookup("Nickname",131221)
-# print(test)
