@@ -143,9 +143,6 @@ def test_DataWorksheet_validate_data_rows(caplog, fixture_dataworksheet, fixture
                 for exp, rec in zip(expected_log, caplog.records)])
 
 
-
-
-
 @pytest.mark.parametrize(
     'field_meta,data_rows,expected_log',
     [
@@ -290,7 +287,30 @@ def test_DataWorksheet_empty_meta(caplog, fixture_dataworksheet,
           (ERROR, "Row numbers contain non-integer values"),
           (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
           (INFO, "Dataframe contains 1 errors"))),
-    ]
+      ( [[1, 1, 2, 3],
+         [2, 1, 2, 3],
+         [3, 1, 2, 3]],
+         False,
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Dataframe formatted correctly"))),
+      ( [[1, 1, 2, 3],
+         [2, 1, 2, 3],
+         [None, None, None, None],
+         [3, 1, 2, 3], 
+         [None, None, None, None]],
+         False,
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (ERROR, "Data contains empty rows"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),    
+          ]
 )
 def test_DataWorksheet_report(caplog, fixture_dataworksheet, fixture_field_meta,
                               data_rows, populate_external, expected_log):
@@ -348,7 +368,50 @@ def test_DataWorksheet_report(caplog, fixture_dataworksheet, fixture_field_meta,
           (INFO, "Checking field c"),
           (ERROR, "Row numbers not consecutive or do not start with 1"),
           (INFO, "Worksheet 'DF' contains 5 descriptors, 6 data rows and 3 fields"),
-          (INFO, "Dataframe contains 1 errors"))),    ]
+          (INFO, "Dataframe contains 1 errors"))),
+      ( [ [[1, 1, 2, 3],
+           [2, 1, 2, 3],
+           [3, 1, 2, 3], ],
+          [[4, 1, 2, 3],
+           [5, 1, 2, 3],
+           [None, None, None, None,], ]],
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 5 data rows and 3 fields"),
+          (INFO, "Dataframe formatted correctly"))),
+      ( [ [[1, 1, 2, 3],
+           [2, 1, 2, 3],
+           [3, 1, 2, 3], 
+           ],
+          [[4, 1, 2, 3],
+           [None, None, None, None,], # internal blank row within block
+           [5, 1, 2, 3],
+           ]],
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (ERROR, "Data contains empty rows"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 5 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),
+      ( [ [[1, 1, 2, 3],
+           [2, 1, 2, 3],
+           [None, None, None, None], # trailing blank row, but with data then loaded
+           ],
+          [[3, 1, 2, 3], 
+           [4, 1, 2, 3],
+           [5, 1, 2, 3],
+           ]],
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (ERROR, "Data contains empty rows"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 5 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),
+    ]
 )
 def test_DataWorksheet_report_multi_load(caplog, fixture_dataworksheet, fixture_field_meta,
                                          data_rows, expected_log):
@@ -461,7 +524,9 @@ def test_DataWorksheet_load_from_worksheet(caplog, fixture_dataworksheet, fixtur
     indirect = ['example_excel_files']  # take actual params from fixture
 )
 def test_DataWorksheet_load_from_file(caplog, example_excel_files, wsheet, n_errors):
-
+    """Test loading a dataworksheet from file - this duplicates a lot of 
+    Dataset.load_from_workbook"""
+    
     # Load the taxa and locations
     rs = Resources()
     tx = Taxa(rs)

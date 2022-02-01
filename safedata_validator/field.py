@@ -91,6 +91,8 @@ class DataWorksheet:
         self.row_numbers_sequential = True
         self.row_numbers_missing = False
         self.row_numbers_noninteger = False
+        self.blank_rows = False
+        self.trailing_blank_rows = False
         self.start_errors = CH.counters['ERROR']
         self.n_errors = 0
 
@@ -239,6 +241,30 @@ class DataWorksheet:
         elif row_lengths.pop() != (self.n_fields + 1):
             LOGGER.critical('Data rows not of same length as field metadata - cannot validate')
             return
+        
+        # Handle empty rows.
+        blank_set = set([None])
+        blank_row = [set(vals) == blank_set for vals in data_rows]
+
+        trailing_blank_row  = [all(blank_row[- (n + 1):]) 
+                                for n in range(0, len(blank_row))]
+        trailing_blank_row.reverse()
+
+        internal_blank_row = [blnk & (trail == False) 
+                              for blnk, trail in zip(blank_row, trailing_blank_row)]
+
+        # Internals within a set of row are automatically bad, but trailing blank
+        # rows are only bad if more data is loaded below them.
+        if any(internal_blank_row):
+            self.blank_rows = True
+        
+        if not self.trailing_blank_rows and any(trailing_blank_row):
+            self.trailing_blank_rows = True
+        elif self.trailing_blank_rows and not all(trailing_blank_row):
+            self.blank_rows = True
+
+        # Drop blank rows for further processing
+        data_rows = [drw for drw, is_blank in zip(data_rows, blank_row) if not is_blank]
 
         # Count the rows, then convert the values into columns and extract the row numbers
         self.n_row += len(data_rows)
@@ -300,6 +326,10 @@ class DataWorksheet:
         if not (self.row_numbers_noninteger or self.row_numbers_missing) and not self.row_numbers_sequential:
             LOGGER.error("Row numbers not consecutive or do not start with 1")
         
+        # Internal blank rows?
+        if self.blank_rows:
+            LOGGER.error("Data contains empty rows")
+
          # report on detected size
         LOGGER.info(f"Worksheet '{self.name}' contains {self.n_descriptors} descriptors, "
                     f"{self.n_row} data rows and {self.n_fields} fields")
