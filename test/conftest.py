@@ -194,14 +194,15 @@ def fixture_field_meta():
                        field_name = ['a', 'b', 'c'])
 
 
-@pytest.fixture(scope='module')
-def fixture_dataworksheet():
+@pytest.fixture()
+def fixture_dataworksheet(fixture_dataset):
     """field_meta object for use across tests
     """
     
     dws = DataWorksheet({'name': 'DF',
                          'title': 'My data table',
                          'description': 'This is a test data worksheet',
-                         'external': None})
+                         'external': None},
+                         dataset=fixture_dataset)
 
     return dws

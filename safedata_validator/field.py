@@ -6,6 +6,7 @@ from openpyxl import worksheet
 from openpyxl.utils import get_column_letter
 from dateutil import parser
 from typing import List
+from safedata_validator import dataset
 
 from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError, IsNotPadded,
                                            HasDuplicates, IsNotNA, IsNumber, 
@@ -17,9 +18,11 @@ from safedata_validator.dataset import Dataset
 from safedata_validator.locations import Locations
 from safedata_validator.taxa import Taxa
 
-MANDATORY_DESCRIPTORS = {'field_type', 'description', 'field_name'}
-OPTIONAL_DESCRIPTORS = {'levels', 'method', 'units', 'taxon_name', 'taxon_field',
-                        'interaction_name', 'interaction_field', 'file_container'}
+# These are lists, not sets because lists preserve order for preserving logging
+# message order in unit testing.
+MANDATORY_DESCRIPTORS = ['field_type', 'description', 'field_name']
+OPTIONAL_DESCRIPTORS = ['levels', 'method', 'units', 'taxon_name', 'taxon_field',
+                        'interaction_name', 'interaction_field', 'file_container']
 
 
 class DataWorksheet:
@@ -33,9 +36,7 @@ class DataWorksheet:
 
     @loggerinfo_push_pop('Checking data worksheet')
     def __init__(self, 
-                 sheet_meta: dict,   # TODO Is this really needed by the object?
-                 taxa: Taxa = None,
-                 locations: Locations = None,
+                 sheet_meta: dict,
                  dataset: Dataset = None,
                  ) -> None:
         
@@ -58,13 +59,8 @@ class DataWorksheet:
                 top to bottom as they appear in the source file - keyed by
                 field descriptor with values as a list of field values for
                 that descriptor.
-            dataset: A safedata_validator Dataset object. 
-            taxa: A safedata_validator Taxa instance for use in validating
-                taxon fields and traits
-            locations: A safedata_validator Locations instance for use in
-                validating locations fields.
-            summary: A safedata_validator Summary instance for access to
-                dataset level metadata like extents.
+            dataset: A safedata_validator Dataset object, providing Taxa, 
+                Locations and Summary information.
         """
 
         # Set initial values
@@ -76,21 +72,14 @@ class DataWorksheet:
         # For sheet meta with an external file, add in the external file name
         self.external = sheet_meta.get('external')
 
-        # Links to reference objects for dataset level information, and taxa and
+        # Links to dataset for dataset level information, and taxa and
         # location validation lists.
         self.dataset = dataset
-        self.taxa = taxa
-        self.locations = locations
-
-        # set up a dictionary to map field types to BaseField subclasses
-        field_subclasses = BaseField.__subclasses__()
-        self.field_subclass_map = {}
-        for subc in field_subclasses:
-            self.field_subclass_map.update({ftype: subc for ftype in subc.field_types})
 
         # Create the field meta attributes, populated using validate_field_meta
         self.fields_loaded = False
         self.field_meta = None
+        self.field_types = None
         self.n_fields = None
         self.n_descriptors = None
         self.fields = None
@@ -103,6 +92,7 @@ class DataWorksheet:
         self.row_numbers_missing = False
         self.row_numbers_noninteger = False
         self.start_errors = CH.counters['ERROR']
+        self.n_errors = 0
 
     @loggerinfo_push_pop('Validating field metadata')
     def validate_field_meta(self, field_meta: OrderedDict) -> List[dict]:
@@ -111,6 +101,9 @@ class DataWorksheet:
         last row in the metadata. A dict should by enough in Python 3.7+ where
         insertion order is guaranteed, but OrderedDict is currently used to
         cover 3.6 and to make the requirement explicit.
+
+        The field meta can include trailing empty fields - these will be checked
+        when data rows are added.
         """
 
         # Checking field_meta - TODO more checking of structure
@@ -128,18 +121,11 @@ class DataWorksheet:
                                in zip(clean_descriptors, field_meta.values())]
             field_meta = OrderedDict(cleaned_entries)
 
-
-        # * Check for mandatory descriptors
-        mandatory_missing = set(MANDATORY_DESCRIPTORS).difference(field_meta.keys())
-        if mandatory_missing:
-            LOGGER.error('Mandatory field descriptors missing: ', 
-                         extra={'join': mandatory_missing})
-            return False, None
-
         # * Expected descriptors - do _not_ preclude user defined descriptors
-        #   but warn about them to alert to typos.
+        #   but warn about them to alert to typos. Missing descriptors vary
+        #   with field type so are handled in BaseField.__init__()
         unknown_descriptors = set(field_meta.keys()).difference(
-                                MANDATORY_DESCRIPTORS.union(OPTIONAL_DESCRIPTORS))
+                                set(MANDATORY_DESCRIPTORS).union(OPTIONAL_DESCRIPTORS))
         if unknown_descriptors:
             LOGGER.warning('Unknown field descriptors:', 
                            extra={'join': unknown_descriptors})
@@ -154,14 +140,10 @@ class DataWorksheet:
         field_meta = [dict(zip(field_meta.keys(), val)) 
                         for val in zip(*field_meta.values())]
 
-        # Insert column index
-        for idx, fld in enumerate(field_meta):
-            fld['col_idx'] = idx + 1
-        
-        # Check field names are unique. This doesn't cause as many problems as
-        # duplications in Taxa and Locations, which expect certain fields, so
-        # warn and continue. Ignore empty mandatory values - these are handled
-        # in field checking.
+        # Check provided field names are unique. This doesn't cause as many
+        # problems as duplications in Taxa and Locations, which expect certain
+        # fields, so warn and continue. Ignore empty mandatory values - these
+        # are handled in field checking.
         field_names = [fld['field_name'] for fld in field_meta 
                        if fld['field_name'] is not None]
         dupes = HasDuplicates(field_names)
@@ -179,21 +161,66 @@ class DataWorksheet:
         self.n_fields = len(field_meta)
         self.n_descriptors = len(field_meta[0].keys())
 
-        # Now initialise the Field objects using the mapping of field types
-        # to the BaseField subclasses
-        self.fields = [self.field_subclass_map[fd['field_type']](fd) 
-                       for fd in self.field_meta]
-
         # get taxa field names for cross checking observation and trait data
         self.taxa_fields = [fld['field_name'] for fld in self.field_meta 
                             if fld['field_type'] == 'taxa']
 
+        # Now initialise the Field objects using the mapping of field types
+        # to the BaseField subclasses. This needs to handle trailing fields
+        # containing _no_ metadata (e.g. from inaccurate Excel sheet bounds or
+        # CSV comments) but also fields with missing field_type (but other 
+        # metadata).
+        #
+        # - trailing empty fields are assumed to be blank columns
+        #   and validate_data_rows should test for content.
+        # - otherwise, these are assumed to be fields and should
+        #   trigger warnings about descriptors
+
+        # Get logical flags for empty and trailing empty metadata 
+        field_meta_empty = [set(vl.values()) == set([None]) for vl in self.field_meta]
+        trailing_empty  = [all(field_meta_empty[- (n + 1):]) 
+                           for n in range(0, len(field_meta_empty))]
+        trailing_empty.reverse()
+
+        # Get the type map and field list
+        field_subclass_map = BaseField.field_type_map()
+        unknown_field_types = set()
+        self.fields = []
+
+        for col_idx, (tr_empty, fd_empty, fmeta) in \
+            enumerate(zip(trailing_empty, field_meta_empty, self.field_meta)):
+            
+            fmeta['col_idx'] = col_idx + 1
+
+            # Consider cases
+            if tr_empty:
+                # Hopefully empty trailing field
+                self.fields.append(EmptyField(fmeta))
+            elif fd_empty:
+                # Empty field within other fields
+                self.fields.append(BaseField(fmeta, dwsh=self, dataset=self.dataset))
+            elif fmeta['field_type'] is None:
+                # Non-empty field of None type - use BaseField for basic checks
+                self.fields.append(BaseField(fmeta, dwsh=self, dataset=self.dataset))
+            elif fmeta['field_type'] not in field_subclass_map:
+                #  Non-empty field of unknown type - use BaseField for basic checks
+                unknown_field_types.add(fmeta['field_type'])
+                self.fields.append(BaseField(fmeta, dwsh=self, dataset=self.dataset))
+            else:
+                # Known field type.
+                fld_class = field_subclass_map[fmeta['field_type']]
+                self.fields.append(fld_class(fmeta, dwsh=self, dataset=self.dataset))
+
+        if unknown_field_types:
+            LOGGER.error('Unknown field types: ', extra={'join': unknown_field_types})
+        
     def validate_data_rows(self, data_rows):
         """Method to pass rows of data into the field checkers for a
         dataworksheet. The data is expected to be as an list of rows
         from a data file, with the first entry in each row being a row
         number.
         """
+
         if not self.fields_loaded:
             LOGGER.critical('No fields defined - use validate_field_meta')
             return
@@ -205,6 +232,7 @@ class DataWorksheet:
             return
 
         row_lengths = set([len(rw) for rw in data_rows])
+
         if len(row_lengths) != 1:
             LOGGER.critical('Data rows of unequal length - cannot validate')
             return
@@ -277,9 +305,9 @@ class DataWorksheet:
                     f"{self.n_row} data rows and {self.n_fields} fields")
 
         # reporting
-        n_errors = CH.counters['ERROR'] - self.start_errors
-        if n_errors > 0:
-            LOGGER.info(f'Dataframe contains {n_errors} errors')
+        self.n_errors  = CH.counters['ERROR'] - self.start_errors
+        if self.n_errors > 0:
+            LOGGER.info(f'Dataframe contains {self.n_errors} errors')
         else:
             LOGGER.info('Dataframe formatted correctly')
 
@@ -497,8 +525,16 @@ class BaseField:
         self.bad_values = []
         self.bad_rows = [] # TODO check on implementation of this
 
-        # Dataworksheet handles subbing in missing names with a column letter
-        self.field_name = str(self.meta['field_name'])
+        # Get a field name - either from the field_meta, or a column letter
+        # from col_idx or 'Unknown'
+        self.field_name = self.meta.get('field_name')
+
+        if self.field_name is None:
+            idx = self.meta.get('col_idx')
+            if idx is None:
+                self.field_name = 'Unknown'
+            else:
+                self.field_name = f"Column_{get_column_letter(idx)}"
 
         # Now check required descriptors - values are present, non-blank and 
         # are unpadded strings (currently all descriptors are strings).
@@ -887,7 +923,7 @@ class NumericField(BaseField):
     Subclass of BaseField to check for numeric data
     """
     field_types = ('numeric',)
-    required_descriptors = MANDATORY_DESCRIPTORS.union(['method', 'units'])
+    required_descriptors = MANDATORY_DESCRIPTORS + ['method', 'units']
 
     def validate_data(self, data: list):
         
@@ -905,7 +941,7 @@ class CategoricalField(BaseField):
     """
 
     field_types = ('categorical', 'ordered_categorical')
-    required_descriptors = MANDATORY_DESCRIPTORS.union(['levels'])
+    required_descriptors = MANDATORY_DESCRIPTORS + ['levels']
 
     def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
                  dataset: Dataset = None) -> None:
@@ -1009,7 +1045,6 @@ class LocationsField(BaseField):
     """
 
     field_types = ('locations', 'location')
-    required_descriptors = MANDATORY_DESCRIPTORS
 
     def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
                  dataset: Dataset = None) -> None:
@@ -1438,7 +1473,7 @@ class EmptyField():
 
     def __init__(self, meta: dict) -> None:
         
-        self.field_name = meta['field_name']
+        self.meta = meta
         self.empty = True
 
     def validate_data(self, data):
@@ -1450,6 +1485,13 @@ class EmptyField():
     
     def report(self):
 
+        # Get a field name - either a column letter from col_idx if set or 'Unknown'
+        idx = self.meta.get('col_idx')
+        if idx is None:
+            self.field_name = 'Unknown'
+        else:
+            self.field_name = f"Column_{get_column_letter(idx)}"
+        
         if not self.empty:
             LOGGER.info(f'Checking field {self.field_name}')
             FORMATTER.push()
