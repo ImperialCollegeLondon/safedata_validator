@@ -1,7 +1,7 @@
 import datetime
 from itertools import groupby, islice
 from collections import OrderedDict
-from logging import ERROR, WARNING, INFO
+from logging import CRITICAL, ERROR, WARNING, INFO
 from openpyxl import worksheet
 from openpyxl.utils import get_column_letter
 from dateutil import parser
@@ -1384,19 +1384,45 @@ class FileField(BaseField):
         
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
-        if self.external_files is None:
-            LOGGER.error('No external files listed in Summary')
+        self.unknown_file_names = set()
+
+        # Check whether filename testing is possible
+        if self.summary is None:
+            self._log('No Summary instance provided - cannot check file fields', 
+                      level=CRITICAL)
+            return
+        if self.summary.external_files is None:
+            self._log('No external files listed in Summary')
             return
         
-        external_names = {ex['file'] for ex in self.external_files}
+        self.external_names = {ex['file'] for ex in self.summary.external_files}
 
-        if 'file_container' in meta and meta['file_container'] is not None:
-            if meta['file_container'] not in external_names:
-                LOGGER.error(
-                    "Field file_container value not found in external files: {}".format(meta['file_container']))
-        else:
-            missing_files = set(data) - external_names
-            if missing_files:
-                LOGGER.error("Field contains files not listed in external files: ",
-                                extra={'join': missing_files})
+        # Look for a file container metadata value, pointing to a single file
+        # containing all of the listed values (zip etc)
+        self.file_container = self.meta.get('file_container')
+
+        if self.file_container is not None:
+            if self.file_container not in self.external_names:
+                self._log(f"Field file_container value not found in external files: {self.file_container}")
+
+
+    def validate_data(self, data: list):
+
+        data = super().validate_data(data)
+
+        # If the files are listed in external and not provided in a file
+        # container then check they are all present 
+        if not self.file_container:
+            unknown_files = set(data) - self.external_names
+            if unknown_files:
+                self.unknown_file_names.update(unknown_files)
+
+    def report(self):
+        
+        super().report()
+
+        if self.unknown_file_names:
+            LOGGER.error("Field contains external files not provided in Summary: ",
+                         extra={'join': self.unknown_file_names})
+
 

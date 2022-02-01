@@ -1,15 +1,14 @@
 from collections import OrderedDict
-from curses import ERR
 import pytest
 from logging import CRITICAL, ERROR, WARNING, INFO
 from datetime import datetime, time, date
-from safedata_validator import dataset
 
 from safedata_validator.field import (BaseField, CommentField, ReplicateField, 
-                                      CategoricalField, GeoField, 
+                                      CategoricalField, GeoField, FileField,
                                       NumericField, TaxaField, LocationsField, 
                                       NumericTaxonField, CategoricalTaxonField,
-                                      NumericInteractionField, CategoricalInteractionField,
+                                      NumericInteractionField, 
+                                      CategoricalInteractionField,
                                       TimeField, DatetimeField,
                                       DataWorksheet)
 
@@ -1144,7 +1143,7 @@ def test_TimeField_validate_data(caplog, data, expected_log):
           (ERROR, "ISO datetime strings contain badly formatted values"))),
     ])
 def test_DatetimeField_validate_data(caplog, fixture_dataset, field_type, data, expected_log):
-    """Testing behaviour of the TaxaField class in using validate_data
+    """Testing behaviour of the DatetimeField class in using validate_data
     """
 
     fld = DatetimeField({'field_name': 'datetimetest',
@@ -1163,7 +1162,6 @@ def test_DatetimeField_validate_data(caplog, fixture_dataset, field_type, data, 
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
-
 
 
 @pytest.mark.parametrize(
@@ -1216,7 +1214,7 @@ def test_DatetimeField_validate_data(caplog, fixture_dataset, field_type, data, 
 
 def test_DatetimeField_extent(caplog, fixture_dataset, provide_dataset, field_type, data, 
                               expected_log):
-    """Testing behaviour of the TaxaField class in using validate_data
+    """Testing behaviour of the DatetimeField class in setting extents
     """
 
     if provide_dataset:
@@ -1247,3 +1245,89 @@ def test_DatetimeField_extent(caplog, fixture_dataset, provide_dataset, field_ty
     if provide_dataset and field_type == 'datetime':
         assert fixture_dataset.temporal_extent.extent[0] == date(2022, 1, 6)
         assert fixture_dataset.temporal_extent.extent[1] == date(2022, 1, 6)
+
+
+@pytest.mark.parametrize(
+    'provide_dataset, use_file_container, external_files, expected_log',
+    [ ( False, False,
+        [],
+        ( (INFO, 'Checking Column file'),
+          (CRITICAL, 'No Summary instance provided - cannot check file fields'),)),
+      ( True, False,
+        [],
+        ( (INFO, 'Checking Column file'),
+          (ERROR, 'No external files listed in Summary'),)),
+      ( False, True, # Never gets to filename checking
+        [{'file': 'extfile1.sql'}, {'file': 'extfile2.zip'}],
+        ( (INFO, 'Checking Column file'),
+          (CRITICAL, 'No Summary instance provided - cannot check file fields'),)),
+      ( True, True,
+        [{'file': 'extfile4.sql'}, {'file': 'extfile6.zip'}],
+        ( (INFO, 'Checking Column file'),
+          (ERROR, 'Field file_container value not found in external files'),)),
+      ( True, True, 
+        [{'file': 'extfile1.sql'}, {'file': 'extfile2.zip'}],
+        ( (INFO, 'Checking Column file'),)),
+])
+def test_FileField_init(caplog, fixture_dataset, 
+                        provide_dataset, use_file_container, external_files, expected_log):
+    """Testing behaviour of the FileField class in using init
+    """
+
+    if provide_dataset:
+        ds = fixture_dataset
+    else:
+        ds = None
+    
+    field_meta = {'field_name': 'file',
+                  'field_type': 'file',
+                  'description': 'file'}
+
+    if use_file_container:
+        field_meta['file_container'] = 'extfile1.sql'
+
+    if provide_dataset and external_files:
+        ds.summary.external_files = external_files
+
+    fld = FileField(field_meta, dataset=ds)
+    fld.report()
+    
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+
+
+@pytest.mark.parametrize(
+    'data, expected_log',
+    [ ( ['extfile1.sql', 'extfile2.zip', 'extfile1.sql', 'extfile2.zip'],
+        ( (INFO, 'Checking Column file'),)),
+      ( ['extfile1.sql', 'extfile2.zip', 'extfile6.sql', 'extfile2.zip'],
+        ( (INFO, 'Checking Column file'),
+          (ERROR, 'Field contains external files not provided in Summary'))),
+])
+def test_FileField_validate_data(caplog, fixture_dataset, 
+                        data, expected_log):
+    """Testing behaviour of the FileField class in using validate_data
+    """
+
+    field_meta = {'field_name': 'file',
+                  'field_type': 'file',
+                  'description': 'file'}
+
+    fixture_dataset.summary.external_files = [{'file': 'extfile1.sql'}, {'file': 'extfile2.zip'}]
+
+    fld = FileField(field_meta, dataset=fixture_dataset)
+    fld.validate_data(data)
+    fld.report()
+    
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
