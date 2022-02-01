@@ -853,6 +853,9 @@ class Taxa:
                                      higher_taxon.taxon_status])
             LOGGER.info(f'Added {tx_lev} {higher_taxon}')
 
+    @property
+    def is_empty(self):
+        return len(self.taxon_names) == 0
 
 def taxon_index_to_text(taxon_index, html=False, indent_width=4):
     """

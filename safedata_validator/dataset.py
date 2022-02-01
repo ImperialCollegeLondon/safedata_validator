@@ -35,7 +35,7 @@ class Dataset:
         # they can be validated against one another once all data is checked.
 
         # TODO - set bounds in Resources()
-        self.temporal_extent = Extent('temporal extent', datetime.date)
+        self.temporal_extent = Extent('temporal extent', (datetime.date,))
         self.latitudinal_extent = Extent('latitudinal extent', (float, int),
                                          hard_bounds=(-90,90), soft_bounds=(-4, 8))
         self.longitudinal_extent = Extent('longitudinal extent', (float, int),

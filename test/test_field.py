@@ -1,14 +1,18 @@
 from collections import OrderedDict
+from curses import ERR
 import pytest
 from logging import CRITICAL, ERROR, WARNING, INFO
-import datetime
+from datetime import datetime, time, date
+from safedata_validator import dataset
 
-from safedata_validator.field import (BaseField, CategoricalField, GeoField, 
+from safedata_validator.field import (BaseField, CommentField, ReplicateField, 
+                                      CategoricalField, GeoField, 
                                       NumericField, TaxaField, LocationsField, 
                                       NumericTaxonField, CategoricalTaxonField,
                                       NumericInteractionField, CategoricalInteractionField,
+                                      TimeField, DatetimeField,
                                       DataWorksheet)
-from test.conftest import fixture_taxa
+
 
 # Checking the helper and private methods
 
@@ -77,6 +81,8 @@ def test_parse_levels(caplog, data, exp_log, exp_levels, exp_desc):
     assert all([do == de for do, de in zip(obs_desc, exp_desc)])
 
 
+# TODO -  test errors on empty Taxa
+
 @pytest.mark.parametrize(
     'tx_meta, has_taxa_object, has_dwsh_object, expected_log',
     [
@@ -88,7 +94,7 @@ def test_parse_levels(caplog, data, exp_log, exp_levels, exp_desc):
         ( (ERROR, "One of taxon name or taxon field must be provided"),)),
       ( dict(taxon_name='foo'),
         False, False,
-        ( (ERROR, "Taxon name provided but no taxa loaded"),)),
+        ( (CRITICAL, "Taxon name provided but no Taxa instance available"),)),
       ( dict(taxon_name='foo'),
         True, False,
         ( (ERROR, "Taxon name not found in the Taxa worksheet"),)),
@@ -106,13 +112,14 @@ def test_parse_levels(caplog, data, exp_log, exp_levels, exp_desc):
         tuple()),
     ] 
 )
-def test_check_taxon_meta(caplog, fixture_taxa,
+def test_check_taxon_meta(caplog, fixture_dataset, 
                           tx_meta, has_taxa_object, has_dwsh_object, expected_log):
     """Testing the use of the BaseField._check_taxon_meta() method
     """
     
     # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
+    ds_obj = fixture_dataset if has_taxa_object else None
+
     dwsh = DataWorksheet({'name': 'DF',
                           'title': 'My data table',
                           'description': 'This is a test data worksheet'})
@@ -127,7 +134,7 @@ def test_check_taxon_meta(caplog, fixture_taxa,
     field_meta.update(tx_meta)
     
     fld = BaseField(field_meta,
-                    taxa = tx_obj,
+                    dataset = ds_obj,
                     dwsh = dwsh_obj)
 
     caplog.clear()
@@ -150,7 +157,7 @@ def test_check_taxon_meta(caplog, fixture_taxa,
         ( (ERROR, "At least one of interaction name or interaction field must be provided"),)),
       ( dict(interaction_name='foo:predator'),
         False, False,
-        ( (ERROR, "Interaction name provided but no taxa loaded"),)),
+        ( (CRITICAL, "Interaction name provided but no Taxa instance available"),)),
       ( dict(interaction_name='foo:predator'),
         True, False,
         ( (ERROR, "Unknown taxa in interaction_name descriptor"),
@@ -194,13 +201,14 @@ def test_check_taxon_meta(caplog, fixture_taxa,
         ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
     ] 
 )
-def test_check_interaction_meta(caplog, fixture_taxa,
+def test_check_interaction_meta(caplog, fixture_dataset,
                                 iact_meta, has_taxa_object, has_dwsh_object, expected_log):
     """Testing the use of the BaseField._check_interaction_meta() method
     """
     
     # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
+    ds_obj = fixture_dataset if has_taxa_object else None
+
     dwsh = DataWorksheet({'name': 'DF',
                           'title': 'My data table',
                           'description': 'This is a test data worksheet'})
@@ -215,8 +223,8 @@ def test_check_interaction_meta(caplog, fixture_taxa,
     field_meta.update(iact_meta)
     
     fld = BaseField(field_meta,
-                    taxa = tx_obj,
-                    dwsh = dwsh_obj)
+                    dwsh = dwsh_obj,
+                    dataset = ds_obj)
 
     caplog.clear()
 
@@ -330,13 +338,82 @@ def test_BaseField_validate_data(caplog, data, expected_log):
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
 
+
+# Comments field
+
+@pytest.mark.parametrize(
+    'data, expected_log',
+    [
+     ([1, 2, 3, 4, 5, 6, 7, 8, 9], 
+      ((INFO, "Checking Column comments"),)),
+     (['Any', None, None, 'old', 5, 'rubbish', None, 'is', 'fine'], 
+      ((INFO, "Checking Column comments"),)),
+       ])
+def test_CommentField_validate_data(caplog, data, expected_log):
+    """Testing behaviour of the CommentsField class in using _validate_data
+    """
+
+    fld = CommentField({'field_type': 'comments',
+                         'description': 'my comments',
+                         'field_name': 'comments'})
+    
+    fld.validate_data(data)
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+               for exp, rec in zip(expected_log, caplog.records)])
+
+# Replicate and ID field
+
+
+@pytest.mark.parametrize(
+  'data, expected_log',
+  [
+    ( [1, 2, 3, 4, 5, 6, 7, 8, 9], 
+      ( (INFO, "Checking Column replicate"),)),
+    ( ['Any', 'old', 5, 'rubbish', 'is', 'fine', 'including', 'NA'], 
+      ( (INFO, "Checking Column replicate"),
+        (WARNING, "1 / 8 values missing"))),
+    ( ['Any', 'old', 5, 'rubbish', 'is', 'fine', None, 'but not missing cells'], 
+      ( (INFO, "Checking Column replicate"),
+        (ERROR, "1 cells are blank or contain only whitespace text"))),
+    ( ['Any', 'old', 5, 'rubbish', 'is', 'fine', '  ', 'but not missing or empty string cells'], 
+      ( (INFO, "Checking Column replicate"),
+        (ERROR, "1 cells are blank or contain only whitespace text"))),
+       ])
+def test_ReplicateField_validate_data(caplog, data, expected_log):
+    """Testing behaviour of the CommentsField class in using _validate_data
+    """
+
+    fld = ReplicateField({'field_type': 'replicate',
+                          'description': 'my comments',
+                          'field_name': 'replicate'})
+    
+    fld.validate_data(data)
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+               for exp, rec in zip(expected_log, caplog.records)])
+
+
+
+
 # NumericField and derived classes
 # - NumericField itself has BaseField init, just test overloaded validate_data 
 # - Can reuse the same data to also check taxon and interaction classes
 #   inheriting from NumericField for validate_data.
 # - The __init__ testing duplicates testing of private methods above but this is
 #   so that I can be sure the  class inheritance works as expected
-
+# - Can also reuse the __init__ testing for Numeric and Categorical versions
+#   of Taxon/Interaction classes.
 
 @pytest.mark.parametrize('tx_meta, has_taxa_object, has_dwsh_object, expected_log',
     [
@@ -348,7 +425,7 @@ def test_BaseField_validate_data(caplog, data, expected_log):
         ( (ERROR, "One of taxon name or taxon field must be provided"),)),
       ( dict(taxon_name='foo'),
         False, False,
-        ( (ERROR, "Taxon name provided but no taxa loaded"),)),
+        ( (CRITICAL, "Taxon name provided but no Taxa instance available"),)),
       ( dict(taxon_name='foo'),
         True, False,
         ( (ERROR, "Taxon name not found in the Taxa worksheet"),)),
@@ -366,13 +443,28 @@ def test_BaseField_validate_data(caplog, data, expected_log):
         tuple()),
     ]
   )
-def test_NumericTaxonField_init(caplog, fixture_taxa, 
+@pytest.mark.parametrize('test_class, field_meta', 
+  [ ( NumericTaxonField,
+      {'field_type': 'abundance',
+       'description': 'Number of ants',
+       'field_name': 'num_data',
+       'method': 'quadrat',
+       'units': 'individuals per m2'}),
+    ( CategoricalTaxonField,
+      {'field_type': 'categorical trait',
+       'description': 'ant colours',
+       'field_name': 'ant_colour',
+       'levels': 'level1:level2'}),
+  ]
+)
+def test_CatNumTaxonField_init(caplog, fixture_dataset, test_class, field_meta,
                                 tx_meta, has_taxa_object, has_dwsh_object, expected_log):
-    """Testing behaviour of the NumericTaxonField class in using _validate_data
-    """
+    """Testing behaviour of the NumericTaxonField and CategoricalTaxonField
+    classes in using __init__"""
 
     # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
+    ds_obj = fixture_dataset if has_taxa_object else None
+
     dwsh = DataWorksheet({'name': 'DF',
                           'title': 'My data table',
                           'description': 'This is a test data worksheet'})
@@ -381,17 +473,11 @@ def test_NumericTaxonField_init(caplog, fixture_taxa,
 
     caplog.clear()
 
-    meta = {'field_type': 'abundance',
-            'description': 'Number of ants',
-            'field_name': 'ant_count',
-            'method': 'quadrat',
-            'units': 'individuals per m2'}
-    
-    meta.update(tx_meta)
+    # Do not directly modify the parameterised value - changes for all tests.
+    field_meta = field_meta.copy()
+    field_meta.update(tx_meta)
 
-    fld = NumericTaxonField(meta,
-                            taxa = tx_obj,
-                            dwsh = dwsh_obj)
+    fld = test_class(field_meta, dataset = ds_obj, dwsh = dwsh_obj)
 
     assert len(expected_log) == len(caplog.records)
 
@@ -408,7 +494,7 @@ def test_NumericTaxonField_init(caplog, fixture_taxa,
         ( (ERROR, "At least one of interaction name or interaction field must be provided"),)),
       ( dict(interaction_name='foo:predator'),
         False, False,
-        ( (ERROR, "Interaction name provided but no taxa loaded"),)),
+        ( (CRITICAL, "Interaction name provided but no Taxa instance available"),)),
       ( dict(interaction_name='foo:predator'),
         True, False,
         ( (ERROR, "Unknown taxa in interaction_name descriptor"),
@@ -452,32 +538,41 @@ def test_NumericTaxonField_init(caplog, fixture_taxa,
         ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
     ] 
 )
-def test_NumericInteractionField_init(caplog, fixture_taxa,
-                                      iact_meta, has_taxa_object, has_dwsh_object, expected_log):
-    """Testing the use of the NumericInteractionField init
-    """
-    
+@pytest.mark.parametrize('test_class, field_meta', 
+  [ ( NumericInteractionField,
+      {'field_type': 'numeric interaction',
+       'description': 'Number of prey eaten',
+       'field_name': 'num_data',
+       'method': 'cage experiment',
+       'units': 'individuals per hour'}),
+    ( CategoricalInteractionField,
+      {'field_type': 'categorical interaction',
+       'description': 'outcome of competition',
+       'field_name': 'factor_data',
+       'levels': 'level1;level2'}),
+  ]
+)
+def test_CatNumInteractionField_init(caplog, fixture_dataset, test_class, field_meta,
+                                     iact_meta, has_taxa_object, has_dwsh_object, expected_log):
+    """Testing behaviour of the NumericInteractionField and 
+    CategoricalInteractionField classes in using __init__"""
+
     # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
+    ds_obj = fixture_dataset if has_taxa_object else None
     dwsh = DataWorksheet({'name': 'DF',
                           'title': 'My data table',
                           'description': 'This is a test data worksheet'})
     dwsh.taxa_fields = ['predator', 'prey']
     dwsh_obj = dwsh if has_dwsh_object else None
 
-    # Technically, this violates the field_name last requirement, but that is
-    # enforced at the dataworksheet level, not the field level. 
-    field_meta = OrderedDict(field_type = 'numeric',
-                             description = 'description',
-                             field_name = 'field')
+    # Do not directly modify the parameterised value - changes for all tests.
+    field_meta = field_meta.copy()
     field_meta.update(iact_meta)
 
     caplog.clear()
 
     # Test the __init__ method
-    fld = NumericInteractionField(field_meta,
-                                  taxa = tx_obj,
-                                  dwsh = dwsh_obj)
+    fld = test_class(field_meta, dataset = ds_obj, dwsh = dwsh_obj)
 
     assert len(expected_log) == len(caplog.records)
 
@@ -533,13 +628,13 @@ def test_NumericInteractionField_init(caplog, fixture_taxa,
        'interaction_name': 'C_born:prey;V_salv:predator'}),
   ]
 )
-def test_NumericField_validate_data(caplog, fixture_taxa, test_class, field_meta,
-                                         data, expected_log):
+def test_NumericField_and_subclasses_validate_data(caplog, fixture_dataset, test_class, field_meta,
+                                                   data, expected_log):
     """Testing behaviour of the NumericField and subclasses in using _validate_data
     """
     
     # Create and instance of the required class
-    fld = test_class(field_meta, taxa = fixture_taxa)
+    fld = test_class(field_meta, dataset = fixture_dataset)
     
     fld.validate_data(data)
     fld.report()
@@ -555,9 +650,6 @@ def test_NumericField_validate_data(caplog, fixture_taxa, test_class, field_meta
 # CategoricalField and derived classes
 # - Can reuse the same data to also check taxon and interaction classes
 #   inheriting from CategoricalField for validate_data.
-# - The __init__ testing duplicates testing of private methods above but this is
-#   so that I can be sure the  class inheritance works as expected
-
 
 @pytest.mark.parametrize('field_meta, expected_log',
     [
@@ -605,155 +697,6 @@ def test_CategoricalField_init(caplog, field_meta, expected_log):
     fld = CategoricalField(field_meta, None)
     fld.report()
     
-    assert len(expected_log) == len(caplog.records)
-
-    assert all([exp[0] == rec.levelno 
-                for exp, rec in zip(expected_log, caplog.records)])
-    assert all([exp[1] in rec.message
-                for exp, rec in zip(expected_log, caplog.records)])
-
-
-@pytest.mark.parametrize('tx_meta, has_taxa_object, has_dwsh_object, expected_log',
-    [
-      ( dict(taxon_name='foo', taxon_field='bar'),
-        False, False,
-        ((ERROR, "Taxon name and taxon field both provided, use one only"),)),
-      ( dict(),
-        False, False,
-        ( (ERROR, "One of taxon name or taxon field must be provided"),)),
-      ( dict(taxon_name='foo'),
-        False, False,
-        ( (ERROR, "Taxon name provided but no taxa loaded"),)),
-      ( dict(taxon_name='foo'),
-        True, False,
-        ( (ERROR, "Taxon name not found in the Taxa worksheet"),)),
-      ( dict(taxon_name='C_born'),
-        True, False,
-        tuple()),
-      ( dict(taxon_field='not_provided'),
-        False, False,
-        ( (CRITICAL, "Taxon field provided but no dataworksheet provided for this field"),)),
-      ( dict(taxon_field='not_provided'),
-        False, True,
-        ( (ERROR, "Taxon field not found in this worksheet"),)),
-      ( dict(taxon_field='my_taxon_field'),
-        False, True,
-        tuple()),
-    ]
-  )
-def test_CategoricalTaxonField_init(caplog, fixture_taxa,
-                                    tx_meta, has_taxa_object, has_dwsh_object, expected_log):
-    """Testing behaviour of the NumericTaxonField class in using _validate_data
-    """
-
-    # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
-    dwsh = DataWorksheet({'name': 'DF',
-                          'title': 'My data table',
-                          'description': 'This is a test data worksheet'})
-    dwsh.taxa_fields = ['my_taxon_field']
-    dwsh_obj = dwsh if has_dwsh_object else None
-
-    caplog.clear()
-
-    meta = {'field_type': 'categorical trait',
-            'description': 'ant colours',
-            'field_name': 'ant_colour',
-            'levels': 'level1:level2'}
-    
-    meta.update(tx_meta)
-
-    fld = CategoricalTaxonField(meta,
-                                taxa = tx_obj,
-                                dwsh = dwsh_obj)
-
-    assert len(expected_log) == len(caplog.records)
-
-    assert all([exp[0] == rec.levelno 
-                for exp, rec in zip(expected_log, caplog.records)])
-    assert all([exp[1] in rec.message
-                for exp, rec in zip(expected_log, caplog.records)])
-
-
-@pytest.mark.parametrize('iact_meta, has_taxa_object, has_dwsh_object, expected_log',
-    [
-      ( dict(),
-        False, False,
-        ( (ERROR, "At least one of interaction name or interaction field must be provided"),)),
-      ( dict(interaction_name='foo:predator'),
-        False, False,
-        ( (ERROR, "Interaction name provided but no taxa loaded"),)),
-      ( dict(interaction_name='foo:predator'),
-        True, False,
-        ( (ERROR, "Unknown taxa in interaction_name descriptor"),
-          (ERROR, "At least two interacting taxon labels or fields must be identified"))),
-      ( dict(interaction_name='C_born:predator'),
-        True, False,
-        ( (ERROR, "At least two interacting taxon labels or fields must be identified"),)),
-      ( dict(interaction_name='C_born:predator;V_salv:prey'),  # Biologically not very plausible
-        True, False,
-        tuple()),
-      ( dict(interaction_field='not_provided:predator'),
-        False, False,
-        ( (CRITICAL, "Interaction field provided but no dataworksheet provided for this field"),)),
-      ( dict(interaction_field='foo:predator'),
-        False, True,
-        ( (ERROR, "Unknown taxon fields in interaction_field descriptor"),
-          (ERROR, "At least two interacting taxon labels or fields must be identified"))),
-      ( dict(interaction_field='predator:eats things'),
-        False, True,
-        ( (ERROR, "At least two interacting taxon labels or fields must be identified"), )),
-      ( dict(interaction_field='predator:eats things;prey:gets eaten'),
-        False, True,
-        tuple()),
-      ( dict(interaction_field='predator:eats things', 
-             interaction_name='C_born:prey'),
-        True, True,
-        tuple()),
-      ( dict(interaction_field='predator:eats things;prey:gets eaten', 
-             interaction_name='C_born:decomposer'),  # Tritrophic example
-        True, True,
-        tuple()),
-      ( dict(interaction_name='C_born;V_salv'),  
-        True, False,
-        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
-      ( dict(interaction_field='predator;prey'),  
-        False, True,
-        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
-      ( dict(interaction_field='predator', 
-             interaction_name='C_born'),
-        True, True,
-        ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
-    ] 
-)
-def test_CategoricalInteractionField_init(caplog, fixture_taxa,
-                                          iact_meta, has_taxa_object, has_dwsh_object, expected_log):
-    """Testing the use of the CategoricalInteractionField init
-    """
-    
-    # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
-    dwsh = DataWorksheet({'name': 'DF',
-                          'title': 'My data table',
-                          'description': 'This is a test data worksheet'})
-    dwsh.taxa_fields = ['predator', 'prey']
-    dwsh_obj = dwsh if has_dwsh_object else None
-
-    # Technically, this violates the field_name last requirement, but that is
-    # enforced at the dataworksheet level, not the field level. 
-    field_meta = {'field_type': 'categorical interaction',
-                  'description': 'outcome of competition',
-                  'field_name': 'factor_data',
-                  'levels': 'level1;level2'}
-    field_meta.update(iact_meta)
-
-    caplog.clear()
-
-    # Test the __init__ method
-    fld = NumericInteractionField(field_meta,
-                                  taxa = tx_obj,
-                                  dwsh = dwsh_obj)
-
     assert len(expected_log) == len(caplog.records)
 
     assert all([exp[0] == rec.levelno 
@@ -810,12 +753,12 @@ def test_CategoricalInteractionField_init(caplog, fixture_taxa,
        'interaction_name': 'C_born:competitor 1;V_salv:competitor 2'}),
   ]
 )
-def test_CategoricalField_validate_data(caplog, fixture_taxa, 
-                                        test_class, field_meta, data, expected_log):
+def test_CategoricalField_and_subclasses_validate_data(caplog, fixture_dataset, 
+                                                       test_class, field_meta, data, expected_log):
     """Testing behaviour of the CategoricalField class in using validate_data
     """
 
-    fld = test_class(field_meta, taxa=fixture_taxa)
+    fld = test_class(field_meta, dataset = fixture_dataset)
 
     fld.validate_data(data)
     fld.report()
@@ -840,18 +783,18 @@ def test_CategoricalField_validate_data(caplog, fixture_taxa,
           (ERROR, 'No taxon details provided for dataset'),
           (ERROR, 'No taxa loaded'))),
        ])
-def test_TaxaField_init(caplog, fixture_taxa, provide_taxa_instance, expected_log):
+def test_TaxaField_init(caplog, fixture_dataset, provide_taxa_instance, expected_log):
     """Testing behaviour of the TaxaField class in handling missing taxa.
     """
 
     if provide_taxa_instance:
-        taxa = fixture_taxa
+        ds = fixture_dataset
     else:
-        taxa = None
+        ds = None
 
     fld = TaxaField({'field_type': 'taxa',
                      'description': 'My taxa',
-                     'field_name': 'taxa_field'}, taxa=taxa)
+                     'field_name': 'taxa_field'}, dataset=ds)
     fld.report()
     
     assert len(expected_log) == len(caplog.records)
@@ -860,9 +803,6 @@ def test_TaxaField_init(caplog, fixture_taxa, provide_taxa_instance, expected_lo
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
-
-
-
 
 
 @pytest.mark.parametrize(
@@ -880,13 +820,13 @@ def test_TaxaField_init(caplog, fixture_taxa, provide_taxa_instance, expected_lo
       ((INFO, "Checking Column taxa_field"),
        (ERROR, 'Includes unreported taxa'))),
     ])
-def test_TaxaField_validate_data(caplog, fixture_taxa, data, expected_log):
+def test_TaxaField_validate_data(caplog, fixture_dataset, data, expected_log):
     """Testing behaviour of the TaxaField class in using validate_data
     """
 
     fld = TaxaField({'field_type': 'taxa',
                      'description': 'My taxa',
-                     'field_name': 'taxa_field'}, taxa=fixture_taxa)
+                     'field_name': 'taxa_field'}, dataset=fixture_dataset)
     
     fld.validate_data(data)
     fld.report()
@@ -911,18 +851,18 @@ def test_TaxaField_validate_data(caplog, fixture_taxa, data, expected_log):
           (ERROR, 'No location details provided for dataset'),
           (ERROR, 'No locations loaded'))),
        ])
-def test_LocationsField_init(caplog, fixture_locations, provide_loc_instance, expected_log):
+def test_LocationsField_init(caplog, fixture_dataset, provide_loc_instance, expected_log):
     """Testing behaviour of the LocationsField class in handling missing locations.
     """
 
     if provide_loc_instance:
-        locs = fixture_locations
+        ds = fixture_dataset
     else:
-        locs = None
+        ds = None
 
     fld = LocationsField({'field_name': 'locations',
                           'field_type': 'locations',
-                          'description': 'my locations'}, locations=locs)
+                          'description': 'my locations'}, dataset=ds)
     fld.report()
     
     assert len(expected_log) == len(caplog.records)
@@ -941,7 +881,7 @@ def test_LocationsField_init(caplog, fixture_locations, provide_loc_instance, ex
       ( ['A_1', 'A_2', 1, 'A_2', 'A_1', 2], 
         ((INFO, "Checking Column locations"),)),
       # Bad data
-      ( ['A_1', 'A_2', 16.2, 'A_2', 'A_1', datetime.datetime.now()], 
+      ( ['A_1', 'A_2', 16.2, 'A_2', 'A_1', datetime.now()], 
         ((INFO, "Checking Column locations"),
          (ERROR, "Cells contain invalid location values"))),
       ( [], 
@@ -951,14 +891,14 @@ def test_LocationsField_init(caplog, fixture_locations, provide_loc_instance, ex
         ((INFO, "Checking Column locations"),
          (ERROR, "Includes unreported locations"))),
     ])
-def test_LocationsField_validate_data(caplog, fixture_locations, data, expected_log):
+def test_LocationsField_validate_data(caplog, fixture_dataset, data, expected_log):
     """Testing behaviour of the TaxaField class in using validate_data
     """
 
     fld = LocationsField({'field_name': 'locations',
                           'field_type': 'locations',
                           'description': 'my locations'}, 
-                          locations=fixture_locations)
+                          dataset=fixture_dataset)
 
     fld.validate_data(data)
     fld.report()
@@ -1005,28 +945,51 @@ def test_GeoField_init(caplog, fixture_dataset, provide_ds_instance, expected_lo
 
 
 @pytest.mark.parametrize(
-    'data, expected_log',
+    'which,data, expected_log',
     [ # Good data
-      ( [1,2,3,4,5,6], 
+      ( 'latitude', 
+        [1,2,3,4,5,6], 
+        ( (INFO, "Checking Column geocoords"),)),
+      ( 'longitude', 
+        [111, 112, 113, 114, 115, 116], 
         ( (INFO, "Checking Column geocoords"),)),
       # Bad inputs
-      ( [1,'2',3,4,5,6], 
+      ( 'latitude', 
+        [1,'2',3,4,5,6], 
         ( (INFO, "Checking Column geocoords"),
           (ERROR, 'Field contains non-numeric data'))),
-      ( [1,'2°',3,4,5,6], 
+      ( 'longitude', 
+        [111, "112", 113, 114, 115, 116], 
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'Field contains non-numeric data'))),
+      ( 'latitude', 
+        [1,'2°',3,4,5,6], 
         ( (INFO, "Checking Column geocoords"),
           (ERROR, 'Field contains non-numeric data'),
           (WARNING, 'Possible degrees minutes and seconds formatting?'))),
-      ( [1,2,3,4,5,600], 
+      ( 'longitude', 
+        [111, "112°", 113, 114, 115, 116], 
         ( (INFO, "Checking Column geocoords"),
-          (ERROR, 'Values range (1, 600) exceeds hard bounds'))),
-      ( [1,2,3,4,5,60], 
+          (ERROR, 'Field contains non-numeric data'),
+          (WARNING, 'Possible degrees minutes and seconds formatting?'))),
+      ( 'latitude', 
+        [1,2,3,4,5,600], 
         ( (INFO, "Checking Column geocoords"),
-          (WARNING, 'Values range (1, 60) exceeds soft bounds'))),
+          (ERROR, 'exceeds hard bounds'))),
+      ( 'longitude', 
+        [-200,2,3,4,5,600], 
+        ( (INFO, "Checking Column geocoords"),
+          (ERROR, 'exceeds hard bounds'))),
+      ( 'latitude', 
+        [1,2,3,4,5,60], 
+        ( (INFO, "Checking Column geocoords"),
+          (WARNING, 'exceeds soft bounds'))),
+      ( 'longitude', 
+        [111,112,113,114,115,160], 
+        ( (INFO, "Checking Column geocoords"),
+          (WARNING, 'exceeds soft bounds'))),
     ])
-@pytest.mark.parametrize(
-    'which', ['latitude', 'longitude'])
-def test_GeoField_validate_data(caplog, fixture_dataset, data, expected_log, which):
+def test_GeoField_validate_data(caplog, fixture_dataset, which, data, expected_log):
     """Testing behaviour of the TaxaField class in using validate_data
     """
 
@@ -1044,3 +1007,243 @@ def test_GeoField_validate_data(caplog, fixture_dataset, data, expected_log, whi
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize(
+    'data, expected_log',
+    [ # Good data
+      ( [ [time(11,12),time(11,12),time(11,12),time(11,12),time(11,12)],], 
+        ( (INFO, "Checking Column time"),)),
+      ( [ ["11:12:13","11:12:13","11:12:13","11:12:13","11:12:13"],], 
+        ( (INFO, "Checking Column time"),)),
+      ( [ ["111213","1112","111213.2","11:12:13","11:12:13"],],  # Different ISO8601 string formats
+        ( (INFO, "Checking Column time"),)),
+      # Bad inputs
+      ( [ [time(11,12),time(11,12),"11:12:13","11:12:13","11:12:13"],], 
+        ( (INFO, "Checking Column time"),
+          (ERROR, "Time data mixes ISO string and time formatted rows"),)),
+      ( [ [time(11,12),time(11,12), 1, 2, 3],], 
+        ( (INFO, "Checking Column time"),
+          (ERROR, "Time data include values neither ISO string nor time formatted"),)),
+      ( [ ["11twelve13","11:12:13","11/12/13","11:12:13","11:12:13"],], 
+        ( (INFO, "Checking Column time"),
+          (ERROR, "ISO time strings contain badly formatted values"),)),
+      ( [ [time(11,12),time(11,12),time(11,12),time(11,12),time(11,12)],
+          ["11:12:13","11:12:13","11:12:13","11:12:13","11:12:13"],], 
+        ( (INFO, "Checking Column time"),
+          (ERROR, "Time data mixes ISO string and time formatted rows"),)),
+      ( [ [time(11,12),time(11,12),time(11,12),time(11,12),time(11,12)],
+          [1, 2, "11:12:13","11:12:13","11:12:13"],], 
+        ( (INFO, "Checking Column time"),
+          (ERROR, "Time data include values neither ISO string nor time formatted"),)),
+    ])
+def test_TimeField_validate_data(caplog, data, expected_log):
+    """Testing behaviour of the TaxaField class in using validate_data
+    """
+
+    fld = TimeField({'field_name': 'time',
+                    'field_type': 'time',
+                    'description': 'time'})
+
+    for d in data:
+        fld.validate_data(d)
+  
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize(
+    'field_type, data, expected_log',
+    [ # Good data
+      ( 'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           datetime(2022, 1, 6),datetime(2022, 1, 6)],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( 'date',
+        [ ["2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", ],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( 'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12)],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( 'datetime',
+        [ ["2022-01-06 11:12", "2022-01-06 11:12", "2022-01-06 11:12",
+           "2022-01-06 11:12", "2022-01-06 11:12"],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      # Bad data - mixed inputs
+      ( 'datetime',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           datetime(2022, 1, 6),datetime(2022, 1, 6)],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (WARNING, "Field is of type datetime, but only reports dates"))),
+      ( 'date',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12)],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Field is of type date, but includes time data"))),
+      ( 'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           "2022-01-06 11:12", "2022-01-06 11:12"],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data mixes ISO string and time formatted rows"),)),
+      ( 'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           "2022-01-06", "2022-01-06"],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data mixes ISO string and time formatted rows"),)),
+      ( 'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           datetime(2022, 1, 6),datetime(2022, 1, 6)],
+          ["2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06"],
+        ], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data mixes ISO string and time formatted rows"),)),
+      ( 'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12)],
+          ["2022-01-06 11:12", "2022-01-06 11:12", "2022-01-06 11:12",
+           "2022-01-06 11:12", "2022-01-06 11:12"],
+        ], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data mixes ISO string and time formatted rows"),)),
+      # Bad data - bad classes
+      ( 'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           1, 2],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data include values neither ISO string nor time formatted"))),
+      ( 'date',
+        [ ["2022-01-06", "2022-01-06", "2022-01-06", 1, 2],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data include values neither ISO string nor time formatted"))),
+      ( 'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           1, 2],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data include values neither ISO string nor time formatted"))),
+      ( 'datetime',
+        [ ["2022-01-06 11:12", "2022-01-06 11:12", "2022-01-06 11:12",
+           1, 2],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "Date or datetime data include values neither ISO string nor time formatted"))),
+      # Bad data - string formats
+      ( 'date',
+        [ ["2022-01-06", "2022/01/06", "2022-01-06", "20220106", "2022-01-06", ],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "ISO datetime strings contain badly formatted values"))),
+      ( 'datetime',
+        [ ["2022-01-06 11:12", "2022/01/06 11:12", "2022-01-06 11:12",
+           "20220106 11:12", "2022-01-06 11:12"],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "ISO datetime strings contain badly formatted values"))),
+    ])
+def test_DatetimeField_validate_data(caplog, fixture_dataset, field_type, data, expected_log):
+    """Testing behaviour of the TaxaField class in using validate_data
+    """
+
+    fld = DatetimeField({'field_name': 'datetimetest',
+                         'field_type': field_type,
+                         'description': 'time'},
+                         dataset=fixture_dataset)
+
+    for d in data:
+        fld.validate_data(d)
+  
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+
+@pytest.mark.parametrize(
+    'provide_dataset,field_type, data, expected_log',
+    [ # Good data - no dataset
+      ( False, 
+        'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           datetime(2022, 1, 6),datetime(2022, 1, 6)],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "No dataset object provided - cannot update extents"))),
+      ( False, 
+        'date',
+        [ ["2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", ],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "No dataset object provided - cannot update extents"))),
+      ( False, 
+        'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12)],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "No dataset object provided - cannot update extents"))),
+      ( False, 
+        'datetime',
+        [ ["2022-01-06 11:12", "2022-01-06 11:12", "2022-01-06 11:12",
+           "2022-01-06 11:12", "2022-01-06 11:12"],], 
+        ( (INFO, "Checking Column datetimetest"),
+          (ERROR, "No dataset object provided - cannot update extents"))),
+      # Good data - with dataset
+      ( True,
+        'date',
+        [ [datetime(2022, 1, 6), datetime(2022, 1, 6), datetime(2022, 1, 6), 
+           datetime(2022, 1, 6),datetime(2022, 1, 6)],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( True,
+        'date',
+        [ ["2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", "2022-01-06", ],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( True,
+        'datetime',
+        [ [datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12), 
+           datetime(2022, 1, 6, 11, 12), datetime(2022, 1, 6, 11, 12)],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+      ( True,
+        'datetime',
+        [ ["2022-01-06 11:12", "2022-01-06 11:12", "2022-01-06 11:12",
+           "2022-01-06 11:12", "2022-01-06 11:12"],], 
+        ( (INFO, "Checking Column datetimetest"),)),
+    ])
+
+def test_DatetimeField_extent(caplog, fixture_dataset, provide_dataset, field_type, data, 
+                              expected_log):
+    """Testing behaviour of the TaxaField class in using validate_data
+    """
+
+    if provide_dataset:
+      ds = fixture_dataset
+    else:
+      ds = None
+
+    fld = DatetimeField({'field_name': 'datetimetest',
+                         'field_type': field_type,
+                         'description': 'time'},
+                         dataset=ds)
+
+    for d in data:
+        fld.validate_data(d)
+  
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+    if provide_dataset and field_type == 'date':
+        assert fixture_dataset.temporal_extent.extent[0] == date(2022, 1, 6)
+        assert fixture_dataset.temporal_extent.extent[1] == date(2022, 1, 6)
+    if provide_dataset and field_type == 'datetime':
+        assert fixture_dataset.temporal_extent.extent[0] == date(2022, 1, 6)
+        assert fixture_dataset.temporal_extent.extent[1] == date(2022, 1, 6)
