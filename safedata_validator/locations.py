@@ -364,4 +364,7 @@ class Locations:
         self.locations.update(loc_names)
         index_entries = [(lc, False, None, None) for lc in loc_names]
         self.location_index.append(index_entries)
-    
+
+    @property
+    def is_empty(self):
+        return len(self.locations) == 0

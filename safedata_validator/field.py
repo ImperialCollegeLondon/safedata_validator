@@ -439,9 +439,7 @@ class BaseField:
 
     def __init__(self, meta: dict, 
                  dwsh: DataWorksheet = None,
-                 dataset: Dataset = None,
-                 taxa: Taxa = None,
-                 locations: Locations = None) -> None:
+                 dataset: Dataset = None) -> None:
         
         """
         Base class to check field metadata and then test whether the data
@@ -464,27 +462,33 @@ class BaseField:
             * Dataworksheet level information - taxon fields
 
         Rather than having complex inheritance with changing subclass signatures
-        and kwargs, the Base class makes all information available to all
+        and kwargs, the BaseField class makes all information available to all
         subclasses.
 
         Args: 
             meta: A dictionary of field metadata
             dwsh: A DataWorksheet instance, used to pass worksheet level
                 information, which at the moment is just taxa fields.
-            dataset: An Dataset instance, used to update dataset level
-                information, such as extents.
-            locations: A Locations instances, used to validate location
-                details and update locations used.
-            taxa: A Taxa instance, used to validate taxon details and update
-                taxa used.
+            dataset: An Dataset instance, used to provide dataset level
+                information, such as taxa, locations and summary, and update
+                dataset level attributes such as data extents.
         """
 
         self.meta = meta
         self.dwsh = dwsh
-        self.dataset = dataset
-        self.taxa = taxa
-        self.locations = locations
+        
+        self.taxa = None
+        self.locations = None
+        self.summary = None
 
+        # Shortcuts to main components
+        self.dataset = dataset
+        if self.dataset:
+            self.taxa = getattr(self.dataset, 'taxa')
+            self.locations = getattr(self.dataset, 'locations')
+            self.summary = getattr(self.dataset, 'summary')
+
+        # Attributes
         self.log_stack = []
         self.n_rows = 0
         self.n_na = 0
@@ -589,6 +593,9 @@ class BaseField:
             LOGGER.error("One of taxon name or taxon field must be provided")
             return False
         elif tx_nm_prov and self.taxa is None:
+            LOGGER.critical('Taxon name provided but no Taxa instance available')
+            return False
+        elif tx_nm_prov and self.taxa.is_empty:
             LOGGER.error('Taxon name provided but no taxa loaded')
             return False
         elif tx_nm_prov and tx_nm not in self.taxa.taxon_names:
@@ -637,6 +644,9 @@ class BaseField:
             LOGGER.error("At least one of interaction name or interaction field must be provided")
             return False
         elif iact_nm_prov and self.taxa is None:
+            LOGGER.critical('Interaction name provided but no Taxa instance available')
+            return False
+        elif iact_nm_prov and self.taxa.is_empty:
             LOGGER.error('Interaction name provided but no taxa loaded')
             return False
         elif iact_fd_prov and self.dwsh is None:
@@ -894,11 +904,13 @@ class CategoricalField(BaseField):
     field_types = ('categorical', 'ordered_categorical')
     required_descriptors = MANDATORY_DESCRIPTORS.union(['levels'])
 
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, taxa: Taxa = None, locations: Locations = None) -> None:
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+                 dataset: Dataset = None) -> None:
 
-        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+        super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
-        # Additional code to validate the levels metadata and store a set of values
+        # Additional code to validate the levels metadata and store a set of
+        # values
         self.level_labels = set()
         self.reported_levels = set()
         levels = meta.get('levels')
@@ -944,8 +956,10 @@ class TaxaField(BaseField):
 
     field_types = ('taxa',)
 
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, taxa: Taxa = None, locations: Locations = None) -> None:
-        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+                 dataset: Dataset = None) -> None:
+
+        super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.taxa is None:
             self._log('No taxon details provided for dataset')
@@ -990,11 +1004,13 @@ class LocationsField(BaseField):
     in the Locations instance.
     """
 
-    field_types = ('locations',)
+    field_types = ('locations', 'location')
     required_descriptors = MANDATORY_DESCRIPTORS
 
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, taxa: Taxa = None, locations: Locations = None) -> None:
-        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+                 dataset: Dataset = None) -> None:
+
+        super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.locations is None:
             self._log('No location details provided for dataset')
@@ -1041,9 +1057,10 @@ class GeoField(BaseField):
 
     field_types = ('latitude', 'longitude')
 
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None, taxa: Taxa = None, locations: Locations = None) -> None:
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None,
+                 dataset: Dataset = None) -> None:
         
-        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+        super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.dataset is None:
             self._log('No dataset object provided - cannot update extents')
@@ -1143,10 +1160,9 @@ class TimeField(BaseField):
     field_types = ('time', )
 
     def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
-                 dataset: Dataset = None, taxa: Taxa = None, 
-                 locations: Locations = None) -> None:
+                 dataset: Dataset = None) -> None:
         
-        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+        super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         # Defaults
         self.first_data_class_set = None
@@ -1236,10 +1252,9 @@ class DatetimeField(BaseField):
     field_types = ('datetime', 'date')
 
     def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
-                 dataset: Dataset = None, taxa: Taxa = None, 
-                 locations: Locations = None) -> None:
+                 dataset: Dataset = None) -> None:
         
-        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
+        super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.dataset is None:
             self._log('No dataset object provided - cannot update extents')
@@ -1365,11 +1380,9 @@ class FileField(BaseField):
     field_types = ('datetime', 'date')
 
     def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
-                 dataset: Dataset = None, taxa: Taxa = None, 
-                 locations: Locations = None) -> None:
+                 dataset: Dataset = None) -> None:
         
-        super().__init__(meta, dwsh=dwsh, dataset=dataset, taxa=taxa, locations=locations)
-
+        super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.external_files is None:
             LOGGER.error('No external files listed in Summary')

@@ -3,6 +3,7 @@ from curses import ERR
 import pytest
 from logging import CRITICAL, ERROR, WARNING, INFO
 from datetime import datetime, time, date
+from safedata_validator import dataset
 
 from safedata_validator.field import (BaseField, CommentField, ReplicateField, 
                                       CategoricalField, GeoField, 
@@ -11,6 +12,7 @@ from safedata_validator.field import (BaseField, CommentField, ReplicateField,
                                       NumericInteractionField, CategoricalInteractionField,
                                       TimeField, DatetimeField,
                                       DataWorksheet)
+
 
 # Checking the helper and private methods
 
@@ -79,6 +81,8 @@ def test_parse_levels(caplog, data, exp_log, exp_levels, exp_desc):
     assert all([do == de for do, de in zip(obs_desc, exp_desc)])
 
 
+# TODO -  test errors on empty Taxa
+
 @pytest.mark.parametrize(
     'tx_meta, has_taxa_object, has_dwsh_object, expected_log',
     [
@@ -90,7 +94,7 @@ def test_parse_levels(caplog, data, exp_log, exp_levels, exp_desc):
         ( (ERROR, "One of taxon name or taxon field must be provided"),)),
       ( dict(taxon_name='foo'),
         False, False,
-        ( (ERROR, "Taxon name provided but no taxa loaded"),)),
+        ( (CRITICAL, "Taxon name provided but no Taxa instance available"),)),
       ( dict(taxon_name='foo'),
         True, False,
         ( (ERROR, "Taxon name not found in the Taxa worksheet"),)),
@@ -108,13 +112,14 @@ def test_parse_levels(caplog, data, exp_log, exp_levels, exp_desc):
         tuple()),
     ] 
 )
-def test_check_taxon_meta(caplog, fixture_taxa,
+def test_check_taxon_meta(caplog, fixture_dataset, 
                           tx_meta, has_taxa_object, has_dwsh_object, expected_log):
     """Testing the use of the BaseField._check_taxon_meta() method
     """
     
     # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
+    ds_obj = fixture_dataset if has_taxa_object else None
+
     dwsh = DataWorksheet({'name': 'DF',
                           'title': 'My data table',
                           'description': 'This is a test data worksheet'})
@@ -129,7 +134,7 @@ def test_check_taxon_meta(caplog, fixture_taxa,
     field_meta.update(tx_meta)
     
     fld = BaseField(field_meta,
-                    taxa = tx_obj,
+                    dataset = ds_obj,
                     dwsh = dwsh_obj)
 
     caplog.clear()
@@ -152,7 +157,7 @@ def test_check_taxon_meta(caplog, fixture_taxa,
         ( (ERROR, "At least one of interaction name or interaction field must be provided"),)),
       ( dict(interaction_name='foo:predator'),
         False, False,
-        ( (ERROR, "Interaction name provided but no taxa loaded"),)),
+        ( (CRITICAL, "Interaction name provided but no Taxa instance available"),)),
       ( dict(interaction_name='foo:predator'),
         True, False,
         ( (ERROR, "Unknown taxa in interaction_name descriptor"),
@@ -196,13 +201,14 @@ def test_check_taxon_meta(caplog, fixture_taxa,
         ( (WARNING, "Label descriptions for interacting taxa incomplete or missing"), )),
     ] 
 )
-def test_check_interaction_meta(caplog, fixture_taxa,
+def test_check_interaction_meta(caplog, fixture_dataset,
                                 iact_meta, has_taxa_object, has_dwsh_object, expected_log):
     """Testing the use of the BaseField._check_interaction_meta() method
     """
     
     # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
+    ds_obj = fixture_dataset if has_taxa_object else None
+
     dwsh = DataWorksheet({'name': 'DF',
                           'title': 'My data table',
                           'description': 'This is a test data worksheet'})
@@ -217,8 +223,8 @@ def test_check_interaction_meta(caplog, fixture_taxa,
     field_meta.update(iact_meta)
     
     fld = BaseField(field_meta,
-                    taxa = tx_obj,
-                    dwsh = dwsh_obj)
+                    dwsh = dwsh_obj,
+                    dataset = ds_obj)
 
     caplog.clear()
 
@@ -419,7 +425,7 @@ def test_ReplicateField_validate_data(caplog, data, expected_log):
         ( (ERROR, "One of taxon name or taxon field must be provided"),)),
       ( dict(taxon_name='foo'),
         False, False,
-        ( (ERROR, "Taxon name provided but no taxa loaded"),)),
+        ( (CRITICAL, "Taxon name provided but no Taxa instance available"),)),
       ( dict(taxon_name='foo'),
         True, False,
         ( (ERROR, "Taxon name not found in the Taxa worksheet"),)),
@@ -451,13 +457,14 @@ def test_ReplicateField_validate_data(caplog, data, expected_log):
        'levels': 'level1:level2'}),
   ]
 )
-def test_CatNumTaxonField_init(caplog, fixture_taxa, test_class, field_meta,
+def test_CatNumTaxonField_init(caplog, fixture_dataset, test_class, field_meta,
                                 tx_meta, has_taxa_object, has_dwsh_object, expected_log):
     """Testing behaviour of the NumericTaxonField and CategoricalTaxonField
     classes in using __init__"""
 
     # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
+    ds_obj = fixture_dataset if has_taxa_object else None
+
     dwsh = DataWorksheet({'name': 'DF',
                           'title': 'My data table',
                           'description': 'This is a test data worksheet'})
@@ -470,7 +477,7 @@ def test_CatNumTaxonField_init(caplog, fixture_taxa, test_class, field_meta,
     field_meta = field_meta.copy()
     field_meta.update(tx_meta)
 
-    fld = test_class(field_meta, taxa = tx_obj, dwsh = dwsh_obj)
+    fld = test_class(field_meta, dataset = ds_obj, dwsh = dwsh_obj)
 
     assert len(expected_log) == len(caplog.records)
 
@@ -487,7 +494,7 @@ def test_CatNumTaxonField_init(caplog, fixture_taxa, test_class, field_meta,
         ( (ERROR, "At least one of interaction name or interaction field must be provided"),)),
       ( dict(interaction_name='foo:predator'),
         False, False,
-        ( (ERROR, "Interaction name provided but no taxa loaded"),)),
+        ( (CRITICAL, "Interaction name provided but no Taxa instance available"),)),
       ( dict(interaction_name='foo:predator'),
         True, False,
         ( (ERROR, "Unknown taxa in interaction_name descriptor"),
@@ -545,13 +552,13 @@ def test_CatNumTaxonField_init(caplog, fixture_taxa, test_class, field_meta,
        'levels': 'level1;level2'}),
   ]
 )
-def test_CatNumInteractionField_init(caplog, fixture_taxa, test_class, field_meta,
+def test_CatNumInteractionField_init(caplog, fixture_dataset, test_class, field_meta,
                                      iact_meta, has_taxa_object, has_dwsh_object, expected_log):
     """Testing behaviour of the NumericInteractionField and 
     CategoricalInteractionField classes in using __init__"""
 
     # Set up what information is available for taxon field validation
-    tx_obj = fixture_taxa if has_taxa_object else None
+    ds_obj = fixture_dataset if has_taxa_object else None
     dwsh = DataWorksheet({'name': 'DF',
                           'title': 'My data table',
                           'description': 'This is a test data worksheet'})
@@ -565,7 +572,7 @@ def test_CatNumInteractionField_init(caplog, fixture_taxa, test_class, field_met
     caplog.clear()
 
     # Test the __init__ method
-    fld = test_class(field_meta, taxa = tx_obj, dwsh = dwsh_obj)
+    fld = test_class(field_meta, dataset = ds_obj, dwsh = dwsh_obj)
 
     assert len(expected_log) == len(caplog.records)
 
@@ -621,13 +628,13 @@ def test_CatNumInteractionField_init(caplog, fixture_taxa, test_class, field_met
        'interaction_name': 'C_born:prey;V_salv:predator'}),
   ]
 )
-def test_NumericField_and_subclasses_validate_data(caplog, fixture_taxa, test_class, field_meta,
-                                         data, expected_log):
+def test_NumericField_and_subclasses_validate_data(caplog, fixture_dataset, test_class, field_meta,
+                                                   data, expected_log):
     """Testing behaviour of the NumericField and subclasses in using _validate_data
     """
     
     # Create and instance of the required class
-    fld = test_class(field_meta, taxa = fixture_taxa)
+    fld = test_class(field_meta, dataset = fixture_dataset)
     
     fld.validate_data(data)
     fld.report()
@@ -746,12 +753,12 @@ def test_CategoricalField_init(caplog, field_meta, expected_log):
        'interaction_name': 'C_born:competitor 1;V_salv:competitor 2'}),
   ]
 )
-def test_CategoricalField_and_subclasses_validate_data(caplog, fixture_taxa, 
-                                        test_class, field_meta, data, expected_log):
+def test_CategoricalField_and_subclasses_validate_data(caplog, fixture_dataset, 
+                                                       test_class, field_meta, data, expected_log):
     """Testing behaviour of the CategoricalField class in using validate_data
     """
 
-    fld = test_class(field_meta, taxa=fixture_taxa)
+    fld = test_class(field_meta, dataset = fixture_dataset)
 
     fld.validate_data(data)
     fld.report()
@@ -776,18 +783,18 @@ def test_CategoricalField_and_subclasses_validate_data(caplog, fixture_taxa,
           (ERROR, 'No taxon details provided for dataset'),
           (ERROR, 'No taxa loaded'))),
        ])
-def test_TaxaField_init(caplog, fixture_taxa, provide_taxa_instance, expected_log):
+def test_TaxaField_init(caplog, fixture_dataset, provide_taxa_instance, expected_log):
     """Testing behaviour of the TaxaField class in handling missing taxa.
     """
 
     if provide_taxa_instance:
-        taxa = fixture_taxa
+        ds = fixture_dataset
     else:
-        taxa = None
+        ds = None
 
     fld = TaxaField({'field_type': 'taxa',
                      'description': 'My taxa',
-                     'field_name': 'taxa_field'}, taxa=taxa)
+                     'field_name': 'taxa_field'}, dataset=ds)
     fld.report()
     
     assert len(expected_log) == len(caplog.records)
@@ -813,13 +820,13 @@ def test_TaxaField_init(caplog, fixture_taxa, provide_taxa_instance, expected_lo
       ((INFO, "Checking Column taxa_field"),
        (ERROR, 'Includes unreported taxa'))),
     ])
-def test_TaxaField_validate_data(caplog, fixture_taxa, data, expected_log):
+def test_TaxaField_validate_data(caplog, fixture_dataset, data, expected_log):
     """Testing behaviour of the TaxaField class in using validate_data
     """
 
     fld = TaxaField({'field_type': 'taxa',
                      'description': 'My taxa',
-                     'field_name': 'taxa_field'}, taxa=fixture_taxa)
+                     'field_name': 'taxa_field'}, dataset=fixture_dataset)
     
     fld.validate_data(data)
     fld.report()
@@ -844,18 +851,18 @@ def test_TaxaField_validate_data(caplog, fixture_taxa, data, expected_log):
           (ERROR, 'No location details provided for dataset'),
           (ERROR, 'No locations loaded'))),
        ])
-def test_LocationsField_init(caplog, fixture_locations, provide_loc_instance, expected_log):
+def test_LocationsField_init(caplog, fixture_dataset, provide_loc_instance, expected_log):
     """Testing behaviour of the LocationsField class in handling missing locations.
     """
 
     if provide_loc_instance:
-        locs = fixture_locations
+        ds = fixture_dataset
     else:
-        locs = None
+        ds = None
 
     fld = LocationsField({'field_name': 'locations',
                           'field_type': 'locations',
-                          'description': 'my locations'}, locations=locs)
+                          'description': 'my locations'}, dataset=ds)
     fld.report()
     
     assert len(expected_log) == len(caplog.records)
@@ -884,14 +891,14 @@ def test_LocationsField_init(caplog, fixture_locations, provide_loc_instance, ex
         ((INFO, "Checking Column locations"),
          (ERROR, "Includes unreported locations"))),
     ])
-def test_LocationsField_validate_data(caplog, fixture_locations, data, expected_log):
+def test_LocationsField_validate_data(caplog, fixture_dataset, data, expected_log):
     """Testing behaviour of the TaxaField class in using validate_data
     """
 
     fld = LocationsField({'field_name': 'locations',
                           'field_type': 'locations',
                           'description': 'my locations'}, 
-                          locations=fixture_locations)
+                          dataset=fixture_dataset)
 
     fld.validate_data(data)
     fld.report()
