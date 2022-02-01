@@ -156,14 +156,29 @@ def fixture_locations(resources_with_local_gbif):
     
     return locations
 
-@pytest.fixture(scope='module')
+@pytest.fixture()
 def fixture_dataset(resources_with_local_gbif):
-    """Fixture to provide a taxon object with a couple of names. These examples
-    need to be in the cutdown local GBIF testing database in fixtures.
+    """Fixture to provide a dataset that has been prepopulated with some taxon
+    and location names for field tests.
     """
 
     dataset = Dataset(resources_with_local_gbif)
     
+    test_taxa = [
+        ('C_born', 
+            ['Crematogaster borneensis', 'Species', None, None], 
+            None), 
+        ('V_salv', 
+            ['Varanus salvator', 'Species', None, None], 
+            None),]
+    
+    for tx in test_taxa:
+        dataset.taxa.validate_and_add_taxon(tx)
+
+    test_locs = ['A_1', 'A_2', 1, 2]
+    
+    dataset.locations.add_known_locations(test_locs)
+
     return dataset
 
 
