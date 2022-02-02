@@ -2,11 +2,11 @@ import datetime
 from itertools import groupby, islice
 from collections import OrderedDict
 from logging import CRITICAL, ERROR, WARNING, INFO
-from openpyxl import worksheet
+from openpyxl import worksheet, load_workbook
+import datetime
 from openpyxl.utils import get_column_letter
 from dateutil import parser
 from typing import List
-from safedata_validator import dataset
 
 from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError, IsNotPadded,
                                            HasDuplicates, IsNotNA, IsNumber, 
@@ -14,15 +14,108 @@ from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError,
                                            blank_value, valid_r_name, RE_DMS)
 
 from safedata_validator.logger import LOGGER, FORMATTER, CH, loggerinfo_push_pop
-from safedata_validator.dataset import Dataset
+from safedata_validator.resources import Resources
 from safedata_validator.locations import Locations
 from safedata_validator.taxa import Taxa
+from safedata_validator.summary import Summary
+from safedata_validator.extent import Extent
+
 
 # These are lists, not sets because lists preserve order for preserving logging
 # message order in unit testing.
 MANDATORY_DESCRIPTORS = ['field_type', 'description', 'field_name']
 OPTIONAL_DESCRIPTORS = ['levels', 'method', 'units', 'taxon_name', 'taxon_field',
                         'interaction_name', 'interaction_field', 'file_container']
+
+
+class Dataset:
+
+    def __init__(self, resources=Resources()):
+        """
+        The Dataset class links an input file with a particular configuration
+        of the safedata_validator validation sources, and then loads the
+        components of the dataset.
+
+        Args:
+            resources: An instance of class Resources providing a set of
+                validation resources for taxa and locations. The default
+                attempts to locate these resources from a user or site config
+                file.
+        """
+
+        self.resources = resources
+        self.summary = Summary(resources)
+        self.locations = Locations(resources)
+        self.taxa = Taxa(resources)
+        self.dataworksheets = []
+        self.n_errors = 0
+
+        # Extents - these can be loaded from the Summary or compiled from the
+        # data, so the Summary and dataset extents are held separately so that
+        # they can be validated against one another once all data is checked.
+
+        # TODO - set bounds in Resources()
+
+        self.temporal_extent = Extent('temporal extent', (datetime.date,))
+        self.latitudinal_extent = Extent('latitudinal extent', (float, int),
+                                         hard_bounds=(-90,90), soft_bounds=(-4, 8))
+        self.longitudinal_extent = Extent('longitudinal extent', (float, int),
+                                          hard_bounds=(-180,180), soft_bounds=(108, 120))
+
+    def load_from_workbook(self, filename, validate_doi=False, valid_pid=None, chunk_size=1000):
+        """
+        
+        
+        
+        """
+
+        # Open the workbook with:
+        #  - read_only to use the memory optimised read_only implementation.
+        #    This is a bit restricted as it only exposes row by row iteration
+        #    to avoid expensive XML traversal but has a low memory footprint.
+        #  - data_only to load values not formulae for equations.
+        CH.reset()
+        
+        wb = load_workbook(filename, read_only=True, data_only=True)
+
+        # Populate summary
+        if 'Summary' in wb.sheetnames:
+            LOGGER.info("Checking Summary worksheet")
+            FORMATTER.push()
+            self.summary.load(wb['Summary'], wb.sheetnames, 
+                              validate_doi=validate_doi, valid_pid=valid_pid)
+            FORMATTER.pop()
+        else:
+            # No summary is impossible - so report error TODO - not counted!
+            LOGGER.error("No summary worksheet found - moving on")
+
+        # Populate locations
+        if 'Locations' in wb.sheetnames:
+            LOGGER.info("Checking Locations worksheet")
+            FORMATTER.push()
+            self.locations.load(wb['Locations'])
+            FORMATTER.pop()
+        else:
+            # No locations is pretty implausible - lab experiments?
+            LOGGER.warn("No locations worksheet found - moving on")
+
+        # Populate taxa
+        if 'Taxa' in wb.sheetnames:
+            LOGGER.info("Checking Taxa worksheet")
+            FORMATTER.push()
+            self.taxa.load(wb['Taxa'])
+            FORMATTER.pop()
+        else:
+            # Leave the default empty Taxa object
+            LOGGER.warn("No Taxa worksheet found - moving on")
+
+        # Load data worksheets
+        if self.summary.title is not None:
+            for dwsh in self.summary.data_worksheets:
+                print(dwsh)
+                self.dataworksheets.append(DataWorksheet(dwsh, self))
+        
+        self.n_errors = CH.counters['ERROR']
 
 
 class DataWorksheet:
@@ -586,9 +679,9 @@ class BaseField:
         if self.check_interaction_meta:
             self._check_interaction_meta()
 
-    def _log(self, msg, level=ERROR):
+    def _log(self, msg, level=ERROR, extra=None):
         """Helper function for adding to log stack"""
-        self.log_stack.append((level, msg))
+        self.log_stack.append((level, msg, extra))
 
     def _check_meta(self, descriptor):
         """
@@ -918,8 +1011,8 @@ class BaseField:
         FORMATTER.push()
 
         # Emit the accumulated messages
-        for log_level, msg in self.log_stack:
-            LOGGER.log(log_level, msg)
+        for log_level, msg, extra in self.log_stack:
+            LOGGER.log(log_level, msg, extra=extra)
         
         # Run any final logging 
         # - warn about NAs
