@@ -75,7 +75,7 @@ class Summary:
                            False, 'Permits', False))
 
 
-    def __init__(self, validate_doi=False, valid_pid=None):
+    def __init__(self, resources):
 
         """
         Checks the information in the summary worksheet and looks for the
@@ -84,18 +84,8 @@ class Summary:
         of metadata returned will have None for any missing data, which should
         be handled by downstream code.
 
-        Args:
-            worksheet: An openpyxl worksheet instance.
-            sheetnames: A set of sheet names found in the workbook.
-            validate_doi: Check any publication DOIs, requiring a web connection.
-            valid_pid: If provided, an integer or list of integer values that are
-                permitted in the Project ID field (usually one for a new dataset
-                but more if a published dataset is associated with multiple projects
-                and any of those ids would be valid).
-        """
 
-        self.validate_doi = validate_doi
-        self._valid_pid = valid_pid
+        """
 
         self.project_id = None
         self.title = None
@@ -118,24 +108,12 @@ class Summary:
         self._rows = None
         self._ncols = None
         self.n_errors = None
+        self.valid_pid = None
+        self.validate_doi = False
 
-        # validate project_id is one of None, an integer or a list of integers
-        if valid_pid is None:
-            pass
-        elif isinstance(valid_pid, int):
-            self._valid_pid = [valid_pid]
-        elif isinstance(valid_pid, list):
-            if not all([isinstance(pid, int) for pid in valid_pid]):
-                LOGGER.error("Invalid value in list of project_ids.")
-                self._valid_pid = None
-            else:
-                self._valid_pid = valid_pid
-        else:
-            LOGGER.error("Provided project id must be an integer or list of integers")
-            self._valid_pid = None
 
     @loggerinfo_push_pop('Checking Summary worksheet')
-    def load(self, worksheet, sheetnames):
+    def load(self, worksheet, sheetnames, validate_doi=False, valid_pid=None):
         """
         Checks the information in a summary worksheet and looks for the
         metadata and dataset worksheets. The methods are intended to try and
@@ -154,6 +132,23 @@ class Summary:
         """
 
         start_errors = CH.counters['ERROR']
+
+        # validate project_id is one of None, an integer or a list of integers
+        if valid_pid is None:
+            pass
+        elif isinstance(valid_pid, int):
+            self.valid_pid = [valid_pid]
+        elif isinstance(valid_pid, list):
+            if not all([isinstance(pid, int) for pid in valid_pid]):
+                LOGGER.error("Invalid value in list of project_ids.")
+                self.valid_pid = None
+            else:
+                self.valid_pid = valid_pid
+        else:
+            LOGGER.error("Provided project id must be an integer or list of integers")
+            self.valid_pid = None
+        
+        self.validate_doi = validate_doi
 
         # load worksheet rows
         rows = list(worksheet.iter_rows(values_only=True))
@@ -502,7 +497,7 @@ class Summary:
                              extra={'join': bad_externals})
 
         # Check for existing sheets without description
-        extra_names = sheetnames - {'Summary', 'Taxa', 'Locations'} - cited_sheets
+        extra_names = set(sheetnames) - {'Summary', 'Taxa', 'Locations'} - cited_sheets
         if extra_names:
             LOGGER.error('Undocumented sheets found in workbook: ',
                          extra={'join': extra_names})
@@ -569,8 +564,8 @@ class Summary:
         pid = core['pid']
 
         # Check the value is in the provided list
-        if pid is not None and self._valid_pid is not None and pid not in self._valid_pid:
+        if pid is not None and self.valid_pid is not None and pid not in self.valid_pid:
             LOGGER.error(f'SAFE Project ID in file ({pid}) does not match any '
-                         f'provided project ids: ', extra={'join': self._valid_pid})
+                         f'provided project ids: ', extra={'join': self.valid_pid})
         else:
             self.project_id = pid
