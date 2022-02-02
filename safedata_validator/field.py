@@ -1,12 +1,13 @@
 import datetime
 from itertools import groupby, islice
 from collections import OrderedDict
-from logging import CRITICAL, ERROR, WARNING, INFO
-from openpyxl import worksheet, load_workbook
 import datetime
-from openpyxl.utils import get_column_letter
 from dateutil import parser
 from typing import List
+from logging import CRITICAL, ERROR, WARNING, INFO
+
+from openpyxl import worksheet, load_workbook
+from openpyxl.utils import get_column_letter
 
 from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError, IsNotPadded,
                                            HasDuplicates, IsNotNA, IsNumber, 
@@ -30,19 +31,23 @@ OPTIONAL_DESCRIPTORS = ['levels', 'method', 'units', 'taxon_name', 'taxon_field'
 
 class Dataset:
 
-    def __init__(self, resources=Resources()):
+    def __init__(self, resources: Resources = None):
         """
-        The Dataset class links an input file with a particular configuration
-        of the safedata_validator validation sources, and then loads the
-        components of the dataset.
+        The Dataset class links an input file with a particular configuration of
+        the safedata_validator validation sources, and then loads the components
+        of the dataset.
 
         Args:
             resources: An instance of class Resources providing a set of
-                validation resources for taxa and locations. The default
-                attempts to locate these resources from a user or site config
-                file.
+                validation resources for taxa and locations. If not provided,
+                the default is to attempt to locate these resources from a user
+                or site config file.
         """
 
+        # Try and load the default resources if None provided
+        if resources is None:
+            resources = Resources()
+        
         self.resources = resources
         self.summary = Summary(resources)
         self.locations = Locations(resources)
@@ -62,60 +67,129 @@ class Dataset:
         self.longitudinal_extent = Extent('longitudinal extent', (float, int),
                                           hard_bounds=(-180,180), soft_bounds=(108, 120))
 
-    def load_from_workbook(self, filename, validate_doi=False, valid_pid=None, chunk_size=1000):
+    def load_from_workbook(self, 
+                           filename: str, 
+                           validate_doi: bool = False,
+                           valid_pid: List[int] = None,
+                           chunk_size: int = 1000) -> None:
+        """This method populates a Dataset using the safedata_validator format 
+        for Excel workbooks in .xlsx format.
+        
+        Args:
+            filename: A path to the workbook containing the dataset
+            validate_doi: Should DOIs in the dataset summary be validated
+            valid_pid: An optional list of valid values for the project ID
+                field in the dataset summary.
+            chunk_size: Data is read from worksheets in chunks of rows - this
+                argument sets the size of that chunk.
         """
         
+        CH.reset()
         
-        
-        """
-
         # Open the workbook with:
         #  - read_only to use the memory optimised read_only implementation.
         #    This is a bit restricted as it only exposes row by row iteration
-        #    to avoid expensive XML traversal but has a low memory footprint.
+        #    to avoid expensive XML traversal but has a lower memory footprint.
         #  - data_only to load values not formulae for equations.
-        CH.reset()
-        
+
         wb = load_workbook(filename, read_only=True, data_only=True)
 
         # Populate summary
         if 'Summary' in wb.sheetnames:
-            LOGGER.info("Checking Summary worksheet")
-            FORMATTER.push()
             self.summary.load(wb['Summary'], wb.sheetnames, 
                               validate_doi=validate_doi, valid_pid=valid_pid)
-            FORMATTER.pop()
         else:
-            # No summary is impossible - so report error TODO - not counted!
+            # No summary is impossible - so an error and no dataworksheets
+            # will be loaded, but taxon and locations could be checked if present
             LOGGER.error("No summary worksheet found - moving on")
 
         # Populate locations
         if 'Locations' in wb.sheetnames:
-            LOGGER.info("Checking Locations worksheet")
-            FORMATTER.push()
             self.locations.load(wb['Locations'])
-            FORMATTER.pop()
         else:
             # No locations is pretty implausible - lab experiments?
             LOGGER.warn("No locations worksheet found - moving on")
 
         # Populate taxa
         if 'Taxa' in wb.sheetnames:
-            LOGGER.info("Checking Taxa worksheet")
-            FORMATTER.push()
             self.taxa.load(wb['Taxa'])
-            FORMATTER.pop()
         else:
             # Leave the default empty Taxa object
             LOGGER.warn("No Taxa worksheet found - moving on")
 
         # Load data worksheets
-        if self.summary.title is not None:
-            for dwsh in self.summary.data_worksheets:
-                print(dwsh)
-                self.dataworksheets.append(DataWorksheet(dwsh, self))
-        
-        self.n_errors = CH.counters['ERROR']
+        for sheet_meta in self.summary.data_worksheets:
+            sheet_name = sheet_meta['name']
+
+            if sheet_name in wb.sheetnames:
+                dwsh = DataWorksheet(sheet_meta, self)
+                dwsh.load_from_worksheet(wb[sheet_name], row_chunk_size=chunk_size)
+                self.dataworksheets.append(dwsh)
+
+        # Run final checks
+        self.final_checks()
+
+    def final_checks(self):
+        """
+        A method to run final checks:
+        i) The locations and taxa provided have been used in the data worksheets scanned.
+        ii) Extents in the data are congruent with the summary extents
+        iii) Report the total number of errors and warnings
+        """
+
+        LOGGER.info('Checking provided locations and taxa all used in data worksheets',
+                    extra={'indent_before': 0, 'indent_after': 1})
+
+        # check locations and taxa
+        # - Can't validate when there are external files which might use any unused ones.
+        # - If the sets are not the same, then the worksheet reports will catch undocumented ones
+        #   so here only look for ones that are provided but not used in the data.
+        if not self.locations.is_empty:
+            if self.summary.external_files:
+                LOGGER.warn('Location list cannot be validated when external data files are used')
+            elif self.locations.locations_used == self.locations.locations:
+                LOGGER.info('Provided locations all used in datasets')
+            elif self.locations.locations_used == (self.locations.locations & self.locations.locations_used):
+                LOGGER.error('Provided locations not used: ',
+                             extra={'join': self.locations - self.locations_used})
+
+        # check taxa
+        if not self.taxa.is_empty:
+            if self.summary.external_files:
+                LOGGER.warn('Taxon list cannot be validated when external data files are used')
+            elif self.taxa.taxon_names_used == self.taxa.taxon_names:
+                LOGGER.info('Provided taxa all used in datasets')
+            elif self.taxa.taxon_names_used == (self.taxa.taxon_names & self.taxa.taxon_names_used):
+                LOGGER.error('Provided taxa not used: ',
+                             extra={'join': self.taxa.taxon_names - self.taxa.taxon_names_used})
+
+        LOGGER.info('Checking temporal and geographic extents',
+                    extra={'indent_before': 0, 'indent_after': 1})
+        if self.temporal_extent is None:
+            LOGGER.error('Temporal extent not set from data, please add start and '
+                         'end dates to summary worksheet')
+        if self.latitudinal_extent is None or self.longitudinal_extent is None:
+            LOGGER.error('Geographic extent not set from data, please add south, north '
+                         'east and west bounds to summary worksheet')
+
+        if CH.counters['ERROR'] > 0:
+            if CH.counters['WARNING'] > 0:
+                LOGGER.info('FAIL: file contained {} errors and {} '
+                            'warnings'.format(CH.counters['ERROR'], CH.counters['WARNING']),
+                            extra={'indent_before': 0})
+            else:
+                LOGGER.info('FAIL: file contained {} errors'.format(CH.counters['ERROR']),
+                            extra={'indent_before': 0})
+        else:
+            if CH.counters['WARNING'] > 0:
+                LOGGER.info('PASS: file formatted correctly but with {} '
+                            'warnings.'.format(CH.counters['WARNING']),
+                            extra={'indent_before': 0})
+                self.passed = True
+            else:
+                LOGGER.info('PASS: file formatted correctly with no warnings',
+                            extra={'indent_before': 0})
+                self.passed = True
 
 
 class DataWorksheet:

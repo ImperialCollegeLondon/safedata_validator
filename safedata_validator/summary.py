@@ -103,7 +103,7 @@ class Summary:
         self.longitudinal_extent = Extent('longitudinal extent', (float, int),
                                           hard_bounds=(-180,180), soft_bounds=(108, 120))
         self.external_files = None
-        self.data_worksheets = None
+        self.data_worksheets = []
 
         self._rows = None
         self._ncols = None
