@@ -519,7 +519,9 @@ def test_DataWorksheet_load_from_worksheet(caplog, fixture_dataworksheet, fixtur
     'example_excel_files, wsheet, n_errors',
     [
       ('good', 'DF', 0), 
-      # ('bad', 'DF', 20)
+      ('good', 'Incidence', 0), 
+      ('bad', 'DF', 41),
+      ('bad', 'Incidence', 8)
     ], 
     indirect = ['example_excel_files']  # take actual params from fixture
 )
@@ -529,18 +531,17 @@ def test_DataWorksheet_load_from_file(caplog, example_excel_files, wsheet, n_err
     
     # Load the taxa and locations
     rs = Resources()
-    tx = Taxa(rs)
-    tx.load(example_excel_files['Taxa'])
-
-    loc = Locations(rs)
-    loc.load(example_excel_files['Locations'])
+    ds = Dataset(rs)
+    ds.taxa.load(example_excel_files['Taxa'])
+    ds.locations.load(example_excel_files['Locations'])
 
     caplog.clear()
 
     dws = DataWorksheet({'name': 'DF',
                          'title': 'My data table',
                          'description': 'This is a test data worksheet',
-                         'external': None})
+                         'external': None},
+                         dataset=ds)
 
     dws.load_from_worksheet(example_excel_files[wsheet])
 
