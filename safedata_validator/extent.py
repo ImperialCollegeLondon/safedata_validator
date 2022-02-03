@@ -1,18 +1,34 @@
+"""Tracking the extent of key variables within a dataset
+
+The extent submodule defines the Extent class to track the extent of a
+particular variable across a dataset. It is designed to track the extents
+required by GEMINI 2: latitude, longitude and date, but the implementation is
+general. Values are fed to a class instance using the
+[update][safedata_validator.extent.Extent.update] method, which adjusts the
+extent as necessary.
+
+Typical usage:
+
+    ext = Extent('latitude', (int, float), hard_bounds=(-90, 90))
+    ext.update([1,2,3,4,5,6])
+
+"""
+
 from safedata_validator.logger import LOGGER
+from typing import Iterable, Tuple, Union
 
 class Extent:
 
-    def __init__(self, label, datatype, hard_bounds=None, soft_bounds=None):
-        """
-        This class holds the extent of a particular variable across a dataset.
-        It is designed to track the extents required by GEMINI 2: latitude,
-        longitude and date, but the implementation is general. Values are fed
-        to the class using the update method, which adjusts the extent as
-        necessary.
+    def __init__(self, label: str, 
+                 datatype: Union[type, Tuple[type, ...]], 
+                 hard_bounds: tuple = None, 
+                 soft_bounds: tuple = None):
+        """Track the extent of data
 
-        The Extent instance is created by providing a datatype and optionally
-        any hard and soft bounds to be applied. Hard bounds log an error when
-        exceeded and soft bounds log a warning.
+        An Extent instance is created by providing a datatype and optionally
+        any hard and soft bounds to be applied. When an Extent instance is updated,
+        values outside hard bounds will generate an error in logging and values
+        outside soft bounds will log a warning.
 
         Args:
             label: A label for the extent, used in reporting
@@ -49,22 +65,26 @@ class Extent:
         return f'Extent: {self.label} {self.extent}'
 
     @property
-    def datatype(self):
+    def datatype(self) -> tuple:
+        """Returns the data types accepted by the Extent object"""
         return self._datatype
 
     @property
-    def extent(self):
+    def extent(self) -> tuple:
+        "Returns a tuple showing the current extent"
         return tuple(self._extent)
 
     @property
-    def hard_bounds(self):
+    def hard_bounds(self) -> tuple:
+        """Returns a tuple showing the hard bounds of the Extent object"""
         return self._hard_bounds
 
     @property
-    def soft_bounds(self):
+    def soft_bounds(self) -> tuple:
+        """Returns a tuple showing the hard bounds of the Extent object"""
         return self._soft_bounds
 
-    def _check_bounds(self, bounds):
+    def _check_bounds(self, bounds: tuple):
         """
         Private function to validate hard and soft bounds, these are set at
         dataset initialisation and so raise an error, rather than logging.
@@ -81,14 +101,14 @@ class Extent:
         if len(bounds) != 2 or bounds[1] <= bounds[0]:
             raise AttributeError('Bounds must be provided as (low, high) tuples')
 
-    def update(self, values):
+    def update(self, values: Iterable) -> None:
         """
-        Takes a set of values and updates the extent of values provided to the
-        instance.
+        Takes an iterable containing values and updates the extent of the
+        instance using the values.
 
         Args:
-             values: An iterable of values, which should all be of the datatype(s)
-                specified when creating the Extent instance.
+             values: An iterable of values, which should all be of the
+                  datatype(s) specified when creating the Extent instance.
         """
 
         values_match_datatype = [isinstance(v, self.datatype) for v in values]
