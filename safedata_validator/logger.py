@@ -22,6 +22,7 @@ code. To avoid constant concatenation of outputs, the logger should be cleared
 when a new Dataset is being validated. 
 """
 
+from functools import wraps
 import logging
 from io import StringIO
 
@@ -200,27 +201,31 @@ def log_and_raise(msg: str, exception: Exception) -> None:
     raise exception(msg)
 
 
+# See https://stackoverflow.com/questions/10176226/how-do-i-pass-extra-arguments-to-a-python-decorator
+
 def loggerinfo_push_pop(wrapper_message):
     """
-    
     This decorator is used to reduce boilerplate logger code within functions.
     It emits a message and then increases the indentation depth while the
     wrapped function is running.
     """
 
-    def decorator_func(func):
-        def wrapper_func(*args, **kwargs):
+    def decorator_func(function):
+        @wraps(function)
+        def wrapped_func(*args, **kwargs):
 
             # Emit the logger info and step in a level
             LOGGER.info(wrapper_message)
             FORMATTER.push()
 
             # Invoke the wrapped function 
-            retval = func(*args, **kwargs)
+            retval = function(*args, **kwargs)
 
             # Step back out
             FORMATTER.pop()
 
             return retval
-        return wrapper_func
+        
+        return wrapped_func
+    
     return decorator_func
