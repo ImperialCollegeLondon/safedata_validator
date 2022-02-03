@@ -14,7 +14,7 @@ from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError,
                                            IsNotNumericString, IsString, IsLocName,
                                            blank_value, valid_r_name, RE_DMS)
 
-from safedata_validator.logger import LOGGER, FORMATTER, CH, loggerinfo_push_pop
+from safedata_validator.logger import CONSOLE_LOGGER, LOG, LOGGER, FORMATTER, CH, loggerinfo_push_pop
 from safedata_validator.resources import Resources
 from safedata_validator.locations import Locations
 from safedata_validator.taxa import Taxa
@@ -71,10 +71,17 @@ class Dataset:
                            filename: str, 
                            validate_doi: bool = False,
                            valid_pid: List[int] = None,
-                           chunk_size: int = 1000) -> None:
+                           chunk_size: int = 1000,
+                           console_log: bool = True) -> None:
         """This method populates a Dataset using the safedata_validator format 
         for Excel workbooks in .xlsx format.
         
+        By default, `safedata_validator` emits log messages to the console and
+        to an internal record. In command line scripts, the console log _is_ the
+        the validation report but if the function is being used programatically,
+        the internal record is all that is needed. The `console_log` argument
+        can be used to suppress console logging.
+
         Args:
             filename: A path to the workbook containing the dataset
             validate_doi: Should DOIs in the dataset summary be validated
@@ -82,9 +89,16 @@ class Dataset:
                 field in the dataset summary.
             chunk_size: Data is read from worksheets in chunks of rows - this
                 argument sets the size of that chunk.
+            console_log: Use the console logging or not
         """
         
+        # Handle logging details
+        LOG.truncate()
         CH.reset()
+        if console_log:
+            CONSOLE_LOGGER.setLevel('DEBUG')
+        else:
+            CONSOLE_LOGGER.setLevel('CRITICAL')
         
         # Open the workbook with:
         #  - read_only to use the memory optimised read_only implementation.

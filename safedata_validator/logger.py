@@ -1,72 +1,112 @@
+""" ## Logging setup for safedata_validator
+
+This submodule extends the standard logging setup to provide extra functionality
+and to expose some global logging objects for use throughout the code.
+
+The submodule defines CounterHandler as a subclass of logging.StreamHandler,
+extended to maintain a count of messages emitted at the different logging
+levels. An instance of this (`CH`) is used with a StringIO instance (`LOG`) to
+maintain a logging history and provided error counts.
+
+A second default logging.StreamHandler instance (`CONSOLE_HANDLER`) is used to
+emit records to the command line for use in scripts.
+
+The submodule also defines IndentFormatter as a subclass of logging.Formatter,
+which is used in both `CH` and `CONSOLE_HANDLER` to provide compact messages
+with variable indentation to show different sections of the validation process.
+
+
+Note that the handlers are created when the module is loaded, so when running
+behind a web server, the content of the handlers persist between runs of the
+code. To avoid constant concatenation of outputs, the logger should be cleared
+when a new Dataset is being validated. 
+"""
+
 import logging
 from io import StringIO
 
-"""
-Logger setup - setup the standard logger to provide:
-  1) A handler providing a counter of the number of calls to each log level
-  2) A formatter to provide user controlled indentation and to
-     code levels as symbols for compactness
-  3) A handler writing to a global log file written to a StringIO container
-  4) Optionally a handler also writing the log to stdout can be added when
-     a Dataset instance is created.
-
-Note that the handlers are created when the module is loaded, so when running
-behind a web server, the content of the handlers persist between runs of the 
-code. To avoid constant concatenation of outputs, Dataset.__init__() empties 
-them.
-
-The depth of indenting can either be set when a message is logged:
-
-    LOGGER.info('Configuring Resources', extra=dict(depth=0))
-    
-or alternatively set directly to set the indent depth for subsequent messages:
- 
-    FORMATTER.depth = 1
-"""
-
-
-class CounterHandler(logging.Handler):
-    """
-    Handler instance that maintains a count of calls at each log level
-    """
+class CounterHandler(logging.StreamHandler):
 
     def __init__(self, *args, **kwargs):
-        logging.Handler.__init__(self, *args, **kwargs)
+        """This is an subclass of `logging.StreamHandler` that maintains a count of
+        calls at each log level.
+        """
+        logging.StreamHandler.__init__(self, *args, **kwargs)
         self.counters = {'DEBUG': 0, 'INFO': 0, 'WARNING': 0, 'ERROR': 0, 'CRITICAL': 0}
 
-    def emit(self, rec):
-        self.counters[rec.levelname] += 1
+    def emit(self, record: logging.LogRecord):
+        """The emit method for CounterHandler emits the message but also increments the
+        counter for the message level.
+        
+        Args:
+            record: A `logging.LogRecord` instance.
+        """
+        self.counters[record.levelname] += 1
 
+        msg = self.format(record=record)
+        self.stream.write(msg)
+        self.flush()
+    
     def reset(self):
+        """This method is used to reset the counters to zero"""
         self.counters = {'DEBUG': 0, 'INFO': 0, 'WARNING': 0, 'ERROR': 0, 'CRITICAL': 0}
 
 
 class IndentFormatter(logging.Formatter):
-    """
-    A formatter that provides an indentation depth and encodes the logging
-    levels as single character strings. The extra argument to logger messages
-    can be used to provide a dictionary to set:
-        - 'join': a list of entries to join as comma separated list on
-          to the end of the message.
-        - 'quote': a flag to set joined entries to be quoted to show
-          whitespace around values.
-    """
 
-    def __init__(self, fmt=None, datefmt=None):
+    def __init__(self, fmt: str = "%(indent)s%(levelcode)s %(message)s",
+                 datefmt: str = None, indent: str = '    ') -> None:
+        """A logging record formatter with indenting
+
+        This record formatter tracks an indent depth that is used to nest
+        messages, making it easier to track the different sections of validation
+        in printed outputs. It also encodes logging levels as single character
+        strings to make logging messages align vertically at different depths  
+        
+        The depth of indenting can be set directly using: 
+            
+            FORMATTER.depth = 1
+
+        but it is more convenient to use the
+        [push][safedata_validator.logger.IndentFormatter.push] and
+        [pop][safedata_validator.logger.IndentFormatter.pop] methods to increase
+        and decrease indenting depth.
+
+        The `extra` argument to logger messages can be used to provide a
+        dictionary and is used in this subclass to provide the ability to `join`
+        a list of entries as comma separated list on to the end of the message.
+
+        Args:
+            fmt: The formatting used for emitted LogRecord instances
+            datefmt: A date format string 
+            indent: This string is used for each depth of the indent.
+        """
         logging.Formatter.__init__(self, fmt, datefmt)
         self.depth = 0
+        self.indent = indent
 
-    def pop(self, n=1):
+    def pop(self, n: int = 1) -> None:
+        """A convenience method to increase the indentation of the formatter.
+        
+        Args:
+            n: Increase the indentation depth by n.
+        """
 
         self.depth = max(0, self.depth - n)
 
-    def push(self, n=1):
-
+    def push(self, n: int = 1) -> None:
+        """A convenience method to decrease the indentation of the formatter.
+        
+        Args:
+            n: Decrease the indentation depth by n.
+        """
         self.depth = self.depth + n
 
-    def format(self, rec):
-
-        rec.indent = '    ' * self.depth
+    def format(self, rec: logging.LogRecord):
+        """A custom format method to output indented messages with encoded
+        logger message levels.
+        """
+        rec.indent = self.indent * self.depth
 
         # encode level
         codes = {'DEBUG': '>', 'INFO': '-', 'WARNING': '?', 'ERROR': '!', 'CRITICAL': 'X'}
@@ -74,6 +114,7 @@ class IndentFormatter(logging.Formatter):
 
         # format message
         msg = logging.Formatter.format(self, rec)
+
         # add any joined values as repr
         if hasattr(rec, 'join'):
             msg += ', '.join([repr(o) for o in rec.join])
@@ -83,72 +124,89 @@ class IndentFormatter(logging.Formatter):
 
 # Setup the logging instance
 LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
+"""logging.Logger: The safedata_validator Logger instance
 
-# Add the counter handler
-CH = CounterHandler()
-CH.setLevel(logging.DEBUG)
-LOGGER.addHandler(CH)
+This logger instance is used throughout the package for outputting validation
+information and is customised to provide counts of error messages and an
+indented logging style formatted.
+"""
 
-# Create the formatter
-FORMATTER = IndentFormatter("%(indent)s%(levelcode)s %(message)s")
-
-# Create a StringIO object to hold the log, set a stream handler to use that,
-# attach the custom formatter and add it to the logger. LOG will then contain
-# a complete record of logging messages.
 LOG = StringIO()
-LOG_SH = logging.StreamHandler(LOG)
-LOG_SH.setFormatter(FORMATTER)
-LOGGER.addHandler(LOG_SH)
+"""io.StringIO: The safedata_validator message log
 
-# A) REPORT TRACKING - clear out previous content in the logger. When the function runs
-# on a webserver, the same logger instance is used for all runs, so the log contents
-# persist unless they are tidied up.
-CH.reset()
-LOG.truncate(0)
+This StringIO object is attached to a stream handler for LOGGER and is used
+to keep a programatically accessible log of the messages emitted during validation.
+It should be truncated between validation runs to remove messages from previous
+runs.
+"""
 
-verbose = True
+CH = CounterHandler(LOG)
+"""CounterHandler: The safedata_validator counting handler
 
-if verbose:
-    # Look to see if the logger already has a verbose handler writing to the console and
-    # add one if it doesn't. This is primarly to provide output for command line usage.
-    handler_names = [handler.get_name() for handler in LOGGER.handlers]
-    if 'console_log' not in handler_names:
-        console_log = logging.StreamHandler()
-        console_log.setFormatter(FORMATTER)
-        console_log.set_name('console_log')
-        LOGGER.addHandler(console_log)
-elif not verbose:
-    # Remove the console_log handler if one exists
-    handler_names = [handler.get_name() for handler in LOGGER.handlers]
-    if 'console_log' in handler_names:
-        console_log_handler = LOGGER.handlers[handler_names.index('console_log')]
-        LOGGER.removeHandler(console_log_handler)
+This handler is used to track the number of messages emitted by the logger in
+different logging levels and emits log messages to the LOG StringIO instance to
+keep a record of the messages. It is exposed globally to make it easy to access
+counts and the validation log programatically.
+"""
+
+CONSOLE_LOGGER = logging.StreamHandler()
+"""logging.StreamHandler: A logger outputting to the console
+
+This handler is used to write logging messages to the console, and is exposed
+globally to make it easier to mute it.
+"""
+
+FORMATTER = IndentFormatter()
+"""IndentFormatter: The safedata_validator message formatter
+
+This formatter instance is used with the main logging stream handler for the
+package and is exposed globally to make it easier to adjust indent depth using
+the custom pop and push methods.
+"""
+
+# Combine those instances into the full LOGGER setup with 2 handlers:
+# - CH - logs records into LOG to keep a history of the validation and maintains
+#        counts of message levels handler
+# - CONSOLE_LOGGER - logs records to the console for command line use and can be
+#     muted
+
+CH.setFormatter(FORMATTER)
+CONSOLE_LOGGER.setFormatter(FORMATTER)
+
+LOGGER.setLevel(logging.DEBUG)
+LOGGER.addHandler(CH)
+LOGGER.addHandler(CONSOLE_LOGGER)
 
 #
 # CONVENIENCE FUNCTIONS
 #
 
-def log_and_raise(logger, msg, raise_type):
-    """ A convenience function that adds a message and a critical entry
-    to the logger and then raises an exception with the same message.
+def log_and_raise(msg: str, exception: Exception) -> None:
+    """
+    This convenience function adds a critical level message to the logger and
+    then raises an exception with the same message. This is intended only for
+    use in loading resources: the package cannot run properly with misconfigured
+    resources but errors with the data checking should log and carry on.
 
     Args:
-        logger: A logging.Logger instance
-        msg: A message to add to the log and error
-        raise_type: An exception type
+        msg: A message to add to the log  
+        exception: An exception type to be raised
 
     Returns:
         None
     """
 
-    logger.critical(msg)
-    raise raise_type(msg)
+    LOGGER.critical(msg)
+    raise exception(msg)
 
 
 def loggerinfo_push_pop(wrapper_message):
-    """This is a convenience decorator to allow reduce boilerplate logger code
-    around functions."""
+    """
+    
+    This decorator is used to reduce boilerplate logger code within functions.
+    It emits a message and then increases the indentation depth while the
+    wrapped function is running.
+    """
 
     def decorator_func(func):
         def wrapper_func(*args, **kwargs):
