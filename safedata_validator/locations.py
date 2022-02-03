@@ -1,3 +1,12 @@
+"""Validation of location data
+
+The Locations class defined in this submodule is used to validate a set of known
+and or new location information, formatted in the safedata_validator style. An
+instance can then also be used to track which of the validated set of locations
+is used in the rest of the dataset.
+"""
+
+from typing import List
 from openpyxl import worksheet
 from shapely import wkt
 from shapely.errors import WKTReadingError
@@ -14,18 +23,14 @@ class Locations:
 
     def __init__(self, resources: Resources) -> None:
         
-        """
-        Attempts to load and check the contents of the Locations worksheet and
-        compile the geographic extent of the locations used. The values in the
-        data file are validated against the locations data loaded when the Dataset
-        was initialised.
+        """A Locations instance is initialised using a Resources instance that
+        provides data on known valid locations. The instance validates location
+        names and then records the extent of the provided locations, the loaded
+        location names and which have been used in a Dataset.
 
         Args:
-            worksheet:
-            resources:
-
-        Returns:
-            A Locations instance
+            resources: A Resources instance, used to provide information about
+                known locations
         """
 
         self.n_errors = 0
@@ -42,9 +47,8 @@ class Locations:
 
     @loggerinfo_push_pop('Loading Locations worksheet')
     def load(self, worksheet: worksheet):
-
         """
-        Loads and check the contents of a Locations worksheet and compile the
+        Loads and check the contents of a Locations worksheet and compiles the
         geographic extent of the locations used. 
 
         Args:
@@ -116,19 +120,24 @@ class Locations:
             LOGGER.info('{} locations loaded correctly'.format(len(self.locations)))
 
     @loggerinfo_push_pop('Checking new locations')
-    def add_new_locations(self, locs):
+    def add_new_locations(self, locs: List[dict]):
         """This method takes list of dictionaries giving the details of
-        new locations to be added to the instance. These dictionaries
-        should contain keys `location name` and `type` and then at least 
-        one of  both `latitude` _and_ `longitude` or `wkt`.
+        new locations to be added to the instance. These dictionaries should
+        contain keys `location name` and `type` and then at least one of:
+        
+        * `latitude` _and_ `longitude` as float values
+        * `wkt` providing a WellKnownText geometry for the location.
+        
+        Either of these options _can_ be 'NA' to show that the location
+        coordinates are not known, but they must be provided.
         """
 
         # Validation - TODO check locs is a list of dicts 
+
         # - Do all the dicts have the same keys
         loc_keys = set([tuple(k.keys()) for k in locs])
         if len(loc_keys) > 1:
-            # TODO - should this be CRITICAL? Check error types.
-            LOGGER.error('Inconsistent keys in add_new_locations')
+            LOGGER.critical('Inconsistent keys in add_new_locations')
             return
         
         # - Do they provide location names...
