@@ -12,7 +12,7 @@ The code is open source Python and  is maintained on [GitHub](https://github.com
 
 The package provides a command line program `safedata_validate`. The usage instructions are below but you will also need to provide links to some external data resources used in location and taxon validation.
 
-    usage: safedata_validator.py [-h] [-l LOCATIONS_JSON]
+    usage: safedata_validate [-h] [-l LOCATIONS_JSON]
                                    [--gbif_database GBIF_DATABASE]
                                    [--validate_doi]
                                    fname
