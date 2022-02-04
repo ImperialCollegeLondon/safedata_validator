@@ -143,6 +143,7 @@ class Dataset:
         # Run final checks
         self.final_checks()
 
+    @loggerinfo_push_pop('Running final checking')
     def final_checks(self):
         """
         A method to run final checks:
@@ -185,6 +186,9 @@ class Dataset:
         if self.latitudinal_extent is None or self.longitudinal_extent is None:
             LOGGER.error('Geographic extent not set from data, please add south, north '
                          'east and west bounds to summary worksheet')
+
+        # Dedent for final result
+        FORMATTER.pop()
 
         if COUNTER_HANDLER.counters['ERROR'] > 0:
             if COUNTER_HANDLER.counters['WARNING'] > 0:
