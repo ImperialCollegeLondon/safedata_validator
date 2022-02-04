@@ -5,16 +5,16 @@ and to expose some global logging objects for use throughout the code.
 
 The submodule defines CounterHandler as a subclass of logging.StreamHandler,
 extended to maintain a count of messages emitted at the different logging
-levels. An instance of this (`CH`) is used with a StringIO instance (`LOG`) to
-maintain a logging history and provided error counts.
+levels. An instance of this (`COUNTER_HANDLER`) is used with a StringIO
+instance (`LOG`) to maintain a logging history and provided error counts.
 
 A second default logging.StreamHandler instance (`CONSOLE_HANDLER`) is used to
 emit records to the command line for use in scripts.
 
 The submodule also defines IndentFormatter as a subclass of logging.Formatter,
-which is used in both `CH` and `CONSOLE_HANDLER` to provide compact messages
-with variable indentation to show different sections of the validation process.
-
+which is used in both `COUNTER_HANDLER` and `CONSOLE_HANDLER` to provide compact
+messages with variable indentation to show different sections of the validation
+process.
 
 Note that the handlers are created when the module is loaded, so when running
 behind a web server, the content of the handlers persist between runs of the
@@ -141,7 +141,7 @@ It should be truncated between validation runs to remove messages from previous
 runs.
 """
 
-CH = CounterHandler(LOG)
+COUNTER_HANDLER = CounterHandler(LOG)
 """CounterHandler: The safedata_validator counting handler
 
 This handler is used to track the number of messages emitted by the logger in
@@ -150,7 +150,7 @@ keep a record of the messages. It is exposed globally to make it easy to access
 counts and the validation log programatically.
 """
 
-CONSOLE_LOGGER = logging.StreamHandler()
+CONSOLE_HANDLER = logging.StreamHandler()
 """logging.StreamHandler: A logger outputting to the console
 
 This handler is used to write logging messages to the console, and is exposed
@@ -166,17 +166,17 @@ the custom pop and push methods.
 """
 
 # Combine those instances into the full LOGGER setup with 2 handlers:
-# - CH - logs records into LOG to keep a history of the validation and maintains
+# - COUNTER_HANDLER - logs records into LOG to keep a history of the validation and maintains
 #        counts of message levels handler
-# - CONSOLE_LOGGER - logs records to the console for command line use and can be
+# - CONSOLE_HANDLER - logs records to the console for command line use and can be
 #     muted
 
-CH.setFormatter(FORMATTER)
-CONSOLE_LOGGER.setFormatter(FORMATTER)
+COUNTER_HANDLER.setFormatter(FORMATTER)
+CONSOLE_HANDLER.setFormatter(FORMATTER)
 
 LOGGER.setLevel(logging.DEBUG)
-LOGGER.addHandler(CH)
-LOGGER.addHandler(CONSOLE_LOGGER)
+LOGGER.addHandler(COUNTER_HANDLER)
+LOGGER.addHandler(CONSOLE_HANDLER)
 
 #
 # CONVENIENCE FUNCTIONS

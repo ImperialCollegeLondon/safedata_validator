@@ -14,7 +14,7 @@ from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError,
                                            IsNotNumericString, IsString, IsLocName,
                                            blank_value, valid_r_name, RE_DMS)
 
-from safedata_validator.logger import CONSOLE_LOGGER, LOG, LOGGER, FORMATTER, CH, loggerinfo_push_pop
+from safedata_validator.logger import CONSOLE_HANDLER, LOG, LOGGER, FORMATTER, COUNTER_HANDLER, loggerinfo_push_pop
 from safedata_validator.resources import Resources
 from safedata_validator.locations import Locations
 from safedata_validator.taxa import Taxa
@@ -94,11 +94,11 @@ class Dataset:
         
         # Handle logging details
         LOG.truncate()
-        CH.reset()
+        COUNTER_HANDLER.reset()
         if console_log:
-            CONSOLE_LOGGER.setLevel('DEBUG')
+            CONSOLE_HANDLER.setLevel('DEBUG')
         else:
-            CONSOLE_LOGGER.setLevel('CRITICAL')
+            CONSOLE_HANDLER.setLevel('CRITICAL')
         
         # Open the workbook with:
         #  - read_only to use the memory optimised read_only implementation.
@@ -122,14 +122,14 @@ class Dataset:
             self.locations.load(wb['Locations'])
         else:
             # No locations is pretty implausible - lab experiments?
-            LOGGER.warn("No locations worksheet found - moving on")
+            LOGGER.warning("No locations worksheet found - moving on")
 
         # Populate taxa
         if 'Taxa' in wb.sheetnames:
             self.taxa.load(wb['Taxa'])
         else:
             # Leave the default empty Taxa object
-            LOGGER.warn("No Taxa worksheet found - moving on")
+            LOGGER.warning("No Taxa worksheet found - moving on")
 
         # Load data worksheets
         for sheet_meta in self.summary.data_worksheets:
@@ -160,7 +160,7 @@ class Dataset:
         #   so here only look for ones that are provided but not used in the data.
         if not self.locations.is_empty:
             if self.summary.external_files:
-                LOGGER.warn('Location list cannot be validated when external data files are used')
+                LOGGER.warning('Location list cannot be validated when external data files are used')
             elif self.locations.locations_used == self.locations.locations:
                 LOGGER.info('Provided locations all used in datasets')
             elif self.locations.locations_used == (self.locations.locations & self.locations.locations_used):
@@ -170,7 +170,7 @@ class Dataset:
         # check taxa
         if not self.taxa.is_empty:
             if self.summary.external_files:
-                LOGGER.warn('Taxon list cannot be validated when external data files are used')
+                LOGGER.warning('Taxon list cannot be validated when external data files are used')
             elif self.taxa.taxon_names_used == self.taxa.taxon_names:
                 LOGGER.info('Provided taxa all used in datasets')
             elif self.taxa.taxon_names_used == (self.taxa.taxon_names & self.taxa.taxon_names_used):
@@ -186,18 +186,18 @@ class Dataset:
             LOGGER.error('Geographic extent not set from data, please add south, north '
                          'east and west bounds to summary worksheet')
 
-        if CH.counters['ERROR'] > 0:
-            if CH.counters['WARNING'] > 0:
+        if COUNTER_HANDLER.counters['ERROR'] > 0:
+            if COUNTER_HANDLER.counters['WARNING'] > 0:
                 LOGGER.info('FAIL: file contained {} errors and {} '
-                            'warnings'.format(CH.counters['ERROR'], CH.counters['WARNING']),
+                            'warnings'.format(COUNTER_HANDLER.counters['ERROR'], COUNTER_HANDLER.counters['WARNING']),
                             extra={'indent_before': 0})
             else:
-                LOGGER.info('FAIL: file contained {} errors'.format(CH.counters['ERROR']),
+                LOGGER.info('FAIL: file contained {} errors'.format(COUNTER_HANDLER.counters['ERROR']),
                             extra={'indent_before': 0})
         else:
-            if CH.counters['WARNING'] > 0:
+            if COUNTER_HANDLER.counters['WARNING'] > 0:
                 LOGGER.info('PASS: file formatted correctly but with {} '
-                            'warnings.'.format(CH.counters['WARNING']),
+                            'warnings.'.format(COUNTER_HANDLER.counters['WARNING']),
                             extra={'indent_before': 0})
                 self.passed = True
             else:
@@ -274,7 +274,7 @@ class DataWorksheet:
         self.row_numbers_noninteger = False
         self.blank_rows = False
         self.trailing_blank_rows = False
-        self.start_errors = CH.counters['ERROR']
+        self.start_errors = COUNTER_HANDLER.counters['ERROR']
         self.n_errors = 0
 
     @loggerinfo_push_pop('Validating field metadata')
@@ -516,7 +516,7 @@ class DataWorksheet:
                     f"{self.n_row} data rows and {self.n_fields} fields")
 
         # reporting
-        self.n_errors  = CH.counters['ERROR'] - self.start_errors
+        self.n_errors  = COUNTER_HANDLER.counters['ERROR'] - self.start_errors
         if self.n_errors > 0:
             LOGGER.info(f'Dataframe contains {self.n_errors} errors')
         else:
@@ -1046,13 +1046,6 @@ class BaseField:
         
         if self.no_validation:
             return
-
-        # TODO - handle blank columns/metadata at Dataworksheet level? -etc.
-        # # Skip any field with no user provided metadata or data
-        # blank_data = [is_blank(cl.value) for cl in data]
-        # blank_meta = [is_blank(vl) for ky, vl in list(meta.items())
-        #               if ky not in ['col_idx', 'column']]
-        # name_is_string = isinstance(meta['field_name'], str)
 
         # Unless any input is ok (comments fields, basically) filter out 
         # missing and blank data. Also check for Excel formula errors.

@@ -2,7 +2,7 @@ import requests
 # from enforce_typing import enforce_types
 import datetime
 import re
-from safedata_validator.logger import LOGGER, FORMATTER, CH, loggerinfo_push_pop
+from safedata_validator.logger import LOGGER, FORMATTER, COUNTER_HANDLER, loggerinfo_push_pop
 from safedata_validator.validators import (IsNotSpace, IsString, NoPunctuation)
 from safedata_validator.extent import Extent
 
@@ -131,7 +131,7 @@ class Summary:
                 and any of those ids would be valid).
         """
 
-        start_errors = CH.counters['ERROR']
+        start_errors = COUNTER_HANDLER.counters['ERROR']
 
         # validate project_id is one of None, an integer or a list of integers
         if valid_pid is None:
@@ -194,7 +194,7 @@ class Summary:
         self._load_data_worksheets(sheetnames)
 
         # summary of processing
-        self.n_errors = CH.counters['ERROR'] - start_errors
+        self.n_errors = COUNTER_HANDLER.counters['ERROR'] - start_errors
         if self.n_errors > 0:
             LOGGER.info('Summary contains {} errors'.format(self.n_errors))
         else:

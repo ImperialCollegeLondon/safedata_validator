@@ -1,20 +1,4 @@
-import dataclasses
-import sqlite3
-from collections import Counter
-from io import StringIO
-from itertools import groupby
-from logging import Formatter
-from typing import Optional, Union
-
-import requests
-from enforce_typing import enforce_types
-
-from safedata_validator.logger import (CH, FORMATTER, LOGGER,
-                                       loggerinfo_push_pop)
-from safedata_validator.validators import (GetDataFrame, HasDuplicates,
-                                           IsLower, IsNotPadded)
-
-"""
+"""## The taxa submodule
 This module describes classes and methods used to compile taxonomic data from
 datasets and to validate taxonomy against the GBIF backbone database.
 
@@ -31,6 +15,24 @@ Note that we explicitly exclude form and variety from the set of GBIF backbone
 taxonomic levels because they cannot be matched into the backbone hierarchy 
 without extra API calls.
 """
+
+import dataclasses
+import sqlite3
+from collections import Counter
+from io import StringIO
+from itertools import groupby
+from logging import Formatter
+from typing import Optional, Union
+
+import requests
+from enforce_typing import enforce_types
+
+from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
+                                       loggerinfo_push_pop)
+from safedata_validator.validators import (GetDataFrame, HasDuplicates,
+                                           IsLower, IsNotPadded)
+
+
 
 BACKBONE_RANKS = ['kingdom', 'phylum', 'order', 'class', 'family',
                   'genus', 'species', 'subspecies']
@@ -465,7 +467,7 @@ class Taxa:
             using the data in the worksheet.
         """
 
-        start_errors = CH.counters['ERROR']
+        start_errors = COUNTER_HANDLER.counters['ERROR']
 
         # Get the data read in.
         LOGGER.info("Reading taxa data")
@@ -535,7 +537,7 @@ class Taxa:
         self.index_higher_taxa()
 
         # summary of processing
-        self.n_errors = CH.counters['ERROR'] - start_errors
+        self.n_errors = COUNTER_HANDLER.counters['ERROR'] - start_errors
         if self.n_errors > 0:
             LOGGER.info('Taxa contains {} errors'.format(self.n_errors))
         else:

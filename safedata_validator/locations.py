@@ -11,7 +11,7 @@ from openpyxl import worksheet
 from shapely import wkt
 from shapely.errors import WKTReadingError
 
-from safedata_validator.logger import LOGGER, FORMATTER, CH, loggerinfo_push_pop
+from safedata_validator.logger import LOGGER, FORMATTER, COUNTER_HANDLER, loggerinfo_push_pop
 from safedata_validator.validators import (GetDataFrame, IsLower, IsNotBlank, IsNumber,
                                            IsString, HasDuplicates, IsLocName)
 from safedata_validator.extent import Extent
@@ -56,7 +56,7 @@ class Locations:
                 locations.
         """
 
-        start_errors = CH.counters['ERROR']
+        start_errors = COUNTER_HANDLER.counters['ERROR']
 
         # Load the locations data frame - which runs header checks
         dframe = GetDataFrame(worksheet)
@@ -112,7 +112,7 @@ class Locations:
             self.add_new_locations(new_locs)
 
         # summary of processing
-        self.n_errors = CH.counters['ERROR'] - start_errors
+        self.n_errors = COUNTER_HANDLER.counters['ERROR'] - start_errors
 
         if self.n_errors > 0:
             LOGGER.info('Locations contains {} errors'.format(self.n_errors))
