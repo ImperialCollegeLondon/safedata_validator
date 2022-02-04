@@ -29,4 +29,6 @@ nav:
     - 'Resources': 'api/resources.md'
     - 'Logger': 'api/logger.md'
     - 'Extents': 'api/extent.md'
+    - 'Locations': 'api/locations.md'
+    - 'Taxa': 'api/taxa.md'
   - 'Build notes': build_notes.md
