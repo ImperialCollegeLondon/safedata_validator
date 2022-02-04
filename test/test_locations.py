@@ -3,7 +3,6 @@ from logging import CRITICAL, ERROR, WARNING, INFO
 from safedata_validator.locations import Locations
 import openpyxl
 
-from test.conftest import resources_with_local_gbif
 
 @pytest.fixture()
 def locations_inst(resources_with_local_gbif):

@@ -9,8 +9,8 @@ from .conftest import good_file_path, bad_file_path
       (bad_file_path, 0), 
     ], 
 )
-def test_DataWorksheet_load_from_file(caplog, resources_with_local_gbif,
-                                      filepath, n_errors):
+def test_DataSet_load_from_file(resources_with_local_gbif,
+                                filepath, n_errors):
     """Test loading a dataworksheet from file - this duplicates a lot of 
     Dataset.load_from_workbook"""
     

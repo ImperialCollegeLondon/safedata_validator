@@ -15,76 +15,81 @@ from safedata_validator.field import DataWorksheet
 This file contains fixtures that will be available to all test suites.
 """
 
-# Get paths to existing resource files
-fixture_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
-loc_file = os.path.join(fixture_dir, 'locations.json')
-gbif_file = os.path.join(fixture_dir, 'gbif_backbone_truncated.sqlite')
-good_file_path = os.path.join(fixture_dir, 'Test_format_good.xlsx')
-bad_file_path = os.path.join(fixture_dir, 'Test_format_bad.xlsx')
+FIXTURE_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
 
-# Create some config files with correct paths - this doesn't feel right - could
-# be faking them but I can't work out how to do this correctly in fixtures
+bad_file_path = os.path.join(FIXTURE_DIR, 'Test_format_bad.xlsx')
+good_file_path = os.path.join(FIXTURE_DIR, 'Test_format_good.xlsx')
 
-local_config = os.path.join(fixture_dir, 'safedata_validator_local.json')
-remote_config = os.path.join(fixture_dir, 'safedata_validator_remote.json')
+@pytest.fixture()
+def config_filesystem(fs):
+    """Create a config and resources setup for testing
 
-# cfg_contents = {'locations': loc_file, 'gbif_database': gbif_file}
-# with open(local_config, 'w') as outf:
-#     cfg_contents = simplejson.dump(cfg_contents, outf)
+    Testing requires access to the configuration files for the package resources
+    and these are not going to be set up in default locations for testing. This
+    fixture uses the pyfakefs plugin for pytest to create a fake file system
+    containing config files and versions of the resources, cut down to save
+    filespace.
 
-# cfg_contents = {'locations': loc_file}
-# with open(remote_config, 'w') as outf:
-#     cfg_contents = simplejson.dump(cfg_contents, outf)
+    See also: https://gist.github.com/peterhurford/09f7dcda0ab04b95c026c60fa49c2a68
 
-# @pytest.fixture(scope='module')
-# def config_filesystem(fs):
-#     """Create a config and resources setup for testing
+    Args:
+        fs: The pyfakefs plugin object
 
-#     Testing requires access to the configuration files for the package resources
-#     and these are not going to be set up in default locations for testing. This
-#     fixture uses the pyfakefs plugin for pytest to create a fake file system
-#     containing config files and versions of the resources, cut down to save
-#     filespace.
+    Returns:
+        A fake filesystem containing a config file in the root, pointing to the
+        actual fixture files in their correct location.
+    """
 
-#     See also: https://gist.github.com/peterhurford/09f7dcda0ab04b95c026c60fa49c2a68
 
-#     Args:
-#         fs: The pyfakefs plugin object
+    # Get paths to existing resource files
+    loc_file = os.path.join(FIXTURE_DIR, 'locations.json')
+    gbif_file = os.path.join(FIXTURE_DIR, 'gbif_backbone_truncated.sqlite')
 
-#     Returns:
-#         A fake filesystem containing a config file in the root, pointing to the
-#         actual fixture files in their correct location.
-#     """
+    # Create some config files with correct paths - this doesn't feel right - could
+    # be faking them but I can't work out how to do this correctly in fixtures
 
-#     # Point to real locations of test fixture example resources
-#     fs.add_real_file(loc_file)
-#     fs.add_real_file(gbif_file)
+    local_config = os.path.join(FIXTURE_DIR, 'safedata_validator_local.json')
+    remote_config = os.path.join(FIXTURE_DIR, 'safedata_validator_remote.json')
 
-#     # The config safedata_validator.json _cannot_ be a real fixture file
-#     # because it contains the test machine variable paths to the resources,
-#     # so fake it and store it in the fake fixture directory
-#     cfg_contents = {'locations': loc_file, 'gbif_database': gbif_file}
-#     cfg_contents = simplejson.dumps(cfg_contents)
+    # Point to real locations of test fixture example resources
+    fs.add_real_file(loc_file)
+    fs.add_real_file(gbif_file)
 
-#     fs.create_file(os.path.join(fixture_dir, 'safedata_validator_local.json'),
-#                    contents=cfg_contents)
+    # The config safedata_validator.json _cannot_ be a real fixture file
+    # because it contains the test machine specific paths to the resources,
+    # so fake it and store it in the fake fixture directory
+    cfg_contents = {'locations': loc_file, 'gbif_database': gbif_file}
+    cfg_contents = simplejson.dumps(cfg_contents)
 
-#     cfg_contents = {'locations': loc_file, 'gbif_database': None}
-#     cfg_contents = simplejson.dumps(cfg_contents)
+    fs.create_file(local_config, contents=cfg_contents)
 
-#     fs.create_file(os.path.join(fixture_dir, 'safedata_validator_remote.json'),
-#                    contents=cfg_contents)
+    cfg_contents = {'locations': loc_file, 'gbif_database': None}
+    cfg_contents = simplejson.dumps(cfg_contents)
 
-#     yield fs
+    fs.create_file(remote_config, contents=cfg_contents)
+
+    yield fs
 
 
 # ------------------------------------------
 # Fixtures: a parameterized fixture containing examples of both local and
 #     remote GBIF validators.
-#
-# TODO - compare local and remote outputs:
-#  https://stackoverflow.com/questions/56558823/pytest-run-all-tests-twice-and-compare-results-bet-mock-and-real
-# ------------------------------------------
+## ------------------------------------------
+
+@pytest.fixture()
+def resources_with_local_gbif_virtual(config_filesystem):
+    """ Creates a Resource object configured to use a local GBIF database
+
+    Returns:
+        A safedata_validator.resources.Resources instance
+    """
+
+    # Get paths to existing resource files
+    local_config = os.path.join(FIXTURE_DIR, 'fixtures', 
+                               'safedata_validator_local.json')
+
+    return Resources(cfg_file=local_config)
+
 
 
 @pytest.fixture(scope='module')
@@ -94,7 +99,8 @@ def resources_with_local_gbif():
     Returns:
         A safedata_validator.resources.Resources instance
     """
-
+    
+    local_config = os.path.join(FIXTURE_DIR, 'safedata_validator_local.json')
     return Resources(cfg_file=local_config)
 
 
@@ -106,6 +112,7 @@ def resources_with_remote_gbif():
         A safedata_validator.resources.Resources instance
     """
 
+    remote_config = os.path.join(FIXTURE_DIR, 'safedata_validator_remote.json')
     return Resources(cfg_file=remote_config)
 
 
@@ -129,10 +136,12 @@ def example_excel_files(request):
     https://stackoverflow.com/questions/70379640
     """
     if request.param == 'good':
-        wb = openpyxl.load_workbook(good_file_path, read_only=True)
+        path = os.path.join(FIXTURE_DIR, 'Test_format_good.xlsx')
+        wb = openpyxl.load_workbook(path, read_only=True)
         return wb
     elif request.param == 'bad':
-        wb = openpyxl.load_workbook(bad_file_path, read_only=True)
+        path = os.path.join(FIXTURE_DIR, 'Test_format_bad.xlsx')
+        wb = openpyxl.load_workbook(path, read_only=True)
         return wb
 
 
