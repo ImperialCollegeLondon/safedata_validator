@@ -7,7 +7,7 @@ from safedata_validator.field import DataWorksheet
 from safedata_validator.taxa import Taxa
 from safedata_validator.resources import Resources
 from safedata_validator.locations import Locations
-from safedata_validator.dataset import Dataset
+from safedata_validator.field import Dataset
 
 @pytest.mark.parametrize(
     'sheet_meta,expected_log',

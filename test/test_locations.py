@@ -1,5 +1,5 @@
 import pytest
-from logging import ERROR, WARNING, INFO
+from logging import CRITICAL, ERROR, WARNING, INFO
 from safedata_validator.locations import Locations
 import openpyxl
 
@@ -74,7 +74,7 @@ def test_add_known_locations(caplog, locations_inst,
        ([{'location name': 'my new loc2',  'type': 'POINT', 'wkt': 'POINT(117 4)'},
          {'location name': 'my new loc', 'type': 'POINT', 'latitude': 4,  'longitude': 117}],
         ((INFO, 'Checking new locations'),
-         (ERROR, 'Inconsistent keys in add_new_locations'))), 
+         (CRITICAL, 'Inconsistent keys in add_new_locations'))), 
          # Bad names
         ([{'type': 'POINT', 'wkt': 'POINT(117 4)'}],
           ((INFO, 'Checking new locations'),
