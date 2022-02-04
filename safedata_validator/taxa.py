@@ -30,7 +30,7 @@ from enforce_typing import enforce_types
 from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
                                        loggerinfo_push_pop)
 from safedata_validator.validators import (GetDataFrame, HasDuplicates,
-                                           IsLower, IsNotPadded)
+                                           IsLower, blank_value)
 
 
 
@@ -520,6 +520,9 @@ class Taxa:
         #       [parent name, parent type, parent id]]
 
         for idx, row in enumerate(taxa):
+
+            # Standardise blank values to None
+            row = {ky: None if blank_value(vl) else vl for ky, vl in row.items()}
             taxon_info = [row['taxon name'], row['taxon type'], row['taxon id'], row['ignore id']]
             parent_info = [row['parent name'], row['parent type'], row['parent id']]
 

@@ -31,8 +31,8 @@ EXCEL_ERRORS = set(["#DIV/0!", "#NAME?", "#N/A", "#NUM!", "#VALUE!",
 # First some simple single value validators
 
 def blank_value(value):
-    """Simple check for 'empty' strings (None or whitespace only)"""
-    return (value is None) or (str(value).isspace())
+    """Simple check for 'empty' cell values (None, zero length string or whitespace only)"""
+    return (value is None) or (str(value).isspace()) or not len(str(value))
 
 
 def valid_r_name(string):
