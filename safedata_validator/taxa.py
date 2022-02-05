@@ -163,7 +163,11 @@ class LocalGBIFValidator:
         if taxon.gbif_id is not None:
 
             # get the record associated with the provided ID
-            id_taxon = self.id_lookup(taxon.gbif_id)
+            try:
+                id_taxon = self.id_lookup(taxon.gbif_id)
+            except GBIFError as err:
+                taxon.lookup_status = f'GBIF ID problem: {err.message}'
+                return taxon
 
             # Check that name and rank are congruent with id
             if (id_taxon.name != taxon.name) or (id_taxon.rank != taxon.rank):
@@ -226,7 +230,8 @@ class LocalGBIFValidator:
             return self.id_lookup(selected_row['id'])
 
     def id_lookup(self, gbif_id: int):
-        """Method to return a Taxon directly from a GBIF ID
+        """Method to return a Taxon directly from a GBIF ID. It will raise
+        a GBIFError if the provided ID cannot be found.
 
         Params:
             gbif_id: An integer
@@ -236,10 +241,10 @@ class LocalGBIFValidator:
         """
 
         if not isinstance(gbif_id, int):
-            raise TypeError()
+            raise GBIFError('Non-integer GBIF code')
 
         if not gbif_id > 0:
-            raise ValueError()
+            raise GBIFError('Negative GBIF code')
 
         # get the record associated with the provided ID
         sql = f"select * from backbone where id = {gbif_id}"
@@ -249,7 +254,7 @@ class LocalGBIFValidator:
         # provided taxon or rank information
         if taxon_row is None:
             raise GBIFError()
-
+        
         # Create and populate taxon
         taxon = Taxon(name=taxon_row['canonical_name'],
                       rank=taxon_row['rank'].lower(),
@@ -311,7 +316,11 @@ class RemoteGBIFValidator:
         if taxon.gbif_id is not None:
 
             # get the record associated with the provided ID
-            id_taxon = self.id_lookup(taxon.gbif_id)
+            try:
+                id_taxon = self.id_lookup(taxon.gbif_id)
+            except GBIFError as err:
+                taxon.lookup_status = f'GBIF ID problem: {err.message}'
+                return taxon
 
             # Check that name and rank are congruent with id
             if (id_taxon.name != taxon.name) or (id_taxon.rank != taxon.rank):
@@ -347,7 +356,9 @@ class RemoteGBIFValidator:
             return self.id_lookup(response['usageKey'])
 
     def id_lookup(self, gbif_id: int):
-        """Method to return a Taxon directly from a GBIF ID
+        """Method to return a Taxon directly from a GBIF ID. It will raise
+        a GBIFError if the provided ID cannot be found, or if there is a
+        connection error.
 
         Params:
             gbif_id: An integer
@@ -357,10 +368,10 @@ class RemoteGBIFValidator:
         """
 
         if not isinstance(gbif_id, int):
-            raise TypeError()
+            raise GBIFError('Non-integer GBIF code')
 
         if not gbif_id > 0:
-            raise ValueError()
+            raise GBIFError('Negative GBIF code')
 
         # Use the species/{id} endpoint
         taxon_row = requests.get(f"http://api.gbif.org/v1/species/{gbif_id}")
@@ -691,8 +702,8 @@ class Taxa:
                                f' of {p_taxon.canon_usage.name} in GBIF backbone')
             else:
                 LOGGER.info(f'Parent taxon ({p_taxon.name}) accepted')
-        else:
-                LOGGER.info('No parent taxon provided')
+        # else:
+        #         LOGGER.info('No parent taxon provided')
 
         # Now check main taxa
         #
