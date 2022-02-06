@@ -451,8 +451,14 @@ class DataWorksheet:
         # Drop blank rows for further processing
         data_rows = [drw for drw, is_blank in zip(data_rows, blank_row) if not is_blank]
 
-        # Count the rows, then convert the values into columns and extract the row numbers
-        self.n_row += len(data_rows)
+        # Check there is any remaning data, then convert the values into columns
+        # and extract the row numbers
+        n_row = len(data_rows)
+        if n_row == 0:
+            return
+        else:
+            self.n_row += n_row
+        
         data_cols = list(zip(*data_rows))
         row_numbers = data_cols.pop(0)
 
