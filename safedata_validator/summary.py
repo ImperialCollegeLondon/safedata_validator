@@ -3,7 +3,7 @@ import requests
 import datetime
 import re
 from safedata_validator.logger import LOGGER, FORMATTER, COUNTER_HANDLER, loggerinfo_push_pop
-from safedata_validator.validators import (IsNotSpace, IsString, NoPunctuation)
+from safedata_validator.validators import (IsNotSpace, IsString, NoPunctuation, blank_value)
 from safedata_validator.extent import Extent
 
 # Compile some regex expressions used in Summary checking
@@ -150,8 +150,13 @@ class Summary:
         
         self.validate_doi = validate_doi
 
-        # load worksheet rows
-        rows = list(worksheet.iter_rows(values_only=True))
+        # load worksheet rows, removing blank rows 
+        # TODO - make 'internal' blank rows an error.
+        rows = []
+        for this_row in worksheet.iter_rows(values_only=True):
+            if not all([blank_value(vl) for vl in this_row]):
+                rows.append(this_row)
+
         self._ncols = worksheet.max_column
 
         # convert into dictionary using the lower cased first entry as the key
