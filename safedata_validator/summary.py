@@ -472,34 +472,36 @@ class Summary:
 
         if data_worksheets is None and self.external_files is None:
             LOGGER.error("No data worksheets or external files provided - no data.")
+            return
         elif data_worksheets is None:
             LOGGER.info("Only external file descriptions provided")
-        elif data_worksheets is not None:
-            # Check sheet names in list of sheets
-            cited_sheets = {ws['name'] for ws in data_worksheets}
+            return
+        
+        # Check sheet names in list of sheets
+        cited_sheets = {ws['name'] for ws in data_worksheets}
 
-            # Names not in list of sheets
-            for each_ws in data_worksheets:
-                # Now match to sheet names
-                if each_ws['name'] not in sheetnames:
-                    if each_ws['external'] is not None:
-                        LOGGER.info(f"Worksheet summary {each_ws['name']} recognized as placeholder for "
-                                    f"external file {each_ws['external']}")
-                    else: 
-                        LOGGER.error(f"Data worksheet {each_ws['name']} not found")
+        # Names not in list of sheets
+        for each_ws in data_worksheets:
+            # Now match to sheet names
+            if each_ws['name'] not in sheetnames:
+                if each_ws['external'] is not None:
+                    LOGGER.info(f"Worksheet summary {each_ws['name']} recognized as placeholder for "
+                                f"external file {each_ws['external']}")
+                else: 
+                    LOGGER.error(f"Data worksheet {each_ws['name']} not found")
 
-            # bad external files
-            external_in_sheet = {ws['external'] for ws in data_worksheets
-                                 if ws['external'] is not None}
-            if self.external_files is not None:
-                external_names = {ex['file'] for ex in self.external_files}
-            else:
-                external_names = set()
+        # bad external files
+        external_in_sheet = {ws['external'] for ws in data_worksheets
+                                if ws['external'] is not None}
+        if self.external_files is not None:
+            external_names = {ex['file'] for ex in self.external_files}
+        else:
+            external_names = set()
 
-            bad_externals = external_in_sheet - external_names
-            if bad_externals:
-                LOGGER.error('Worksheet descriptions refer to unreported external files: ',
-                             extra={'join': bad_externals})
+        bad_externals = external_in_sheet - external_names
+        if bad_externals:
+            LOGGER.error('Worksheet descriptions refer to unreported external files: ',
+                            extra={'join': bad_externals})
 
         # Check for existing sheets without description
         extra_names = set(sheetnames) - {'Summary', 'Taxa', 'Locations'} - cited_sheets
