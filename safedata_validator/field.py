@@ -757,10 +757,10 @@ class BaseField:
             self._check_meta(dsc)
         
         # Specific check that field name is valid - the column letter codes are
-        # always valid, so missing names won't trigger this.
-        if not isinstance(self.field_name, str):
-            self._log(f"Field name is not a text string: {repr(self.field_name)}. ")
-        elif not valid_r_name(self.field_name):
+        # always valid, so missing names won't trigger this. 
+        # _check_meta has already tested and logged non-string errors, so
+        # only test here for strings that fail.
+        if isinstance(self.field_name, str) and not valid_r_name(self.field_name):
             self._log(f"Field name is not valid: {repr(self.field_name)}. "
                       "Common errors are spaces and non-alphanumeric "
                       "characters other than underscore and full stop")
