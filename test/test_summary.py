@@ -1,8 +1,14 @@
 import datetime
 import pytest
+from sympy import Sum
 
 from safedata_validator.logger import LOGGER
 from safedata_validator.summary import *
+
+@pytest.fixture
+def fixture_summary(resources_with_local_gbif):
+
+    return Summary(resources_with_local_gbif)
 
 
 # TODO - _read_block is being tested by repeated _read_`block` calls and
@@ -60,10 +66,7 @@ from safedata_validator.summary import *
      True,
      'Author ORCIDs not properly formatted')
     ])
-def test_authors(caplog, alterations, should_log_error, expected_log):
-
-    # Initialise a Summary instance.
-    summary = Summary(None, None)
+def test_authors(caplog, fixture_summary, alterations, should_log_error, expected_log):
 
     # Valid set of information
     input = {'author name': ('Orme, David',),
@@ -74,10 +77,10 @@ def test_authors(caplog, alterations, should_log_error, expected_log):
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
     input.update(alterations)
-    summary._rows = input
+    fixture_summary._rows = input
 
     # Test the block load
-    summary._load_authors()
+    fixture_summary._load_authors()
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
@@ -152,17 +155,15 @@ def test_authors(caplog, alterations, should_log_error, expected_log):
      True,
      'Only a single record should be present'),
     ])
-def test_access(caplog, row_data, should_log_error, expected_log):
+def test_access(caplog, fixture_summary, row_data, should_log_error, expected_log):
 
-    # Initialise a Summary instance.
-    summary = Summary(None, None)
 
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
-    summary._rows = row_data
+    fixture_summary._rows = row_data
 
     # Test the block load
-    summary._load_access_details()
+    fixture_summary._load_access_details()
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
@@ -187,10 +188,7 @@ def test_access(caplog, row_data, should_log_error, expected_log):
      True,
      'Put each keyword in a separate cell'),
     ])
-def test_keywords(caplog, alterations, should_log_error, expected_log):
-
-    # Initialise a Summary instance.
-    summary = Summary(None, None)
+def test_keywords(caplog, fixture_summary, alterations, should_log_error, expected_log):
 
     # Valid set of information
     input = {'keywords': ('abc', 'def')}
@@ -198,10 +196,10 @@ def test_keywords(caplog, alterations, should_log_error, expected_log):
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
     input.update(alterations)
-    summary._rows = input
+    fixture_summary._rows = input
 
     # Test the block load
-    summary._load_keywords()
+    fixture_summary._load_keywords()
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
@@ -249,10 +247,7 @@ def test_keywords(caplog, alterations, should_log_error, expected_log):
      True,
      'Field permit number contains values of wrong type'),  # via _read_block
     ])
-def test_permits(caplog, alterations, should_log_error, expected_log):
-
-    # Initialise a Summary instance.
-    summary = Summary(None, None)
+def test_permits(caplog, fixture_summary, alterations, should_log_error, expected_log):
 
     # Valid set of information
     input = {'permit type': ('research',),
@@ -262,10 +257,10 @@ def test_permits(caplog, alterations, should_log_error, expected_log):
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
     input.update(alterations)
-    summary._rows = input
+    fixture_summary._rows = input
 
     # Test the block load
-    summary._load_permits()
+    fixture_summary._load_permits()
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
@@ -299,10 +294,7 @@ def test_permits(caplog, alterations, should_log_error, expected_log):
      'DOI not found',
      True),
     ])
-def test_doi(caplog, alterations, should_log_error, expected_log, do_val_doi):
-
-    # Initialise a Summary instance.
-    summary = Summary(validate_doi=do_val_doi)
+def test_doi(caplog, fixture_summary, alterations, should_log_error, expected_log, do_val_doi):
 
     # Valid set of information
     input = {'publication doi': ('https://doi.org/10.1098/rstb.2011.0049',)}
@@ -310,10 +302,11 @@ def test_doi(caplog, alterations, should_log_error, expected_log, do_val_doi):
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
     input.update(alterations)
-    summary._rows = input
+    fixture_summary._rows = input
+    fixture_summary.validate_doi = do_val_doi
 
     # Test the block load
-    summary._load_doi()
+    fixture_summary._load_doi()
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
@@ -371,10 +364,7 @@ def test_doi(caplog, alterations, should_log_error, expected_log, do_val_doi):
      True,
      'Field funding link contains values of wrong type'),  # via _read_block
 ])
-def test_funders(caplog, alterations, should_log_error, expected_log):
-
-    # Initialise a Summary instance.
-    summary = Summary(None, None)
+def test_funders(caplog, fixture_summary, alterations, should_log_error, expected_log):
 
     # Valid set of information
     input = {'funding body': ('NERC',),
@@ -385,10 +375,10 @@ def test_funders(caplog, alterations, should_log_error, expected_log):
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
     input.update(alterations)
-    summary._rows = input
+    fixture_summary._rows = input
 
     # Test the block load
-    summary._load_funders()
+    fixture_summary._load_funders()
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
@@ -431,10 +421,7 @@ def test_funders(caplog, alterations, should_log_error, expected_log):
      True,
      'Start date is after end date'),
 ])
-def test_temporal_extent(caplog, alterations, should_log_error, expected_log):
-
-    # Initialise a Summary instance.
-    summary = Summary(None, None)
+def test_temporal_extent(caplog, fixture_summary, alterations, should_log_error, expected_log):
 
     # Valid set of information - openpyxl loads dates as datetimes.
     input = {'start date': (datetime.datetime(2001, 1, 1),),
@@ -443,15 +430,15 @@ def test_temporal_extent(caplog, alterations, should_log_error, expected_log):
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
     input.update(alterations)
-    summary._rows = input
+    fixture_summary._rows = input
 
     # Test the block load
-    summary._load_temporal_extent()
+    fixture_summary._load_temporal_extent()
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
     else:
-        assert summary.temporal_extent.extent == (input['start date'][0], input['end date'][0])
+        assert fixture_summary.temporal_extent.extent == (input['start date'][0], input['end date'][0])
 
     assert expected_log in caplog.text
 
@@ -514,10 +501,7 @@ def test_temporal_extent(caplog, alterations, should_log_error, expected_log):
      True,
      'South limit is greater than north limit'),
 ])
-def test_geographic_extent(caplog, alterations, should_log_error, expected_log):
-
-    # Initialise a Summary instance.
-    summary = Summary(None, None)
+def test_geographic_extent(caplog, fixture_summary, alterations, should_log_error, expected_log):
 
     # Valid set of information
     input = {'west': (116.75, ), 'east': (117.82, ),
@@ -526,10 +510,10 @@ def test_geographic_extent(caplog, alterations, should_log_error, expected_log):
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
     input.update(alterations)
-    summary._rows = input
+    fixture_summary._rows = input
 
     # Test the block load
-    summary._load_geographic_extent()
+    fixture_summary._load_geographic_extent()
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
@@ -573,10 +557,7 @@ def test_geographic_extent(caplog, alterations, should_log_error, expected_log):
      True,  # Whitespace in filenames (captures padding too)
      'External file names must not contain whitespace'),
 ])
-def test_external_files(caplog, alterations, should_log_error, expected_log):
-
-    # Initialise a Summary instance.
-    summary = Summary(None, None)
+def test_external_files(caplog, fixture_summary, alterations, should_log_error, expected_log):
 
     # Valid set of information
     input = {'external file': ('BaitTrapImages.zip', 'BaitTrapTransects.geojson'),
@@ -586,10 +567,10 @@ def test_external_files(caplog, alterations, should_log_error, expected_log):
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
     input.update(alterations)
-    summary._rows = input
+    fixture_summary._rows = input
 
     # Test the block load
-    summary._load_external_files()
+    fixture_summary._load_external_files()
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
@@ -683,14 +664,12 @@ def test_external_files(caplog, alterations, should_log_error, expected_log):
      False,
      'Only external file descriptions provided'),
      ])
-def test_data_worksheets(caplog, alterations, alt_sheets, ext_alterations, should_log_error, expected_log):
+def test_data_worksheets(caplog, fixture_summary, alterations, alt_sheets, ext_alterations, should_log_error, expected_log):
 
     """This test suite is more complex as the data worksheets need to match to the 
     existing sheetnames in the workbook and potentially to a set of external files.
     """
 
-    # Initialise a Summary instance
-    summary = Summary()
     sheetnames = alt_sheets or {'DF', 'Incidence', 'Transects', 'Summary', 'Taxa', 'Locations'}
     
     # Valid set of information
@@ -705,7 +684,7 @@ def test_data_worksheets(caplog, alterations, alt_sheets, ext_alterations, shoul
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
     input.update(alterations)
-    summary._rows = input
+    fixture_summary._rows = input
     
     # Populate the external files 
     external = {'external file': ('BaitTrapImages.zip', 'BaitTrapTransects.geojson'),
@@ -713,13 +692,13 @@ def test_data_worksheets(caplog, alterations, alt_sheets, ext_alterations, shoul
                                               'GeoJSON file containing polylines of the bait trap transects')}
 
     external.update(ext_alterations)
-    summary._rows.update(external)
+    fixture_summary._rows.update(external)
 
     # Load the external file data
-    summary._load_external_files()
+    fixture_summary._load_external_files()
 
     # Test the block load
-    summary._load_data_worksheets(sheetnames)
+    fixture_summary._load_data_worksheets(sheetnames)
 
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
@@ -733,12 +712,12 @@ def test_data_worksheets(caplog, alterations, alt_sheets, ext_alterations, shoul
      ('bad', 16)], 
     indirect = ['example_excel_files']  # take actual params from fixture
 )
-def test_summary_load(example_excel_files, n_errors):
+def test_summary_load(fixture_summary, example_excel_files, n_errors):
     """This tests the ensemble loading of a summary from a file using
     indirect parameterisation to access the fixtures containing the
     sample excel files.
     """
-    summary = Summary()
-    summary.load(example_excel_files['Summary'], set(example_excel_files.sheetnames))
+    
+    fixture_summary.load(example_excel_files['Summary'], set(example_excel_files.sheetnames))
 
-    assert summary.n_errors == n_errors
+    assert fixture_summary.n_errors == n_errors

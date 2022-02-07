@@ -19,7 +19,7 @@ setuptools.setup(
     packages=['safedata_validator'],
     entry_points = {
             'console_scripts':
-             ['safedata_validate=safedata_validator:_safedata_validator_cli']
+             ['safedata_validate=safedata_validator.scripts:_safedata_validator_cli']
     },
     license='MIT',
     classifiers=[

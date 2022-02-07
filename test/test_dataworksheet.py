@@ -4,6 +4,10 @@ from logging import CRITICAL, ERROR, WARNING, INFO
 
 import openpyxl
 from safedata_validator.field import DataWorksheet
+from safedata_validator.taxa import Taxa
+from safedata_validator.resources import Resources
+from safedata_validator.locations import Locations
+from safedata_validator.field import Dataset
 
 @pytest.mark.parametrize(
     'sheet_meta,expected_log',
@@ -44,8 +48,7 @@ def test_DataWorksheet_init(caplog, fixture_field_meta, sheet_meta, expected_log
           (ERROR, 'Whitespace padding in descriptor names'),)),
       (OrderedDict([('field_type',  ['numeric', 'numeric', 'numeric']),
                     ('field_name', ['a', 'b', 'c'])]),
-        ( (INFO, 'Validating field metadata'),
-          (ERROR, 'Mandatory field descriptors missing'),)),
+        ( (INFO, 'Validating field metadata'),)),
       (OrderedDict([('field_type',  ['numeric', 'numeric', 'numeric']),
                     ('description', ['a', 'b', 'c']),
                     ('whatdoesthisdo', ['a', 'b', 'c']),
@@ -62,6 +65,19 @@ def test_DataWorksheet_init(caplog, fixture_field_meta, sheet_meta, expected_log
                     ('field_name', ['a', 'b', 'a'])]),
         ( (INFO, 'Validating field metadata'),
           (ERROR, 'Field names duplicated'),)),
+      (OrderedDict([('field_type',  ['numeric', 'bad type', 'numeric']),
+                    ('description', ['a', 'b', 'c']),
+                    ('field_name', ['a', 'b', 'c'])]),
+        ( (INFO, 'Validating field metadata'),
+          (ERROR, 'Unknown field types'),)),
+      (OrderedDict([('field_type',  ['numeric', 'numeric', None]), # trailing empty
+                    ('description', ['a', 'b', None]),
+                    ('field_name', ['a', 'b', None])]),
+        ( (INFO, 'Validating field metadata'),)),
+      (OrderedDict([('field_type',  ['numeric', None, 'numeric']), # internal empty
+                    ('description', ['a', None, 'b']),
+                    ('field_name', ['a', None, 'b'])]),
+        ( (INFO, 'Validating field metadata'),)),
     ]
 )
 def test_DataWorksheet_validate_field_meta(caplog, fixture_dataworksheet, field_meta, expected_log):
@@ -74,6 +90,7 @@ def test_DataWorksheet_validate_field_meta(caplog, fixture_dataworksheet, field_
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
+
 
 
 @pytest.mark.parametrize(
@@ -127,6 +144,92 @@ def test_DataWorksheet_validate_data_rows(caplog, fixture_dataworksheet, fixture
 
 
 @pytest.mark.parametrize(
+    'field_meta,data_rows,expected_log',
+    [
+      ( OrderedDict(field_type = ['id', 'id', 'id'],
+                    description = ['a', 'b', 'c'],
+                    field_name = ['a', 'b', 'c']),
+        [[1, 1, 2, 3],
+         [2, 1, 2, 3],
+         [3, 1, 2, 3], ],
+        ( (INFO, 'Validating field metadata'),
+          (INFO, 'Validating field data'),
+          (INFO, 'Checking field a'),
+          (INFO, 'Checking field b'),
+          (INFO, 'Checking field c'),
+          (INFO, "Worksheet 'DF' contains 3 descriptors, 3 data rows"),
+          (INFO, "Dataframe formatted correctly"),
+          )),
+      ( OrderedDict(field_type = ['id', 'id', 'id', None],
+                    description = ['a', 'b', 'c', None],
+                    field_name = ['a', 'b', 'c', None]),
+        [[1, 1, 2, 3, None],
+         [2, 1, 2, 3, None],
+         [3, 1, 2, 3, None], ],
+        ( (INFO, 'Validating field metadata'),
+          (INFO, 'Validating field data'),
+          (INFO, 'Checking field a'),
+          (INFO, 'Checking field b'),
+          (INFO, 'Checking field c'),
+          (INFO, "Worksheet 'DF' contains 3 descriptors, 3 data rows"),
+          (INFO, "Dataframe formatted correctly"),
+          )),
+      ( OrderedDict(field_type = ['id', 'id', 'id', None],
+                    description = ['a', 'b', 'c', None],
+                    field_name = ['a', 'b', 'c', None]),
+        [[1, 1, 2, 3, None],
+         [2, 1, 2, 3, 'argh'],
+         [3, 1, 2, 3, None], ],
+        ( (INFO, 'Validating field metadata'),
+          (INFO, 'Validating field data'),
+          (INFO, 'Checking field a'),
+          (INFO, 'Checking field b'),
+          (INFO, 'Checking field c'),
+          (INFO, 'Checking field Column_D'),
+          (ERROR, 'Trailing field with no descriptors contains data'),
+          (INFO, "Worksheet 'DF' contains 3 descriptors, 3 data rows"),
+          (INFO, "Dataframe contains 1 errors"),
+          )),
+      ( OrderedDict(field_type = ['id', 'id', None, 'id'],
+                    description = ['a', 'b', None, 'c'],
+                    field_name = ['a', 'b', None, 'c']),
+        [[1, 1, 2, None, 3],
+         [2, 1, 2, 'argh', 3],
+         [3, 1, 2, None, 3], ],
+        ( (INFO, 'Validating field metadata'),
+          (INFO, 'Validating field data'),
+          (INFO, 'Checking field a'),
+          (INFO, 'Checking field b'),
+          (INFO, 'Checking field Column_C'),
+          (ERROR, 'field_type descriptor is blank'),
+          (ERROR, 'description descriptor is blank'),
+          (ERROR, 'field_name descriptor is blank'),
+          (ERROR, '2 cells are blank or contain only whitespace text'),
+          (INFO, 'Checking field c'),
+          (INFO, "Worksheet 'DF' contains 3 descriptors, 3 data rows"),
+          (INFO, "Dataframe contains 4 errors"),
+          )),
+    ]
+)
+def test_DataWorksheet_empty_meta(caplog, fixture_dataworksheet,
+                                  field_meta, data_rows, expected_log):
+    """Testing errors created as data rows are added.
+    """
+    caplog.clear()
+
+    fixture_dataworksheet.validate_field_meta(field_meta)
+    fixture_dataworksheet.validate_data_rows(data_rows)
+    fixture_dataworksheet.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+@pytest.mark.parametrize(
     'data_rows,populate_external,expected_log',
     [
       ( [[1, 1, 2, 3],
@@ -134,57 +237,80 @@ def test_DataWorksheet_validate_data_rows(caplog, fixture_dataworksheet, fixture
          [3, 1, 2, 3], ],
          False,
         ( (INFO, "Validating field data"),
-          (INFO, "Checking Column a"),
-          (INFO, "Checking Column b"),
-          (INFO, "Checking Column c"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
           (INFO, "Dataframe formatted correctly"))),
       ( [],
         False,
         ( (INFO, "Validating field data"),
           (ERROR, "No data passed for validation"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 0 data rows and 3 fields"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 0 data rows and 3 fields"),
           (INFO, "Dataframe contains 1 errors"))),
       ( [],
         True,
         ( (INFO, "Validating field data"),
           (INFO, "Data table description associated with external file"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 0 data rows and 3 fields"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 0 data rows and 3 fields"),
           (INFO, "Dataframe formatted correctly"))),
       ( [[11, 1, 2, 3],
          [12, 1, 2, 3],
          [13, 1, 2, 3], ],
         False,
         ( (INFO, "Validating field data"),
-          (INFO, "Checking Column a"),
-          (INFO, "Checking Column b"),
-          (INFO, "Checking Column c"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
           (ERROR, "Row numbers not consecutive or do not start with 1"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
           (INFO, "Dataframe contains 1 errors"))),
       ( [[1, 1, 2, 3],
          [2, 1, 2, 3],
          [None, 1, 2, 3], ],
         False,
         ( (INFO, "Validating field data"),
-          (INFO, "Checking Column a"),
-          (INFO, "Checking Column b"),
-          (INFO, "Checking Column c"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
           (ERROR, "Missing row numbers in data"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
           (INFO, "Dataframe contains 1 errors"))),
       ( [[1, 1, 2, 3],
          [2, 1, 2, 3],
          ['3', 1, 2, 3], ],
         False,
         ( (INFO, "Validating field data"),
-          (INFO, "Checking Column a"),
-          (INFO, "Checking Column b"),
-          (INFO, "Checking Column c"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
           (ERROR, "Row numbers contain non-integer values"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
           (INFO, "Dataframe contains 1 errors"))),
-    ]
+      ( [[1, 1, 2, 3],
+         [2, 1, 2, 3],
+         [3, 1, 2, 3]],
+         False,
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Dataframe formatted correctly"))),
+      ( [[1, 1, 2, 3],
+         [2, 1, 2, 3],
+         [None, None, None, None],
+         [3, 1, 2, 3], 
+         [None, None, None, None]],
+         False,
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (ERROR, "Data contains empty rows"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),    
+          ]
 )
 def test_DataWorksheet_report(caplog, fixture_dataworksheet, fixture_field_meta,
                               data_rows, populate_external, expected_log):
@@ -225,10 +351,10 @@ def test_DataWorksheet_report(caplog, fixture_dataworksheet, fixture_field_meta,
            [5, 1, 2, 3],
            [6, 1, 2, 3], ]],
         ( (INFO, "Validating field data"),
-          (INFO, "Checking Column a"),
-          (INFO, "Checking Column b"),
-          (INFO, "Checking Column c"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 6 data rows and 3 fields"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 6 data rows and 3 fields"),
           (INFO, "Dataframe formatted correctly"))),
       ( [ [[1, 1, 2, 3],
            [2, 1, 2, 3],
@@ -237,12 +363,55 @@ def test_DataWorksheet_report(caplog, fixture_dataworksheet, fixture_field_meta,
            [8, 1, 2, 3],
            [9, 1, 2, 3], ]],
         ( (INFO, "Validating field data"),
-          (INFO, "Checking Column a"),
-          (INFO, "Checking Column b"),
-          (INFO, "Checking Column c"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
           (ERROR, "Row numbers not consecutive or do not start with 1"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 6 data rows and 3 fields"),
-          (INFO, "Dataframe contains 1 errors"))),    ]
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 6 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),
+      ( [ [[1, 1, 2, 3],
+           [2, 1, 2, 3],
+           [3, 1, 2, 3], ],
+          [[4, 1, 2, 3],
+           [5, 1, 2, 3],
+           [None, None, None, None,], ]],
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 5 data rows and 3 fields"),
+          (INFO, "Dataframe formatted correctly"))),
+      ( [ [[1, 1, 2, 3],
+           [2, 1, 2, 3],
+           [3, 1, 2, 3], 
+           ],
+          [[4, 1, 2, 3],
+           [None, None, None, None,], # internal blank row within block
+           [5, 1, 2, 3],
+           ]],
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (ERROR, "Data contains empty rows"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 5 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),
+      ( [ [[1, 1, 2, 3],
+           [2, 1, 2, 3],
+           [None, None, None, None], # trailing blank row, but with data then loaded
+           ],
+          [[3, 1, 2, 3], 
+           [4, 1, 2, 3],
+           [5, 1, 2, 3],
+           ]],
+        ( (INFO, "Validating field data"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (ERROR, "Data contains empty rows"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 5 data rows and 3 fields"),
+          (INFO, "Dataframe contains 1 errors"))),
+    ]
 )
 def test_DataWorksheet_report_multi_load(caplog, fixture_dataworksheet, fixture_field_meta,
                                          data_rows, expected_log):
@@ -275,10 +444,10 @@ def test_DataWorksheet_report_multi_load(caplog, fixture_dataworksheet, fixture_
         ( (INFO, "Loading from worksheet"),
           (INFO, "Validating field metadata"),
           (INFO, "Validating field data"),
-          (INFO, "Checking Column a"),
-          (INFO, "Checking Column b"),
-          (INFO, "Checking Column c"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
           (INFO, "Dataframe formatted correctly"))),
       ( [],
         False,
@@ -286,7 +455,7 @@ def test_DataWorksheet_report_multi_load(caplog, fixture_dataworksheet, fixture_
           (INFO, "Validating field metadata"),
           (INFO, "Validating field data"),
           (ERROR, "No data passed for validation"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 0 data rows and 3 fields"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 0 data rows and 3 fields"),
           (INFO, "Dataframe contains 1 errors"))),
       ( [],
         True,
@@ -294,7 +463,7 @@ def test_DataWorksheet_report_multi_load(caplog, fixture_dataworksheet, fixture_
           (INFO, "Validating field metadata"),
           (INFO, "Validating field data"),
           (INFO, "Data table description associated with external file"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 0 data rows and 3 fields"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 0 data rows and 3 fields"),
           (INFO, "Dataframe formatted correctly"))),
       ( [[11, 1, 2, 3],
          [12, 1, 2, 3],
@@ -303,11 +472,11 @@ def test_DataWorksheet_report_multi_load(caplog, fixture_dataworksheet, fixture_
         ( (INFO, "Loading from worksheet"),
           (INFO, "Validating field metadata"),
           (INFO, "Validating field data"),
-          (INFO, "Checking Column a"),
-          (INFO, "Checking Column b"),
-          (INFO, "Checking Column c"),
+          (INFO, "Checking field a"),
+          (INFO, "Checking field b"),
+          (INFO, "Checking field c"),
           (ERROR, "Row numbers not consecutive or do not start with 1"),
-          (INFO, "Worksheet 'DF' contains 6 descriptors, 3 data rows and 3 fields"),
+          (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
           (INFO, "Dataframe contains 1 errors"))),
     ]
 )
@@ -345,3 +514,35 @@ def test_DataWorksheet_load_from_worksheet(caplog, fixture_dataworksheet, fixtur
                 for exp, rec in zip(expected_log, caplog.records)])
 
 
+
+@pytest.mark.parametrize(
+    'example_excel_files, wsheet, n_errors',
+    [
+      ('good', 'DF', 0), 
+      ('good', 'Incidence', 0), 
+      ('bad', 'DF', 41),
+      ('bad', 'Incidence', 8)
+    ], 
+    indirect = ['example_excel_files']  # take actual params from fixture
+)
+def test_DataWorksheet_load_from_file(caplog, example_excel_files, wsheet, n_errors):
+    """Test loading a dataworksheet from file - this duplicates a lot of 
+    Dataset.load_from_workbook"""
+    
+    # Load the taxa and locations
+    rs = Resources()
+    ds = Dataset(rs)
+    ds.taxa.load(example_excel_files['Taxa'])
+    ds.locations.load(example_excel_files['Locations'])
+
+    caplog.clear()
+
+    dws = DataWorksheet({'name': 'DF',
+                         'title': 'My data table',
+                         'description': 'This is a test data worksheet',
+                         'external': None},
+                         dataset=ds)
+
+    dws.load_from_worksheet(example_excel_files[wsheet])
+
+    assert dws.n_errors == n_errors

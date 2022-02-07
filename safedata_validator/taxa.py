@@ -1,20 +1,4 @@
-import dataclasses
-import sqlite3
-from collections import Counter
-from io import StringIO
-from itertools import groupby
-from logging import Formatter
-from typing import Optional, Union
-
-import requests
-from enforce_typing import enforce_types
-
-from safedata_validator.logger import (CH, FORMATTER, LOGGER,
-                                       loggerinfo_push_pop)
-from safedata_validator.validators import (GetDataFrame, HasDuplicates,
-                                           IsLower, IsNotPadded)
-
-"""
+"""## The taxa submodule
 This module describes classes and methods used to compile taxonomic data from
 datasets and to validate taxonomy against the GBIF backbone database.
 
@@ -31,6 +15,24 @@ Note that we explicitly exclude form and variety from the set of GBIF backbone
 taxonomic levels because they cannot be matched into the backbone hierarchy
 without extra API calls.
 """
+
+import dataclasses
+import sqlite3
+from collections import Counter
+from io import StringIO
+from itertools import groupby
+from logging import Formatter
+from typing import Optional, Union
+
+import requests
+from enforce_typing import enforce_types
+
+from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
+                                       loggerinfo_push_pop)
+from safedata_validator.validators import (GetDataFrame, HasDuplicates,
+                                           IsLower, blank_value)
+
+
 
 BACKBONE_RANKS = ['kingdom', 'phylum', 'order', 'class', 'family',
                   'genus', 'species', 'subspecies']
@@ -161,7 +163,11 @@ class LocalGBIFValidator:
         if taxon.gbif_id is not None:
 
             # get the record associated with the provided ID
-            id_taxon = self.id_lookup(taxon.gbif_id)
+            try:
+                id_taxon = self.id_lookup(taxon.gbif_id)
+            except GBIFError as err:
+                taxon.lookup_status = f'GBIF ID problem: {err.message}'
+                return taxon
 
             # Check that name and rank are congruent with id
             if (id_taxon.name != taxon.name) or (id_taxon.rank != taxon.rank):
@@ -224,7 +230,8 @@ class LocalGBIFValidator:
             return self.id_lookup(selected_row['id'])
 
     def id_lookup(self, gbif_id: int):
-        """Method to return a Taxon directly from a GBIF ID
+        """Method to return a Taxon directly from a GBIF ID. It will raise
+        a GBIFError if the provided ID cannot be found.
 
         Params:
             gbif_id: An integer
@@ -234,10 +241,10 @@ class LocalGBIFValidator:
         """
 
         if not isinstance(gbif_id, int):
-            raise TypeError()
+            raise GBIFError('Non-integer GBIF code')
 
         if not gbif_id > 0:
-            raise ValueError()
+            raise GBIFError('Negative GBIF code')
 
         # get the record associated with the provided ID
         sql = f"select * from backbone where id = {gbif_id}"
@@ -247,7 +254,7 @@ class LocalGBIFValidator:
         # provided taxon or rank information
         if taxon_row is None:
             raise GBIFError()
-
+        
         # Create and populate taxon
         taxon = Taxon(name=taxon_row['canonical_name'],
                       rank=taxon_row['rank'].lower(),
@@ -309,7 +316,11 @@ class RemoteGBIFValidator:
         if taxon.gbif_id is not None:
 
             # get the record associated with the provided ID
-            id_taxon = self.id_lookup(taxon.gbif_id)
+            try:
+                id_taxon = self.id_lookup(taxon.gbif_id)
+            except GBIFError as err:
+                taxon.lookup_status = f'GBIF ID problem: {err.message}'
+                return taxon
 
             # Check that name and rank are congruent with id
             if (id_taxon.name != taxon.name) or (id_taxon.rank != taxon.rank):
@@ -345,7 +356,9 @@ class RemoteGBIFValidator:
             return self.id_lookup(response['usageKey'])
 
     def id_lookup(self, gbif_id: int):
-        """Method to return a Taxon directly from a GBIF ID
+        """Method to return a Taxon directly from a GBIF ID. It will raise
+        a GBIFError if the provided ID cannot be found, or if there is a
+        connection error.
 
         Params:
             gbif_id: An integer
@@ -355,10 +368,10 @@ class RemoteGBIFValidator:
         """
 
         if not isinstance(gbif_id, int):
-            raise TypeError()
+            raise GBIFError('Non-integer GBIF code')
 
         if not gbif_id > 0:
-            raise ValueError()
+            raise GBIFError('Negative GBIF code')
 
         # Use the species/{id} endpoint
         taxon_row = requests.get(f"http://api.gbif.org/v1/species/{gbif_id}")
@@ -465,7 +478,7 @@ class Taxa:
             using the data in the worksheet.
         """
 
-        start_errors = CH.counters['ERROR']
+        start_errors = COUNTER_HANDLER.counters['ERROR']
 
         # Get the data read in.
         LOGGER.info("Reading taxa data")
@@ -518,6 +531,9 @@ class Taxa:
         #       [parent name, parent type, parent id]]
 
         for idx, row in enumerate(taxa):
+
+            # Standardise blank values to None
+            row = {ky: None if blank_value(vl) else vl for ky, vl in row.items()}
             taxon_info = [row['taxon name'], row['taxon type'], row['taxon id'], row['ignore id']]
             parent_info = [row['parent name'], row['parent type'], row['parent id']]
 
@@ -535,7 +551,7 @@ class Taxa:
         self.index_higher_taxa()
 
         # summary of processing
-        self.n_errors = CH.counters['ERROR'] - start_errors
+        self.n_errors = COUNTER_HANDLER.counters['ERROR'] - start_errors
         if self.n_errors > 0:
             LOGGER.info('Taxa contains {} errors'.format(self.n_errors))
         else:
@@ -686,8 +702,8 @@ class Taxa:
                                f' of {p_taxon.canon_usage.name} in GBIF backbone')
             else:
                 LOGGER.info(f'Parent taxon ({p_taxon.name}) accepted')
-        else:
-                LOGGER.info('No parent taxon provided')
+        # else:
+        #         LOGGER.info('No parent taxon provided')
 
         # Now check main taxa
         #
