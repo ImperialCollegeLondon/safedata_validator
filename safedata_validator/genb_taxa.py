@@ -6,7 +6,7 @@ import requests
 import urllib
 from enforce_typing import enforce_types
 
-from safedata_validator.logger import (CH, FORMATTER, LOGGER,
+from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
                                        loggerinfo_push_pop)
 
 # CHANGE THIS TO A PURPOSE DEFINED EMAIL AT SOMEPOINT
@@ -46,6 +46,8 @@ class NCBIError(Exception):
     def __init__(self, message="NCBI taxa ID not found"):
         self.message = message
         super().__init__(self.message)
+
+# IMMEDIATE - Update error structure of taxa to match genb_taxa
 
 # TODO - Unit testing, work out how I set up unit tests. Probably best begun early
 # Worth asking David how to do this if I can't work it out myself
