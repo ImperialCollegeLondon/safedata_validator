@@ -1,3 +1,16 @@
+"""## The genb_taxa submodule
+This module describes classes and methods used to validate taxonomic data against
+the NCBI database and convert it to a form compatible with the GBIF backbone database.
+
+The NCBITaxon dataclass is used to store data about a taxon entry in NCBI (GenBank)
+form. It is initialised with user data and then the taxon Validator class can
+be used to update a NCBITaxon object with the result of NCBI validation. At present
+only online validation is possible through the `RemoteNCBIValidator` class.
+
+THIS IS STILL VERY MUCH A WORK IN PROGRESS SO MORE INFORMATION IS GOING TO BE
+ENTERED HERE
+"""
+
 from typing import Union, Optional
 import dataclasses
 from Bio import Entrez
@@ -147,10 +160,10 @@ class RemoteNCBIValidator:
         """
 
         if not isinstance(genbank_id, int):
-            raise TypeError()
+            raise NCBIError('Non-integer NCBI taxonomy ID')
 
         if not genbank_id > 0:
-            raise ValueError()
+            raise NCBIError('Negative NCBI taxonomy ID')
 
         # Set status of taxa validity as initally false
         valid = False

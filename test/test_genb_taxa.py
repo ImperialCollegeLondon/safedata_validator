@@ -116,11 +116,13 @@ def test_validate_id_lookup(caplog, test_input, expected_log_entries, validators
     [(None,  # no parameters
       TypeError),
      (dict(nnme='E coli', genbank_id='invalid_string'),  # a string
-      TypeError),
+      genb_taxa.NCBIError),
+     (dict(nnme='E coli', genbank_id=27.5),  # non-integer ID
+      genb_taxa.NCBIError),
      (dict(nnme=27, genbank_id=27),  # named using a number
       TypeError),
      (dict(nnme='E coli', genbank_id=-1),  # bad ID
-      ValueError),
+      genb_taxa.NCBIError),
      (dict(nnme='E coli', genbank_id=100000000000000),  # bad ID
       genb_taxa.NCBIError)])
 def test_id_lookup_errors(validators, test_input, expected_exception):
