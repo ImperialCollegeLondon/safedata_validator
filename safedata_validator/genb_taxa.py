@@ -60,11 +60,6 @@ class NCBIError(Exception):
         self.message = message
         super().__init__(self.message)
 
-# IMMEDIATE - Update error structure of taxa to match genb_taxa
-
-# TODO - Unit testing, work out how I set up unit tests. Probably best begun early
-# Worth asking David how to do this if I can't work it out myself
-
 # TODO - Validate against GBIF
 # So check if taxa provided exists if GBIF, if not check up hierachy until one that does is found
 # Then tell user that they have to contract their taxonomic specification to this levels
@@ -92,7 +87,6 @@ class NCBIError(Exception):
 
 # QUESTIONS FOR DAVID
 # SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
-# WHY DOES ONLY python -m pytest WORK AND NOT pytest? IS THIS CONSEQUENTIAL?
 # IS THERE A SENSIBLE WAY TO DUMMY CONNECTION ERRORS?
 
 @enforce_types
@@ -408,3 +402,204 @@ class RemoteNCBIValidator:
                 mtaxon.superseed = True
 
         return mtaxon
+
+# OKAY SO WHAT DO I NEED THIS TOP LEVEL FUNCTION TO DO?
+# FIRST IT NEEDS TO READ IN WORKSHEET DATA
+# IT SHOULD STORE IT IN NCBI FORMAT (AND VALIDATE)
+# THEN IT SHOULD CONVERT THIS INFO TO GBIF FORM
+# THIS INFO IS STORED FOR OUTPUT
+class GenBankTaxa:
+    # REWRITE THIS HEAVILY
+    """A class to hold a list of taxon names and a validated taxonomic
+    index for those taxa and their taxonomic hierarchy. The validate_taxon
+    method checks that taxon details and their optional parent taxon can be
+    matched into the the GBIF backbone and populates two things:
+
+    i)  the taxon_names attribute of the dataset, which is just a set of
+        names used as a validation list for taxon names used in data worksheets.
+    ii) the taxon_index attribute of the dataset, which contains a set
+        of lists structured as:
+
+            [worksheet_name (str),
+            gbif_id (int),
+            gbif_parent_id (int),
+            canonical_name (str),
+            taxonomic_rank (str),
+            status (str)]
+
+        Where a taxon is not accepted or doubtful on GBIF, two entries are
+        inserted for the taxon, one under the canon name and one under the
+        provided name. They will share the same worksheet name and so can
+        be paired back up for description generation. The worksheet name
+        for parent taxa and deeper taxonomic hierarchy is set to None.
+
+    The index_higher_taxa method can be used to extend the taxon_index to
+    include all of the higher taxa linking the validated taxa.
+
+    The index can then be used:
+
+    a) to generate the taxonomic coverage section of the dataset description, and
+    b) as the basis of a SQL dataset_taxa table to index the taxonomic coverage
+    of datasets.
+    """
+
+    def __init__(self):
+        """Sets the initial properties of a GenBankTaxa object
+        """
+
+        # WHAT INFO FROM NCBI SHOULD BE STORED???
+        # name: str ???
+        # taxa_hier: dict NO NEED TO STORE FULL hierachy
+        # genbank_id: YES
+        # synonyms: list[str] THESE ARE ALSO ONLY OF TRANSIENT INTEREST
+        # diverg: str = dataclasses.field(init=False) # SHOULD GENERATE A WARNING
+        # superseed: # SHOULD GENERATE A WARNING
+
+        self.taxon_index = []
+        self.taxon_names = set()
+        self.parents = dict()
+        self.hierarchy = set()
+        self.n_errors = None
+        self.taxon_names_used = set()
+
+        # At the moment we only have one validator defined
+        self.validator = RemoteNCBIValidator()
+
+    # def load():
+    # FUNCTION TO LOAD IN A TAXA WORKSHEET SHOULD BE ADDED IN HERE
+
+    def validate_and_add_taxon(self, gb_taxon_input):
+        # REWRITE THIS TO MATCH ALTERED FUNCTION
+        """ User information is provided that names a taxon and (optionally) gives
+        a NCBI taxonomy ID. This information is then used to find the closest GBIF
+        backbone compatible entry in the NCBI database. This information along with
+        the NCBI ID for the orginal entry is then saved, along with a list of possible
+        synoyms. All this information is then used to find the closest taxa match
+        in the GBIF database. This information is then used to update the relevant
+        GenBankTaxa instance.
+
+        The gb_taxon_input has the form:
+
+        ['worksheet_name',
+         ['name', 'taxa_hier'],
+          'genbank_id']
+
+        If there is no NCBI ID, the structure is:
+        ['worksheet_name',
+         ['name', 'taxa_hier'],
+          None]
+
+        Args:
+            taxon_input: Taxon information in standard form as above
+
+        Returns:
+            IS THE BELOW CORRECT FOR MY CASE???
+            Updates the taxon_names and taxon_index attributes of the class instance.
+        """
+
+        m_name, taxon_info, genbank_id = gb_taxon_input
+
+        # Sanitise worksheet names for taxa - only keep unpadded strings.
+        if m_name is None or not isinstance(m_name, str) or m_name.isspace() or not m_name:
+            LOGGER.error('Worksheet name missing, whitespace only or not text')
+        elif m_name != m_name.strip():
+            LOGGER.error(f"Worksheet name has whitespace padding: {repr(m_name)}")
+            m_name = m_name.strip()
+            self.taxon_names.add(m_name)
+        else:
+            self.taxon_names.add(m_name)
+
+        # Check that ID provided is reasonable (if provided)
+        i_fail = False
+
+        # ID can be None or an integer (openpyxl loads all values as float)
+        if not(genbank_id is None or
+               (isinstance(genbank_id, float) and genbank_id.is_integer()) or
+               isinstance(genbank_id, int)) :
+            LOGGER.error('NCBI ID contains value that is not an integer')
+            i_fail = True
+
+        # Check the main taxon details
+        h_fail = False
+
+        # Check that the right amount of information has been provided
+        if len(taxon_info) != 2:
+            LOGGER.error('Two objects should be provided as taxon info')
+            h_fail = True
+        else:
+            # Check that it is a dictonary with at least one element
+            if not isinstance(taxon_info[0], str):
+                LOGGER.error('Taxon name should be a string')
+                h_fail = True
+            # Otherwise do checks for padding
+            else:
+                # Check for empty strings
+                if taxon_info[0] == "" or taxon_info[0].isspace():
+                    LOGGER.error('Taxon name should not be blank or just whitespace')
+                    h_fail = True
+                # Check if the string is padded
+                elif taxon_info[0] != taxon_info[0].strip():
+                    LOGGER.error(f"Taxon name has whitespace padding: {repr(taxon_info[0])}")
+                    taxon_info[0] = taxon_info[0].strip()
+
+            # Check that a dictonary with at least one entry has been provided
+            if not isinstance(taxon_info[1],dict) or len(taxon_info[1]) == 0:
+                LOGGER.error('Taxa hierachy should be a (not empty) dictonary')
+                h_fail = True
+            # Otherwise check for padding of dictonary keys and values
+            else:
+                # Make a translation table
+                translate = {}
+                # Loop over all dictonary keys
+                for idx in taxon_info[1].keys():
+                    if not isinstance(idx,str):
+                        LOGGER.error(f"Non-string dictonary key used: {repr(idx)}")
+                        h_fail = True
+                    elif idx == "" or idx.isspace():
+                        LOGGER.error('Empty dictonary key used')
+                        h_fail = True
+                    elif idx != idx.strip():
+                        LOGGER.error(f"Dictonary key has whitespace padding: {repr(idx)}")
+                        # Save keys to swap to new translation table
+                        translate[idx] = idx.strip()
+
+                    # Extract corresponding dictonary value
+                    val = (taxon_info[1])[idx]
+                    # Then perform similar checks on dictonary value
+                    if not isinstance(val,str):
+                        LOGGER.error(f"Non-string dictonary value used: {repr(val)}")
+                        h_fail = True
+                    elif val == "" or val.isspace():
+                        LOGGER.error('Empty dictonary value used')
+                        h_fail = True
+                    elif val != val.strip():
+                        LOGGER.error(f"Dictonary value has whitespace padding: {repr(val)}")
+                        taxon_info[1][idx] = val.strip()
+
+                # Use translation table to replace whitespaced dictonary keys
+                for old, new in translate.items():
+                    taxon_info[1][new] = taxon_info[1].pop(old)
+
+        if i_fail:
+            LOGGER.error(f'Improper NCBI ID provided, cannot be validated')
+
+        if h_fail:
+            LOGGER.error(f'Taxon details not properly formatted, cannot validate')
+
+        if h_fail or i_fail:
+            return
+
+        ###################### NOTHING BELOW THIS LINE WORKS ###########################
+        # CHECK SOMEWHERE THAT ID AND HIERACHY MATCH!!!!
+        return
+
+# ROUGH TESTING BLOCK
+# SHOULD CONVERT THIS INTO PROPER UNIT TESTS AS I GO
+v1 = GenBankTaxa()
+# Should work fine
+d1 = ['worksheet name', ['E coli', {'species': 'Escherichia coli'}], None]
+# Should give an error
+d2 = ['worksheet name', ['E coli', {' species': 'Escherichia coli'}], None]
+
+test = v1.validate_and_add_taxon(d1)
+print(test)

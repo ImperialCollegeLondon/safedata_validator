@@ -4,12 +4,19 @@ from safedata_validator import genb_taxa
 # TESTS TO PUT IN:
 # NEED TEST ON HIGHER LEVEL FUNCTIONS TO AVOID DUPLICATED TAXANOMIC RANKS, AND TO
 # CHECK THAT INPUT TAXANOMIC RANKS MATCH OUTPUT TAXOMONIC RANKS
+# NEED TO ALSO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
 
 @pytest.fixture(scope='module')
 def validators():
     """Parameterised fixture to return local GBIF validator
     """
     return genb_taxa.RemoteNCBIValidator()
+
+@pytest.fixture(scope='module')
+def gb_instance():
+    """Parameterised fixture to return a GenBankTaxa instance
+    """
+    return genb_taxa.GenBankTaxa()
 
 # ------------------------------------------
 # Testing NCBITaxon
@@ -260,3 +267,141 @@ def test_taxa_search_errors(validators, test_input, expected_exception):
 
     with pytest.raises(expected_exception):
         _ = validators.taxa_search(**test_input)
+
+# Then do the same for the validate_and_add_taxon function
+
+# SECTION TESTING EXPECTED OUTPUT
+
+# Now test that the search function logs errors correctly
+@pytest.mark.parametrize(
+    'test_input,expected_log_entries',
+    # Fine so empty
+    [(['worksheet name', ['E coli', {'genus': 'Escherichia', 'species': 'Escherichia coli'}], None],
+      ()),
+     # Same but with valid code provided
+     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 562],
+      ()),
+     # whitespace padding error
+     (['worksheet name ', ['E coli', {'species': 'Escherichia coli'}], None],
+      (('ERROR', "Worksheet name has whitespace padding: 'worksheet name '"),
+      )),
+     # No name error
+     ([' ', ['E coli', {'species': 'Escherichia coli'}], None],
+      (('ERROR', "Worksheet name missing, whitespace only or not text"),
+      )),
+     # No name error
+     ([None, ['E coli', {'species': 'Escherichia coli'}], None],
+      (('ERROR', "Worksheet name missing, whitespace only or not text"),
+      )),
+     # No name error
+     (['', ['E coli', {'species': 'Escherichia coli'}], None],
+      (('ERROR', "Worksheet name missing, whitespace only or not text"),
+      )),
+     # Floats that can be cocnverted to integers are allowed
+     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 562.0],
+      ()),
+     # A true float results in multiple errors
+     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 562.5],
+      (('ERROR', "NCBI ID contains value that is not an integer"),
+       ('ERROR', "Improper NCBI ID provided, cannot be validated"),
+      )),
+     # As does a string
+     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], "ID"],
+      (('ERROR', "NCBI ID contains value that is not an integer"),
+       ('ERROR', "Improper NCBI ID provided, cannot be validated"),
+      )),
+     # Too little information
+     (['worksheet name', [{'species': 'Escherichia coli'}], None],
+      (('ERROR', "Two objects should be provided as taxon info"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # This checks that multiple errors can fire at once
+     (['worksheet name', [{'species': 'Escherichia coli'}], 562.5],
+      (('ERROR', "NCBI ID contains value that is not an integer"),
+       ('ERROR', "Two objects should be provided as taxon info"),
+       ('ERROR', "Improper NCBI ID provided, cannot be validated"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # Non-string name provided
+     (['worksheet name', [None, {'species': 'Escherichia coli'}], None],
+      (('ERROR', "Taxon name should be a string"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # Blank string provided as name
+     (['worksheet name', ["", {'species': 'Escherichia coli'}], None],
+      (('ERROR', "Taxon name should not be blank or just whitespace"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # String of just whitespace provided as name
+     (['worksheet name', ["    ", {'species': 'Escherichia coli'}], None],
+      (('ERROR', "Taxon name should not be blank or just whitespace"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # String of just whitespace provided as name
+     (['worksheet name', [' E coli', {'species': 'Escherichia coli'}], None],
+      (('ERROR', "Taxon name has whitespace padding: ' E coli'"),
+      )),
+     # Taxa hierachy provided as a string
+     (['worksheet name', ['E coli', 'Escherichia coli'], None],
+      (('ERROR', "Taxa hierachy should be a (not empty) dictonary"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # Taxa hierachy dictonary empty
+     (['worksheet name', ['E coli', {}], None],
+      (('ERROR', "Taxa hierachy should be a (not empty) dictonary"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # Example of multiple errors
+     (['worksheet name', [' E coli', {}], None],
+      (('ERROR', "Taxon name has whitespace padding: ' E coli'"),
+       ('ERROR', "Taxa hierachy should be a (not empty) dictonary"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # Missing dictonary key
+     (['worksheet name', ['E coli', {' ': 'Escherichia coli'}], None],
+      (('ERROR', "Empty dictonary key used"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # Non-string dictonary key
+     (['worksheet name', ['E coli', {26: 'Escherichia coli'}], None],
+      (('ERROR', "Non-string dictonary key used: 26"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # Padded dictonary key
+     (['worksheet name', ['E coli', {' species': 'Escherichia coli'}], None],
+      (('ERROR', "Dictonary key has whitespace padding: ' species'"),
+      )),
+     # Missing dictonary value
+     (['worksheet name', ['E coli', {'species': ''}], None],
+      (('ERROR', "Empty dictonary value used"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # Non-string dictonary value
+     (['worksheet name', ['E coli', {'species': 26}], None],
+      (('ERROR', "Non-string dictonary value used: 26"),
+       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      )),
+     # Padding on dictonary value
+     (['worksheet name', ['E coli', {'species': ' Escherichia coli'}], None],
+      (('ERROR', "Dictonary value has whitespace padding: ' Escherichia coli'"),
+      )),
+     ])
+def test_validate_and_add_taxon(caplog, test_input, expected_log_entries, gb_instance):
+    """This test checks that the function that searches the NCBI database to find
+    information on particular taxa logs the correct errors and warnings. At the
+    moment this for the Remote validator, but if a local validator is defined
+    this should also be checked against.
+
+    """
+    fnd_tx = gb_instance.validate_and_add_taxon(test_input)
+
+    if len(expected_log_entries) != len(caplog.records):
+        pytest.fail('Incorrect number of log records emitted')
+
+    # Note that this implicitly asserts that the order of logging messages is correct too
+    for idx, log_rec in enumerate(caplog.records):
+        exp_rec = expected_log_entries[idx]
+        assert log_rec.levelname == exp_rec[0]
+        assert exp_rec[1] in log_rec.message
+
+# THEN SECTION TESTING THAT ERRORS ARE THROWN CORRECTLY
