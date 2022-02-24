@@ -241,10 +241,10 @@ class LocalGBIFValidator:
         """
 
         if not isinstance(gbif_id, int):
-            raise GBIFError('Non-integer GBIF code')
+            raise ValueError('Non-integer GBIF code')
 
         if not gbif_id > 0:
-            raise GBIFError('Negative GBIF code')
+            raise ValueError('Negative GBIF code')
 
         # get the record associated with the provided ID
         sql = f"select * from backbone where id = {gbif_id}"
@@ -368,10 +368,10 @@ class RemoteGBIFValidator:
         """
 
         if not isinstance(gbif_id, int):
-            raise GBIFError('Non-integer GBIF code')
+            raise ValueError('Non-integer GBIF code')
 
         if not gbif_id > 0:
-            raise GBIFError('Negative GBIF code')
+            raise ValueError('Negative GBIF code')
 
         # Use the species/{id} endpoint
         taxon_row = requests.get(f"http://api.gbif.org/v1/species/{gbif_id}")

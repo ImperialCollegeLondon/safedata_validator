@@ -87,9 +87,9 @@ def test_validator_gbif_lookup_outputs(validators, test_input, expected):
 @pytest.mark.parametrize(
     'test_input,expected_exception',
     [(None,  # no parameters
-      TypeError),
+      ValueError),
      ('invalid_string',  # a string
-      TypeError),
+      ValueError),
      (-1,  # bad ID
       ValueError),
      (100000000000000,  # bad ID
