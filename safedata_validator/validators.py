@@ -368,12 +368,20 @@ class GetDataFrame:
             bad_headers: A dictionary of malformed header values
         """
 
+        self.headers = []
         self.bad_headers = dict()
-
+        self.data_columns = []
+        
         # Load the rows and pop off the top tuple for headers, converting it to
         # a list so that terminal Nones can be trimmed off
         data = ws.iter_rows(min_row=header_row, values_only=True)
         data_rows = [rw for rw in data]
+
+        # If there are fewer than 2 rows, then there is either no data or only a 
+        # header.
+        if len(data_rows) < 2:
+            return
+        
         headers = list(data_rows.pop(0))
 
         # Strip off terminal empty rows from the data

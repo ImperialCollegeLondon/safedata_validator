@@ -485,6 +485,10 @@ class Taxa:
         FORMATTER.push()
         dframe = GetDataFrame(worksheet)
 
+        if not dframe.data_columns:
+            LOGGER.error('No data or only headers in Taxa worksheet')
+            return
+        
         # Dupe headers likely cause serious issues, so stop
         if 'duplicated' in dframe.bad_headers:
             LOGGER.error('Cannot parse taxa with duplicated headers')

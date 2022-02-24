@@ -61,6 +61,10 @@ class Locations:
         # Load the locations data frame - which runs header checks
         dframe = GetDataFrame(worksheet)
 
+        if not dframe.data_columns:
+            LOGGER.error('No data or only headers in Locations worksheet')
+            return
+
         # Dupe headers likely cause serious issues, so stop
         if 'duplicated' in dframe.bad_headers:
             LOGGER.error('Cannot parse locations with duplicated headers')
