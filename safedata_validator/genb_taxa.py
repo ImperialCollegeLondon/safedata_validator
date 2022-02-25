@@ -468,7 +468,7 @@ class GenBankTaxa:
     # def load():
     # FUNCTION TO LOAD IN A TAXA WORKSHEET SHOULD BE ADDED IN HERE
 
-    def validate_and_add_taxon(self, gb_taxon_input):
+    def validate_and_add_taxon(self, validator, gb_taxon_input):
         # REWRITE THIS TO MATCH ALTERED FUNCTION
         """ User information is provided that names a taxon and (optionally) gives
         a NCBI taxonomy ID. This information is then used to find the closest GBIF
@@ -580,6 +580,7 @@ class GenBankTaxa:
                 for old, new in translate.items():
                     taxon_info[1][new] = taxon_info[1].pop(old)
 
+        # Now check that the taxa hierachy is correctly ordered
         if i_fail:
             LOGGER.error(f'Improper NCBI ID provided, cannot be validated')
 
@@ -589,17 +590,121 @@ class GenBankTaxa:
         if h_fail or i_fail:
             return
 
+        # Now check that dictonary containing taxa hierachy is properly ordered
+        # Only matters if it contains multiple entries
+        if len(taxon_info[1]) > 1:
+            # Find all keys in taxa hierachy
+            t_ord = list(taxon_info[1].keys())
+            # Find corresponding keys from backbone
+            b_ord = [x for x in BACKBONE_RANKS_EX if x in t_ord]
+            # Remove non-backbone keys from taxa order
+            t_ord = [x for x in t_ord if x in b_ord]
+            # Then catch cases where orders don't match
+            if b_ord != t_ord:
+                LOGGER.error(f'Taxon hierachy not in correct order')
+
+        # Now that inputs are sanitised, continue with checking...
+        # First check if pair has already been processed
+        # DELETE THESE COMMENTS WHEN DONE!!!
+        # Only want to use previous result if taxa_hierarchy genbank_id PAIR has been used before
+        # Otherwise one needs to be validated against the other
+        # This would naturally include cases where no id is provided
+        if True == False: # PLACEHOLDER
+            # PUTTING IN A PLACEHOLDER HERE FOR NOW AS I NEED TO DECIDE HOW TO DO THIS LATER
+            print("PLACEHOLDER")
+            # elif tuple(parent_info) in self.parents:
+            #     p_taxon = self.parents[tuple(parent_info)]
+        else:
+            # In this case go straight ahead and search for the taxon
+            hr_taxon = validator.taxa_search(taxon_info[0], taxon_info[1])
+            # Catch case where errors are returned rather than a taxon
+            if hr_taxon == None:
+                LOGGER.error(f'Search based on taxon hierachy failed')
+                return
+            # Then check if a genbank ID number has been provided
+            if genbank_id != None:
+                id_taxon = validator.id_lookup(taxon_info[0], int(genbank_id))
+                # Check whether this matches what was found using hierarchy
+                if id_taxon != hr_taxon:
+                    # Check if taxonomy hierachy superseeded
+                    if hr_taxon.superseed == True:
+                        LOGGER.warning(f'Taxonomic classification superseeded for '
+                        f'{taxon_info[0]}, using new taxonomic classification')
+                    elif id_taxon.superseed == True:
+                        LOGGER.warning(f'NCBI taxa ID superseeded for {taxon_info[0]}'
+                        f', using new taxa ID')
+                    else:
+                        LOGGER.error(f"The NCBI ID supplied for {taxon_info[0]} "
+                        f"does not match hierarchy: expected {hr_taxon.genbank_id}"
+                        f" got {genbank_id}")
+                        return
+            else:
+                # Warn user that superseeded taxonomy won't be used
+                if hr_taxon.superseed:
+                    LOGGER.warning(f'Taxonomic classification superseeded for '
+                    f'{taxon_info[0]}, using new taxonomic classification')
+
+
+        # ALWAYS USE hr_taxon AS TRUE REPRESENTATION OF THE TAXON
+
+        # else:
+        #     # Create a taxon object
+        #     p_taxon = Taxon(name=parent_info[0], rank=parent_info[1], gbif_id=parent_info[2])
+        #
+        #     # Look for a match
+        #     if p_taxon.is_backbone:
+        #         p_taxon = self.validator.search(p_taxon)
+        #
+        #         # Update the hierarchy and index with the search results
+        #         self.hierarchy.update([rw for rw in p_taxon.hierarchy if rw[1] is not None])
+        #         self.taxon_index.append([None, p_taxon.gbif_id, p_taxon.parent_id,
+        #                                     p_taxon.name, p_taxon.rank, p_taxon.taxon_status])
+        #
+        #         if p_taxon.is_backbone and p_taxon.found and not p_taxon.is_canon:
+        #             self.hierarchy.update([rw for rw in p_taxon.canon_usage.hierarchy if rw[1] is not None])
+        #             self.taxon_index.append([None,
+        #                                     p_taxon.canon_usage.gbif_id,
+        #                                     p_taxon.canon_usage.parent_id,
+        #                                     p_taxon.canon_usage.name,
+        #                                     p_taxon.canon_usage.rank,
+        #                                     p_taxon.canon_usage.taxon_status])
+        #
+        #     # Store the parent taxon keyed by parent information (needs tuple)
+        #     self.parents[tuple(parent_info)] = p_taxon
+
         ###################### NOTHING BELOW THIS LINE WORKS ###########################
         # CHECK SOMEWHERE THAT ID AND HIERACHY MATCH!!!!
+        print("Reached end")
         return
+
+        # Report on the parent information
+        if p_taxon is not None:
+            if not p_taxon.is_backbone:
+                LOGGER.error(f'Parent taxon ({p_taxon.name}) is not of a backbone rank')
+
+            elif not p_taxon.found:
+                LOGGER.error(f'Parent taxon ({p_taxon.name}) {p_taxon.lookup_status}')
+
+            elif not p_taxon.is_canon:
+                LOGGER.warning(f'Parent taxon ({p_taxon.name}) considered a {p_taxon.taxon_status}'
+                               f' of {p_taxon.canon_usage.name} in GBIF backbone')
+            else:
+                LOGGER.info(f'Parent taxon ({p_taxon.name}) accepted')
 
 # ROUGH TESTING BLOCK
 # SHOULD CONVERT THIS INTO PROPER UNIT TESTS AS I GO
 v1 = GenBankTaxa()
+v2 = RemoteNCBIValidator()
 # Should work fine
-d1 = ['worksheet name', ['E coli', {'species': 'Escherichia coli'}], None]
-# Should give an error
-d2 = ['worksheet name', ['E coli', {' species': 'Escherichia coli'}], None]
+d1 = ['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 562]
+# With superseeded code and hierachy
+d2 = ['worksheet name', ['C marina', {'species': 'Cytophaga marina'}], 1000]
+# Just superseeded code
+d3 = ['worksheet name', ['T maritimum', {'species': 'Tenacibaculum maritimum'}], 1000]
+# Just superseeded hierachy
+d4 = ['worksheet name', ['C marina', {'species': 'Cytophaga marina'}], 107401]
+# No ID Case
+d5 = ['worksheet name', ['C marina', {'genus': 'Cytophaga', 'species': 'Cytophaga marina'}], None]
 
-test = v1.validate_and_add_taxon(d1)
+test = v1.validate_and_add_taxon(v2,d4)
 print(test)

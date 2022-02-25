@@ -2,8 +2,7 @@ import pytest
 from safedata_validator import genb_taxa
 
 # TESTS TO PUT IN:
-# NEED TEST ON HIGHER LEVEL FUNCTIONS TO AVOID DUPLICATED TAXANOMIC RANKS, AND TO
-# CHECK THAT INPUT TAXANOMIC RANKS MATCH OUTPUT TAXOMONIC RANKS
+# NEED TEST ON HIGHER LEVEL FUNCTIONS TO CHECK THAT INPUT TAXANOMIC RANKS MATCH OUTPUT TAXOMONIC RANKS
 # NEED TO ALSO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
 
 @pytest.fixture(scope='module')
@@ -385,15 +384,68 @@ def test_taxa_search_errors(validators, test_input, expected_exception):
      (['worksheet name', ['E coli', {'species': ' Escherichia coli'}], None],
       (('ERROR', "Dictonary value has whitespace padding: ' Escherichia coli'"),
       )),
+     # Taxon hierachy in wrong order
+     (['worksheet name', ['E coli', {'species': 'Escherichia coli', 'genus': 'Escherichia'}], None],
+      (('ERROR', "Taxon hierachy not in correct order"),
+      )),
+     # Right order but non-backbone rank
+     (['worksheet name', ['Strepto', {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}], None],
+      (('WARNING', "Strepto not of backbone rank, instead resolved to phylum level"),
+      )),
+     # Superseeded taxon name used
+     (['worksheet name', ['C marina', {'species': 'Cytophaga marina'}], None],
+      (('WARNING', "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
+       ('WARNING', "Taxonomic classification superseeded for C marina, using new taxonomic classification")
+      )),
+     # Nonsense taxon provided
+     (['worksheet name', ['N garbage', {'species': 'Nonsense garbage'}], None],
+      (('ERROR', "Taxa N garbage cannot be found"),
+       ('ERROR', "Search based on taxon hierachy failed"),
+      )),
+     # Ambigious taxon provided
+     (['worksheet name', ['Morus', {'genus': 'Morus'}], None],
+      (('ERROR', "Taxa Morus cannot be found using only one taxonomic level, more should be provided"),
+       ('ERROR', "Search based on taxon hierachy failed"),
+      )),
+     # Ambigious taxon resolved
+     (['worksheet name', ['M Morus', {'family': 'Moraceae', 'genus': 'Morus'}], None],
+      ()),
+     # E coli with incorrect NCBI ID
+     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 333],
+      (('ERROR', "The NCBI ID supplied for E coli does not match hierarchy: expected 562 got 333"),
+      )),
+     # Non-backbone case with code
+     (['worksheet name', ['E coli strain', {'species': 'Escherichia coli', 'strain':
+       'Escherichia coli 1-110-08_S1_C1'}], 1444049],
+      (('WARNING', "E coli strain not of backbone rank, instead resolved to species level"),
+       ('WARNING', "E coli strain not of backbone rank, instead resolved to species level"),
+      )),
+     # Superseeded taxa ID and name
+     (['worksheet name', ['C marina', {'species': 'Cytophaga marina'}], 1000],
+      (('WARNING', "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
+       ('WARNING', "NCBI ID 1000 has been superseeded by ID 107401"),
+       ('WARNING', "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
+      )),
+     # Just superseeded taxa ID
+     (['worksheet name', ['T maritimum', {'species': 'Tenacibaculum maritimum'}], 1000],
+      (('WARNING', "NCBI ID 1000 has been superseeded by ID 107401"),
+       ('WARNING', "NCBI taxa ID superseeded for T maritimum, using new taxa ID"),
+      )),
+     # Just superseeded name
+     (['worksheet name', ['C marina', {'species': 'Cytophaga marina'}], 107401],
+      (('WARNING', "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
+       ('WARNING', "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
+      )),
      ])
-def test_validate_and_add_taxon(caplog, test_input, expected_log_entries, gb_instance):
+def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
+                                gb_instance, validators):
     """This test checks that the function that searches the NCBI database to find
     information on particular taxa logs the correct errors and warnings. At the
     moment this for the Remote validator, but if a local validator is defined
     this should also be checked against.
 
     """
-    fnd_tx = gb_instance.validate_and_add_taxon(test_input)
+    fnd_tx = gb_instance.validate_and_add_taxon(validators,test_input)
 
     if len(expected_log_entries) != len(caplog.records):
         pytest.fail('Incorrect number of log records emitted')
@@ -404,4 +456,26 @@ def test_validate_and_add_taxon(caplog, test_input, expected_log_entries, gb_ins
         assert log_rec.levelname == exp_rec[0]
         assert exp_rec[1] in log_rec.message
 
-# THEN SECTION TESTING THAT ERRORS ARE THROWN CORRECTLY
+# Third function that checks that validate_and_add_taxon throws the appropriate errors
+@pytest.mark.parametrize(
+    'test_input,expected_exception',
+    [(None,  # no parameters
+      TypeError),
+     ([],  # empty list
+      ValueError),
+     (['worksheet name', 252],  # too few elements
+      ValueError),
+     # Bad code
+     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], -1],
+      genb_taxa.NCBIError),
+     # Bad code
+     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 100000000000000],
+      genb_taxa.NCBIError),
+    ])
+
+def test_validate_and_add_taxon_errors(validators, gb_instance, test_input, expected_exception):
+    """This test checks validator.validate_and_add_taxon inputs throw errors as expected
+    """
+
+    with pytest.raises(expected_exception):
+        _ = gb_instance.validate_and_add_taxon(validators,test_input)
