@@ -3,6 +3,7 @@ from safedata_validator import genb_taxa
 
 # TESTS TO PUT IN:
 # NEED TEST ON HIGHER LEVEL FUNCTIONS TO CHECK THAT INPUT TAXANOMIC RANKS MATCH OUTPUT TAXOMONIC RANKS
+# NEED TO TEST THAT SKIPPING PROCESSING OF MULTIPLE TAXA IS WORKING CORRECTLY
 # NEED TO ALSO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
 
 @pytest.fixture(scope='module')
@@ -435,6 +436,19 @@ def test_taxa_search_errors(validators, test_input, expected_exception):
      (['worksheet name', ['C marina', {'species': 'Cytophaga marina'}], 107401],
       (('WARNING', "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
        ('WARNING', "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
+      )),
+     # E coli recorded as a family rather than a species
+     (['worksheet name', ['E coli', {'family': 'Escherichia coli'}], None],
+      (('ERROR', "Escherichia coli is a species not a family"),
+      )),
+     # E coli recorded as a subspecies rather than a species
+     (['worksheet name', ['E coli', {'subspecies': 'Escherichia coli'}], None],
+      (('ERROR', "Escherichia coli is a species not a subspecies"),
+      )),
+     # Same idea for a non-backbone case
+     (['worksheet name', ['Streptophytina', {'phylum': 'Streptophytina'}], None],
+      (('WARNING', "Streptophytina not of backbone rank, instead resolved to phylum level"),
+       ('ERROR', "Streptophytina is a subphylum not a phylum"),
       )),
      ])
 def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,

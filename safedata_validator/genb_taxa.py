@@ -373,17 +373,29 @@ class RemoteNCBIValidator:
                     # Use ID lookup function to find generate as a NCBITaxon object
                     mtaxon = self.id_lookup(nnme,tID)
 
+        # Find last dictonary key
+        f_key = list(mtaxon.taxa_hier.keys())[-1]
+
         # Check if taxonomic rank supplied is used
         if mtaxon.diverg == None:
-            # Find last dictonary key
-            f_key = list(taxah.keys())[-1]
+            # Check that this is also the last dictonary key that was supplied
+            if f_key != list(taxah.keys())[-1]:
+                # If not raise an error
+                LOGGER.error(f'{list(taxah.values())[-1]} is a {f_key}'
+                             f' not a {list(taxah.keys())[-1]}')
             # Then check whether orginally supplied name is still used
-            if taxah[f_key] != mtaxon.taxa_hier[f_key]:
+            elif taxah[f_key] != mtaxon.taxa_hier[f_key]:
                 # If not print a warning
                 LOGGER.warning(f'{taxah[f_key]} not accepted usage should be '
                                f'{mtaxon.taxa_hier[f_key]} instead')
                 # And record the fact that usage is superseeded
                 mtaxon.superseed = True
+        else:
+            # Check that the divergence rank matches the initially supplied rank
+            if mtaxon.diverg != list(taxah.keys())[-1]:
+                # If not raise an error
+                LOGGER.error(f'{list(taxah.values())[-1]} is a {mtaxon.diverg}'
+                             f' not a {list(taxah.keys())[-1]}')
 
         return mtaxon
 
@@ -601,6 +613,7 @@ class GenBankTaxa:
             if hr_taxon == None:
                 LOGGER.error(f'Search based on taxon hierachy failed')
                 return
+
             # Then check if a genbank ID number has been provided
             if genbank_id != None:
                 id_taxon = validator.id_lookup(taxon_info[0], int(genbank_id))
@@ -628,7 +641,6 @@ class GenBankTaxa:
             self.ncbi_t[tuple(ncbi_info)] = hr_taxon
 
         print(self.ncbi_t)
-        return
         # IMPORTANT QUESTION, WHAT DO I ACTUALLY NEED TO SAVE, AND WHAT CAN JUST BE KEPT FOR THE REST OF THIS FUNCTION
         # genbank_ID SHOULD BE SAVED LONG TERM
         # As should the lowest NCBI taxonomic level
@@ -691,6 +703,10 @@ v1 = GenBankTaxa()
 v2 = RemoteNCBIValidator()
 # Should work fine
 d1 = ['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 562]
+d2 = ['worksheet name', ['E coli', {'family': 'Escherichia coli'}], None]
+d3 = ['worksheet name', ['E coli', {'subspecies': 'Escherichia coli'}], None]
+d4 = ['worksheet name', ['Streptophytina', {'phylum': 'Streptophytina'}], None]
 
-test = v1.validate_and_add_taxon(v2,d1)
+
+test = v1.validate_and_add_taxon(v2,d2)
 print(test)
