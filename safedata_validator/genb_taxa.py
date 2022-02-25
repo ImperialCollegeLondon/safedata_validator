@@ -7,6 +7,8 @@ form. It is initialised with user data and then the taxon Validator class can
 be used to update a NCBITaxon object with the result of NCBI validation. At present
 only online validation is possible through the `RemoteNCBIValidator` class.
 
+FURTHER DETAILS OF STUFF DEFINED.
+
 THIS IS STILL VERY MUCH A WORK IN PROGRESS SO MORE INFORMATION IS GOING TO BE
 ENTERED HERE
 """
@@ -30,24 +32,6 @@ Entrez.email = "jc2017@ic.ac.uk"
 # WILL NEED THOUGHT ABOUT THE MAPPING
 BACKBONE_RANKS_EX = ['superkingdom', 'kingdom', 'phylum', 'class', 'order',
                     'family', 'genus', 'species', 'subspecies']
-
-"""
-This module describes classes and methods used to both assess the validity of
-GenBank taxonic data, and to check that the taxonomic data is consistent with
-that stored in GBIF. When a conflict arises the user will be informed and asked
-to reduce the level of taxonomic detail they provide to the point where GenBank
-and GBIF are in agreement.
-
-The NCBITaxon dataclass is used to store data about a taxon entry in a dataset. It
-is initialised with user data and then the RemoteNCBIValidator class can be used
-to update a Taxon object with the result of NCBI (GenBank) validation. Further
-information (e.g. synonymus names) is also extract from the remote database, in
-order to help with the next validation step.
-
-FURTHER DETAILS OF STUFF DEFINED.
-
-MORE SPIEL (ANYTHING THAT ITS IMPORTANT THAT THE END USER NOTES).
-"""
 
 class NCBIError(Exception):
     """Exception class for remote NCBI errors
@@ -457,7 +441,7 @@ class GenBankTaxa:
 
         self.taxon_index = []
         self.taxon_names = set()
-        self.parents = dict()
+        self.ncbi_t = dict()
         self.hierarchy = set()
         self.n_errors = None
         self.taxon_names_used = set()
@@ -591,8 +575,7 @@ class GenBankTaxa:
             return
 
         # Now check that dictonary containing taxa hierachy is properly ordered
-        # Only matters if it contains multiple entries
-        if len(taxon_info[1]) > 1:
+        if len(taxon_info[1]) > 1: # Only matters if it contains multiple entries
             # Find all keys in taxa hierachy
             t_ord = list(taxon_info[1].keys())
             # Find corresponding keys from backbone
@@ -604,18 +587,15 @@ class GenBankTaxa:
                 LOGGER.error(f'Taxon hierachy not in correct order')
 
         # Now that inputs are sanitised, continue with checking...
-        # First check if pair has already been processed
-        # DELETE THESE COMMENTS WHEN DONE!!!
-        # Only want to use previous result if taxa_hierarchy genbank_id PAIR has been used before
-        # Otherwise one needs to be validated against the other
-        # This would naturally include cases where no id is provided
-        if True == False: # PLACEHOLDER
-            # PUTTING IN A PLACEHOLDER HERE FOR NOW AS I NEED TO DECIDE HOW TO DO THIS LATER
-            print("PLACEHOLDER")
-            # elif tuple(parent_info) in self.parents:
-            #     p_taxon = self.parents[tuple(parent_info)]
+        # First gather the info needed to index the entry
+        ncbi_info = [list(taxon_info[1].values())[-1], list(taxon_info[1].keys())[-1],
+                     genbank_id]
+
+        # Check if pair has already been processed
+        if tuple(ncbi_info) in self.ncbi_t:
+            hr_taxon = self.ncbi_t[tuple(ncbi_info)]
         else:
-            # In this case go straight ahead and search for the taxon
+            # If not go straight ahead and search for the taxon
             hr_taxon = validator.taxa_search(taxon_info[0], taxon_info[1])
             # Catch case where errors are returned rather than a taxon
             if hr_taxon == None:
@@ -644,12 +624,26 @@ class GenBankTaxa:
                     LOGGER.warning(f'Taxonomic classification superseeded for '
                     f'{taxon_info[0]}, using new taxonomic classification')
 
+            # Store the NCBI taxon keyed by NCBI information (needs tuple)
+            self.ncbi_t[tuple(ncbi_info)] = hr_taxon
 
-        # ALWAYS USE hr_taxon AS TRUE REPRESENTATION OF THE TAXON
+        print(self.ncbi_t)
+        return
+        # IMPORTANT QUESTION, WHAT DO I ACTUALLY NEED TO SAVE, AND WHAT CAN JUST BE KEPT FOR THE REST OF THIS FUNCTION
+        # genbank_ID SHOULD BE SAVED LONG TERM
+        # As should the lowest NCBI taxonomic level
+        # And the nickname
+        # Okay so record the nickname, genbank_Id, the lowest level taxa (which we are using to search)
+        # Then record the divergence to account for difference between taxa and genbank ID
+
+        # EVERYTHING SEEMS TO GET STORED IN taxon_index
+        # Oh right is this a way of storing data for the long term?
+        # Mainly so that repeated processing steps can be skipped?
+        # So this is a keying step => Need to include all identifying information
+        # And then the entire taxon object is saved
+        # Makes sense to save two sets of indices and taxon objects imo
 
         # else:
-        #     # Create a taxon object
-        #     p_taxon = Taxon(name=parent_info[0], rank=parent_info[1], gbif_id=parent_info[2])
         #
         #     # Look for a match
         #     if p_taxon.is_backbone:
@@ -697,14 +691,6 @@ v1 = GenBankTaxa()
 v2 = RemoteNCBIValidator()
 # Should work fine
 d1 = ['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 562]
-# With superseeded code and hierachy
-d2 = ['worksheet name', ['C marina', {'species': 'Cytophaga marina'}], 1000]
-# Just superseeded code
-d3 = ['worksheet name', ['T maritimum', {'species': 'Tenacibaculum maritimum'}], 1000]
-# Just superseeded hierachy
-d4 = ['worksheet name', ['C marina', {'species': 'Cytophaga marina'}], 107401]
-# No ID Case
-d5 = ['worksheet name', ['C marina', {'genus': 'Cytophaga', 'species': 'Cytophaga marina'}], None]
 
-test = v1.validate_and_add_taxon(v2,d4)
+test = v1.validate_and_add_taxon(v2,d1)
 print(test)
