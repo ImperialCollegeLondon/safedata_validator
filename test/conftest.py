@@ -12,19 +12,18 @@ from safedata_validator.field import Dataset
 from safedata_validator.resources import Resources
 from safedata_validator.field import DataWorksheet
 
-"""
-This file contains fixtures that will be available to all test suites.
-"""
 
-FIXTURE_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
-
-@pytest.fixture()
 def fixture_files():
     """Whenever testing is run, this conftest file is loaded and the path of the
-    file can be used to provide a benchmark for the location of all other
-    testing and fixture files on a given test system. This helps make sure that
-    absolute paths are maintained so that testing is not sensitive to the
-    directory where tests are run.
+    file can be used to provide paths to the location of all other testing and
+    fixture files on a given test system. This helps make sure that absolute
+    paths are maintained so that testing is not sensitive to the directory where
+    tests are run.
+
+    The Dotmap contains real files (.rf) that will be copied into the fake
+    filesystem, along with key paths to virtual files (.vf) created within the
+    same system. A missing file (.mf) is also provided to test responses to
+    missing files.
     """
     
     fixture_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
@@ -48,11 +47,25 @@ def fixture_files():
                      'fix_cfg_local': os.path.join(fixture_dir, 'safedata_validator_local.cfg'),
                      'fix_cfg_remote': os.path.join(fixture_dir, 'safedata_validator_remote.cfg')}
 
-    return DotMap(dict(rf = real_files, vf=virtual_files))
+    return DotMap(dict(rf = real_files, vf=virtual_files, 
+                       mf = os.path.join(fixture_dir, 'thisfiledoesnotexist')))
 
+
+FIXTURE_FILES = fixture_files()
+"""DotMap: This global variable contains a dotmap of the paths of various
+key testing files. This could be a fixture, but these paths are used with
+parameterisation as well as within tests, and using fixture values in
+parameterisation is clumsy and complex.
+"""
+
+
+
+"""
+The other contents are fixtures that will be available to all test suites.
+"""
 
 @pytest.fixture()
-def config_filesystem(fs, fixture_files):
+def config_filesystem(fs):
     """Create a config and resources setup for testing
 
     Testing requires access to the configuration files for the package resources
@@ -72,7 +85,7 @@ def config_filesystem(fs, fixture_files):
     """
 
     # Point to real locations of test fixture example resources
-    for _, val in  fixture_files.rf.items():
+    for _, val in  FIXTURE_FILES.rf.items():
         fs.add_real_file(val)
 
     # The config files _cannot_ be real files because they need to
@@ -97,17 +110,17 @@ def config_filesystem(fs, fixture_files):
                        'zenodo_token = xyz']
 
     # Remote config (no gbif database) in the fixture directory
-    config_contents[0] += fixture_files.rf.loc_file
-    fs.create_file(fixture_files.vf.fix_cfg_remote, 
+    config_contents[0] += FIXTURE_FILES.rf.loc_file
+    fs.create_file(FIXTURE_FILES.vf.fix_cfg_remote, 
                    contents='\n'.join(config_contents))
 
     # Local config (local GBIF database) in the fixture directory
-    config_contents[1] += fixture_files.rf.gbif_file
-    fs.create_file(fixture_files.vf.fix_cfg_local, 
+    config_contents[1] += FIXTURE_FILES.rf.gbif_file
+    fs.create_file(FIXTURE_FILES.vf.fix_cfg_local, 
                    contents='\n'.join(config_contents))
 
     # Local user config
-    fs.create_file(fixture_files.vf.user_config, contents='\n'.join(config_contents))
+    fs.create_file(FIXTURE_FILES.vf.user_config, contents='\n'.join(config_contents))
 
     yield fs
 
@@ -136,25 +149,25 @@ def config_filesystem(fs, fixture_files):
 ## ------------------------------------------
 
 @pytest.fixture()
-def resources_with_local_gbif(config_filesystem, fixture_files):
+def resources_with_local_gbif(config_filesystem):
     """ Creates a Resource object configured to use a local GBIF database
 
     Returns:
         A safedata_validator.resources.Resources instance
     """
     
-    return Resources(config=fixture_files.vf.fix_cfg_local)
+    return Resources(config=FIXTURE_FILES.vf.fix_cfg_local)
 
 
 @pytest.fixture()
-def resources_with_remote_gbif(config_filesystem, fixture_files):
+def resources_with_remote_gbif(config_filesystem):
     """ Creates a Resource object configured to use the remote GBIF API
 
     Returns:
         A safedata_validator.resources.Resources instance
     """
 
-    return Resources(config=fixture_files.vf.fix_cfg_remote)
+    return Resources(config=FIXTURE_FILES.vf.fix_cfg_remote)
 
 
 @pytest.fixture(params=['remote', 'local'])
@@ -175,7 +188,7 @@ def resources_local_and_remote(request, resources_with_local_gbif, resources_wit
 
 
 @pytest.fixture()
-def example_excel_files(config_filesystem, fixture_files, request):
+def example_excel_files(config_filesystem, request):
     """This uses indirect parameterisation, to allow the shared fixture
     to be paired with request specific expectations rather than all pair
     combinations:
@@ -183,10 +196,10 @@ def example_excel_files(config_filesystem, fixture_files, request):
     https://stackoverflow.com/questions/70379640
     """
     if request.param == 'good':
-        wb = openpyxl.load_workbook(fixture_files.rf.good_excel_file, read_only=True)
+        wb = openpyxl.load_workbook(FIXTURE_FILES.rf.good_excel_file, read_only=True)
         return wb
     elif request.param == 'bad':
-        wb = openpyxl.load_workbook(fixture_files.rf.bad_excel_file, read_only=True)
+        wb = openpyxl.load_workbook(FIXTURE_FILES.rf.bad_excel_file, read_only=True)
         return wb
 
 
