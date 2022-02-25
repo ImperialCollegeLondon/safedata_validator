@@ -1,11 +1,12 @@
 import os
 from collections import OrderedDict
 
-import simplejson
+import appdirs
 import openpyxl
 import pytest
+from dotmap import DotMap
 
-from safedata_validator.taxa import Taxa
+from safedata_validator.taxa import Taxa, RemoteGBIFValidator, LocalGBIFValidator
 from safedata_validator.locations import Locations
 from safedata_validator.field import Dataset
 from safedata_validator.resources import Resources
@@ -17,11 +18,41 @@ This file contains fixtures that will be available to all test suites.
 
 FIXTURE_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
 
-bad_file_path = os.path.join(FIXTURE_DIR, 'Test_format_bad.xlsx')
-good_file_path = os.path.join(FIXTURE_DIR, 'Test_format_good.xlsx')
+@pytest.fixture()
+def fixture_files():
+    """Whenever testing is run, this conftest file is loaded and the path of the
+    file can be used to provide a benchmark for the location of all other
+    testing and fixture files on a given test system. This helps make sure that
+    absolute paths are maintained so that testing is not sensitive to the
+    directory where tests are run.
+    """
+    
+    fixture_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
+
+    real_files = [('loc_file', 'locations.json'),
+                  ('gbif_file', 'gbif_backbone_truncated.sqlite'),
+                  ('sqlite_not_gbif', 'database_file_not_gbif.sqlite'),
+                  ('json_not_locations', 'notalocationsjson.json'),
+                  ('bad_excel_file', 'Test_format_bad.xlsx'),
+                  ('good_excel_file', 'Test_format_good.xlsx')]
+
+    real_files = {ky: os.path.join(fixture_dir, vl) 
+                  for ky, vl in real_files}
+
+    virtual_files = {'user_config': os.path.join(appdirs.user_config_dir(),
+                                                 'safedata_validator',
+                                                 'safedata_validator.cfg'),
+                     'site_config': os.path.join(appdirs.site_config_dir(),
+                                                 'safedata_validator',
+                                                 'safedata_validator.cfg'),
+                     'fix_cfg_local': os.path.join(fixture_dir, 'safedata_validator_local.cfg'),
+                     'fix_cfg_remote': os.path.join(fixture_dir, 'safedata_validator_remote.cfg')}
+
+    return DotMap(dict(rf = real_files, vf=virtual_files))
+
 
 @pytest.fixture()
-def config_filesystem(fs):
+def config_filesystem(fs, fixture_files):
     """Create a config and resources setup for testing
 
     Testing requires access to the configuration files for the package resources
@@ -40,83 +71,93 @@ def config_filesystem(fs):
         actual fixture files in their correct location.
     """
 
-
-    # Get paths to existing resource files
-    loc_file = os.path.join(FIXTURE_DIR, 'locations.json')
-    gbif_file = os.path.join(FIXTURE_DIR, 'gbif_backbone_truncated.sqlite')
-
-    # Create some config files with correct paths - this doesn't feel right - could
-    # be faking them but I can't work out how to do this correctly in fixtures
-
-    local_config = os.path.join(FIXTURE_DIR, 'safedata_validator_local.json')
-    remote_config = os.path.join(FIXTURE_DIR, 'safedata_validator_remote.json')
-
     # Point to real locations of test fixture example resources
-    fs.add_real_file(loc_file)
-    fs.add_real_file(gbif_file)
+    for _, val in  fixture_files.rf.items():
+        fs.add_real_file(val)
 
-    # The config safedata_validator.json _cannot_ be a real fixture file
-    # because it contains the test machine specific paths to the resources,
-    # so fake it and store it in the fake fixture directory
-    cfg_contents = {'locations': loc_file, 'gbif_database': gbif_file}
-    cfg_contents = simplejson.dumps(cfg_contents)
+    # The config files _cannot_ be real files because they need to
+    # contain absolute paths to the resources available on the specific
+    # test machine, and so need to be created with those paths
 
-    fs.create_file(local_config, contents=cfg_contents)
+    config_contents = ['locations = ',
+                       'gbif_database = ',
+                       '[extents]',
+                       'temporal_soft_extent = 2002-02-01, 2030-02-01',
+                       'temporal_hard_extent = 2002-02-01, 2030-02-01',
+                       'latitudinal_hard_extent = -90, 90',
+                       'latitudinal_soft_extent = -4, 2',
+                       'longitudinal_hard_extent = -180, 180',
+                       'longitudinal_soft_extent = 110, 120',
+                       '[zenodo]',
+                       'community_name = safe',
+                       'use_sandbox = True',
+                       'zenodo_sandbox_api = https://sandbox.zenodo.org',
+                       'zenodo_sandbox_token = xyz',
+                       'zenodo_api = https://api.zenodo.org',
+                       'zenodo_token = xyz']
 
-    cfg_contents = {'locations': loc_file, 'gbif_database': None}
-    cfg_contents = simplejson.dumps(cfg_contents)
+    # Remote config (no gbif database) in the fixture directory
+    config_contents[0] += fixture_files.rf.loc_file
+    fs.create_file(fixture_files.vf.fix_cfg_remote, 
+                   contents='\n'.join(config_contents))
 
-    fs.create_file(remote_config, contents=cfg_contents)
+    # Local config (local GBIF database) in the fixture directory
+    config_contents[1] += fixture_files.rf.gbif_file
+    fs.create_file(fixture_files.vf.fix_cfg_local, 
+                   contents='\n'.join(config_contents))
+
+    # Local user config
+    fs.create_file(fixture_files.vf.user_config, contents='\n'.join(config_contents))
 
     yield fs
 
 
-# ------------------------------------------
-# Fixtures: a parameterized fixture containing examples of both local and
-#     remote GBIF validators.
+# @pytest.fixture()
+# def user_config_file(config_filesystem, fixture_dir):
+#     """Attempt to extend the fake fs - does not seem to work"""
+#     # Local user config as a duplicate of the existing config in the fixture
+#     # directory
+#     local_user_config = os.path.join(appdirs.user_config_dir(),
+#                                      'safedata_validator',
+#                                      'safedata_validator.cfg')
+#
+#     local_config = os.path.join(fixture_dir, 'safedata_validator_local.cfg')
+#
+#     with open(local_config) as infile:
+#         config_filesystem.create_file(local_user_config, contents=infile.readlines())
+#
+#     yield config_filesystem
+
+
+## ------------------------------------------
+# Resources: fixtures containing instances of both local and remote GBIF
+#            validators and a parameterised fixture providing both for
+#            duplicating tests on both systems.
 ## ------------------------------------------
 
 @pytest.fixture()
-def resources_with_local_gbif_virtual(config_filesystem):
-    """ Creates a Resource object configured to use a local GBIF database
-
-    Returns:
-        A safedata_validator.resources.Resources instance
-    """
-
-    # Get paths to existing resource files
-    local_config = os.path.join(FIXTURE_DIR, 'fixtures', 
-                               'safedata_validator_local.json')
-
-    return Resources(cfg_file=local_config)
-
-
-
-@pytest.fixture(scope='module')
-def resources_with_local_gbif():
+def resources_with_local_gbif(config_filesystem, fixture_files):
     """ Creates a Resource object configured to use a local GBIF database
 
     Returns:
         A safedata_validator.resources.Resources instance
     """
     
-    local_config = os.path.join(FIXTURE_DIR, 'safedata_validator_local.json')
-    return Resources(cfg_file=local_config)
+    return Resources(config=fixture_files.vf.fix_cfg_local)
 
 
-@pytest.fixture(scope='module')
-def resources_with_remote_gbif():
+@pytest.fixture()
+def resources_with_remote_gbif(config_filesystem, fixture_files):
     """ Creates a Resource object configured to use the remote GBIF API
 
     Returns:
         A safedata_validator.resources.Resources instance
     """
 
-    remote_config = os.path.join(FIXTURE_DIR, 'safedata_validator_remote.json')
-    return Resources(cfg_file=remote_config)
+    return Resources(config=fixture_files.vf.fix_cfg_remote)
 
 
-@pytest.fixture(scope='module', params=['remote', 'local'])
+@pytest.fixture(params=['remote', 'local'])
 def resources_local_and_remote(request, resources_with_local_gbif, resources_with_remote_gbif):
     """Parameterised fixture to run tests using both the local and remote GBIF.
     """
@@ -126,9 +167,15 @@ def resources_local_and_remote(request, resources_with_local_gbif, resources_wit
     elif request.param == 'local':
         return resources_with_local_gbif
 
+## ------------------------------------------
+# Other fixtures
+#            validators and a parameterised fixture providing both for
+#            duplicating tests on both systems.
+## ------------------------------------------
 
-@pytest.fixture(scope='module')
-def example_excel_files(request):
+
+@pytest.fixture()
+def example_excel_files(config_filesystem, fixture_files, request):
     """This uses indirect parameterisation, to allow the shared fixture
     to be paired with request specific expectations rather than all pair
     combinations:
@@ -136,19 +183,29 @@ def example_excel_files(request):
     https://stackoverflow.com/questions/70379640
     """
     if request.param == 'good':
-        path = os.path.join(FIXTURE_DIR, 'Test_format_good.xlsx')
-        wb = openpyxl.load_workbook(path, read_only=True)
+        wb = openpyxl.load_workbook(fixture_files.rf.good_excel_file, read_only=True)
         return wb
     elif request.param == 'bad':
-        path = os.path.join(FIXTURE_DIR, 'Test_format_bad.xlsx')
-        wb = openpyxl.load_workbook(path, read_only=True)
+        wb = openpyxl.load_workbook(fixture_files.rf.bad_excel_file, read_only=True)
         return wb
+
+
+
+@pytest.fixture(params=['remote', 'local'])
+def fixture_taxon_validators(resources_with_local_gbif, request):
+    """Parameterised fixture to return local and remote taxon validators
+    """
+    if request.param == 'remote':
+        return RemoteGBIFValidator()
+
+    elif request.param == 'local':
+        return LocalGBIFValidator(resources_with_local_gbif)
 
 
 # Fixtures to provide Taxon, Locations, Dataset, Dataworksheet 
 # and field meta objects for testing
 
-@pytest.fixture(scope='module')
+@pytest.fixture()
 def fixture_taxa(resources_with_local_gbif):
     """Fixture to provide a taxon object with a couple of names. These examples
     need to be in the cutdown local GBIF testing database in fixtures.
