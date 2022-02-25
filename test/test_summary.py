@@ -269,22 +269,22 @@ def test_permits(caplog, fixture_summary, alterations, should_log_error, expecte
 
 
 @pytest.mark.parametrize('alterations,should_log_error,expected_log,do_val_doi', [
-    # (dict(),  # no amendments,
-    #  False,
-    #  'Metadata for DOI found',
-    #  False),
-    # ({'publication doi': (None,)},
-    #  False,  # Optional block
-    #  '',
-    #  False),
-    # ({'publication doi': ('   ',)},
-    #  True,
-    #  'Whitespace only cells in field publication doi',
-    #  False),  # via _read_block
-    # ({'publication doi': (123456789,)},
-    #  True,
-    #  'Field publication doi contains values of wrong type',
-    #  False),  # via _read_block
+    (dict(),  # no amendments,
+     False,
+     'Metadata for DOI found',
+     False),
+    ({'publication doi': (None,)},
+     False,  # Optional block
+     '',
+     False),
+    ({'publication doi': ('   ',)},
+     True,
+     'Whitespace only cells in field publication doi',
+     False),  # via _read_block
+    ({'publication doi': (123456789,)},
+     True,
+     'Field publication doi contains values of wrong type',
+     False),  # via _read_block
     ({'publication doi': ('thisisnotaURL',)},
      True,
      'Publication DOIs not all in format',

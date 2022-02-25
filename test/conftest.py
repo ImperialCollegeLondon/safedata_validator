@@ -59,17 +59,18 @@ parameterisation is clumsy and complex.
 """
 
 
-
 """
 The other contents are fixtures that will be available to all test suites.
+
+
 """
 
 @pytest.fixture()
 def config_filesystem(fs):
-    """Create a config and resources setup for testing
+    """Create a config and resources file system for testing
 
     Testing requires access to the configuration files for the package resources
-    and these are not going to be set up in default locations for testing. This
+    and the paths to these files are going to differ across test system. This
     fixture uses the pyfakefs plugin for pytest to create a fake file system
     containing config files and versions of the resources, cut down to save
     filespace.
@@ -80,8 +81,9 @@ def config_filesystem(fs):
         fs: The pyfakefs plugin object
 
     Returns:
-        A fake filesystem containing a config file in the root, pointing to the
-        actual fixture files in their correct location.
+        A fake filesystem containing copies of key actual fixture files in their
+        correct location, along with virtual config files containing the correct
+        paths to those fixtures files.
     """
 
     # Point to real locations of test fixture example resources
@@ -182,8 +184,6 @@ def resources_local_and_remote(request, resources_with_local_gbif, resources_wit
 
 ## ------------------------------------------
 # Other fixtures
-#            validators and a parameterised fixture providing both for
-#            duplicating tests on both systems.
 ## ------------------------------------------
 
 
@@ -240,7 +240,7 @@ def fixture_taxa(resources_with_local_gbif):
     return taxa
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture()
 def fixture_locations(resources_with_local_gbif):
     """Fixture to provide a taxon object with a couple of names. These examples
     need to be in the cutdown local GBIF testing database in fixtures.
@@ -253,6 +253,7 @@ def fixture_locations(resources_with_local_gbif):
     locations.add_known_locations(test_locs)
     
     return locations
+
 
 @pytest.fixture()
 def fixture_dataset(resources_with_local_gbif):
