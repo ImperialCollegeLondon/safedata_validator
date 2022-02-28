@@ -2,7 +2,6 @@ import pytest
 from safedata_validator import genb_taxa
 
 # TESTS TO PUT IN:
-# NEED TEST ON HIGHER LEVEL FUNCTIONS TO CHECK THAT INPUT TAXANOMIC RANKS MATCH OUTPUT TAXOMONIC RANKS
 # NEED TO TEST THAT SKIPPING PROCESSING OF MULTIPLE TAXA IS WORKING CORRECTLY
 # NEED TO ALSO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
 
@@ -123,13 +122,13 @@ def test_validate_id_lookup(caplog, test_input, expected_log_entries, validators
     [(None,  # no parameters
       TypeError),
      (dict(nnme='E coli', genbank_id='invalid_string'),  # a string
-      genb_taxa.NCBIError),
+      ValueError),
      (dict(nnme='E coli', genbank_id=27.5),  # non-integer ID
-      genb_taxa.NCBIError),
+      ValueError),
      (dict(nnme=27, genbank_id=27),  # named using a number
       TypeError),
      (dict(nnme='E coli', genbank_id=-1),  # bad ID
-      genb_taxa.NCBIError),
+      ValueError),
      (dict(nnme='E coli', genbank_id=100000000000000),  # bad ID
       genb_taxa.NCBIError)])
 def test_id_lookup_errors(validators, test_input, expected_exception):
@@ -276,179 +275,165 @@ def test_taxa_search_errors(validators, test_input, expected_exception):
 @pytest.mark.parametrize(
     'test_input,expected_log_entries',
     # Fine so empty
-    [(['worksheet name', ['E coli', {'genus': 'Escherichia', 'species': 'Escherichia coli'}], None],
-      ()),
+    [(['E coli', {'species': 'Escherichia coli'}, None],
+      (('INFO', "Taxon (E coli) found in NCBI database"),
+      )),
      # Same but with valid code provided
-     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 562],
-      ()),
+     (['E coli', {'species': 'Escherichia coli'}, 562],
+      (('INFO', "Taxon (E coli) found in NCBI database"),
+      )),
      # whitespace padding error
-     (['worksheet name ', ['E coli', {'species': 'Escherichia coli'}], None],
-      (('ERROR', "Worksheet name has whitespace padding: 'worksheet name '"),
+     ([' E coli', {'species': 'Escherichia coli'}, None],
+      (('ERROR', "Worksheet name has whitespace padding: ' E coli'"),
+       ('INFO', "Taxon (E coli) found in NCBI database"),
       )),
-     # No name error
-     ([' ', ['E coli', {'species': 'Escherichia coli'}], None],
+     # String of just whitespace provided as name
+     ([' ', {'species': 'Escherichia coli'}, None],
       (('ERROR', "Worksheet name missing, whitespace only or not text"),
       )),
      # No name error
-     ([None, ['E coli', {'species': 'Escherichia coli'}], None],
+     ([None, {'species': 'Escherichia coli'}, None],
       (('ERROR', "Worksheet name missing, whitespace only or not text"),
       )),
-     # No name error
-     (['', ['E coli', {'species': 'Escherichia coli'}], None],
+     # Blank string provided as name
+     (['', {'species': 'Escherichia coli'}, None],
       (('ERROR', "Worksheet name missing, whitespace only or not text"),
       )),
      # Floats that can be cocnverted to integers are allowed
-     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 562.0],
-      ()),
+     (['E coli', {'species': 'Escherichia coli'}, 562.0],
+      (('INFO', "Taxon (E coli) found in NCBI database"),
+      )),
      # A true float results in multiple errors
-     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 562.5],
+     (['E coli', {'species': 'Escherichia coli'}, 562.5],
       (('ERROR', "NCBI ID contains value that is not an integer"),
        ('ERROR', "Improper NCBI ID provided, cannot be validated"),
       )),
      # As does a string
-     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], "ID"],
+     (['E coli', {'species': 'Escherichia coli'}, "ID"],
       (('ERROR', "NCBI ID contains value that is not an integer"),
        ('ERROR', "Improper NCBI ID provided, cannot be validated"),
-      )),
-     # Too little information
-     (['worksheet name', [{'species': 'Escherichia coli'}], None],
-      (('ERROR', "Two objects should be provided as taxon info"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
       )),
      # This checks that multiple errors can fire at once
-     (['worksheet name', [{'species': 'Escherichia coli'}], 562.5],
+     (['E coli', {}, 562.5],
       (('ERROR', "NCBI ID contains value that is not an integer"),
-       ('ERROR', "Two objects should be provided as taxon info"),
+       ('ERROR', "Taxa hierarchy should be a (not empty) dictonary"),
        ('ERROR', "Improper NCBI ID provided, cannot be validated"),
        ('ERROR', "Taxon details not properly formatted, cannot validate"),
       )),
-     # Non-string name provided
-     (['worksheet name', [None, {'species': 'Escherichia coli'}], None],
-      (('ERROR', "Taxon name should be a string"),
+     # Taxa hierarchy provided as a string
+     (['E coli', 'Escherichia coli', None],
+      (('ERROR', "Taxa hierarchy should be a (not empty) dictonary"),
        ('ERROR', "Taxon details not properly formatted, cannot validate"),
       )),
-     # Blank string provided as name
-     (['worksheet name', ["", {'species': 'Escherichia coli'}], None],
-      (('ERROR', "Taxon name should not be blank or just whitespace"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
-      )),
-     # String of just whitespace provided as name
-     (['worksheet name', ["    ", {'species': 'Escherichia coli'}], None],
-      (('ERROR', "Taxon name should not be blank or just whitespace"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
-      )),
-     # String of just whitespace provided as name
-     (['worksheet name', [' E coli', {'species': 'Escherichia coli'}], None],
-      (('ERROR', "Taxon name has whitespace padding: ' E coli'"),
-      )),
-     # Taxa hierachy provided as a string
-     (['worksheet name', ['E coli', 'Escherichia coli'], None],
-      (('ERROR', "Taxa hierachy should be a (not empty) dictonary"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
-      )),
-     # Taxa hierachy dictonary empty
-     (['worksheet name', ['E coli', {}], None],
-      (('ERROR', "Taxa hierachy should be a (not empty) dictonary"),
+     # Taxa hierarchy dictonary empty
+     (['E coli', {}, None],
+      (('ERROR', "Taxa hierarchy should be a (not empty) dictonary"),
        ('ERROR', "Taxon details not properly formatted, cannot validate"),
       )),
      # Example of multiple errors
-     (['worksheet name', [' E coli', {}], None],
-      (('ERROR', "Taxon name has whitespace padding: ' E coli'"),
-       ('ERROR', "Taxa hierachy should be a (not empty) dictonary"),
+     ([' E coli', {}, None],
+      (('ERROR', "Worksheet name has whitespace padding: ' E coli'"),
+       ('ERROR', "Taxa hierarchy should be a (not empty) dictonary"),
        ('ERROR', "Taxon details not properly formatted, cannot validate"),
       )),
      # Missing dictonary key
-     (['worksheet name', ['E coli', {' ': 'Escherichia coli'}], None],
+     (['E coli', {' ': 'Escherichia coli'}, None],
       (('ERROR', "Empty dictonary key used"),
        ('ERROR', "Taxon details not properly formatted, cannot validate"),
       )),
      # Non-string dictonary key
-     (['worksheet name', ['E coli', {26: 'Escherichia coli'}], None],
+     (['E coli', {26: 'Escherichia coli'}, None],
       (('ERROR', "Non-string dictonary key used: 26"),
        ('ERROR', "Taxon details not properly formatted, cannot validate"),
       )),
      # Padded dictonary key
-     (['worksheet name', ['E coli', {' species': 'Escherichia coli'}], None],
+     (['E coli', {' species': 'Escherichia coli'}, None],
       (('ERROR', "Dictonary key has whitespace padding: ' species'"),
+       ('INFO', "Taxon (E coli) found in NCBI database"),
       )),
      # Missing dictonary value
-     (['worksheet name', ['E coli', {'species': ''}], None],
+     (['E coli', {'species': ''}, None],
       (('ERROR', "Empty dictonary value used"),
        ('ERROR', "Taxon details not properly formatted, cannot validate"),
       )),
      # Non-string dictonary value
-     (['worksheet name', ['E coli', {'species': 26}], None],
+     (['E coli', {'species': 26}, None],
       (('ERROR', "Non-string dictonary value used: 26"),
        ('ERROR', "Taxon details not properly formatted, cannot validate"),
       )),
      # Padding on dictonary value
-     (['worksheet name', ['E coli', {'species': ' Escherichia coli'}], None],
+     (['E coli', {'species': ' Escherichia coli'}, None],
       (('ERROR', "Dictonary value has whitespace padding: ' Escherichia coli'"),
+       ('INFO', "Taxon (E coli) found in NCBI database"),
       )),
-     # Taxon hierachy in wrong order
-     (['worksheet name', ['E coli', {'species': 'Escherichia coli', 'genus': 'Escherichia'}], None],
-      (('ERROR', "Taxon hierachy not in correct order"),
+     # Taxon hierarchy in wrong order
+     (['E coli', {'species': 'Escherichia coli', 'genus': 'Escherichia'}, None],
+      (('ERROR', "Taxon hierarchy not in correct order"),
       )),
      # Right order but non-backbone rank
-     (['worksheet name', ['Strepto', {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}], None],
+     (['Strepto', {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}, None],
       (('WARNING', "Strepto not of backbone rank, instead resolved to phylum level"),
       )),
      # Superseeded taxon name used
-     (['worksheet name', ['C marina', {'species': 'Cytophaga marina'}], None],
+     (['C marina', {'species': 'Cytophaga marina'}, None],
       (('WARNING', "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
        ('WARNING', "Taxonomic classification superseeded for C marina, using new taxonomic classification")
       )),
      # Nonsense taxon provided
-     (['worksheet name', ['N garbage', {'species': 'Nonsense garbage'}], None],
+     (['N garbage', {'species': 'Nonsense garbage'}, None],
       (('ERROR', "Taxa N garbage cannot be found"),
-       ('ERROR', "Search based on taxon hierachy failed"),
+       ('ERROR', "Search based on taxon hierarchy failed"),
       )),
      # Ambigious taxon provided
-     (['worksheet name', ['Morus', {'genus': 'Morus'}], None],
+     (['Morus', {'genus': 'Morus'}, None],
       (('ERROR', "Taxa Morus cannot be found using only one taxonomic level, more should be provided"),
-       ('ERROR', "Search based on taxon hierachy failed"),
+       ('ERROR', "Search based on taxon hierarchy failed"),
       )),
      # Ambigious taxon resolved
-     (['worksheet name', ['M Morus', {'family': 'Moraceae', 'genus': 'Morus'}], None],
-      ()),
+     (['M Morus', {'family': 'Moraceae', 'genus': 'Morus'}, None],
+      (('INFO', "Taxon (M Morus) found in NCBI database"),
+      )),
      # E coli with incorrect NCBI ID
-     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 333],
+     (['E coli', {'species': 'Escherichia coli'}, 333],
       (('ERROR', "The NCBI ID supplied for E coli does not match hierarchy: expected 562 got 333"),
       )),
      # Non-backbone case with code
-     (['worksheet name', ['E coli strain', {'species': 'Escherichia coli', 'strain':
-       'Escherichia coli 1-110-08_S1_C1'}], 1444049],
+     (['E coli strain', {'species': 'Escherichia coli', 'strain': 'Escherichia coli 1-110-08_S1_C1'},
+       1444049],
       (('WARNING', "E coli strain not of backbone rank, instead resolved to species level"),
        ('WARNING', "E coli strain not of backbone rank, instead resolved to species level"),
       )),
      # Superseeded taxa ID and name
-     (['worksheet name', ['C marina', {'species': 'Cytophaga marina'}], 1000],
+     (['C marina', {'species': 'Cytophaga marina'}, 1000],
       (('WARNING', "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
        ('WARNING', "NCBI ID 1000 has been superseeded by ID 107401"),
        ('WARNING', "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
       )),
      # Just superseeded taxa ID
-     (['worksheet name', ['T maritimum', {'species': 'Tenacibaculum maritimum'}], 1000],
+     (['T maritimum', {'species': 'Tenacibaculum maritimum'}, 1000],
       (('WARNING', "NCBI ID 1000 has been superseeded by ID 107401"),
        ('WARNING', "NCBI taxa ID superseeded for T maritimum, using new taxa ID"),
       )),
      # Just superseeded name
-     (['worksheet name', ['C marina', {'species': 'Cytophaga marina'}], 107401],
+     (['C marina', {'species': 'Cytophaga marina'}, 107401],
       (('WARNING', "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
        ('WARNING', "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
       )),
      # E coli recorded as a family rather than a species
-     (['worksheet name', ['E coli', {'family': 'Escherichia coli'}], None],
+     (['E coli', {'family': 'Escherichia coli'}, None],
       (('ERROR', "Escherichia coli is a species not a family"),
+       ('ERROR', "Search based on taxon hierarchy failed"),
       )),
      # E coli recorded as a subspecies rather than a species
-     (['worksheet name', ['E coli', {'subspecies': 'Escherichia coli'}], None],
+     (['E coli', {'subspecies': 'Escherichia coli'}, None],
       (('ERROR', "Escherichia coli is a species not a subspecies"),
+       ('ERROR', "Search based on taxon hierarchy failed"),
       )),
      # Same idea for a non-backbone case
-     (['worksheet name', ['Streptophytina', {'phylum': 'Streptophytina'}], None],
+     (['Streptophytina', {'phylum': 'Streptophytina'}, None],
       (('WARNING', "Streptophytina not of backbone rank, instead resolved to phylum level"),
        ('ERROR', "Streptophytina is a subphylum not a phylum"),
+       ('ERROR', "Search based on taxon hierarchy failed"),
       )),
      ])
 def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
@@ -477,13 +462,13 @@ def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
       TypeError),
      ([],  # empty list
       ValueError),
-     (['worksheet name', 252],  # too few elements
+     (['taxon name', 252],  # too few elements
       ValueError),
      # Bad code
-     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], -1],
-      genb_taxa.NCBIError),
+     (['E coli', {'species': 'Escherichia coli'}, -1],
+      ValueError),
      # Bad code
-     (['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 100000000000000],
+     (['E coli', {'species': 'Escherichia coli'}, 100000000000000],
       genb_taxa.NCBIError),
     ])
 

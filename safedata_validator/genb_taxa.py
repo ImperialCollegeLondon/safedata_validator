@@ -45,7 +45,7 @@ class NCBIError(Exception):
         super().__init__(self.message)
 
 # TODO - Validate against GBIF
-# So check if taxa provided exists if GBIF, if not check up hierachy until one that does is found
+# So check if taxa provided exists if GBIF, if not check up hierarchy until one that does is found
 # Then tell user that they have to contract their taxonomic specification to this levels
 
 # TODO - Link NCBI and GBIF steps
@@ -81,7 +81,7 @@ class NCBITaxon:
 
     There are 3 class properties that can be used to create an instance:
         * name
-        * taxa_hier: Dictionary of valid taxonomic hierachy
+        * taxa_hier: Dictionary of valid taxonomic hierarchy
         * genbank_id: GenBank ID for full taxa (i.e. including non-backbone ranks)
     The remaining properties are populated by processing functions not when an
     instance is created.
@@ -138,10 +138,10 @@ class RemoteNCBIValidator:
         """
 
         if not isinstance(genbank_id, int):
-            raise NCBIError('Non-integer NCBI taxonomy ID')
+            raise ValueError('Non-integer NCBI taxonomy ID')
 
         if not genbank_id > 0:
-            raise NCBIError('Negative NCBI taxonomy ID')
+            raise ValueError('Negative NCBI taxonomy ID')
 
         # Set status of taxa validity as initally false
         valid = False
@@ -383,6 +383,7 @@ class RemoteNCBIValidator:
                 # If not raise an error
                 LOGGER.error(f'{list(taxah.values())[-1]} is a {f_key}'
                              f' not a {list(taxah.keys())[-1]}')
+                return
             # Then check whether orginally supplied name is still used
             elif taxah[f_key] != mtaxon.taxa_hier[f_key]:
                 # If not print a warning
@@ -396,6 +397,7 @@ class RemoteNCBIValidator:
                 # If not raise an error
                 LOGGER.error(f'{list(taxah.values())[-1]} is a {mtaxon.diverg}'
                              f' not a {list(taxah.keys())[-1]}')
+                return
 
         return mtaxon
 
@@ -445,7 +447,7 @@ class GenBankTaxa:
 
         # WHAT INFO FROM NCBI SHOULD BE STORED???
         # name: str ???
-        # taxa_hier: dict NO NEED TO STORE FULL hierachy
+        # taxa_hier: dict NO NEED TO STORE FULL hierarchy
         # genbank_id: YES
         # synonyms: list[str] THESE ARE ALSO ONLY OF TRANSIENT INTEREST
         # diverg: str = dataclasses.field(init=False) # SHOULD GENERATE A WARNING
@@ -493,11 +495,12 @@ class GenBankTaxa:
             Updates the taxon_names and taxon_index attributes of the class instance.
         """
 
-        m_name, taxon_info, genbank_id = gb_taxon_input
+        m_name, taxon_hier, genbank_id = gb_taxon_input
 
         # Sanitise worksheet names for taxa - only keep unpadded strings.
         if m_name is None or not isinstance(m_name, str) or m_name.isspace() or not m_name:
             LOGGER.error('Worksheet name missing, whitespace only or not text')
+            return
         elif m_name != m_name.strip():
             LOGGER.error(f"Worksheet name has whitespace padding: {repr(m_name)}")
             m_name = m_name.strip()
@@ -518,65 +521,45 @@ class GenBankTaxa:
         # Check the main taxon details
         h_fail = False
 
-        # Check that the right amount of information has been provided
-        if len(taxon_info) != 2:
-            LOGGER.error('Two objects should be provided as taxon info')
+        # Check that a dictonary with at least one entry has been provided
+        if not isinstance(taxon_hier,dict) or len(taxon_hier) == 0:
+            LOGGER.error('Taxa hierarchy should be a (not empty) dictonary')
             h_fail = True
+        # Otherwise check for padding of dictonary keys and values
         else:
-            # Check that it is a dictonary with at least one element
-            if not isinstance(taxon_info[0], str):
-                LOGGER.error('Taxon name should be a string')
-                h_fail = True
-            # Otherwise do checks for padding
-            else:
-                # Check for empty strings
-                if taxon_info[0] == "" or taxon_info[0].isspace():
-                    LOGGER.error('Taxon name should not be blank or just whitespace')
+            # Make a translation table
+            translate = {}
+            # Loop over all dictonary keys
+            for idx in taxon_hier.keys():
+                if not isinstance(idx,str):
+                    LOGGER.error(f"Non-string dictonary key used: {repr(idx)}")
                     h_fail = True
-                # Check if the string is padded
-                elif taxon_info[0] != taxon_info[0].strip():
-                    LOGGER.error(f"Taxon name has whitespace padding: {repr(taxon_info[0])}")
-                    taxon_info[0] = taxon_info[0].strip()
+                elif idx == "" or idx.isspace():
+                    LOGGER.error('Empty dictonary key used')
+                    h_fail = True
+                elif idx != idx.strip():
+                    LOGGER.error(f"Dictonary key has whitespace padding: {repr(idx)}")
+                    # Save keys to swap to new translation table
+                    translate[idx] = idx.strip()
 
-            # Check that a dictonary with at least one entry has been provided
-            if not isinstance(taxon_info[1],dict) or len(taxon_info[1]) == 0:
-                LOGGER.error('Taxa hierachy should be a (not empty) dictonary')
-                h_fail = True
-            # Otherwise check for padding of dictonary keys and values
-            else:
-                # Make a translation table
-                translate = {}
-                # Loop over all dictonary keys
-                for idx in taxon_info[1].keys():
-                    if not isinstance(idx,str):
-                        LOGGER.error(f"Non-string dictonary key used: {repr(idx)}")
-                        h_fail = True
-                    elif idx == "" or idx.isspace():
-                        LOGGER.error('Empty dictonary key used')
-                        h_fail = True
-                    elif idx != idx.strip():
-                        LOGGER.error(f"Dictonary key has whitespace padding: {repr(idx)}")
-                        # Save keys to swap to new translation table
-                        translate[idx] = idx.strip()
+                # Extract corresponding dictonary value
+                val = taxon_hier[idx]
+                # Then perform similar checks on dictonary value
+                if not isinstance(val,str):
+                    LOGGER.error(f"Non-string dictonary value used: {repr(val)}")
+                    h_fail = True
+                elif val == "" or val.isspace():
+                    LOGGER.error('Empty dictonary value used')
+                    h_fail = True
+                elif val != val.strip():
+                    LOGGER.error(f"Dictonary value has whitespace padding: {repr(val)}")
+                    taxon_hier[idx] = val.strip()
 
-                    # Extract corresponding dictonary value
-                    val = (taxon_info[1])[idx]
-                    # Then perform similar checks on dictonary value
-                    if not isinstance(val,str):
-                        LOGGER.error(f"Non-string dictonary value used: {repr(val)}")
-                        h_fail = True
-                    elif val == "" or val.isspace():
-                        LOGGER.error('Empty dictonary value used')
-                        h_fail = True
-                    elif val != val.strip():
-                        LOGGER.error(f"Dictonary value has whitespace padding: {repr(val)}")
-                        taxon_info[1][idx] = val.strip()
+            # Use translation table to replace whitespaced dictonary keys
+            for old, new in translate.items():
+                taxon_hier[new] = taxon_hier.pop(old)
 
-                # Use translation table to replace whitespaced dictonary keys
-                for old, new in translate.items():
-                    taxon_info[1][new] = taxon_info[1].pop(old)
-
-        # Now check that the taxa hierachy is correctly ordered
+        # Now check that the taxa hierarchy is correctly ordered
         if i_fail:
             LOGGER.error(f'Improper NCBI ID provided, cannot be validated')
 
@@ -586,127 +569,91 @@ class GenBankTaxa:
         if h_fail or i_fail:
             return
 
-        # Now check that dictonary containing taxa hierachy is properly ordered
-        if len(taxon_info[1]) > 1: # Only matters if it contains multiple entries
-            # Find all keys in taxa hierachy
-            t_ord = list(taxon_info[1].keys())
+        # Now check that dictonary containing taxa hierarchy is properly ordered
+        if len(taxon_hier) > 1: # Only matters if it contains multiple entries
+            # Find all keys in taxa hierarchy
+            t_ord = list(taxon_hier.keys())
             # Find corresponding keys from backbone
             b_ord = [x for x in BACKBONE_RANKS_EX if x in t_ord]
             # Remove non-backbone keys from taxa order
             t_ord = [x for x in t_ord if x in b_ord]
             # Then catch cases where orders don't match
             if b_ord != t_ord:
-                LOGGER.error(f'Taxon hierachy not in correct order')
+                LOGGER.error(f'Taxon hierarchy not in correct order')
+                return
 
         # Now that inputs are sanitised, continue with checking...
         # First gather the info needed to index the entry
-        ncbi_info = [list(taxon_info[1].values())[-1], list(taxon_info[1].keys())[-1],
-                     genbank_id]
+        if genbank_id != None:
+            ncbi_info = [list(taxon_hier.values())[-1], list(taxon_hier.keys())[-1],
+                         int(genbank_id)]
+        else:
+            ncbi_info = [list(taxon_hier.values())[-1], list(taxon_hier.keys())[-1],
+                         None]
+
+        # Set pre-processing as initially false
+        p_proc = False
 
         # Check if pair has already been processed
         if tuple(ncbi_info) in self.ncbi_t:
             hr_taxon = self.ncbi_t[tuple(ncbi_info)]
+            p_proc = True
         else:
             # If not go straight ahead and search for the taxon
-            hr_taxon = validator.taxa_search(taxon_info[0], taxon_info[1])
+            hr_taxon = validator.taxa_search(m_name, taxon_hier)
             # Catch case where errors are returned rather than a taxon
             if hr_taxon == None:
-                LOGGER.error(f'Search based on taxon hierachy failed')
+                LOGGER.error(f'Search based on taxon hierarchy failed')
                 return
 
             # Then check if a genbank ID number has been provided
             if genbank_id != None:
-                id_taxon = validator.id_lookup(taxon_info[0], int(genbank_id))
+                id_taxon = validator.id_lookup(m_name, int(genbank_id))
                 # Check whether this matches what was found using hierarchy
                 if id_taxon != hr_taxon:
-                    # Check if taxonomy hierachy superseeded
+                    # Check if taxonomy hierarchy superseeded
                     if hr_taxon.superseed == True:
                         LOGGER.warning(f'Taxonomic classification superseeded for '
-                        f'{taxon_info[0]}, using new taxonomic classification')
+                        f'{m_name}, using new taxonomic classification')
                     elif id_taxon.superseed == True:
-                        LOGGER.warning(f'NCBI taxa ID superseeded for {taxon_info[0]}'
+                        LOGGER.warning(f'NCBI taxa ID superseeded for {m_name}'
                         f', using new taxa ID')
                     else:
-                        LOGGER.error(f"The NCBI ID supplied for {taxon_info[0]} "
-                        f"does not match hierarchy: expected {hr_taxon.genbank_id}"
+                        LOGGER.error(f"The NCBI ID supplied for {m_name} does "
+                        f"not match hierarchy: expected {hr_taxon.genbank_id}"
                         f" got {genbank_id}")
                         return
             else:
                 # Warn user that superseeded taxonomy won't be used
                 if hr_taxon.superseed:
                     LOGGER.warning(f'Taxonomic classification superseeded for '
-                    f'{taxon_info[0]}, using new taxonomic classification')
+                    f'{m_name}, using new taxonomic classification')
 
             # Store the NCBI taxon keyed by NCBI information (needs tuple)
             self.ncbi_t[tuple(ncbi_info)] = hr_taxon
 
-        print(self.ncbi_t)
-        # IMPORTANT QUESTION, WHAT DO I ACTUALLY NEED TO SAVE, AND WHAT CAN JUST BE KEPT FOR THE REST OF THIS FUNCTION
-        # genbank_ID SHOULD BE SAVED LONG TERM
-        # As should the lowest NCBI taxonomic level
-        # And the nickname
-        # Okay so record the nickname, genbank_Id, the lowest level taxa (which we are using to search)
-        # Then record the divergence to account for difference between taxa and genbank ID
-
-        # EVERYTHING SEEMS TO GET STORED IN taxon_index
-        # Oh right is this a way of storing data for the long term?
-        # Mainly so that repeated processing steps can be skipped?
-        # So this is a keying step => Need to include all identifying information
-        # And then the entire taxon object is saved
-        # Makes sense to save two sets of indices and taxon objects imo
-
-        # else:
-        #
-        #     # Look for a match
-        #     if p_taxon.is_backbone:
-        #         p_taxon = self.validator.search(p_taxon)
-        #
-        #         # Update the hierarchy and index with the search results
-        #         self.hierarchy.update([rw for rw in p_taxon.hierarchy if rw[1] is not None])
-        #         self.taxon_index.append([None, p_taxon.gbif_id, p_taxon.parent_id,
-        #                                     p_taxon.name, p_taxon.rank, p_taxon.taxon_status])
-        #
-        #         if p_taxon.is_backbone and p_taxon.found and not p_taxon.is_canon:
-        #             self.hierarchy.update([rw for rw in p_taxon.canon_usage.hierarchy if rw[1] is not None])
-        #             self.taxon_index.append([None,
-        #                                     p_taxon.canon_usage.gbif_id,
-        #                                     p_taxon.canon_usage.parent_id,
-        #                                     p_taxon.canon_usage.name,
-        #                                     p_taxon.canon_usage.rank,
-        #                                     p_taxon.canon_usage.taxon_status])
-        #
-        #     # Store the parent taxon keyed by parent information (needs tuple)
-        #     self.parents[tuple(parent_info)] = p_taxon
+        # Check if this has succeded without warnings or errors
+        if hr_taxon.superseed == False and hr_taxon.diverg == None:
+            # Straight forward when there isn't a genbank id, or previously processed
+            if genbank_id == None or p_proc == True:
+                # If so inform the user of this
+                LOGGER.info(f'Taxon ({m_name}) found in NCBI database')
+            # Otherwise need to check for superseeded ID's
+            elif id_taxon.superseed == False:
+                LOGGER.info(f'Taxon ({m_name}) found in NCBI database')
 
         ###################### NOTHING BELOW THIS LINE WORKS ###########################
-        # CHECK SOMEWHERE THAT ID AND HIERACHY MATCH!!!!
-        print("Reached end")
         return
-
-        # Report on the parent information
-        if p_taxon is not None:
-            if not p_taxon.is_backbone:
-                LOGGER.error(f'Parent taxon ({p_taxon.name}) is not of a backbone rank')
-
-            elif not p_taxon.found:
-                LOGGER.error(f'Parent taxon ({p_taxon.name}) {p_taxon.lookup_status}')
-
-            elif not p_taxon.is_canon:
-                LOGGER.warning(f'Parent taxon ({p_taxon.name}) considered a {p_taxon.taxon_status}'
-                               f' of {p_taxon.canon_usage.name} in GBIF backbone')
-            else:
-                LOGGER.info(f'Parent taxon ({p_taxon.name}) accepted')
 
 # ROUGH TESTING BLOCK
 # SHOULD CONVERT THIS INTO PROPER UNIT TESTS AS I GO
 v1 = GenBankTaxa()
 v2 = RemoteNCBIValidator()
+
 # Should work fine
-d1 = ['worksheet name', ['E coli', {'species': 'Escherichia coli'}], 562]
-d2 = ['worksheet name', ['E coli', {'family': 'Escherichia coli'}], None]
-d3 = ['worksheet name', ['E coli', {'subspecies': 'Escherichia coli'}], None]
-d4 = ['worksheet name', ['Streptophytina', {'phylum': 'Streptophytina'}], None]
+d1 = ['E coli', {'species': 'Escherichia coli'}, 562]
+# TEST THIS ONE
+d2 = ['E coli', {'species': 'Escherichia coli'}, 562.0]
 
 
-test = v1.validate_and_add_taxon(v2,d2)
-print(test)
+test = v1.validate_and_add_taxon(v2,d1)
