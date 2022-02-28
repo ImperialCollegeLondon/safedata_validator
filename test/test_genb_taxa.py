@@ -414,6 +414,10 @@ def test_taxa_search_errors(validators, test_input, expected_exception):
       (('WARNING', "NCBI ID 1000 has been superseeded by ID 107401"),
        ('WARNING', "NCBI taxa ID superseeded for T maritimum, using new taxa ID"),
       )),
+     # Repeated so warnings skipped
+     (['T maritimum', {'species': 'Tenacibaculum maritimum'}, 1000],
+      (('INFO', "Taxon (T maritimum) found in NCBI database"),
+      )),
      # Just superseeded name
      (['C marina', {'species': 'Cytophaga marina'}, 107401],
       (('WARNING', "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
