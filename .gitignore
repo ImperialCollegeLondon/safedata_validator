@@ -4,8 +4,9 @@ SAFE_import_files*
 # ignore Excel backup files
 ~*
 
-# PyCharm
+# PyCharm and VS code
 .idea/
+.vscode/
 
 # Mac DS files
 .DS_Store
