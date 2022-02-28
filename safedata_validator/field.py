@@ -59,13 +59,15 @@ class Dataset:
         # data, so the Summary and dataset extents are held separately so that
         # they can be validated against one another once all data is checked.
 
-        # TODO - set bounds in Resources()
-
-        self.temporal_extent = Extent('temporal extent', (datetime.date,))
+        self.temporal_extent = Extent('temporal extent', (datetime.date,),
+                                      hard_bounds=resources.extents.temporal_hard_extent,
+                                      soft_bounds=resources.extents.temporal_soft_extent)
         self.latitudinal_extent = Extent('latitudinal extent', (float, int),
-                                         hard_bounds=(-90,90), soft_bounds=(-4, 8))
+                                         hard_bounds=resources.extents.latitudinal_hard_extent,
+                                         soft_bounds=resources.extents.latitudinal_soft_extent)
         self.longitudinal_extent = Extent('longitudinal extent', (float, int),
-                                          hard_bounds=(-180,180), soft_bounds=(108, 120))
+                                          hard_bounds=resources.extents.latitudinal_hard_extent,
+                                          soft_bounds=resources.extents.latitudinal_soft_extent)
 
     def load_from_workbook(self, 
                            filename: str, 
@@ -92,9 +94,11 @@ class Dataset:
             console_log: Use the console logging or not
         """
         
-        # Handle logging details
-        LOG.truncate()
+        # Handle logging details - flush and reset from previous runs.
+        LOG.seek(0)
+        LOG.truncate(0)
         COUNTER_HANDLER.reset()
+
         if console_log:
             CONSOLE_HANDLER.setLevel('DEBUG')
         else:
