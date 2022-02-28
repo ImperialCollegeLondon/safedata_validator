@@ -2,8 +2,7 @@ import pytest
 from safedata_validator import genb_taxa
 
 # TESTS TO PUT IN:
-# NEED TO TEST THAT SKIPPING PROCESSING OF MULTIPLE TAXA IS WORKING CORRECTLY
-# NEED TO ALSO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
+# NEED TO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
 
 @pytest.fixture(scope='module')
 def validators():
@@ -164,7 +163,9 @@ def test_id_lookup_errors(validators, test_input, expected_exception):
      'Tenacibaculum maritimum'}),
       ("T maritimum", 107401, None, False, "species", "Tenacibaculum maritimum")),
      (dict(nnme="C marina",taxah={'genus': 'Cytophaga', 'species': 'Cytophaga marina'}),
-      ("C marina", 107401, None, True, "species", "Tenacibaculum maritimum"))
+      ("C marina", 107401, None, True, "species", "Tenacibaculum maritimum")),
+     (dict(nnme="Bacteria",taxah={'superkingdom': 'Bacteria'}),
+      ("Bacteria", 2, None, False, "superkingdom", "Bacteria"))
     ])
 def test_taxa_search(validators, test_input, expected):
     """This test checks the results of searching for a taxa in the NCBI taxonomy
@@ -439,6 +440,12 @@ def test_taxa_search_errors(validators, test_input, expected_exception):
        ('ERROR', "Streptophytina is a subphylum not a phylum"),
        ('ERROR', "Search based on taxon hierarchy failed"),
       )),
+     # Superkingdom not included in GBIF case
+     (['Eukaryota', {'superkingdom': 'Eukaryota'}, 2759],
+      (('INFO', "Taxon (Eukaryota) found in NCBI database"),
+       ('INFO', "Attempting to validate against GBIF database"),
+       ('ERROR', "Parent taxon (Eukaryota) is not of a GBIF backbone rank"),
+      )),
      ])
 def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
                                 gb_instance, validators):
@@ -475,7 +482,6 @@ def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
      (['E coli', {'species': 'Escherichia coli'}, 100000000000000],
       genb_taxa.NCBIError),
     ])
-
 def test_validate_and_add_taxon_errors(validators, gb_instance, test_input, expected_exception):
     """This test checks validator.validate_and_add_taxon inputs throw errors as expected
     """

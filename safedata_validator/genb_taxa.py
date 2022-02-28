@@ -23,6 +23,7 @@ from enforce_typing import enforce_types
 
 from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
                                        loggerinfo_push_pop)
+from safedata_validator import taxa
 
 # CHANGE THIS TO A PURPOSE DEFINED EMAIL AT SOMEPOINT
 # MAYBE ADD TO RESOURCE FILE, AS A CHECK THAT USER HAS PROVIDED ONE
@@ -298,15 +299,37 @@ class RemoteNCBIValidator:
         if c == 1:
             # Find taxa ID as single entry in the list
             tID = int(record['IdList'][0])
-            # Use ID lookup function to find generate as a NCBITaxon object
+            # Use ID lookup function to generate as a NCBITaxon object
             mtaxon = self.id_lookup(nnme,tID)
         # Catch cases where no record is found
         elif c == 0:
             LOGGER.error(f'Taxa {nnme} cannot be found')
             return
         else:
-            # Check whether multiple taxonomic levels have been provided
-            if len(taxah) == 1:
+            # Preallocate container for the ranks
+            t_ranks = []
+            # First check if multiple taxa have the same rank
+            for i in range(c):
+                # Find taxa ID as single entry in the list
+                tID = int(record['IdList'][i])
+                # Use ID lookup function to generate a tempoary taxon
+                temp_taxon = self.id_lookup(nnme,tID)
+                # Add rank to list
+                t_ranks.append(list(temp_taxon.taxa_hier.keys())[-1])
+
+            # Record whether ranks match expected rank
+            mtch = [True if x == f_key else False for x in t_ranks]
+
+            # If there's only one match, we have determined the correct entry
+            if sum(mtch) == 1:
+                # Find relevant index
+                ind = ([i for i, x in enumerate(mtch) if x])[0]
+                # Find taxa ID as single entry in the list
+                tID = int(record['IdList'][ind])
+                # Use ID lookup function to generate as a NCBITaxon object
+                mtaxon = self.id_lookup(nnme,tID)
+            # Then check whether multiple taxonomic levels have been provided
+            elif len(taxah) == 1:
                 # If not raise an error
                 LOGGER.error(f'Taxa {nnme} cannot be found using only one '
                              f'taxonomic level, more should be provided')
@@ -642,7 +665,42 @@ class GenBankTaxa:
             elif id_taxon.superseed == False:
                 LOGGER.info(f'Taxon ({m_name}) found in NCBI database')
 
-        ###################### NOTHING BELOW THIS LINE WORKS ###########################
+        # Inform user that validation against GBIF is
+        LOGGER.info(f'Attempting to validate against GBIF database')
+        # Check if already processed
+        if True == False:
+            # THIS HAS TO BE A PLACEHOLDER FOR NOW
+            print("PLACEHOLDER")
+        # Otherwise go and use the stored information to searcg
+        else:
+            # Create a taxon object
+            # THIS IS FLAWED BECAUSE I CHANGE THE INPUT
+            # NEED TO DO THIS BASED ON THE UPDATED INFO
+            gbf_taxon = taxa.Taxon(name=list(hr_taxon.taxa_hier.values())[-1],
+                       rank=list(hr_taxon.taxa_hier.keys())[-1], gbif_id=None)
+            print(gbf_taxon)
+
+            # Look for a match
+            if gbf_taxon.is_backbone:
+                # self IS WRONG HERE
+                gbf_taxon = self.validator.search(p_taxon)
+                print(gbf_taxon)
+            else: # Should only fire for superkingdom case
+                LOGGER.error(f'Parent taxon ({gbf_taxon.name}) is not of a GBIF backbone rank')
+                # MORE SHOULD BE WRITTEN HERE TO HANDLE SUPERKINGDOM CASE
+
+        # THIS WILL NEED TO BE UPDATED WHEN I DO MORE ADVANCED STUFF
+        # Report on the parent information
+        if not gbf_taxon.found:
+            LOGGER.error(f'Parent taxon ({gbf_taxon.name}) {gbf_taxon.lookup_status}')
+
+        elif not gbf_taxon.is_canon:
+            LOGGER.warning(f'Parent taxon ({gbf_taxon.name}) considered a {gbf_taxon.taxon_status}'
+                           f' of {gbf_taxon.canon_usage.name} in GBIF backbone')
+        else:
+            LOGGER.info(f'Parent taxon ({gbf_taxon.name}) accepted')
+
+        #
         return
 
 # ROUGH TESTING BLOCK
@@ -652,8 +710,5 @@ v2 = RemoteNCBIValidator()
 
 # Should work fine
 d1 = ['E coli', {'species': 'Escherichia coli'}, 562]
-# TEST THIS ONE
-d2 = ['E coli', {'species': 'Escherichia coli'}, 562.0]
-
 
 test = v1.validate_and_add_taxon(v2,d1)
