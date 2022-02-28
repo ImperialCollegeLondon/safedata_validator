@@ -1,21 +1,21 @@
 import pytest
 from safedata_validator.field import Dataset
-from .conftest import good_file_path, bad_file_path
+from .conftest import FIXTURE_FILES
 
 @pytest.mark.parametrize(
-    'filepath, n_errors',
+    'file_key, n_errors',
     [
-      (good_file_path , 0), 
-      (bad_file_path, 0), 
+      ('good_excel_file' , 0), 
+      ('bad_excel_file', 0), 
     ], 
 )
-def test_DataSet_load_from_file(resources_with_local_gbif,
-                                filepath, n_errors):
+def test_DataSet_load_from_file(config_filesystem,
+                                resources_with_local_gbif, file_key, n_errors):
     """Test loading a dataworksheet from file - this duplicates a lot of 
     Dataset.load_from_workbook"""
     
     # Load the taxa and locations
     ds = Dataset(resources_with_local_gbif)
-    ds.load_from_workbook(filepath)
+    ds.load_from_workbook(FIXTURE_FILES.rf[file_key])
 
     assert ds.n_errors == n_errors

@@ -3,15 +3,6 @@ from safedata_validator import taxa
 from safedata_validator.resources import Resources
 
 
-@pytest.fixture(scope='module', params=['remote', 'local'])
-def validators(resources_with_local_gbif, request):
-    """Parameterised fixture to return local and remote taxon validators
-    """
-    if request.param == 'remote':
-        return taxa.RemoteGBIFValidator()
-
-    elif request.param == 'local':
-        return taxa.LocalGBIFValidator(resources_with_local_gbif)
 
 # ------------------------------------------
 # Testing Taxon
@@ -48,7 +39,7 @@ def test_taxon_init_errors(test_input, expected_exception):
      (dict(name='Alsomitra simplex', rank='species'),
       ('found', False, 5537041, 3623287))
      ])
-def test_validator_search(validators, test_input, expected):
+def test_validator_search(fixture_taxon_validators, test_input, expected):
     """This test checks inputs against expected outputs for both the local
     and remote validator classes.
 
@@ -57,7 +48,7 @@ def test_validator_search(validators, test_input, expected):
     """
 
     tx = taxa.Taxon(**test_input)
-    srch_out = validators.search(tx)
+    srch_out = fixture_taxon_validators.search(tx)
 
     assert srch_out.lookup_status == expected[0]
     assert srch_out.is_canon == expected[1]
@@ -71,14 +62,14 @@ def test_validator_search(validators, test_input, expected):
     'test_input,expected',
     [(1324716, ('found', 'Crematogaster borneensis')),
      (2480962, ('found', 'Morus'))])
-def test_validator_gbif_lookup_outputs(validators, test_input, expected):
+def test_validator_gbif_lookup_outputs(fixture_taxon_validators, test_input, expected):
     """This test checks inputs against expected outputs for both the local
     and remote validator classes.
     TODO - proof of concept, think about systematic structure and failure
     cases
     """
 
-    found = validators.id_lookup(test_input)
+    found = fixture_taxon_validators.id_lookup(test_input)
 
     assert found.lookup_status == expected[0]
     assert found.name == expected[1]
@@ -87,19 +78,19 @@ def test_validator_gbif_lookup_outputs(validators, test_input, expected):
 @pytest.mark.parametrize(
     'test_input,expected_exception',
     [(None,  # no parameters
-      TypeError),
+      ValueError),
      ('invalid_string',  # a string
-      TypeError),
+      ValueError),
      (-1,  # bad ID
       ValueError),
      (100000000000000,  # bad ID
       taxa.GBIFError)])
-def test_validator_gbif_lookup_errors(validators, test_input, expected_exception):
+def test_validator_gbif_lookup_errors(fixture_taxon_validators, test_input, expected_exception):
     """This test checks validator.id_lookup inputs throw errors as expected
     """
 
     with pytest.raises(expected_exception):
-        _ = validators.id_lookup(test_input)
+        _ = fixture_taxon_validators.id_lookup(test_input)
 
 # ------------------------------------------
 # Testing Taxa validate_and_add_taxon
@@ -436,13 +427,13 @@ def test_validate_taxon_lookup(caplog, resources_local_and_remote,
      ('bad', 20, 20)], 
     indirect = ['example_excel_files']  # take actual params from fixture
 )
-def test_taxa_load(example_excel_files, n_errors, n_taxa):
+def test_taxa_load(example_excel_files, resources_with_local_gbif, n_errors, n_taxa):
     """This tests the ensemble loading of taxa from a file using
     indirect parameterisation to access the fixtures containing the
     sample excel files.
     """
-    rs = Resources()
-    tx = taxa.Taxa(rs)
+
+    tx = taxa.Taxa(resources_with_local_gbif)
     tx.load(example_excel_files['Taxa'])
 
     assert tx.n_errors == n_errors

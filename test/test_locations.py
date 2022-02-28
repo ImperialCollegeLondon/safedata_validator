@@ -266,3 +266,4 @@ def test_load_from_file(locations_inst, example_excel_files, n_errors):
     locations_inst.load(example_excel_files['Locations'])
     assert locations_inst.n_errors == n_errors
 
+    

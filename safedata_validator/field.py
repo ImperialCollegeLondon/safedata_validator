@@ -451,8 +451,14 @@ class DataWorksheet:
         # Drop blank rows for further processing
         data_rows = [drw for drw, is_blank in zip(data_rows, blank_row) if not is_blank]
 
-        # Count the rows, then convert the values into columns and extract the row numbers
-        self.n_row += len(data_rows)
+        # Check there is any remaning data, then convert the values into columns
+        # and extract the row numbers
+        n_row = len(data_rows)
+        if n_row == 0:
+            return
+        else:
+            self.n_row += n_row
+        
         data_cols = list(zip(*data_rows))
         row_numbers = data_cols.pop(0)
 
@@ -757,10 +763,10 @@ class BaseField:
             self._check_meta(dsc)
         
         # Specific check that field name is valid - the column letter codes are
-        # always valid, so missing names won't trigger this.
-        if not isinstance(self.field_name, str):
-            self._log(f"Field name is not a text string: {repr(self.field_name)}. ")
-        elif not valid_r_name(self.field_name):
+        # always valid, so missing names won't trigger this. 
+        # _check_meta has already tested and logged non-string errors, so
+        # only test here for strings that fail.
+        if isinstance(self.field_name, str) and not valid_r_name(self.field_name):
             self._log(f"Field name is not valid: {repr(self.field_name)}. "
                       "Common errors are spaces and non-alphanumeric "
                       "characters other than underscore and full stop")

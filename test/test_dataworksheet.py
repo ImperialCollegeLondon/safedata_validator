@@ -525,13 +525,12 @@ def test_DataWorksheet_load_from_worksheet(caplog, fixture_dataworksheet, fixtur
     ], 
     indirect = ['example_excel_files']  # take actual params from fixture
 )
-def test_DataWorksheet_load_from_file(caplog, example_excel_files, wsheet, n_errors):
+def test_DataWorksheet_load_from_file(caplog, resources_with_local_gbif, example_excel_files, wsheet, n_errors):
     """Test loading a dataworksheet from file - this duplicates a lot of 
     Dataset.load_from_workbook"""
     
     # Load the taxa and locations
-    rs = Resources()
-    ds = Dataset(rs)
+    ds = Dataset(resources_with_local_gbif)
     ds.taxa.load(example_excel_files['Taxa'])
     ds.locations.load(example_excel_files['Locations'])
 
