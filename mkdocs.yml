@@ -1,6 +1,7 @@
 site_name: Data at the SAFE Project
 repo_url: https://github.com/ImperialCollegeLondon/safedata_validator/
-theme: material
+theme: 
+  name: material
 markdown_extensions:
   - admonition
 plugins:
@@ -20,15 +21,19 @@ nav:
     - 'Locations worksheet': 'data_format/locations.md'
     - 'Data worksheets': 'data_format/data.md'
     - 'Data format FAQs': 'data_format/faqs.md'
-  - 'Package details':
-    - 'Usage': 'usage/usage.md'
-    - 'Installation': 'usage/install.md'
-    - 'Building local GBIF': 'usage/build_local_gbif.md'
-    - 'GBIF validation notes': 'usage/gbif_validation.md'
+  - 'Installation and configuration':
+    - 'Installation': 'install/install.md'
+    - 'Configuration': 'install/configuration.md'
+    - 'Building local GBIF': 'install/build_local_gbif.md'
+    - 'GBIF validation notes': 'install/gbif_validation.md'
+  - 'Commands':
+    - 'safedata_validate': 'usage/usage.md'
   - 'API Reference':
     - 'Resources': 'api/resources.md'
     - 'Logger': 'api/logger.md'
     - 'Extents': 'api/extent.md'
+    - 'Summary': 'api/summary.md'
     - 'Locations': 'api/locations.md'
+    - 'Fields and dataworksheets': 'api/field.md'
     - 'Taxa': 'api/taxa.md'
   - 'Build notes': build_notes.md

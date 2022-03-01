@@ -14,8 +14,10 @@ Typical usage:
 
 """
 
-from safedata_validator.logger import LOGGER
+from safedata_validator.logger import LOGGER, log_and_raise
 from typing import Iterable, Tuple, Union
+
+from safedata_validator.validators import TypeCheck
 
 class Extent:
 
@@ -47,6 +49,7 @@ class Extent:
         self._extent = [None, None]
         self._hard_bounds = None
         self._soft_bounds = None
+        self._populated = False
 
         if hard_bounds is not None:
             self._check_bounds(hard_bounds)
@@ -56,7 +59,8 @@ class Extent:
 
         if ((soft_bounds is not None and hard_bounds is not None) and
                 (soft_bounds[0] <= hard_bounds[0] or soft_bounds[1] >= hard_bounds[1])):
-            raise AttributeError('Hard bounds must lie outside soft bounds')
+            log_and_raise('Hard bounds must lie outside soft bounds',  
+                          AttributeError)
 
         self._hard_bounds = hard_bounds
         self._soft_bounds = soft_bounds
@@ -84,6 +88,11 @@ class Extent:
         """Returns a tuple showing the hard bounds of the Extent object"""
         return self._soft_bounds
 
+    @property
+    def populated(self) -> bool:
+        """Returns a boolean showing if the extent has been populated"""
+        return self._populated
+
     def _check_bounds(self, bounds: tuple):
         """
         Private function to validate hard and soft bounds, these are set at
@@ -93,13 +102,15 @@ class Extent:
             bounds: Expecting an iterable of length 2 with low, high values
         """
 
-        values_match_datatype = [isinstance(v, self.datatype) for v in bounds]
+        valid_types = TypeCheck(bounds, self.datatype)
 
-        if not all(values_match_datatype):
-            raise AttributeError(f'Bounds are not all of type {self.datatype}')
+        if not valid_types:
+            log_and_raise(f'Bounds are not all of type {self.datatype}',
+                          AttributeError)
 
         if len(bounds) != 2 or bounds[1] <= bounds[0]:
-            raise AttributeError('Bounds must be provided as (low, high) tuples')
+            log_and_raise('Bounds must be provided as (low, high) tuples',
+                          AttributeError)
 
     def update(self, values: Iterable) -> None:
         """
@@ -111,26 +122,31 @@ class Extent:
                   datatype(s) specified when creating the Extent instance.
         """
 
-        values_match_datatype = [isinstance(v, self.datatype) for v in values]
+        valid_types = TypeCheck(values, self.datatype)
 
-        if not all(values_match_datatype):
-            invalid = [v for v, b in zip(values, values_match_datatype) if not b]
-            values = [v for v, b in zip(values, values_match_datatype) if b]
+        if not valid_types:
             LOGGER.error(f'Values are not all of type {self.datatype}: ',
-                         extra={'join': invalid, 'quote': True})
+                         extra={'join': valid_types.failed})
 
-        values = (min(values), max(values))
+        if len(valid_types.values) == 0:
+            LOGGER.error(f'No valid data in extent update')
+            return
 
-        if self.hard_bounds and (self.hard_bounds[0] > values[0] or
-                                 self.hard_bounds[1] < values[1]):
+        minv = min(valid_types.values)
+        maxv = max(valid_types.values)
+
+        if self.hard_bounds and (self.hard_bounds[0] > minv or
+                                 self.hard_bounds[1] < maxv):
             LOGGER.error(f'Values range {values} exceeds hard bounds {self.hard_bounds}')
 
-        elif self.soft_bounds and (self.soft_bounds[0] > values[0] or
-                                 self.soft_bounds[1] < values[1]):
+        elif self.soft_bounds and (self.soft_bounds[0] > minv or
+                                 self.soft_bounds[1] < maxv):
             LOGGER.warning(f'Values range {values} exceeds soft bounds {self.soft_bounds}')
 
         if self.extent[0] is None or values[0] < self.extent[0]:
-            self._extent[0] = values[0]
+            self._extent[0] = minv
+            self._populated = True
 
         if self.extent[1] is None or values[1] > self.extent[1]:
-            self._extent[1] = values[1]
+            self._extent[1] = maxv
+            self._populated = True

@@ -96,12 +96,15 @@ class Summary:
         self.publication_doi = None
         self.funders = None
         self.keywords = None
-        self.temporal_extent = Extent('temporal extent', datetime.date)
-        # TODO - take these bounds from Resources
+        self.temporal_extent = Extent('temporal extent', (datetime.date,),
+                                      hard_bounds=resources.extents.temporal_hard_extent,
+                                      soft_bounds=resources.extents.temporal_soft_extent)
         self.latitudinal_extent = Extent('latitudinal extent', (float, int),
-                                         hard_bounds=(-90,90), soft_bounds=(-4, 8))
+                                         hard_bounds=resources.extents.latitudinal_hard_extent,
+                                         soft_bounds=resources.extents.latitudinal_soft_extent)
         self.longitudinal_extent = Extent('longitudinal extent', (float, int),
-                                          hard_bounds=(-180,180), soft_bounds=(108, 120))
+                                          hard_bounds=resources.extents.longitudinal_hard_extent,
+                                          soft_bounds=resources.extents.longitudinal_soft_extent)
         self.external_files = None
         self.data_worksheets = []
 

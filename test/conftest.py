@@ -60,6 +60,26 @@ parameterisation is clumsy and complex.
 """
 
 
+def log_check(caplog, expected_log):
+    """
+    This helper function checks that the captured log during a test
+    matches the expected log levels and messages. 
+
+    Arguments:
+        caplog: An instance of the caplog fixture
+        expected_log: An iterable of 2-tuples containing the 
+            log level and message.
+    """
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
+
+
+
 """
 The other contents are fixtures that will be available to all test suites.
 
@@ -98,7 +118,7 @@ def config_filesystem(fs):
     config_contents = ['locations = ',
                        'gbif_database = ',
                        '[extents]',
-                       'temporal_soft_extent = 2002-02-01, 2030-02-01',
+                       'temporal_soft_extent = 2002-02-02, 2030-01-31',
                        'temporal_hard_extent = 2002-02-01, 2030-02-01',
                        'latitudinal_hard_extent = -90, 90',
                        'latitudinal_soft_extent = -4, 2',

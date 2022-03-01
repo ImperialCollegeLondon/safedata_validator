@@ -3,12 +3,12 @@
 The  `safedata_validator` package contains Python code to validate files containing data using SAFE data formatting  and report on any problems. The code validates:
 
   1. The data submission formatting of the file.
-  1. All taxonomic names against the [GBIF taxonomy database](gbif_validation.md).
+  1. All taxonomic names against the [GBIF taxonomy database](../install/gbif_validation.md).
   1. All location names against the SAFE Gazetteer.
 
 This package is used to validate datasets submitted online to a SAFE data management website, such as the  [SAFE Project website](https://safeproject.net/datasets/submit_dataset). However, it can also be installed and run independently, for example by data managers or individual researchers.
 
-The code is open source Python and  is maintained on [GitHub](https://github.com/ImperialCollegeLondon/safedata_validator) but  can also be installed using  [PyPI](https://pypi.org/project/safedata-validator). See the [installation notes](install.md) for setup instructions. 
+The code is open source Python and  is maintained on [GitHub](https://github.com/ImperialCollegeLondon/safedata_validator) but  can also be installed using  [PyPI](https://pypi.org/project/safedata-validator). See the [installation notes](../install/install.md) for setup instructions. 
 
 The package provides a command line program `safedata_validate`. The usage instructions are below but you will also need to provide links to some external data resources used in location and taxon validation.
 
@@ -84,55 +84,10 @@ Once you have this file, you can use it like this:
     safedata_validate MyData.xlsx -g /path/to/gbif_backbone.sqlite \
         -l /path/to/validator_locations.json
 
-## Configuration file
 
-You can also avoid having to specify location and taxa data resources every time you use `safedata_validate` by storing their locations in a configuration file. This is simply a JSON file that contains the resource locations. 
-
-For example, this file would set up `safedata_validate` to run online:
-
-```json
-{
-        "locations": "https://www.safeproject.net/api/validator_locations"
-}
-```
-
-The next configuration sets up fully offline use:
-
-```json
-{
-        "locations": "/path/to/validator_locations.json",
-        "gbif_database": "/path/to/gbif_backbone.sqlite"
-}
-```
 
 In both cases, validation can now simply use:
 
     safedata_validate MyData.xlsx
 
 If you do provide command line arguments, they will override anything set in the configuration.
-
-### Configuration file location
-
-To avoid having to provide a path to the configuration file, `safedata_validator` looks in specific locations for configuration files. Conventions for config file locations differ across operating systems and we use the conventions used by the `appdirs` package.
-
-In addition, `safedata_validator` will look for both user and site configuration files. Site configurations allow a data manager to set up a specific machine with data resources for all users. If both are present, the user configuration is used. The configuration file must be called `safedata_validator.json` and the user and site config folders are:
-
-On Mac OS X:
-
-```sh
-/Users/username/Library/Application Support/safedata_validator/
-/Library/Application Support/safedata_validator/
-```
-
-On Windows (the repeated name is not an error):
-
-```sh
-C:\\Users\\username\\AppData\\Local\\safedata_validator\\safedata_validator
-```
-
-On Linux:
-
-```sh
-/home/username/.config/safedata_validator
-/etc/xdg/safedata_validator
-```
