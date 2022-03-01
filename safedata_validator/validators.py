@@ -344,6 +344,55 @@ class IsInSet:
         yield from self.values
 
 
+class TypeCheck:
+
+    def __init__(self, values: Iterable, types: tuple):
+        """Filter an iterable of input values
+
+        This class is used to check whether all the values are members of a
+        given set of types.
+
+        The __iter__ method is set to iterate over the resulting checked values
+        and the __bool__ method is set to report whether any values failed the
+        checks. The failing values themselves are saved in the `failed`
+        attribute.
+
+        Args:
+            values: An iterable of values to be filtered 
+            types: A tuple of accepted types
+
+        Attributes:
+            failed: A list of failing values 
+            values: An iterable of filtered values
+        """
+
+        self.failed = []
+        self.values = [v for v in self._filter(values, types)]
+
+    def _filter(self, values, types):
+
+        for val in values:
+            if isinstance(val, types):
+                yield val
+            else:
+                self.failed.append(val)
+
+    @staticmethod
+    def tfunc(val):
+        return True
+
+    @staticmethod
+    def rfunc(val):
+        return val
+
+    def __bool__(self):
+        return not self.failed
+
+    def __repr__(self):
+        return str(not self.failed)
+
+    def __iter__(self):
+        yield from self.values
 
 # INFO - pandas has Excel reading including vectorised string operations?
 #        It uses openpyxl for xlsx but doesn't seem to use the memory optimised
