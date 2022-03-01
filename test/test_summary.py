@@ -423,7 +423,9 @@ def test_funders(caplog, fixture_summary, alterations, should_log_error, expecte
 ])
 def test_temporal_extent(caplog, fixture_summary, alterations, should_log_error, expected_log):
 
-    # Valid set of information - openpyxl loads dates as datetimes.
+    # Valid set of information - openpyxl loads dates as datetimes but
+    # the validation checks that these values are dates 
+    # (have no time information)
     input = {'start date': (datetime.datetime(2001, 1, 1),),
              'end date': (datetime.datetime(2011, 1, 1),)}
 
@@ -438,7 +440,12 @@ def test_temporal_extent(caplog, fixture_summary, alterations, should_log_error,
     if should_log_error:
         assert 'ERROR' in [r.levelname for r in caplog.records]
     else:
-        assert fixture_summary.temporal_extent.extent == (input['start date'][0], input['end date'][0])
+        # Check the extent is updated - note that datetime.date is enforced
+        start = input['start date'][0] 
+        end = input['end date'][0]
+        expected_dates = (start if start is None else start.date(),
+                          end if end is None else end.date())
+        assert fixture_summary.temporal_extent.extent == expected_dates
 
     assert expected_log in caplog.text
 
