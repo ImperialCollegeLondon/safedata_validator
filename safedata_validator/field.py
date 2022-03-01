@@ -54,6 +54,7 @@ class Dataset:
         self.taxa = Taxa(resources)
         self.dataworksheets = []
         self.n_errors = 0
+        self.passed = False
 
         # Extents - these can be loaded from the Summary or compiled from the
         # data, so the Summary and dataset extents are held separately so that
@@ -66,8 +67,8 @@ class Dataset:
                                          hard_bounds=resources.extents.latitudinal_hard_extent,
                                          soft_bounds=resources.extents.latitudinal_soft_extent)
         self.longitudinal_extent = Extent('longitudinal extent', (float, int),
-                                          hard_bounds=resources.extents.latitudinal_hard_extent,
-                                          soft_bounds=resources.extents.latitudinal_soft_extent)
+                                          hard_bounds=resources.extents.longitudinal_hard_extent,
+                                          soft_bounds=resources.extents.longitudinal_soft_extent)
 
     def load_from_workbook(self, 
                            filename: str, 
@@ -156,8 +157,8 @@ class Dataset:
         iii) Report the total number of errors and warnings
         """
 
-        LOGGER.info('Checking provided locations and taxa all used in data worksheets',
-                    extra={'indent_before': 0, 'indent_after': 1})
+        LOGGER.info('Checking provided locations and taxa all used in data worksheets')
+        FORMATTER.push()
 
         # check locations and taxa
         # - Can't validate when there are external files which might use any unused ones.
@@ -182,36 +183,51 @@ class Dataset:
                 LOGGER.error('Provided taxa not used: ',
                              extra={'join': self.taxa.taxon_names - self.taxa.taxon_names_used})
 
-        LOGGER.info('Checking temporal and geographic extents',
-                    extra={'indent_before': 0, 'indent_after': 1})
-        if self.temporal_extent is None:
-            LOGGER.error('Temporal extent not set from data, please add start and '
-                         'end dates to summary worksheet')
-        if self.latitudinal_extent is None or self.longitudinal_extent is None:
-            LOGGER.error('Geographic extent not set from data, please add south, north '
-                         'east and west bounds to summary worksheet')
+        # Check the extents - there are both summary and dataset extents so
+        # check at least one is populated for each extent and that they are 
+        # compatible
+        FORMATTER.pop()
+        LOGGER.info('Checking temporal and geographic extents')
+        FORMATTER.push()
+
+        extents_to_check = (("Temporal", 'temporal_extent'),
+                            ("Latitudinal", 'latitudinal_extent'),
+                            ("Longitudinal", 'longitudinal_extent'))
+        
+        for label, this_extent in extents_to_check:
+
+            dataset_extent = getattr(self, this_extent)
+            summary_extent = getattr(self.summary, this_extent)
+
+            # If neither: need summary. If both: consistent.
+            if not (dataset_extent.populated or summary_extent.populated):
+                LOGGER.error(f'{label} extent not set from data or provided in summary: ',
+                             'add extents to dataset Summary')
+            elif ((dataset_extent.populated and summary_extent.populated) and 
+                  ((dataset_extent.extent[0] < summary_extent.extent[0]) or
+                   (dataset_extent.extent[0] < summary_extent.extent[0]))):
+
+                LOGGER.error(f'The {label} extent provided in the dataset Summary '
+                             f'is narrower than the provided data {dataset_extent.extent}')
 
         # Dedent for final result
         FORMATTER.pop()
 
         if COUNTER_HANDLER.counters['ERROR'] > 0:
+            self.n_errors = COUNTER_HANDLER.counters['ERROR']
             if COUNTER_HANDLER.counters['WARNING'] > 0:
-                LOGGER.info('FAIL: file contained {} errors and {} '
-                            'warnings'.format(COUNTER_HANDLER.counters['ERROR'], COUNTER_HANDLER.counters['WARNING']),
-                            extra={'indent_before': 0})
+                LOGGER.info(f"FAIL: file contained {COUNTER_HANDLER.counters['ERROR']} errors "
+                            f"and {COUNTER_HANDLER.counters['WARNING']} warnings")
             else:
-                LOGGER.info('FAIL: file contained {} errors'.format(COUNTER_HANDLER.counters['ERROR']),
-                            extra={'indent_before': 0})
+                LOGGER.info(f"FAIL: file contained {COUNTER_HANDLER.counters['ERROR']} errors")
         else:
+            self.passed = True
+
             if COUNTER_HANDLER.counters['WARNING'] > 0:
-                LOGGER.info('PASS: file formatted correctly but with {} '
-                            'warnings.'.format(COUNTER_HANDLER.counters['WARNING']),
-                            extra={'indent_before': 0})
-                self.passed = True
+                LOGGER.info("PASS: file formatted correctly but with "
+                            f"{COUNTER_HANDLER.counters['WARNING']} warnings")
             else:
-                LOGGER.info('PASS: file formatted correctly with no warnings',
-                            extra={'indent_before': 0})
-                self.passed = True
+                LOGGER.info('PASS: file formatted correctly with no warnings')
 
 
 class DataWorksheet:
@@ -610,6 +626,8 @@ class DataWorksheet:
 
     def _old_load_waste_code():
         """Code from old version that may need to work back into new approach"""
+
+        # TODO CHECK THIS!
         row_sample = len(MANDATORY_DESCRIPTORS) + len(OPTIONAL_DESCRIPTORS) + 10
         
         field_meta = [r for r in ws_rows]
