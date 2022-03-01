@@ -679,38 +679,55 @@ class GenBankTaxa:
 
             # Look for a match
             if gbf_taxon.is_backbone:
-                # # self IS WRONG HERE
-                gbf_taxon = validator.search(p_taxon)
-                print(gbf_taxon)
+                # Search for taxon
+                gbf_taxon = validator.search(gbf_taxon)
+
             else: # Should only fire for superkingdom case
-                LOGGER.error(f'Parent taxon ({gbf_taxon.name}) is not of a GBIF backbone rank')
-                # MORE SHOULD BE WRITTEN HERE TO HANDLE SUPERKINGDOM CASE
+                LOGGER.warning(f'Taxon ({gbf_taxon.name}) is not of a GBIF backbone rank')
+
+                # Check if we are dealing with the superkingdom case
+                if gbf_taxon.rank == "superkingdom":
+                    # If so remake the object using kingdom as the rank
+                    gbf_taxon = taxa.Taxon(name=list(hr_taxon.taxa_hier.values())[-1],
+                               rank="kingdom", gbif_id=None)
+                    # Then search for new taxon
+                    gbf_taxon = validator.search(gbf_taxon)
+
+                    # If this works let the user know what we did
+                    if gbf_taxon.found:
+                        LOGGER.info(f'Taxon ({gbf_taxon.name}) defined as kingdom'
+                                    f' rank in GBIF')
 
         # THIS WILL NEED TO BE UPDATED WHEN I DO MORE ADVANCED STUFF
-        # Report on the parent information
+        # Report on the taxon information
+        # NEED TO HANDLE SYNONYMS FOUND CASE (CAN I FIND AN EXAMPLE?)
+        # AND THE ONLY HIGHER ORDER TAXA FOUND CASE
+        # ALSO NEEDS TO CATCH AMBIGIOUS TAXA
         if not gbf_taxon.found:
-            LOGGER.error(f'Parent taxon ({gbf_taxon.name}) {gbf_taxon.lookup_status}')
+            LOGGER.error(f'Taxon ({gbf_taxon.name}) {gbf_taxon.lookup_status}')
 
         elif not gbf_taxon.is_canon:
-            LOGGER.warning(f'Parent taxon ({gbf_taxon.name}) considered a {gbf_taxon.taxon_status}'
+            LOGGER.warning(f'Taxon ({gbf_taxon.name}) considered a {gbf_taxon.taxon_status}'
                            f' of {gbf_taxon.canon_usage.name} in GBIF backbone')
         else:
-            LOGGER.info(f'Parent taxon ({gbf_taxon.name}) accepted')
+            LOGGER.info(f'Taxon ({gbf_taxon.name}) accepted in GBIF')
 
-        # SORT ALL THIS TOMORROW
         return
 
 # ROUGH TESTING BLOCK
 # SHOULD CONVERT THIS INTO PROPER UNIT TESTS AS I GO
 v1 = GenBankTaxa()
-# # NEED TO FIGURE OUT WHICH VALIDATOR TO MAKE TO TEST THIS
-# # Get a validator instance
-# if resources.use_local_gbif:
-#     self.validator = LocalGBIFValidator(resources)
-# else:
-#     self.validator = RemoteGBIFValidator()
-#
-# # Should work fine
-# d1 = ['E coli', {'species': 'Escherichia coli'}, 562]
-# #
-# test = v1.validate_and_add_taxon(d1)
+# Use remote GBIF validator
+v2 = taxa.RemoteGBIFValidator()
+
+# Should work fine
+d1 = ['E coli', {'species': 'Escherichia coli'}, 562]
+# OOH IT GIVES AN ERROR, THAT IS INTERESTING
+# A LOT OF COMPLEXITY HERE
+# NOT SURE IF THIS IS A SYNONYMS PROBLEM, A NEW EDGE CASE, A LACK OF TAXONOMIC RESOLUTION PROBLEM,
+# OR AN ERROR THAT I HAVE GENERATED THROUGH MY OWN THOUGHTLESSNESS
+d2 = ['Strepto', {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}, None]
+# IS PLANT KINGDOM A GOOD ONE FOR SYNONYMS?
+d3 = ['Bacteria', {'superkingdom': 'Bacteria'}, 2]
+
+test = v1.validate_and_add_taxon(v2,d3)
