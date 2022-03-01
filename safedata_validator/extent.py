@@ -49,6 +49,7 @@ class Extent:
         self._extent = [None, None]
         self._hard_bounds = None
         self._soft_bounds = None
+        self._populated = False
 
         if hard_bounds is not None:
             self._check_bounds(hard_bounds)
@@ -86,6 +87,11 @@ class Extent:
     def soft_bounds(self) -> tuple:
         """Returns a tuple showing the hard bounds of the Extent object"""
         return self._soft_bounds
+
+    @property
+    def populated(self) -> bool:
+        """Returns a boolean showing if the extent has been populated"""
+        return self._populated
 
     def _check_bounds(self, bounds: tuple):
         """
@@ -139,6 +145,8 @@ class Extent:
 
         if self.extent[0] is None or values[0] < self.extent[0]:
             self._extent[0] = minv
+            self._populated = True
 
         if self.extent[1] is None or values[1] > self.extent[1]:
             self._extent[1] = maxv
+            self._populated = True
