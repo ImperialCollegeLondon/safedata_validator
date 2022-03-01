@@ -117,7 +117,7 @@ def config_filesystem(fs):
     config_contents = ['locations = ',
                        'gbif_database = ',
                        '[extents]',
-                       'temporal_soft_extent = 2002-02-01, 2030-02-01',
+                       'temporal_soft_extent = 2002-02-02, 2030-01-31',
                        'temporal_hard_extent = 2002-02-01, 2030-02-01',
                        'latitudinal_hard_extent = -90, 90',
                        'latitudinal_soft_extent = -4, 2',

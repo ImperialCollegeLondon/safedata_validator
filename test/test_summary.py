@@ -11,7 +11,7 @@ def fixture_summary(resources_with_local_gbif):
     return Summary(resources_with_local_gbif)
 
 
-# TODO - _read_block is being tested by repeated _read_`block` calls and
+# NOTE - _read_block is being tested by repeated _read_`block` calls and
 #        this could be simplified to reduce the code, but there are block
 #        specific variations (types, mandatory etc) that make it easier
 #        to test block by block
