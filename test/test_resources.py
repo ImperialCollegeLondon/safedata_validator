@@ -211,6 +211,33 @@ def test_load_resources_by_file(config_filesystem, caplog, filepath, expected_lo
                 for exp, rec in zip(expected_log, caplog.records)])
 
 
+# TODO  - there may be a way to combine these, but they rely on different fake
+#         file systems as the first argument, so not straightforward
+
+
+@pytest.mark.parametrize(
+    'expected_log',
+    [ ( (INFO, 'Configuring Resources'),
+        (CRITICAL, "No user config in"),
+        (CRITICAL, "No site config in"),
+        (CRITICAL, "No config files provided or found")),
+    ])
+def test_load_resources_from_missing_config(config_filesystem, caplog, expected_log):
+    """This test checks failure modes when no config is provided
+    """
+
+    with pytest.raises(RuntimeError):
+
+      res = Resources()
+      
+      assert len(expected_log) == len(caplog.records)
+
+      assert all([exp[0] == rec.levelno 
+                  for exp, rec in zip(expected_log, caplog.records)])
+      assert all([exp[1] in rec.message
+                  for exp, rec in zip(expected_log, caplog.records)])
+
+
 @pytest.mark.parametrize(
     'expected_log',
     [ ( (INFO, 'Configuring Resources'),
@@ -218,7 +245,7 @@ def test_load_resources_by_file(config_filesystem, caplog, filepath, expected_lo
         (INFO, 'Validating locations: '),
         (INFO, 'Validating local GBIF database: ')),
     ])
-def test_load_resources_by_user(config_filesystem, caplog, expected_log):
+def test_load_resources_from_user_config(user_config_file, caplog, expected_log):
     """This test uses the ability to find a user config file
     """
 
@@ -231,5 +258,25 @@ def test_load_resources_by_user(config_filesystem, caplog, expected_log):
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
 
+
+@pytest.mark.parametrize(
+    'expected_log',
+    [ ( (INFO, 'Configuring Resources'),
+        (INFO, 'Configuring resources from site '),
+        (INFO, 'Validating locations: '),
+        (INFO, 'Validating local GBIF database: ')),
+    ])
+def test_load_resources_from_site_config(site_config_file, caplog, expected_log):
+    """This test uses the ability to find a site config file
+    """
+
+    res = Resources()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all([exp[0] == rec.levelno 
+                for exp, rec in zip(expected_log, caplog.records)])
+    assert all([exp[1] in rec.message
+                for exp, rec in zip(expected_log, caplog.records)])
 
 

@@ -122,27 +122,34 @@ def config_filesystem(fs):
     fs.create_file(FIXTURE_FILES.vf.fix_cfg_local,
                    contents='\n'.join(config_contents))
 
-    # Local user config
-    fs.create_file(FIXTURE_FILES.vf.user_config, contents='\n'.join(config_contents))
+    # # Local user config
+    # fs.create_file(FIXTURE_FILES.vf.user_config, contents='\n'.join(config_contents))
 
     yield fs
 
 
-# @pytest.fixture()
-# def user_config_file(config_filesystem, fixture_dir):
-#     """Attempt to extend the fake fs - does not seem to work"""
-#     # Local user config as a duplicate of the existing config in the fixture
-#     # directory
-#     local_user_config = os.path.join(appdirs.user_config_dir(),
-#                                      'safedata_validator',
-#                                      'safedata_validator.cfg')
-#
-#     local_config = os.path.join(fixture_dir, 'safedata_validator_local.cfg')
-#
-#     with open(local_config) as infile:
-#         config_filesystem.create_file(local_user_config, contents=infile.readlines())
-#
-#     yield config_filesystem
+@pytest.fixture()
+def user_config_file(config_filesystem):
+    """Attempt to extend the fake fs - does not seem to work"""
+    # Local user config as a duplicate of the existing config in the fixture
+    # directory
+
+    with open(FIXTURE_FILES.vf.fix_cfg_local) as infile:
+        config_filesystem.create_file(FIXTURE_FILES.vf.user_config, contents=''.join(infile.readlines()))
+
+    yield config_filesystem
+
+
+@pytest.fixture()
+def site_config_file(config_filesystem):
+    """Attempt to extend the fake fs - does not seem to work"""
+    # Local user config as a duplicate of the existing config in the fixture
+    # directory
+
+    with open(FIXTURE_FILES.vf.fix_cfg_local) as infile:
+        config_filesystem.create_file(FIXTURE_FILES.vf.site_config, contents=''.join(infile.readlines()))
+
+    yield config_filesystem
 
 
 ## ------------------------------------------
