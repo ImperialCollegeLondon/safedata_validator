@@ -4,12 +4,7 @@ from safedata_validator import genb_taxa
 # TESTS TO PUT IN:
 # NEED TO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
 
-@pytest.fixture(scope='module')
-def validators():
-    """Parameterised fixture to return local GBIF validator
-    """
-    return genb_taxa.RemoteNCBIValidator()
-
+# MOVE THESE TO CONFTEST
 @pytest.fixture(scope='module')
 def gb_instance():
     """Parameterised fixture to return a GenBankTaxa instance
@@ -65,14 +60,14 @@ def test_taxon_init_errors(test_input, expected_exception):
      (dict(nnme='Cytophaga marina', genbank_id=1000),
       ('Cytophaga marina', 1000, None, True, "species", "Tenacibaculum maritimum"))
      ])
-def test_id_lookup(validators, test_input, expected):
+def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of looking up a specific NCBI taxonomy against
     the actual returned taxonomy details. At the moment this for the Remote validator,
     but if a local validator is defined this should also be checked against.
 
     """
 
-    fnd_tx = validators.id_lookup(**test_input)
+    fnd_tx = fixture_ncbi_validators.id_lookup(**test_input)
 
     assert fnd_tx.name == expected[0]
     assert fnd_tx.genbank_id == expected[1]
@@ -97,14 +92,14 @@ def test_id_lookup(validators, test_input, expected):
       (('WARNING', 'NCBI ID 1000 has been superseeded by ID 107401'),
       ))
      ])
-def test_validate_id_lookup(caplog, test_input, expected_log_entries, validators):
+def test_validate_id_lookup(caplog, test_input, expected_log_entries, fixture_ncbi_validators):
     """This test checks that the function to generate NCBITaxon objects by searching
     an ID logs the correct errors and warnings. At the moment this for the Remote
     validator, but if a local validator is defined this should also be checked against.
 
     """
 
-    fnd_tx = validators.id_lookup(**test_input)
+    fnd_tx = fixture_ncbi_validators.id_lookup(**test_input)
 
     if len(expected_log_entries) != len(caplog.records):
         pytest.fail('Incorrect number of log records emitted')
@@ -130,12 +125,12 @@ def test_validate_id_lookup(caplog, test_input, expected_log_entries, validators
       ValueError),
      (dict(nnme='E coli', genbank_id=100000000000000),  # bad ID
       genb_taxa.NCBIError)])
-def test_id_lookup_errors(validators, test_input, expected_exception):
+def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exception):
     """This test checks validator.id_lookup inputs throw errors as expected
     """
 
     with pytest.raises(expected_exception):
-        _ = validators.id_lookup(**test_input)
+        _ = fixture_ncbi_validators.id_lookup(**test_input)
 
 # Then do the same for the taxa serach function
 @pytest.mark.parametrize(
@@ -167,14 +162,14 @@ def test_id_lookup_errors(validators, test_input, expected_exception):
      (dict(nnme="Bacteria",taxah={'superkingdom': 'Bacteria'}),
       ("Bacteria", 2, None, False, "superkingdom", "Bacteria"))
     ])
-def test_taxa_search(validators, test_input, expected):
+def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of searching for a taxa in the NCBI taxonomy
     database against what was expected to be found. At the moment this for the
     Remote validator, but if a local validator is defined this should also be
     checked against.
 
     """
-    fnd_tx = validators.taxa_search(**test_input)
+    fnd_tx = fixture_ncbi_validators.taxa_search(**test_input)
 
     assert fnd_tx.name == expected[0]
     assert fnd_tx.genbank_id == expected[1]
@@ -227,7 +222,8 @@ def test_taxa_search(validators, test_input, expected):
        ('WARNING', "E coli strain not of backbone rank, instead resolved to species level"),
       )),
      ])
-def test_validate_taxa_search(caplog, test_input, expected_log_entries, validators):
+def test_validate_taxa_search(caplog, test_input, expected_log_entries,
+                              fixture_ncbi_validators):
     """This test checks that the function that searches the NCBI database to find
     information on particular taxa logs the correct errors and warnings. At the
     moment this for the Remote validator, but if a local validator is defined
@@ -235,7 +231,7 @@ def test_validate_taxa_search(caplog, test_input, expected_log_entries, validato
 
     """
 
-    fnd_tx = validators.taxa_search(**test_input)
+    fnd_tx = fixture_ncbi_validators.taxa_search(**test_input)
 
     if len(expected_log_entries) != len(caplog.records):
         pytest.fail('Incorrect number of log records emitted')
@@ -261,12 +257,12 @@ def test_validate_taxa_search(caplog, test_input, expected_log_entries, validato
       ValueError),
     ])
 
-def test_taxa_search_errors(validators, test_input, expected_exception):
+def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_exception):
     """This test checks validator.taxa_search inputs throw errors as expected
     """
 
     with pytest.raises(expected_exception):
-        _ = validators.taxa_search(**test_input)
+        _ = fixture_ncbi_validators.taxa_search(**test_input)
 
 # Then do the same for the validate_and_add_taxon function
 
@@ -448,14 +444,17 @@ def test_taxa_search_errors(validators, test_input, expected_exception):
       )),
      ])
 def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
-                                gb_instance, validators):
+                                fixture_taxon_validators):
     """This test checks that the function that searches the NCBI database to find
     information on particular taxa logs the correct errors and warnings. At the
     moment this for the Remote validator, but if a local validator is defined
     this should also be checked against.
 
     """
-    fnd_tx = gb_instance.validate_and_add_taxon(validators,test_input)
+
+    # ONLY MAKING A LOCAL VERSION FOR NOW
+    gb_instance = GenBankTaxa()
+    fnd_tx = gb_instance.validate_and_add_taxon(fixture_taxon_validators,test_input)
 
     if len(expected_log_entries) != len(caplog.records):
         pytest.fail('Incorrect number of log records emitted')
@@ -482,9 +481,12 @@ def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
      (['E coli', {'species': 'Escherichia coli'}, 100000000000000],
       genb_taxa.NCBIError),
     ])
-def test_validate_and_add_taxon_errors(validators, gb_instance, test_input, expected_exception):
+def test_validate_and_add_taxon_errors(fixture_taxon_validators, test_input, expected_exception):
     """This test checks validator.validate_and_add_taxon inputs throw errors as expected
     """
+    
+    # ONLY MAKING A LOCAL VERSION FOR NOW
+    gb_instance = GenBankTaxa()
 
     with pytest.raises(expected_exception):
-        _ = gb_instance.validate_and_add_taxon(validators,test_input)
+        _ = gb_instance.validate_and_add_taxon(fixture_taxon_validators,test_input)

@@ -623,7 +623,7 @@ class GenBankTaxa:
             p_proc = True
         else:
             # If not go straight ahead and search for the taxon
-            hr_taxon = validator.taxa_search(m_name, taxon_hier)
+            hr_taxon = self.validator.taxa_search(m_name, taxon_hier)
             # Catch case where errors are returned rather than a taxon
             if hr_taxon == None:
                 LOGGER.error(f'Search based on taxon hierarchy failed')
@@ -631,7 +631,7 @@ class GenBankTaxa:
 
             # Then check if a genbank ID number has been provided
             if genbank_id != None:
-                id_taxon = validator.id_lookup(m_name, int(genbank_id))
+                id_taxon = self.validator.id_lookup(m_name, int(genbank_id))
                 # Check whether this matches what was found using hierarchy
                 if id_taxon != hr_taxon:
                     # Check if taxonomy hierarchy superseeded
@@ -674,16 +674,13 @@ class GenBankTaxa:
         # Otherwise go and use the stored information to searcg
         else:
             # Create a taxon object
-            # THIS IS FLAWED BECAUSE I CHANGE THE INPUT
-            # NEED TO DO THIS BASED ON THE UPDATED INFO
             gbf_taxon = taxa.Taxon(name=list(hr_taxon.taxa_hier.values())[-1],
                        rank=list(hr_taxon.taxa_hier.keys())[-1], gbif_id=None)
-            print(gbf_taxon)
 
             # Look for a match
             if gbf_taxon.is_backbone:
-                # self IS WRONG HERE
-                gbf_taxon = self.validator.search(p_taxon)
+                # # self IS WRONG HERE
+                gbf_taxon = validator.search(p_taxon)
                 print(gbf_taxon)
             else: # Should only fire for superkingdom case
                 LOGGER.error(f'Parent taxon ({gbf_taxon.name}) is not of a GBIF backbone rank')
@@ -700,15 +697,20 @@ class GenBankTaxa:
         else:
             LOGGER.info(f'Parent taxon ({gbf_taxon.name}) accepted')
 
-        #
+        # SORT ALL THIS TOMORROW
         return
 
 # ROUGH TESTING BLOCK
 # SHOULD CONVERT THIS INTO PROPER UNIT TESTS AS I GO
 v1 = GenBankTaxa()
-v2 = RemoteNCBIValidator()
-
-# Should work fine
-d1 = ['E coli', {'species': 'Escherichia coli'}, 562]
-
-test = v1.validate_and_add_taxon(v2,d1)
+# # NEED TO FIGURE OUT WHICH VALIDATOR TO MAKE TO TEST THIS
+# # Get a validator instance
+# if resources.use_local_gbif:
+#     self.validator = LocalGBIFValidator(resources)
+# else:
+#     self.validator = RemoteGBIFValidator()
+#
+# # Should work fine
+# d1 = ['E coli', {'species': 'Escherichia coli'}, 562]
+# #
+# test = v1.validate_and_add_taxon(d1)
