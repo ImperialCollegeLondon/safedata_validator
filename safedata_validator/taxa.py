@@ -244,7 +244,8 @@ class LocalGBIFValidator:
         if not isinstance(gbif_id, int):
             raise ValueError('Non-integer GBIF code')
 
-        if not gbif_id > 0:
+        if not gbif_id >= 0:
+            # 0 is kingdom placeholder for incertae sedis
             raise ValueError('Negative GBIF code')
 
         # get the record associated with the provided ID
