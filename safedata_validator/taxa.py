@@ -27,6 +27,7 @@ from typing import Optional, Union
 import requests
 from enforce_typing import enforce_types
 
+from safedata_validator.resources import Resources
 from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
                                        loggerinfo_push_pop)
 from safedata_validator.validators import (GetDataFrame, HasDuplicates,
@@ -418,7 +419,7 @@ class RemoteGBIFValidator:
 
 class Taxa:
 
-    def __init__(self, resources):
+    def __init__(self, resources: Resources):
         """A class to hold a list of taxon names and a validated taxonomic 
         index for those taxa and their taxonomic hierarchy. The validate_taxon
         method checks that taxon details and their optional parent taxon can be
