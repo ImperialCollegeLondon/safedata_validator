@@ -1,9 +1,12 @@
 import pytest
 from safedata_validator import genb_taxa
+from logging import ERROR, WARNING, INFO
+from .conftest import log_check
 
 # TESTS TO PUT IN:
 # NEED TO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
 # NEED TO CHECK THAT REPEATED ENTRIES ARE ACTUALLY SKIPPED
+# SHOULD MAKE USE OF DAVID'S log check, AND LOOK FOR SIMILAR
 
 # MOVE THESE TO CONFTEST
 @pytest.fixture(scope='module')
@@ -87,10 +90,10 @@ def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     [(dict(nnme='E coli', genbank_id=562), # Fine so empty
       ()),
      (dict(nnme='Streptophytina', genbank_id=131221), # Non-backbone rank
-      (('WARNING', 'Streptophytina not of backbone rank, instead resolved to phylum level'),
+      ((WARNING, 'Streptophytina not of backbone rank, instead resolved to phylum level'),
       )),
      (dict(nnme='C marina', genbank_id=1000), # Non-backbone rank
-      (('WARNING', 'NCBI ID 1000 has been superseeded by ID 107401'),
+      ((WARNING, 'NCBI ID 1000 has been superseeded by ID 107401'),
       ))
      ])
 def test_validate_id_lookup(caplog, test_input, expected_log_entries, fixture_ncbi_validators):
@@ -102,14 +105,7 @@ def test_validate_id_lookup(caplog, test_input, expected_log_entries, fixture_nc
 
     fnd_tx = fixture_ncbi_validators.id_lookup(**test_input)
 
-    if len(expected_log_entries) != len(caplog.records):
-        pytest.fail('Incorrect number of log records emitted')
-
-    # Note that this implicitly asserts that the order of logging messages is correct too
-    for idx, log_rec in enumerate(caplog.records):
-        exp_rec = expected_log_entries[idx]
-        assert log_rec.levelname == exp_rec[0]
-        assert exp_rec[1] in log_rec.message
+    log_check(caplog, expected_log_entries)
 
 # Third function that checks that id_lookup throws the appropriate errors
 @pytest.mark.parametrize(
@@ -190,37 +186,37 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     [(dict(nnme='E coli', taxah={'genus': 'Escherichia', 'species': 'Escherichia coli'}),
       ()),
      (dict(nnme='Nonsense', taxah={'species': 'Nonsense garbage'}), # Nonsense
-      (('ERROR', 'Taxa Nonsense cannot be found'),
+      ((ERROR, 'Taxa Nonsense cannot be found'),
       )),
      (dict(nnme='Morus', taxah={'genus': 'Morus'}), # ambigious Morus
-      (('ERROR', 'Taxa Morus cannot be found using only one taxonomic level,'
+      ((ERROR, 'Taxa Morus cannot be found using only one taxonomic level,'
       ' more should be provided'),
       )),
      # Nonsense Morus
      (dict(nnme='N Morus', taxah={'family': 'Nonsense', 'genus': 'Morus'}),
-      (('ERROR', 'Provided parent taxa for N Morus not found'),
+      ((ERROR, 'Provided parent taxa for N Morus not found'),
       )),
      # Aegle Morus
      (dict(nnme='A Morus', taxah={'family': 'Aegle', 'genus': 'Morus'}),
-      (('ERROR', 'More than one possible parent taxa for A Morus found'),
+      ((ERROR, 'More than one possible parent taxa for A Morus found'),
       )),
      # Eukaryote Morus
      (dict(nnme='E Morus', taxah={'superkingdom': 'Eukaryota', 'genus': 'Morus'}),
-      (('ERROR', 'Parent taxa for E Morus refers to multiple possible child taxa'),
+      ((ERROR, 'Parent taxa for E Morus refers to multiple possible child taxa'),
       )),
      # Carnivora Morus
      (dict(nnme='C Morus', taxah={'superkingdom': 'Carnivora', 'genus': 'Morus'}),
-      (('ERROR', 'Parent taxa not actually a valid parent of C Morus'),
+      ((ERROR, 'Parent taxa not actually a valid parent of C Morus'),
       )),
      # Cytophaga marina
      (dict(nnme='C marina', taxah={'genus': 'Cytophaga', 'species': 'Cytophaga marina'}),
-      (('WARNING', 'Cytophaga marina not accepted usage should be Tenacibaculum'
+      ((WARNING, 'Cytophaga marina not accepted usage should be Tenacibaculum'
       ' maritimum instead'),
       )),
      # Cytophaga marina
      (dict(nnme='E coli strain', taxah={'strain': 'Escherichia coli 1-110-08_S1_C1'}),
-      (('WARNING', "No backbone ranks provided in E coli strain's taxa hierarchy"),
-       ('WARNING', "E coli strain not of backbone rank, instead resolved to species level"),
+      ((WARNING, "No backbone ranks provided in E coli strain's taxa hierarchy"),
+       (WARNING, "E coli strain not of backbone rank, instead resolved to species level"),
       )),
      ])
 def test_validate_taxa_search(caplog, test_input, expected_log_entries,
@@ -234,14 +230,7 @@ def test_validate_taxa_search(caplog, test_input, expected_log_entries,
 
     fnd_tx = fixture_ncbi_validators.taxa_search(**test_input)
 
-    if len(expected_log_entries) != len(caplog.records):
-        pytest.fail('Incorrect number of log records emitted')
-
-    # Note that this implicitly asserts that the order of logging messages is correct too
-    for idx, log_rec in enumerate(caplog.records):
-        exp_rec = expected_log_entries[idx]
-        assert log_rec.levelname == exp_rec[0]
-        assert exp_rec[1] in log_rec.message
+    log_check(caplog, expected_log_entries)
 
 # Third function that checks that taxa_search throws the appropriate errors
 @pytest.mark.parametrize(
@@ -274,205 +263,205 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
     'test_input,expected_log_entries',
     # Fine so empty
     [(['E coli', {'species': 'Escherichia coli'}, None],
-      (('INFO', "Taxon (E coli) found in NCBI database"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('INFO', "Taxon (Escherichia coli) accepted in GBIF"),
+      ((INFO, "Taxon (E coli) found in NCBI database"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # Same but with valid code provided
      (['E coli', {'species': 'Escherichia coli'}, 562],
-      (('INFO', "Taxon (E coli) found in NCBI database"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('INFO', "Taxon (Escherichia coli) accepted in GBIF"),
+      ((INFO, "Taxon (E coli) found in NCBI database"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # whitespace padding error
      ([' E coli', {'species': 'Escherichia coli'}, None],
-      (('ERROR', "Worksheet name has whitespace padding: ' E coli'"),
-       ('INFO', "Taxon (E coli) found in NCBI database"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('INFO', "Taxon (Escherichia coli) accepted in GBIF"),
+      ((ERROR, "Worksheet name has whitespace padding: ' E coli'"),
+       (INFO, "Taxon (E coli) found in NCBI database"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # String of just whitespace provided as name
      ([' ', {'species': 'Escherichia coli'}, None],
-      (('ERROR', "Worksheet name missing, whitespace only or not text"),
+      ((ERROR, "Worksheet name missing, whitespace only or not text"),
       )),
      # No name error
      ([None, {'species': 'Escherichia coli'}, None],
-      (('ERROR', "Worksheet name missing, whitespace only or not text"),
+      ((ERROR, "Worksheet name missing, whitespace only or not text"),
       )),
      # Blank string provided as name
      (['', {'species': 'Escherichia coli'}, None],
-      (('ERROR', "Worksheet name missing, whitespace only or not text"),
+      ((ERROR, "Worksheet name missing, whitespace only or not text"),
       )),
      # Floats that can be cocnverted to integers are allowed
      (['E coli', {'species': 'Escherichia coli'}, 562.0],
-      (('INFO', "Taxon (E coli) found in NCBI database"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('INFO', "Taxon (Escherichia coli) accepted in GBIF"),
+      ((INFO, "Taxon (E coli) found in NCBI database"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # A true float results in multiple errors
      (['E coli', {'species': 'Escherichia coli'}, 562.5],
-      (('ERROR', "NCBI ID contains value that is not an integer"),
-       ('ERROR', "Improper NCBI ID provided, cannot be validated"),
+      ((ERROR, "NCBI ID contains value that is not an integer"),
+       (ERROR, "Improper NCBI ID provided, cannot be validated"),
       )),
      # As does a string
      (['E coli', {'species': 'Escherichia coli'}, "ID"],
-      (('ERROR', "NCBI ID contains value that is not an integer"),
-       ('ERROR', "Improper NCBI ID provided, cannot be validated"),
+      ((ERROR, "NCBI ID contains value that is not an integer"),
+       (ERROR, "Improper NCBI ID provided, cannot be validated"),
       )),
      # This checks that multiple errors can fire at once
      (['E coli', {}, 562.5],
-      (('ERROR', "NCBI ID contains value that is not an integer"),
-       ('ERROR', "Taxa hierarchy should be a (not empty) dictonary"),
-       ('ERROR', "Improper NCBI ID provided, cannot be validated"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      ((ERROR, "NCBI ID contains value that is not an integer"),
+       (ERROR, "Taxa hierarchy should be a (not empty) dictonary"),
+       (ERROR, "Improper NCBI ID provided, cannot be validated"),
+       (ERROR, "Taxon details not properly formatted, cannot validate"),
       )),
      # Taxa hierarchy provided as a string
      (['E coli', 'Escherichia coli', None],
-      (('ERROR', "Taxa hierarchy should be a (not empty) dictonary"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      ((ERROR, "Taxa hierarchy should be a (not empty) dictonary"),
+       (ERROR, "Taxon details not properly formatted, cannot validate"),
       )),
      # Taxa hierarchy dictonary empty
      (['E coli', {}, None],
-      (('ERROR', "Taxa hierarchy should be a (not empty) dictonary"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      ((ERROR, "Taxa hierarchy should be a (not empty) dictonary"),
+       (ERROR, "Taxon details not properly formatted, cannot validate"),
       )),
      # Example of multiple errors
      ([' E coli', {}, None],
-      (('ERROR', "Worksheet name has whitespace padding: ' E coli'"),
-       ('ERROR', "Taxa hierarchy should be a (not empty) dictonary"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      ((ERROR, "Worksheet name has whitespace padding: ' E coli'"),
+       (ERROR, "Taxa hierarchy should be a (not empty) dictonary"),
+       (ERROR, "Taxon details not properly formatted, cannot validate"),
       )),
      # Missing dictonary key
      (['E coli', {' ': 'Escherichia coli'}, None],
-      (('ERROR', "Empty dictonary key used"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      ((ERROR, "Empty dictonary key used"),
+       (ERROR, "Taxon details not properly formatted, cannot validate"),
       )),
      # Non-string dictonary key
      (['E coli', {26: 'Escherichia coli'}, None],
-      (('ERROR', "Non-string dictonary key used: 26"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      ((ERROR, "Non-string dictonary key used: 26"),
+       (ERROR, "Taxon details not properly formatted, cannot validate"),
       )),
      # Padded dictonary key
      (['E coli', {' species': 'Escherichia coli'}, None],
-      (('ERROR', "Dictonary key has whitespace padding: ' species'"),
-       ('INFO', "Taxon (E coli) found in NCBI database"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('INFO', "Taxon (Escherichia coli) accepted in GBIF"),
+      ((ERROR, "Dictonary key has whitespace padding: ' species'"),
+       (INFO, "Taxon (E coli) found in NCBI database"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # Missing dictonary value
      (['E coli', {'species': ''}, None],
-      (('ERROR', "Empty dictonary value used"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      ((ERROR, "Empty dictonary value used"),
+       (ERROR, "Taxon details not properly formatted, cannot validate"),
       )),
      # Non-string dictonary value
      (['E coli', {'species': 26}, None],
-      (('ERROR', "Non-string dictonary value used: 26"),
-       ('ERROR', "Taxon details not properly formatted, cannot validate"),
+      ((ERROR, "Non-string dictonary value used: 26"),
+       (ERROR, "Taxon details not properly formatted, cannot validate"),
       )),
      # Padding on dictonary value
      (['E coli', {'species': ' Escherichia coli'}, None],
-      (('ERROR', "Dictonary value has whitespace padding: ' Escherichia coli'"),
-       ('INFO', "Taxon (E coli) found in NCBI database"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('INFO', "Taxon (Escherichia coli) accepted in GBIF"),
+      ((ERROR, "Dictonary value has whitespace padding: ' Escherichia coli'"),
+       (INFO, "Taxon (E coli) found in NCBI database"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # Taxon hierarchy in wrong order
      (['E coli', {'species': 'Escherichia coli', 'genus': 'Escherichia'}, None],
-      (('ERROR', "Taxon hierarchy not in correct order"),
+      ((ERROR, "Taxon hierarchy not in correct order"),
       )),
      # Right order but non-backbone rank
      (['Strepto', {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}, None],
-      (('WARNING', "Strepto not of backbone rank, instead resolved to phylum level"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('ERROR', "Taxon (Streptophyta) No match found"),
+      ((WARNING, "Strepto not of backbone rank, instead resolved to phylum level"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (ERROR, "Taxon (Streptophyta) No match found"),
       )),
      # Superseeded taxon name used
      (['C marina', {'species': 'Cytophaga marina'}, None],
-      (('WARNING', "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
-       ('WARNING', "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('INFO', "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
+      ((WARNING, "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
+       (WARNING, "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (INFO, "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
       )),
      # Nonsense taxon provided
      (['N garbage', {'species': 'Nonsense garbage'}, None],
-      (('ERROR', "Taxa N garbage cannot be found"),
-       ('ERROR', "Search based on taxon hierarchy failed"),
+      ((ERROR, "Taxa N garbage cannot be found"),
+       (ERROR, "Search based on taxon hierarchy failed"),
       )),
      # Ambigious taxon provided
      (['Morus', {'genus': 'Morus'}, None],
-      (('ERROR', "Taxa Morus cannot be found using only one taxonomic level, more should be provided"),
-       ('ERROR', "Search based on taxon hierarchy failed"),
+      ((ERROR, "Taxa Morus cannot be found using only one taxonomic level, more should be provided"),
+       (ERROR, "Search based on taxon hierarchy failed"),
       )),
      # Ambigious taxon resolved
      (['M Morus', {'family': 'Moraceae', 'genus': 'Morus'}, None],
-      (('INFO', "Taxon (M Morus) found in NCBI database"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('ERROR', "Taxon (Morus) Multiple equal matches for Morus"),
+      ((INFO, "Taxon (M Morus) found in NCBI database"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (ERROR, "Taxon (Morus) Multiple equal matches for Morus"),
       )),
      # E coli with incorrect NCBI ID
      (['E coli', {'species': 'Escherichia coli'}, 333],
-      (('ERROR', "The NCBI ID supplied for E coli does not match hierarchy: expected 562 got 333"),
+      ((ERROR, "The NCBI ID supplied for E coli does not match hierarchy: expected 562 got 333"),
       )),
      # Non-backbone case with code
      (['E coli strain', {'species': 'Escherichia coli', 'strain': 'Escherichia coli 1-110-08_S1_C1'},
        1444049],
-      (('WARNING', "E coli strain not of backbone rank, instead resolved to species level"),
-       ('WARNING', "E coli strain not of backbone rank, instead resolved to species level"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('INFO', "Taxon (Escherichia coli) accepted in GBIF"),
+      ((WARNING, "E coli strain not of backbone rank, instead resolved to species level"),
+       (WARNING, "E coli strain not of backbone rank, instead resolved to species level"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # Superseeded taxa ID and name
      (['C marina', {'species': 'Cytophaga marina'}, 1000],
-      (('WARNING', "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
-       ('WARNING', "NCBI ID 1000 has been superseeded by ID 107401"),
-       ('WARNING', "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('INFO', "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
+      ((WARNING, "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
+       (WARNING, "NCBI ID 1000 has been superseeded by ID 107401"),
+       (WARNING, "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (INFO, "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
       )),
      # Just superseeded taxa ID
      (['T maritimum', {'species': 'Tenacibaculum maritimum'}, 1000],
-      (('WARNING', "NCBI ID 1000 has been superseeded by ID 107401"),
-       ('WARNING', "NCBI taxa ID superseeded for T maritimum, using new taxa ID"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('INFO', "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
+      ((WARNING, "NCBI ID 1000 has been superseeded by ID 107401"),
+       (WARNING, "NCBI taxa ID superseeded for T maritimum, using new taxa ID"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (INFO, "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
       )),
      # Just superseeded name
      (['C marina', {'species': 'Cytophaga marina'}, 107401],
-      (('WARNING', "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
-       ('WARNING', "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('INFO', "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
+      ((WARNING, "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
+       (WARNING, "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (INFO, "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
       )),
      # E coli recorded as a family rather than a species
      (['E coli', {'family': 'Escherichia coli'}, None],
-      (('ERROR', "Escherichia coli is a species not a family"),
-       ('ERROR', "Search based on taxon hierarchy failed"),
+      ((ERROR, "Escherichia coli is a species not a family"),
+       (ERROR, "Search based on taxon hierarchy failed"),
       )),
      # E coli recorded as a subspecies rather than a species
      (['E coli', {'subspecies': 'Escherichia coli'}, None],
-      (('ERROR', "Escherichia coli is a species not a subspecies"),
-       ('ERROR', "Search based on taxon hierarchy failed"),
+      ((ERROR, "Escherichia coli is a species not a subspecies"),
+       (ERROR, "Search based on taxon hierarchy failed"),
       )),
      # Same idea for a non-backbone case
      (['Streptophytina', {'phylum': 'Streptophytina'}, None],
-      (('WARNING', "Streptophytina not of backbone rank, instead resolved to phylum level"),
-       ('ERROR', "Streptophytina is a subphylum not a phylum"),
-       ('ERROR', "Search based on taxon hierarchy failed"),
+      ((WARNING, "Streptophytina not of backbone rank, instead resolved to phylum level"),
+       (ERROR, "Streptophytina is a subphylum not a phylum"),
+       (ERROR, "Search based on taxon hierarchy failed"),
       )),
      # Superkingdom not included in GBIF case
      (['Eukaryota', {'superkingdom': 'Eukaryota'}, 2759],
-      (('INFO', "Taxon (Eukaryota) found in NCBI database"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('WARNING', "Taxon (Eukaryota) is not of a GBIF backbone rank"),
-       ('ERROR', "Taxon (Eukaryota) No match found")
+      ((INFO, "Taxon (Eukaryota) found in NCBI database"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (WARNING, "Taxon (Eukaryota) is not of a GBIF backbone rank"),
+       (ERROR, "Taxon (Eukaryota) No match found")
       )),
      # Can actually deal with the bacterial case
      (['Bacteria', {'superkingdom': 'Bacteria'}, 2],
-      (('INFO', "Taxon (Bacteria) found in NCBI database"),
-       ('INFO', "Attempting to validate against GBIF database"),
-       ('WARNING', "Taxon (Bacteria) is not of a GBIF backbone rank"),
-       ('INFO', "Taxon (Bacteria) defined as kingdom rank in GBIF"),
-       ('INFO', "Taxon (Bacteria) accepted in GBIF"),
+      ((INFO, "Taxon (Bacteria) found in NCBI database"),
+       (INFO, "Attempting to validate against GBIF database"),
+       (WARNING, "Taxon (Bacteria) is not of a GBIF backbone rank"),
+       (INFO, "Taxon (Bacteria) defined as kingdom rank in GBIF"),
+       (INFO, "Taxon (Bacteria) accepted in GBIF"),
       )),
      ])
 def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
@@ -488,14 +477,7 @@ def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
     gb_instance = genb_taxa.GenBankTaxa()
     fnd_tx = gb_instance.validate_and_add_taxon(fixture_taxon_validators,test_input)
 
-    if len(expected_log_entries) != len(caplog.records):
-        pytest.fail('Incorrect number of log records emitted')
-
-    # Note that this implicitly asserts that the order of logging messages is correct too
-    for idx, log_rec in enumerate(caplog.records):
-        exp_rec = expected_log_entries[idx]
-        assert log_rec.levelname == exp_rec[0]
-        assert exp_rec[1] in log_rec.message
+    log_check(caplog, expected_log_entries)
 
 # Third function that checks that validate_and_add_taxon throws the appropriate errors
 @pytest.mark.parametrize(
