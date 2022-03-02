@@ -401,12 +401,21 @@ class Summary:
             start_date = temp_extent[0]['start date']
             end_date = temp_extent[0]['end date']
 
-            if (isinstance(start_date, datetime.datetime) and
-                isinstance(end_date, datetime.datetime) and
-                start_date > end_date):
+            if not (isinstance(start_date, datetime.datetime) and
+                    isinstance(end_date, datetime.datetime)):
+                LOGGER.error('Temporal extents are not date values')
+                return
+            
+            if not (start_date.time() == datetime.time(0,0) and
+                    end_date.time() == datetime.time(0,0)):
+                LOGGER.error('Temporal extents should be date not datetime values')
+                return
+            
+            if start_date > end_date:
                 LOGGER.error('Start date is after end date')
-            else:
-                self.temporal_extent.update([start_date, end_date])
+                return
+            
+            self.temporal_extent.update([start_date.date(), end_date.date()])
 
     @loggerinfo_push_pop('Loading geographic extent metadata')
     def _load_geographic_extent(self):

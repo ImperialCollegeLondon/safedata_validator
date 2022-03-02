@@ -59,7 +59,7 @@ class Extent:
 
         if ((soft_bounds is not None and hard_bounds is not None) and
                 (soft_bounds[0] <= hard_bounds[0] or soft_bounds[1] >= hard_bounds[1])):
-            log_and_raise('Hard bounds must lie outside soft bounds',  
+            log_and_raise(f'Hard bounds must lie outside soft bounds in {label}',  
                           AttributeError)
 
         self._hard_bounds = hard_bounds
@@ -143,10 +143,7 @@ class Extent:
                                  self.soft_bounds[1] < maxv):
             LOGGER.warning(f'Values range {values} exceeds soft bounds {self.soft_bounds}')
 
-        if self.extent[0] is None or values[0] < self.extent[0]:
-            self._extent[0] = minv
-            self._populated = True
-
-        if self.extent[1] is None or values[1] > self.extent[1]:
-            self._extent[1] = maxv
-            self._populated = True
+        # Update the bounds, handling None from __init__
+        self._extent[0] = min(minv, self._extent[0]) if self._extent[0] else minv
+        self._extent[1] = max(maxv, self._extent[1]) if self._extent[1] else maxv
+        self._populated = True

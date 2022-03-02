@@ -39,8 +39,8 @@ CONFIGSPEC = {
     'locations':  'string()',
     'gbif_database':  'string(default=None)',
     'extents': {
-        'temporal_soft_extent':  'datetime_list(min=2, max=2, default=None)',
-        'temporal_hard_extent':  'datetime_list(min=2, max=2, default=None)',
+        'temporal_soft_extent':  'date_list(min=2, max=2, default=None)',
+        'temporal_hard_extent':  'date_list(min=2, max=2, default=None)',
         'latitudinal_hard_extent':  'float_list(min=2, max=2, default=list(-90, 90))',
         'latitudinal_soft_extent':  'float_list(min=2, max=2, default=None)',
         'longitudinal_hard_extent':  'float_list(min=2, max=2, default=list(-180, 180))',
@@ -59,12 +59,13 @@ allows the ConfigObj.validate() method to do basic validation and type
 conversions.
 """
 
-def datetime_list(value, min, max):
+def date_list(value, min, max):
     """A configobj.Validator extension function to check configuration values
-    containing a list of ISO formatted datetime strings and to return parsed values.
+    containing a list of ISO formatted date strings and to return parsed
+    values.
 
     Args:
-        value: A string containing comma-separated ISO datetime strings 
+        value: A string containing comma-separated ISO date strings 
         min: The minimum allowed number of entries
         max: The maximum allowed number of entries
     """
@@ -83,11 +84,12 @@ def datetime_list(value, min, max):
     value = is_list(value, min=min, max=max)
     
     # Next, check every member in the list is an ISO date string
+    # noting that this strips out time information
     out = []
     for entry in value:
         
         try:
-            parsed_entry = isoparse(entry)
+            parsed_entry = isoparse(entry).date()
         except ValueError:
             raise VdtValueError(entry)
 
@@ -198,7 +200,7 @@ class Resources:
         # Otherwise, there is a file, so try and use it and now raise if there
         # is a problem: don't skip over broken resource configurations.
         # - First, create a validator instance that handles lists of dates
-        cf_validator = Validator({'datetime_list': datetime_list})
+        cf_validator = Validator({'date_list': date_list})
 
         # - Now load the config input and then apply the basic validation - are
         #   the values of the right type, right count etc.
