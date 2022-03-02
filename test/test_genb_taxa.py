@@ -6,9 +6,10 @@ from .conftest import log_check
 # TESTS TO PUT IN:
 # NEED TO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
 # NEED TO CHECK THAT REPEATED ENTRIES ARE ACTUALLY SKIPPED
-# SHOULD MAKE USE OF DAVID'S log check, AND LOOK FOR SIMILAR
+# SEEMS TO BE SOME PROBLEM WHERE white space padding errors are not captured when
+# using local database. THIS HAS TO BE FIXED
 
-# MOVE THESE TO CONFTEST
+# MOVE THIS TO CONFTEST EVENTUALLY
 @pytest.fixture(scope='module')
 def gb_instance():
     """Parameterised fixture to return a GenBankTaxa instance
