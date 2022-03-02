@@ -11,17 +11,16 @@ from openpyxl import worksheet
 from shapely import wkt
 from shapely.errors import WKTReadingError
 
+import safedata_validator.field
 from safedata_validator.logger import LOGGER, FORMATTER, COUNTER_HANDLER, loggerinfo_push_pop
 from safedata_validator.validators import (GetDataFrame, IsLower, IsNotBlank, IsNumber,
                                            IsString, HasDuplicates, IsLocName)
-from safedata_validator.extent import Extent
-
 from safedata_validator.resources import Resources
 
 
 class Locations:
 
-    def __init__(self, resources: Resources) -> None:
+    def __init__(self, resources: Resources, dataset: safedata_validator.field.Dataset = None) -> None:
         
         """A Locations instance is initialised using a Resources instance that
         provides data on known valid locations. The instance validates location
@@ -31,13 +30,14 @@ class Locations:
         Args:
             resources: A Resources instance, used to provide information about
                 known locations
+            dataset: A Dataset instance - if provided, the geographic extents
+                of the the dataset instance will be updated.
         """
 
         self.n_errors = 0
         self.locations = set()
         self.location_index = []
-        self.extents = {'latitude': Extent('latitude', (float, int)),
-                        'longitude': Extent('longitude', (float, int))}
+        self.dataset = dataset
         self.locations_used = set()
 
         self.valid_locations = resources.valid_locations
@@ -220,14 +220,14 @@ class Locations:
             LOGGER.error('New locations reported: you must provide Lat/Long or WKT,'
                          'using NA explicitly when this data is missing.')
         else:
-            # Check Lat Long and WKT using check_field_geo to validate the values,
-            # since this method automatically updates the dataset extents. 
+            # Check Lat Long and WKT 
 
             if lonlat_provided:
 
                 LOGGER.info('Validating lat / long data')
                 FORMATTER.push()
-                for axs in ['latitude', 'longitude']:
+                for axs, ext_attr in [('latitude', 'latitudinal_extent'),
+                                 ('longitude', 'longitudinal_extent')]:
                     
                     # Allow NAs for unknown location points
                     axs_vals = [vl[axs] for vl in locs if vl[axs] != 'NA']
@@ -243,9 +243,11 @@ class Locations:
                         LOGGER.error(f'Non-numeric {axs} values for new locations: ',
                                      extra={'join': axs_vals.failed})
 
-                    # Update extents
-                    if axs_vals.values:
-                        self.extents[axs].update(axs_vals)
+                    # Update extent instances of dataset
+                    if self.dataset is not None and axs_vals.values:
+                        ext = getattr(self.dataset, ext_attr)
+                        ext.update(axs_vals)
+
                 FORMATTER.pop()
             
             if wkt_provided:
@@ -256,6 +258,7 @@ class Locations:
                 blank_wkt = []
                 non_string_wkt = []
                 bad_wkt = []
+                bounds = []
 
                 for this_new_loc in locs:
                     
@@ -280,9 +283,7 @@ class Locations:
                             if not this_new_geom.is_valid or this_new_geom.has_z:
                                 bad_wkt.append(this_new_loc['location name'])
                             # Store the extents to check for sensible coordinates
-                            bnds = this_new_geom.bounds
-                            self.extents['latitude'].update([bnds[1], bnds[3]])
-                            self.extents['longitude'].update([bnds[0], bnds[2]])
+                            bounds.append(this_new_geom.bounds)
 
                 if blank_wkt:
                     LOGGER.error('Blank WKT values for new locations: use NA.')
@@ -294,6 +295,13 @@ class Locations:
                 if bad_wkt:
                     LOGGER.error('WKT information badly formatted, not geometrically valid or 3D: ',
                                     extra={'join': bad_wkt})
+
+                if self.dataset is not None and bounds:
+                    # Extract from bound tuples to lists of lats and longs
+                    lat_bnds = [bnd[1] for bnd in bounds] + [bnd[3] for bnd in bounds]
+                    lng_bnds = [bnd[0] for bnd in bounds] + [bnd[2] for bnd in bounds]
+                    self.dataset.latitudinal_extent.update(lat_bnds)
+                    self.dataset.longitudinal_extent.update(lng_bnds)
 
                 FORMATTER.pop()
         
@@ -357,15 +365,18 @@ class Locations:
             LOGGER.warning('Locations aliases used. Maybe change to primary location names: ',
                            extra={'join': aliased})
 
-        # Get the bounding box of known locations and aliased locations
-        bbox_keys = (loc_names - (unknown | aliased)) | {self.location_aliases[ky] for ky in aliased}
+        if self.dataset is not None:
+            # Get the bounding box of known locations and aliased locations
+            bbox_keys = (loc_names - (unknown | aliased)) | {self.location_aliases[ky] 
+                         for ky in aliased}
 
-        # get the extents of known unaliased locations
-        if bbox_keys:
-            bbox = [vl for ky, vl in list(self.valid_locations.items()) if ky in bbox_keys]
-            bbox = list(zip(*bbox))
-            self.extents['longitude'].update((min(bbox[0]), max(bbox[1])))
-            self.extents['latitude'].update((min(bbox[2]), max(bbox[3])))
+            # get the extents of known unaliased locations
+            if bbox_keys:
+                bbox = [vl for ky, vl in list(self.valid_locations.items()) 
+                        if ky in bbox_keys]
+                bbox = list(zip(*bbox))
+                self.dataset.longitudinal_extent.update((min(bbox[0]), max(bbox[1])))
+                self.dataset.latitudinal_extent.update((min(bbox[2]), max(bbox[3])))
 
         # Update location names and index
         # - test for duplicated names to already added values

@@ -14,9 +14,17 @@ from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError,
                                            IsNotNumericString, IsString, IsLocName,
                                            blank_value, valid_r_name, RE_DMS)
 
-from safedata_validator.logger import CONSOLE_HANDLER, LOG, LOGGER, FORMATTER, COUNTER_HANDLER, loggerinfo_push_pop
+# HACK - One issue with the module structure here is that there is the possibility 
+#        of circular imports. For this reason, Locations is not imported directly
+#        since it contains an import of Dataset in this module. The usual advice is
+#        to refactor (or put everything in a single file), but you can also avoid
+#        by not using `import from`: https://stackoverflow.com/a/22210807/3401916 
+#        
+
+from safedata_validator.logger import (CONSOLE_HANDLER, LOG, LOGGER, FORMATTER,
+                                       COUNTER_HANDLER, loggerinfo_push_pop)
 from safedata_validator.resources import Resources
-from safedata_validator.locations import Locations
+import safedata_validator.locations
 from safedata_validator.taxa import Taxa
 from safedata_validator.summary import Summary
 from safedata_validator.extent import Extent
@@ -50,7 +58,7 @@ class Dataset:
         
         self.resources = resources
         self.summary = Summary(resources)
-        self.locations = Locations(resources)
+        self.locations = safedata_validator.locations.Locations(resources)
         self.taxa = Taxa(resources)
         self.dataworksheets = []
         self.n_errors = 0
@@ -201,7 +209,7 @@ class Dataset:
 
             # If neither: need summary. If both: consistent.
             if not (dataset_extent.populated or summary_extent.populated):
-                LOGGER.error(f'{label} extent not set from data or provided in summary: ',
+                LOGGER.error(f'{label} extent not set from data or provided in summary: '
                              'add extents to dataset Summary')
             elif ((dataset_extent.populated and summary_extent.populated) and 
                   ((dataset_extent.extent[0] < summary_extent.extent[0]) or
@@ -1178,7 +1186,7 @@ class CategoricalField(BaseField):
     Subclass of BaseField to check for categorical data
     """
 
-    field_types = ('categorical', 'ordered_categorical')
+    field_types = ('categorical', 'ordered categorical')
     required_descriptors = MANDATORY_DESCRIPTORS + ['levels']
 
     def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
