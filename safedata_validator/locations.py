@@ -11,7 +11,7 @@ from openpyxl import worksheet
 from shapely import wkt
 from shapely.errors import WKTReadingError
 
-import safedata_validator.field
+import safedata_validator.field as field
 from safedata_validator.logger import LOGGER, FORMATTER, COUNTER_HANDLER, loggerinfo_push_pop
 from safedata_validator.validators import (GetDataFrame, IsLower, IsNotBlank, IsNumber,
                                            IsString, HasDuplicates, IsLocName)
@@ -20,7 +20,7 @@ from safedata_validator.resources import Resources
 
 class Locations:
 
-    def __init__(self, resources: Resources, dataset: safedata_validator.field.Dataset = None) -> None:
+    def __init__(self, resources: Resources, dataset: field.Dataset = None) -> None:
         
         """A Locations instance is initialised using a Resources instance that
         provides data on known valid locations. The instance validates location
@@ -323,8 +323,7 @@ class Locations:
             else:
                 geom = None
 
-            self.location_index.append((this_new_loc['location name'], True,
-                                        this_new_loc['type'], geom))
+            self.location_index.append((this_new_loc['location name'], True, geom))
 
     @loggerinfo_push_pop('Checking known locations')
     def add_known_locations(self, loc_names: list):
@@ -386,7 +385,7 @@ class Locations:
                          extra={'join': dupes})
 
         self.locations.update(loc_names)
-        index_entries = [(lc, False, None, None) for lc in loc_names]
+        index_entries = [(lc, False, None) for lc in loc_names]
         self.location_index.append(index_entries)
 
     @property
