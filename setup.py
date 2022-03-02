@@ -19,11 +19,11 @@ setuptools.setup(
     packages=['safedata_validator'],
     entry_points = {
             'console_scripts':
-             ['safedata_validate=safedata_validator:_safedata_validator_cli']
+             ['safedata_validate=safedata_validator.scripts:_safedata_validator_cli']
     },
     license='MIT',
     classifiers=[
-        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],

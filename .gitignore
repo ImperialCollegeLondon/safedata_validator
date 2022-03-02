@@ -4,8 +4,9 @@ SAFE_import_files*
 # ignore Excel backup files
 ~*
 
-# PyCharm
+# PyCharm and VS code
 .idea/
+.vscode/
 
 # Mac DS files
 .DS_Store
@@ -26,6 +27,9 @@ site
 # Do not include the local copy of the taxon database
 local_db/backbone-current-simple.sqlite
 local_db/taxdump.tar.gz
+
+# ignore the local example inputs folder
+local_example_inputs/*
 
 # Ignore local pyenv settings
 .python-version

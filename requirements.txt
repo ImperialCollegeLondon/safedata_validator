@@ -4,3 +4,6 @@ simplejson
 shapely
 appdirs
 python-dateutil
+
+pytest
+pyfakefs

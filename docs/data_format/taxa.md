@@ -31,10 +31,10 @@ The table format looks like this:
 | crbo | Crematogaster borneensis | Species |   |   |   |   |   |   |
 | dolic_sp | Dolichoderus | Genus |   |   |   |   |   |   |
 | gannets  | Morus | Genus | 2480962 |   |   |   |   |   |
-| lost_orang | Pongo tapanuliensis| Species |   |   | Pongo | Genus   |   |  New species |
-| morpho1 | NA | Morphospecies |   | Formicidae | Family |   |   |   |
-| bombines | Bombini | Tribe |   |   | Apidae | Family   |   |  |
-| micr_hid | Microcopris hidakai | Species | 1090433 | Microcopris | Genus |   |
+| lost_orang | Pongo tapanuliensis | Species |   |   | Pongo | Genus  |   |  New species |
+| morpho1 | NA | Morphospecies |   |   | Formicidae | Family |   |   |
+| bombines | Bombini | Tribe |   |   | Apidae | Family |   |   |
+| micr_hid | Microcopris hidakai | Species |   | 1090433 | Microcopris | Genus |   |   |
 
 The table must contain column headers in the **first row** of the worksheet. The first three columns (Name, Taxon name and Taxon type) are mandatory and contain the following:
 
@@ -42,14 +42,14 @@ The table must contain column headers in the **first row** of the worksheet. The
 
 !!! Note
 
-    These are the names that you are going to use in your data worksheet. The 
+    These are the names that you are going to use in your data worksheet. The
 	other columns are to help us validate the taxonomy of your names.
 
  * **Taxon name**: This column must contain the scientific name of the taxon, which will be used for taxon validation via GBIF. Note that this should not include any taxon authority, so _Panthera tigris_ not _Panthera tigris_ (Linnaeus, 1758).
 
  * **Taxon type**: This column must provide the **taxonomic type** of the named taxon, which is usually the taxonomic **rank**. For example, the taxon _Pongo pygmaeus_ would be of type `Species` and the taxon Formicidae would be of type `Family`. If the taxon type is not one of the core GBIF backbone levels ( Kingdom, Phylum, Order, Class, Family, Genus, Species and Subspecies), or is one of the special values `Morphospecies` or `Functional group`, then you will need to provide a **parent taxon** (see below).
 
-* **Comments**: This is entirely optional - if you have a fairly standard set of taxa with no  serious issues then you can leave it out entirely or it can be empty. If you do have particular notes that you want to make - explaining disagreements with GBIF taxonomy, new species notes and the  like - then these can be very useful for future researchers trying to place taxa. 
+* **Comments**: This is entirely optional - if you have a fairly standard set of taxa with no  serious issues then you can leave it out entirely or it can be empty. If you do have particular notes that you want to make - explaining disagreements with GBIF taxonomy, new species notes and the  like - then these can be very useful for future researchers trying to place taxa.
 
 The other fields are optional and are used to handle the following taxonomic issues. You only need to put anything in these optional fields for the rows they apply to: leave them blank for all other rows as in the example table above.
 
@@ -63,11 +63,11 @@ The example in the table allows us to confirm that you mean this _Morus_: [https
 ## Incorrect GBIF taxonomy
 
  In general, we follow the GBIF 'accepted usage' of a taxon name and this includes following when GBIF say a taxon is a synonym. We include your taxon name in our taxonomic indices, but under the taxonomic hierarchy suggested by GBIF.  
- 
+
  In the example in the table, GBIF asserts that _Microcopris hidakai_ is a synonym of [_Onthophagus hidakai_](https://www.gbif.org/species/1090433) and so our taxonomic index will include both those names under the parent genus _Onthophagus_. The taxon validation of your dataset does warn about this in the output:
- 
+
     ? Row 7 (micr_hid): considered a homotypic_synonym of Onthophagus hidakai (1090433) in GBIF backbone
- 
+
 If you strongly disagree with that accepted usage, then you can use the **Ignore ID** field to explicitly ignore the GBIF match. You will need to insert the GBIF ID number of the accepted usage (reported in the warning message) in this field. You will then need to provide a **parent taxon** (see below)
 
 # Parent taxon details
@@ -76,8 +76,8 @@ If a taxon name cannot be matched against GBIF,  then you will need to provide d
 
 In these cases, the next three columns (**Parent name**, **Parent type** and **Parent
 ID**) are used to provide a parent taxon. They are used in exactly the same way
-as the Taxon columns: the only restriction is that the Parent type must be one of 
-core ranks used in the GBIF backbone: Kingdom, Phylum, Order, Class, Family, Genus, Species and Subspecies. Again **Parent ID** is only needed to resolve ambiguous 
+as the Taxon columns: the only restriction is that the Parent type must be one of
+core ranks used in the GBIF backbone: Kingdom, Phylum, Order, Class, Family, Genus, Species and Subspecies. Again **Parent ID** is only needed to resolve ambiguous
 taxon names.
 
 The table shows examples for the following cases:
@@ -87,7 +87,7 @@ The table shows examples for the following cases:
 If a taxon is new or not recognized by GBIF (and you're sure it isn't just a typo!) then provide a
 parent name and type to allow us to hook the taxon into the index. For example, before _Pongo
 tapanuliensis_ was recognised as a species, you would need to provide _Pongo_ as a parent
-name of type 'genus', 
+name of type 'genus',
 
 You would then get a message in the file validation report saying:
 
@@ -105,7 +105,7 @@ morphospecies and functional groups is quite variable, but we'd like the finest 
 you can provide. As an example, in the table above, 'Morphospecies #1' is simply identified as
 being an ant. The validation report will show:
 
-    - Row 5 (morpho1): Morphospecies with valid parent information 
+    - Row 5 (morpho1): Morphospecies with valid parent information
 
 ## Less common taxonomic levels
 

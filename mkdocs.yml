@@ -1,8 +1,12 @@
 site_name: Data at the SAFE Project
 repo_url: https://github.com/ImperialCollegeLondon/safedata_validator/
-theme: readthedocs
+theme: 
+  name: material
 markdown_extensions:
   - admonition
+plugins:
+  - search
+  - mkdocstrings
 extra_css:
   - custom.css
 use_directory_urls: false
@@ -10,16 +14,26 @@ nav:
   - 'Introduction': 'index.md'
   - 'Data availability': 'availability.md'
   - 'Data format overview': 'data_format/overview.md'
+  - 'Other file formats': 'data_format/other_formats.md'
   - 'Excel format details':
     - 'Summary worksheet': 'data_format/summary.md'
     - 'Taxa worksheet': 'data_format/taxa.md'
     - 'Locations worksheet': 'data_format/locations.md'
     - 'Data worksheets': 'data_format/data.md'
-  - 'Other file formats': 'data_format/other_formats.md'
-  - 'Data format FAQs': 'faqs.md'
-  - 'The safedata_validator package':
-    - 'Usage': 'safedata_validator/usage.md'
-    - 'Installation': 'safedata_validator/install.md'
-    - 'Building local GBIF': 'safedata_validator/build_local_gbif.md'
-    - 'GBIF validation notes': 'safedata_validator/gbif_validation.md'
+    - 'Data format FAQs': 'data_format/faqs.md'
+  - 'Installation and configuration':
+    - 'Installation': 'install/install.md'
+    - 'Configuration': 'install/configuration.md'
+    - 'Building local GBIF': 'install/build_local_gbif.md'
+    - 'GBIF validation notes': 'install/gbif_validation.md'
+  - 'Commands':
+    - 'safedata_validate': 'usage/usage.md'
+  - 'API Reference':
+    - 'Resources': 'api/resources.md'
+    - 'Logger': 'api/logger.md'
+    - 'Extents': 'api/extent.md'
+    - 'Summary': 'api/summary.md'
+    - 'Locations': 'api/locations.md'
+    - 'Fields and dataworksheets': 'api/field.md'
+    - 'Taxa': 'api/taxa.md'
   - 'Build notes': build_notes.md
