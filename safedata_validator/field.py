@@ -242,6 +242,53 @@ class Dataset:
             else:
                 LOGGER.info('PASS: file formatted correctly with no warnings')
 
+    def to_json(self):
+        """
+        This method exports key data about the dataset in JSON format. This
+        method is used to export a description of a dataset that can be used
+        to populate a dataset database and publish datasets to Zenodo. 
+        """
+
+        json_dict = dict(
+            # Summary information
+            title = self.summary.title,
+            description = self.summary.description,
+            authors = self.summary.authors,
+            filename = self.filename,
+            external_files = self.summary.external_files,
+            access = self.summary.access['access'],
+            embargo_date = self.summary.access['embargo_date'],
+            access_conditions = self.summary.access['access_conditions'],
+            funders = self.summary.funders,
+            permits = self.summary.permits,
+            keywords = self.summary.keywords,
+            
+            # Taxa
+            # TODO: remember that DB API should populate:
+            #   * dataset_id to link from taxon searches to datasets
+            #  * id (what's this? Erroneous row ID in query?)
+            taxa = [dict(zip(("worksheet_name", "gbif_id", "gbif_parent_id", 
+                              "taxon_name", "taxon_rank", "gbif_status"), tx)) 
+                         for tx in self.taxa.taxon_index],
+            # Locations 
+            locations = [dict(zip(('name', 'new_location', 'wkt_wgs84'), lc)) 
+                         for lc in self.locations.location_index],
+            # Publication details - these are populated by the 
+            # Zenodo publication mechanism.
+            zenodo_concept_id = None,
+            zenodo_record_id = None,
+            zenodo_publication_date = None
+        )
+
+        # Extents - summary take priority over dataset.
+        for ext in ('temporal_extent', 'latitudinal_extent', 'longitudinal_extent'):
+            sum_ext = getattr(self.summary, ext)
+            if sum_ext is not None:
+                json_dict[sum_ext] = sum_ext.extent
+            else:
+                json_dict[sum_ext] = self.extent
+
+        return simplejson.dumps(json_dict)
 
 class DataWorksheet:
 
