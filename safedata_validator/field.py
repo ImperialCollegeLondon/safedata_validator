@@ -1,4 +1,6 @@
+import os
 import datetime
+import simplejson
 from itertools import groupby, islice
 from collections import OrderedDict
 import datetime
@@ -14,17 +16,10 @@ from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError,
                                            IsNotNumericString, IsString, IsLocName,
                                            blank_value, valid_r_name, RE_DMS)
 
-# HACK - One issue with the module structure here is that there is the possibility 
-#        of circular imports. For this reason, Locations is not imported directly
-#        since it contains an import of Dataset in this module. The usual advice is
-#        to refactor (or put everything in a single file), but you can also avoid
-#        by not using `import from`: https://stackoverflow.com/a/22210807/3401916 
-#        
-
 from safedata_validator.logger import (CONSOLE_HANDLER, LOG, LOGGER, FORMATTER,
                                        COUNTER_HANDLER, loggerinfo_push_pop)
 from safedata_validator.resources import Resources
-import safedata_validator.locations
+from safedata_validator.locations import Locations
 from safedata_validator.taxa import Taxa
 from safedata_validator.summary import Summary
 from safedata_validator.extent import Extent
@@ -56,9 +51,9 @@ class Dataset:
         if resources is None:
             resources = Resources()
         
+        self.filename = None
         self.resources = resources
         self.summary = Summary(resources)
-        self.locations = safedata_validator.locations.Locations(resources)
         self.taxa = Taxa(resources)
         self.dataworksheets = []
         self.n_errors = 0
@@ -77,6 +72,11 @@ class Dataset:
         self.longitudinal_extent = Extent('longitudinal extent', (float, int),
                                           hard_bounds=resources.extents.longitudinal_hard_extent,
                                           soft_bounds=resources.extents.longitudinal_soft_extent)
+        
+        # Create Locations and pass in dataset extents
+        self.locations = Locations(resources,
+                                   latitudinal_extent=self.latitudinal_extent, 
+                                   longitudinal_extent=self.longitudinal_extent)
 
     def load_from_workbook(self, 
                            filename: str, 
@@ -118,7 +118,7 @@ class Dataset:
         #    This is a bit restricted as it only exposes row by row iteration
         #    to avoid expensive XML traversal but has a lower memory footprint.
         #  - data_only to load values not formulae for equations.
-
+        self.filename = os.path.basename(filename)
         wb = load_workbook(filename, read_only=True, data_only=True)
 
         # Populate summary
@@ -207,16 +207,21 @@ class Dataset:
             dataset_extent = getattr(self, this_extent)
             summary_extent = getattr(self.summary, this_extent)
 
-            # If neither: need summary. If both: consistent.
+            # If neither: need to provide in summary. If both: consistent.
             if not (dataset_extent.populated or summary_extent.populated):
                 LOGGER.error(f'{label} extent not set from data or provided in summary: '
                              'add extents to dataset Summary')
             elif ((dataset_extent.populated and summary_extent.populated) and 
                   ((dataset_extent.extent[0] < summary_extent.extent[0]) or
-                   (dataset_extent.extent[0] < summary_extent.extent[0]))):
+                   (dataset_extent.extent[1] > summary_extent.extent[1]))):
 
                 LOGGER.error(f'The {label} extent provided in the dataset Summary '
                              f'is narrower than the provided data {dataset_extent.extent}')
+            elif dataset_extent.populated and summary_extent.populated:
+
+                LOGGER.warning(f'The {label} extent is set in Summary but also '
+                               f'is populated from the data - this may be deliberate!')
+            
 
         # Dedent for final result
         FORMATTER.pop()
