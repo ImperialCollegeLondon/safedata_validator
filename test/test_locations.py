@@ -3,6 +3,7 @@ from logging import CRITICAL, ERROR, WARNING, INFO
 from safedata_validator.locations import Locations
 import openpyxl
 
+from .conftest import log_check
 
 @pytest.fixture()
 def locations_inst(resources_with_local_gbif):
@@ -48,12 +49,7 @@ def test_add_known_locations(caplog, locations_inst,
     # Test the addition of the parameterised values
     locations_inst.add_known_locations(known_loc_names)
  
-    assert len(expected_log) == len(caplog.records)
-
-    assert all([exp[0] == rec.levelno 
-                for exp, rec in zip(expected_log, caplog.records)])
-    assert all([exp[1] in rec.message
-                for exp, rec in zip(expected_log, caplog.records)])
+    log_check(caplog, expected_log)
 
 
 @pytest.mark.parametrize(
@@ -173,12 +169,7 @@ def test_add_new_locations(caplog, locations_inst,
     # Test the addition of the parameterised values
     locations_inst.add_new_locations(new_loc_dicts)
  
-    assert len(expected_log) == len(caplog.records)
-
-    assert all([exp[0] == rec.levelno 
-                for exp, rec in zip(expected_log, caplog.records)])
-    assert all([exp[1] in rec.message
-                for exp, rec in zip(expected_log, caplog.records)])
+    log_check(caplog, expected_log)
 
 
 @pytest.mark.parametrize(
@@ -247,18 +238,13 @@ def test_load_from_instance(caplog, locations_inst, headers, rows, expected_log)
 
     locations_inst.load(ws)
 
-    assert len(expected_log) == len(caplog.records)
-
-    assert all([exp[0] == rec.levelno 
-                for exp, rec in zip(expected_log, caplog.records)])
-    assert all([exp[1] in rec.message
-                for exp, rec in zip(expected_log, caplog.records)])
+    log_check(caplog, expected_log)
 
 
 @pytest.mark.parametrize(
     'example_excel_files, n_errors',
     [('good', 0), 
-     ('bad', 8)], 
+     ('bad', 9)], # TODO - document expected log!
     indirect = ['example_excel_files']  # take actual params from fixture
 )
 def test_load_from_file(locations_inst, example_excel_files, n_errors):
