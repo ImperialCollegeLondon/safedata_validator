@@ -6,7 +6,7 @@ from .conftest import FIXTURE_FILES
     'file_key, n_errors',
     [
       ('good_excel_file' , 0), 
-      ('bad_excel_file', 93), 
+      ('bad_excel_file', 94), 
     ], 
 )
 def test_DataSet_load_from_file(config_filesystem,

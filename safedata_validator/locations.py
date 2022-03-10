@@ -11,17 +11,18 @@ from openpyxl import worksheet
 from shapely import wkt
 from shapely.errors import WKTReadingError
 
+from safedata_validator.extent import Extent
 from safedata_validator.logger import LOGGER, FORMATTER, COUNTER_HANDLER, loggerinfo_push_pop
 from safedata_validator.validators import (GetDataFrame, IsLower, IsNotBlank, IsNumber,
                                            IsString, HasDuplicates, IsLocName)
-from safedata_validator.extent import Extent
-
 from safedata_validator.resources import Resources
 
 
 class Locations:
 
-    def __init__(self, resources: Resources) -> None:
+    def __init__(self, resources: Resources, 
+                 latitudinal_extent: Extent = None,
+                 longitudinal_extent: Extent = None) -> None:
         
         """A Locations instance is initialised using a Resources instance that
         provides data on known valid locations. The instance validates location
@@ -31,19 +32,35 @@ class Locations:
         Args:
             resources: A Resources instance, used to provide information about
                 known locations
+            dataset: A Dataset instance - if provided, the geographic extents
+                of the the dataset instance will be updated.
         """
 
         self.n_errors = 0
         self.locations = set()
         self.location_index = []
-        self.extents = {'latitude': Extent('latitude', (float, int)),
-                        'longitude': Extent('longitude', (float, int))}
         self.locations_used = set()
 
         self.valid_locations = resources.valid_locations
         self.location_aliases = resources.location_aliases
         self.known_loc_names = set(list(resources.valid_locations.keys()) +
                                    list(resources.location_aliases.keys()))
+
+        # Attach or create extents
+        if latitudinal_extent is None:
+            self.latitudinal_extent = Extent('latitudinal extent', (float, int),
+                                             hard_bounds=resources.extents.latitudinal_hard_extent,
+                                             soft_bounds=resources.extents.latitudinal_soft_extent)
+        else:
+            self.latitudinal_extent = latitudinal_extent
+
+        if longitudinal_extent is None:
+            self.longitudinal_extent = Extent('latitudinal extent', (float, int),
+                                             hard_bounds=resources.extents.longitudinal_hard_extent,
+                                             soft_bounds=resources.extents.longitudinal_soft_extent)
+        else:
+            self.longitudinal_extent = longitudinal_extent
+
 
     @loggerinfo_push_pop('Loading Locations worksheet')
     def load(self, worksheet: worksheet):
@@ -220,14 +237,14 @@ class Locations:
             LOGGER.error('New locations reported: you must provide Lat/Long or WKT,'
                          'using NA explicitly when this data is missing.')
         else:
-            # Check Lat Long and WKT using check_field_geo to validate the values,
-            # since this method automatically updates the dataset extents. 
+            # Check Lat Long and WKT 
 
             if lonlat_provided:
 
                 LOGGER.info('Validating lat / long data')
                 FORMATTER.push()
-                for axs in ['latitude', 'longitude']:
+                for axs, ext_attr in [('latitude', 'latitudinal_extent'),
+                                 ('longitude', 'longitudinal_extent')]:
                     
                     # Allow NAs for unknown location points
                     axs_vals = [vl[axs] for vl in locs if vl[axs] != 'NA']
@@ -243,9 +260,11 @@ class Locations:
                         LOGGER.error(f'Non-numeric {axs} values for new locations: ',
                                      extra={'join': axs_vals.failed})
 
-                    # Update extents
+                    # Update extent instances
                     if axs_vals.values:
-                        self.extents[axs].update(axs_vals)
+                        ext = getattr(self, ext_attr)
+                        ext.update(axs_vals)
+
                 FORMATTER.pop()
             
             if wkt_provided:
@@ -256,6 +275,7 @@ class Locations:
                 blank_wkt = []
                 non_string_wkt = []
                 bad_wkt = []
+                bounds = []
 
                 for this_new_loc in locs:
                     
@@ -280,9 +300,7 @@ class Locations:
                             if not this_new_geom.is_valid or this_new_geom.has_z:
                                 bad_wkt.append(this_new_loc['location name'])
                             # Store the extents to check for sensible coordinates
-                            bnds = this_new_geom.bounds
-                            self.extents['latitude'].update([bnds[1], bnds[3]])
-                            self.extents['longitude'].update([bnds[0], bnds[2]])
+                            bounds.append(this_new_geom.bounds)
 
                 if blank_wkt:
                     LOGGER.error('Blank WKT values for new locations: use NA.')
@@ -294,6 +312,13 @@ class Locations:
                 if bad_wkt:
                     LOGGER.error('WKT information badly formatted, not geometrically valid or 3D: ',
                                     extra={'join': bad_wkt})
+
+                if bounds:
+                    # Extract from bound tuples to lists of lats and longs
+                    lat_bnds = [bnd[1] for bnd in bounds] + [bnd[3] for bnd in bounds]
+                    lng_bnds = [bnd[0] for bnd in bounds] + [bnd[2] for bnd in bounds]
+                    self.latitudinal_extent.update(lat_bnds)
+                    self.longitudinal_extent.update(lng_bnds)
 
                 FORMATTER.pop()
         
@@ -315,8 +340,7 @@ class Locations:
             else:
                 geom = None
 
-            self.location_index.append((this_new_loc['location name'], True,
-                                        this_new_loc['type'], geom))
+            self.location_index.append((this_new_loc['location name'], True, geom))
 
     @loggerinfo_push_pop('Checking known locations')
     def add_known_locations(self, loc_names: list):
@@ -358,14 +382,16 @@ class Locations:
                            extra={'join': aliased})
 
         # Get the bounding box of known locations and aliased locations
-        bbox_keys = (loc_names - (unknown | aliased)) | {self.location_aliases[ky] for ky in aliased}
+        bbox_keys = (loc_names - (unknown | aliased)) | {self.location_aliases[ky] 
+                        for ky in aliased}
 
         # get the extents of known unaliased locations
         if bbox_keys:
-            bbox = [vl for ky, vl in list(self.valid_locations.items()) if ky in bbox_keys]
+            bbox = [vl for ky, vl in list(self.valid_locations.items()) 
+                    if ky in bbox_keys]
             bbox = list(zip(*bbox))
-            self.extents['longitude'].update((min(bbox[0]), max(bbox[1])))
-            self.extents['latitude'].update((min(bbox[2]), max(bbox[3])))
+            self.longitudinal_extent.update((min(bbox[0]), max(bbox[1])))
+            self.latitudinal_extent.update((min(bbox[2]), max(bbox[3])))
 
         # Update location names and index
         # - test for duplicated names to already added values
@@ -375,7 +401,7 @@ class Locations:
                          extra={'join': dupes})
 
         self.locations.update(loc_names)
-        index_entries = [(lc, False, None, None) for lc in loc_names]
+        index_entries = [(lc, False, None) for lc in loc_names]
         self.location_index.append(index_entries)
 
     @property

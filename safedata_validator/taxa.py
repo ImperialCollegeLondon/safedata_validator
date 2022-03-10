@@ -27,6 +27,7 @@ from typing import Optional, Union
 import requests
 from enforce_typing import enforce_types
 
+from safedata_validator.resources import Resources
 from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
                                        loggerinfo_push_pop)
 from safedata_validator.validators import (GetDataFrame, HasDuplicates,
@@ -243,7 +244,8 @@ class LocalGBIFValidator:
         if not isinstance(gbif_id, int):
             raise ValueError('Non-integer GBIF code')
 
-        if not gbif_id > 0:
+        if not gbif_id >= 0:
+            # 0 is kingdom placeholder for incertae sedis
             raise ValueError('Negative GBIF code')
 
         # get the record associated with the provided ID
@@ -254,7 +256,7 @@ class LocalGBIFValidator:
         # provided taxon or rank information
         if taxon_row is None:
             raise GBIFError()
-        
+
         # Create and populate taxon
         taxon = Taxon(name=taxon_row['canonical_name'],
                       rank=taxon_row['rank'].lower(),
@@ -418,7 +420,7 @@ class RemoteGBIFValidator:
 
 class Taxa:
 
-    def __init__(self, resources):
+    def __init__(self, resources: Resources):
         """A class to hold a list of taxon names and a validated taxonomic
         index for those taxa and their taxonomic hierarchy. The validate_taxon
         method checks that taxon details and their optional parent taxon can be
@@ -488,7 +490,7 @@ class Taxa:
         if not dframe.data_columns:
             LOGGER.error('No data or only headers in Taxa worksheet')
             return
-        
+
         # Dupe headers likely cause serious issues, so stop
         if 'duplicated' in dframe.bad_headers:
             LOGGER.error('Cannot parse taxa with duplicated headers')
