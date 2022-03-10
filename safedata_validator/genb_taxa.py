@@ -714,6 +714,24 @@ class GenBankTaxa:
 
         return
 
+    # THIS IS A TEMPORARY FUNCTION THAT SHOULD BE REMOVED IN THE LONG TERM
+    def temp_test_function(self, validator, gbif_id):
+        # Use the species/{id} endpoint
+        taxon_row = requests.get(f"http://api.gbif.org/v1/species/{gbif_id}")
+
+        # unknown ID numbers return a 404 error
+        if taxon_row.status_code == 404:
+            raise taxa.GBIFError()
+        elif taxon_row.status_code != 200:
+            raise taxa.GBIFError('Connection error to remote server')
+
+        # Extract the response
+        response = taxon_row.json()
+
+        print(response)
+
+        return
+
 # ROUGH TESTING BLOCK
 # SHOULD CONVERT THIS INTO PROPER UNIT TESTS AS I GO
 v1 = GenBankTaxa()
@@ -727,7 +745,11 @@ d1 = ['E coli', {'species': 'Escherichia coli'}, 562]
 # NOT SURE IF THIS IS A SYNONYMS PROBLEM, A NEW EDGE CASE, A LACK OF TAXONOMIC RESOLUTION PROBLEM,
 # OR AN ERROR THAT I HAVE GENERATED THROUGH MY OWN THOUGHTLESSNESS
 d2 = ['Strepto', {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}, None]
-# IS PLANT KINGDOM A GOOD ONE FOR SYNONYMS?
+# IS PLANTS ARE A REALLY THORNY ONE TO SOLVE
 d3 = ['Bacteria', {'superkingdom': 'Bacteria'}, 2]
+# The kingdom metazoa is a synonym of animalia
+# Good to test synonyms
+d4 = ['Metazoa', {'kingdom': 'Metazoa'}, 33208]
 
-test = v1.validate_and_add_taxon(v2,d3)
+# Using this to test searching GBIF
+test = v1.temp_test_function(v2,5219243)
