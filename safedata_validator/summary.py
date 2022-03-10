@@ -538,7 +538,7 @@ class Summary:
             embargo_date = access['embargo_date']
 
             if status not in ['open', 'embargo', 'restricted']:
-                LOGGER.error(f'Access status must be Open, Embargo or Restricted not {access}')
+                LOGGER.error(f"Access status must be Open, Embargo or Restricted not {access['access']}")
             
             if status == 'embargo':
                 

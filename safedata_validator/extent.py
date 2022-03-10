@@ -137,11 +137,11 @@ class Extent:
 
         if self.hard_bounds and (self.hard_bounds[0] > minv or
                                  self.hard_bounds[1] < maxv):
-            LOGGER.error(f'Values range {values} exceeds hard bounds {self.hard_bounds}')
+            LOGGER.error(f'Values (range {minv}, {maxv}) exceeds hard bounds {self.hard_bounds}')
 
         elif self.soft_bounds and (self.soft_bounds[0] > minv or
                                  self.soft_bounds[1] < maxv):
-            LOGGER.warning(f'Values range {values} exceeds soft bounds {self.soft_bounds}')
+            LOGGER.warning(f'Values (range {minv}, {maxv}) exceeds soft bounds {self.soft_bounds}')
 
         # Update the bounds, handling None from __init__
         self._extent[0] = min(minv, self._extent[0]) if self._extent[0] else minv
