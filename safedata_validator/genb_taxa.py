@@ -46,30 +46,23 @@ class NCBIError(Exception):
         self.message = message
         super().__init__(self.message)
 
-# TODO - Validate against GBIF
-# So check if taxa provided exists if GBIF, if not check up hierarchy until one that does is found
-# Then tell user that they have to contract their taxonomic specification to this levels
-
-# TODO - Link NCBI and GBIF steps
-# Some kind of higher level function that links NCBI functions with GBIF functions
-# into a coherent whole.
 
 # TODO - Correctly read in xslx data
 # Lot of this has already been written by David, main thing is that I will have
 # to decide on the formatting, like what data are we taking in.
 
 # TODO - Think about data output
-# Does this make a GBIF compatible csv (or xslx) file?
-# Or does it just validate that the provided data is GBIF compatible?
+# Have to make sure that the indexing is compatibale with David's database
+# Probably have to add in the first databasing steps as well
 
 # POTENTIAL - Take steps to increase the speed
-# Could involve using an api to speed up entrez
-# Or alternatively by downloading the relevant part of NCBI's database and
+# Make local copy by downloading the relevant part of NCBI's database and
 # running the validation locally
 
 # TODO - Modify the resource file to ask the user to provide an email address
 # This should only be done if the user actually wants to use this module as it
 # isn't need elsewhere (as far as I know)
+# Also should ask for api key
 
 # QUESTIONS FOR DAVID
 # SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
@@ -83,12 +76,11 @@ class NCBITaxon:
 
     There are 3 class properties that can be used to create an instance:
         * name
-        * taxa_hier: Dictionary of valid taxonomic hierarchy
+        * taxa_hier: Dictionary of valid taxonomic hierarchy (with ID's)
         * genbank_id: GenBank ID for full taxa (i.e. including non-backbone ranks)
     The remaining properties are populated by processing functions not when an
     instance is created.
         * diverg: does the GenBank ID and stored taxa info diverge, and if so how?
-        * synonyms: list of synonymus names for the taxa
         * superseed: is supplied taxon name/ID still the accepted usage
     """
 
@@ -97,7 +89,6 @@ class NCBITaxon:
     taxa_hier: dict
     genbank_id: Optional[Union[int, float]] = None
     diverg: str = dataclasses.field(init=False)
-    synonyms: list[str] = dataclasses.field(init=False)
     superseed: bool = dataclasses.field(init=False)
 
     def __post_init__(self):
@@ -114,11 +105,13 @@ class NCBITaxon:
                 raise ValueError('Taxa hierarchy dictonary empty')
             elif all(isinstance(x,str) for x in self.taxa_hier.keys()) == False:
                 raise ValueError('Not all taxa dictionary keys are strings')
-            elif all(isinstance(x,str) for x in self.taxa_hier.values()) == False:
-                raise ValueError('Not all taxa dictionary values are strings')
+            elif all(isinstance(x,tuple) for x in self.taxa_hier.values()) == False:
+                raise ValueError('Not all taxa dictionary values are tuples')
+            elif all(list(map(type,x)) == [str, int] for x in
+                 self.taxa_hier.values()) == False:
+                 raise ValueError('Taxa tuples not all in [string integer] form')
 
         self.diverg = None
-        self.synonyms = []
         self.superseed = False
 
 @enforce_types

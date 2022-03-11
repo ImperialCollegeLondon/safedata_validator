@@ -6,8 +6,7 @@ from .conftest import log_check
 # TESTS TO PUT IN:
 # NEED TO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
 # NEED TO CHECK THAT REPEATED ENTRIES ARE ACTUALLY SKIPPED
-# SEEMS TO BE SOME PROBLEM WHERE white space padding errors are not captured when
-# using local database. THIS HAS TO BE FIXED
+# UNIT TESTS FOR LOAD FUNCTIONS
 
 # MOVE THIS TO CONFTEST EVENTUALLY
 @pytest.fixture(scope='module')
@@ -24,22 +23,31 @@ def gb_instance():
     'test_input,expected_exception',
     [(dict(),  # no parameters
       TypeError),
-     (dict(name=1, genbank_id=2, taxa_hier={'genus': 'Morus'}),  # non string name
+     (dict(name=1, genbank_id=2, taxa_hier={'genus': ('Morus', 37577)}),  # non string name
       TypeError),
      # non-numeric genbank_id
-     (dict(name='Bombus bombus', genbank_id='error', taxa_hier={'genus': 'Morus'}),
+     (dict(name='Bombus bombus', genbank_id='error',
+      taxa_hier={'genus': ('Morus', 37577)}),
       TypeError),
      # non-integer genbank_id
-     (dict(name='Bombus bombus', genbank_id=3.141, taxa_hier={'genus': 'Morus'}),
+     (dict(name='Bombus bombus', genbank_id=3.141, taxa_hier={'genus': ('Morus', 37577)}),
       TypeError),
      # string instead of dictonary
      (dict(name='Bombus bombus', genbank_id=3, taxa_hier="test"),
       TypeError),
      (dict(name='Bombus bombus', genbank_id=3, taxa_hier={}), # empty dictonary
       ValueError),
-     (dict(name='Bombus bombus', genbank_id=3, taxa_hier={1: 'Morus'}), # non-string key
+     # non-string key
+     (dict(name='Bombus bombus', genbank_id=3, taxa_hier={1: ('Morus', 37577)}),
       ValueError),
-     (dict(name='Bombus bombus', genbank_id=3, taxa_hier={'genus': 27}), # non-string value
+     (dict(name='Bombus bombus', genbank_id=3, taxa_hier={'genus': 27}), # non-tuple value
+      ValueError),
+     # non-tuple value
+     (dict(name='Bombus bombus', genbank_id=3, taxa_hier={'genus': (37577, 'Morus')}),
+      ValueError),
+     # 3 elements in tuple
+     (dict(name='Bombus bombus', genbank_id=3,
+      taxa_hier={'genus': ('Morus', 37577, "extra")}),
       ValueError)])
 def test_taxon_init_errors(test_input, expected_exception):
     """This test checks NCBI taxon inputs throw errors as expected
