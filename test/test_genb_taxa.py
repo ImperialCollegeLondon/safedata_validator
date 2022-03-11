@@ -265,21 +265,15 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
     # Fine so empty
     [(['E coli', {'species': 'Escherichia coli'}, None],
       ((INFO, "Taxon (E coli) found in NCBI database"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # Same but with valid code provided
      (['E coli', {'species': 'Escherichia coli'}, 562],
       ((INFO, "Taxon (E coli) found in NCBI database"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # whitespace padding error
      ([' E coli', {'species': 'Escherichia coli'}, None],
       ((ERROR, "Worksheet name has whitespace padding: ' E coli'"),
        (INFO, "Taxon (E coli) found in NCBI database"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # String of just whitespace provided as name
      ([' ', {'species': 'Escherichia coli'}, None],
@@ -296,8 +290,6 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
      # Floats that can be cocnverted to integers are allowed
      (['E coli', {'species': 'Escherichia coli'}, 562.0],
       ((INFO, "Taxon (E coli) found in NCBI database"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # A true float results in multiple errors
      (['E coli', {'species': 'Escherichia coli'}, 562.5],
@@ -346,8 +338,6 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
      (['E coli', {' species': 'Escherichia coli'}, None],
       ((ERROR, "Dictonary key has whitespace padding: ' species'"),
        (INFO, "Taxon (E coli) found in NCBI database"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # Missing dictonary value
      (['E coli', {'species': ''}, None],
@@ -363,8 +353,6 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
      (['E coli', {'species': ' Escherichia coli'}, None],
       ((ERROR, "Dictonary value has whitespace padding: ' Escherichia coli'"),
        (INFO, "Taxon (E coli) found in NCBI database"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # Taxon hierarchy in wrong order
      (['E coli', {'species': 'Escherichia coli', 'genus': 'Escherichia'}, None],
@@ -373,15 +361,11 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
      # Right order but non-backbone rank
      (['Strepto', {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}, None],
       ((WARNING, "Strepto not of backbone rank, instead resolved to phylum level"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (ERROR, "Taxon (Streptophyta) No match found"),
       )),
      # Superseeded taxon name used
      (['C marina', {'species': 'Cytophaga marina'}, None],
       ((WARNING, "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
        (WARNING, "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (INFO, "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
       )),
      # Nonsense taxon provided
      (['N garbage', {'species': 'Nonsense garbage'}, None],
@@ -396,8 +380,6 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
      # Ambigious taxon resolved
      (['M Morus', {'family': 'Moraceae', 'genus': 'Morus'}, None],
       ((INFO, "Taxon (M Morus) found in NCBI database"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (ERROR, "Taxon (Morus) Multiple equal matches for Morus"),
       )),
      # E coli with incorrect NCBI ID
      (['E coli', {'species': 'Escherichia coli'}, 333],
@@ -408,30 +390,22 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
        1444049],
       ((WARNING, "E coli strain not of backbone rank, instead resolved to species level"),
        (WARNING, "E coli strain not of backbone rank, instead resolved to species level"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (INFO, "Taxon (Escherichia coli) accepted in GBIF"),
       )),
      # Superseeded taxa ID and name
      (['C marina', {'species': 'Cytophaga marina'}, 1000],
       ((WARNING, "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
        (WARNING, "NCBI ID 1000 has been superseeded by ID 107401"),
        (WARNING, "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (INFO, "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
       )),
      # Just superseeded taxa ID
      (['T maritimum', {'species': 'Tenacibaculum maritimum'}, 1000],
       ((WARNING, "NCBI ID 1000 has been superseeded by ID 107401"),
        (WARNING, "NCBI taxa ID superseeded for T maritimum, using new taxa ID"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (INFO, "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
       )),
      # Just superseeded name
      (['C marina', {'species': 'Cytophaga marina'}, 107401],
       ((WARNING, "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
        (WARNING, "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (INFO, "Taxon (Tenacibaculum maritimum) accepted in GBIF"),
       )),
      # E coli recorded as a family rather than a species
      (['E coli', {'family': 'Escherichia coli'}, None],
@@ -452,21 +426,13 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
      # Superkingdom not included in GBIF case
      (['Eukaryota', {'superkingdom': 'Eukaryota'}, 2759],
       ((INFO, "Taxon (Eukaryota) found in NCBI database"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (WARNING, "Taxon (Eukaryota) is not of a GBIF backbone rank"),
-       (ERROR, "Taxon (Eukaryota) No match found")
       )),
      # Can actually deal with the bacterial case
      (['Bacteria', {'superkingdom': 'Bacteria'}, 2],
       ((INFO, "Taxon (Bacteria) found in NCBI database"),
-       (INFO, "Attempting to validate against GBIF database"),
-       (WARNING, "Taxon (Bacteria) is not of a GBIF backbone rank"),
-       (INFO, "Taxon (Bacteria) defined as kingdom rank in GBIF"),
-       (INFO, "Taxon (Bacteria) accepted in GBIF"),
       )),
      ])
-def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
-                                fixture_taxon_validators):
+def test_validate_and_add_taxon(caplog, test_input, expected_log_entries):
     """This test checks that the function that searches the NCBI database to find
     information on particular taxa logs the correct errors and warnings. At the
     moment this for the Remote validator, but if a local validator is defined
@@ -476,7 +442,7 @@ def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
 
     # ONLY MAKING A LOCAL VERSION FOR NOW
     gb_instance = genb_taxa.GenBankTaxa()
-    fnd_tx = gb_instance.validate_and_add_taxon(fixture_taxon_validators,test_input)
+    fnd_tx = gb_instance.validate_and_add_taxon(test_input)
 
     log_check(caplog, expected_log_entries)
 
@@ -496,7 +462,7 @@ def test_validate_and_add_taxon(caplog, test_input, expected_log_entries,
      (['E coli', {'species': 'Escherichia coli'}, 100000000000000],
       genb_taxa.NCBIError),
     ])
-def test_validate_and_add_taxon_errors(fixture_taxon_validators, test_input, expected_exception):
+def test_validate_and_add_taxon_errors(test_input, expected_exception):
     """This test checks validator.validate_and_add_taxon inputs throw errors as expected
     """
 
@@ -504,4 +470,4 @@ def test_validate_and_add_taxon_errors(fixture_taxon_validators, test_input, exp
     gb_instance = genb_taxa.GenBankTaxa()
 
     with pytest.raises(expected_exception):
-        _ = gb_instance.validate_and_add_taxon(fixture_taxon_validators,test_input)
+        _ = gb_instance.validate_and_add_taxon(test_input)

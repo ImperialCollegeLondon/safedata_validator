@@ -23,8 +23,6 @@ from enforce_typing import enforce_types
 
 from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
                                        loggerinfo_push_pop)
-# THESE PROBABLY NOT NEEDED IN THE LONG RUN
-from safedata_validator.taxa import (Taxon, GBIFError)
 
 # ADD TO RESOURCE FILE, AS A CHECK THAT USER HAS PROVIDED ONE
 # Key should also be added to the resource file
@@ -492,7 +490,7 @@ class GenBankTaxa:
     # def load():
     # FUNCTION TO LOAD IN A TAXA WORKSHEET SHOULD BE ADDED IN HERE
 
-    def validate_and_add_taxon(self, validator, gb_taxon_input):
+    def validate_and_add_taxon(self, gb_taxon_input):
         # REWRITE THIS TO MATCH ALTERED FUNCTION
         """ User information is provided that names a taxon and (optionally) gives
         a NCBI taxonomy ID. This information is then used to find the closest GBIF
@@ -667,68 +665,5 @@ class GenBankTaxa:
             # Otherwise need to check for superseeded ID's
             elif id_taxon.superseed == False:
                 LOGGER.info(f'Taxon ({m_name}) found in NCBI database')
-
-        # Inform user that validation against GBIF is
-        LOGGER.info(f'Attempting to validate against GBIF database')
-        # Check if already processed
-        if True == False:
-            # THIS HAS TO BE A PLACEHOLDER FOR NOW
-            print("PLACEHOLDER")
-        # Otherwise go and use the stored information to searcg
-        else:
-            # Create a taxon object
-            gbf_taxon = Taxon(name=list(hr_taxon.taxa_hier.values())[-1],
-                       rank=list(hr_taxon.taxa_hier.keys())[-1], gbif_id=None)
-
-            # Look for a match
-            if gbf_taxon.is_backbone:
-                # Search for taxon
-                gbf_taxon = validator.search(gbf_taxon)
-
-            else: # Should only fire for superkingdom case
-                LOGGER.warning(f'Taxon ({gbf_taxon.name}) is not of a GBIF backbone rank')
-
-                # Check if we are dealing with the superkingdom case
-                if gbf_taxon.rank == "superkingdom":
-                    # If so remake the object using kingdom as the rank
-                    gbf_taxon = Taxon(name=list(hr_taxon.taxa_hier.values())[-1],
-                               rank="kingdom", gbif_id=None)
-                    # Then search for new taxon
-                    gbf_taxon = validator.search(gbf_taxon)
-
-                    # If this works let the user know what we did
-                    if gbf_taxon.found:
-                        LOGGER.info(f'Taxon ({gbf_taxon.name}) defined as kingdom'
-                                    f' rank in GBIF')
-
-        # THIS WILL NEED TO BE UPDATED WHEN I DO MORE ADVANCED STUFF
-        # Report on the taxon information
-        # NEED TO HANDLE SYNONYMS FOUND CASE (CAN I FIND AN EXAMPLE?)
-        # AND THE ONLY HIGHER ORDER TAXA FOUND CASE
-        # ALSO NEEDS TO CATCH AMBIGIOUS TAXA
-        if not gbf_taxon.found:
-            LOGGER.error(f'Taxon ({gbf_taxon.name}) {gbf_taxon.lookup_status}')
-
-        elif not gbf_taxon.is_canon:
-            LOGGER.warning(f'Taxon ({gbf_taxon.name}) considered a {gbf_taxon.taxon_status}'
-                           f' of {gbf_taxon.canon_usage.name} in GBIF backbone')
-        else:
-            LOGGER.info(f'Taxon ({gbf_taxon.name}) accepted in GBIF')
-
-        return
-
-    # THIS IS A TEMPORARY FUNCTION THAT SHOULD BE REMOVED IN THE LONG TERM
-    def temp_test_function(self, validator, gbif_id):
-        # Use the species/{id} endpoint
-        taxon_row = requests.get(f"http://api.gbif.org/v1/species/{gbif_id}")
-
-        # unknown ID numbers return a 404 error
-        if taxon_row.status_code == 404:
-            raise GBIFError()
-        elif taxon_row.status_code != 200:
-            raise GBIFError('Connection error to remote server')
-
-        # Extract the response
-        response = taxon_row.json()
 
         return
