@@ -213,12 +213,13 @@ class RemoteNCBIValidator:
         vinds = [idx for idx, element in enumerate(rnks) if element in actual_bb_rnks]
 
         # Create dictonary of valid taxa lineage using a list
-        red_taxa = {f"{actual_bb_rnks[i]}":linx[vinds[i]]["ScientificName"]
-                    for i in range(0,rnk-m_rnk)}
+        red_taxa = {f"{actual_bb_rnks[i]}":(str(linx[vinds[i]]["ScientificName"]),
+                    int(linx[vinds[i]]["TaxId"])) for i in range(0,rnk-m_rnk)}
 
         # Then if taxa is valid then add taxa as final entry
         if valid == True:
-            red_taxa[f"{BACKBONE_RANKS_EX[rnk]}"] = tax_dic["ScientificName"]
+            red_taxa[f"{BACKBONE_RANKS_EX[rnk]}"] = (str(tax_dic["ScientificName"]),
+            int(tax_dic["TaxId"]))
 
         # Create and populate microbial taxon
         mtaxon = NCBITaxon(name=nnme,genbank_id=genbank_id,taxa_hier=red_taxa)
@@ -228,11 +229,6 @@ class RemoteNCBIValidator:
             # Store (non-standard) taxon rank to explain divergence
             t = tax_dic["Rank"]
             mtaxon.diverg=f"{t}"
-
-        # Check that OtherNames exist in the dictonary
-        if 'OtherNames' in tax_dic.keys():
-            # If so find and add synonyms to potentially search GBIF for
-            mtaxon.synonyms = (tax_dic["OtherNames"])["Synonym"]
 
         # Check if AkaTaxIds exists in taxonomic information
         if 'AkaTaxIds' in tax_dic.keys():

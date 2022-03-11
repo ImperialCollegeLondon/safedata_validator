@@ -63,15 +63,15 @@ def test_taxon_init_errors(test_input, expected_exception):
 @pytest.mark.parametrize(
     'test_input,expected',
     [(dict(nnme='E coli', genbank_id=562),
-      ('E coli', 562, None, False, "species", "Escherichia coli")),
+      ('E coli', 562, None, False, "species", "Escherichia coli", 562)),
      (dict(nnme='E coli strain', genbank_id=1444049),
-      ('E coli strain', 1444049, "strain", False, "species", "Escherichia coli")),
+      ('E coli strain', 1444049, "strain", False, "species", "Escherichia coli", 562)),
      (dict(nnme='Streptophytina', genbank_id=131221),
-      ('Streptophytina', 131221, "subphylum", False, "phylum", "Streptophyta")),
+      ('Streptophytina', 131221, "subphylum", False, "phylum", "Streptophyta", 35493)),
      (dict(nnme='Opisthokonta', genbank_id=33154),
-      ('Opisthokonta', 33154, "clade", False, "superkingdom", "Eukaryota")),
+      ('Opisthokonta', 33154, "clade", False, "superkingdom", "Eukaryota", 2759)),
      (dict(nnme='Cytophaga marina', genbank_id=1000),
-      ('Cytophaga marina', 1000, None, True, "species", "Tenacibaculum maritimum"))
+      ('Cytophaga marina', 1000, None, True, "species", "Tenacibaculum maritimum", 107401))
      ])
 def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of looking up a specific NCBI taxonomy against
@@ -91,7 +91,7 @@ def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     f_key = list(fnd_tx.taxa_hier.keys())[-1]
 
     assert f_key == expected[4]
-    assert fnd_tx.taxa_hier[f_key] == expected[5]
+    assert fnd_tx.taxa_hier[f_key] == (expected[5], expected[6])
 
 # Now test that the search function logs errors correctly
 @pytest.mark.parametrize(
