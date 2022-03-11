@@ -31,7 +31,6 @@ Entrez.email = "jacobcook1995@gmail.com"
 user_key = "1738fe86eba2d8fc287ff0d1dcbfeda44a0a"
 
 # Extended version of backbone ranks to capture superkingdoms
-# WILL NEED THOUGHT ABOUT THE MAPPING
 BACKBONE_RANKS_EX = ['superkingdom', 'kingdom', 'phylum', 'class', 'order',
                     'family', 'genus', 'species', 'subspecies']
 
@@ -294,7 +293,8 @@ class RemoteNCBIValidator:
         elif c == 0:
             LOGGER.error(f'Taxa {nnme} cannot be found')
             return
-        else:
+        # Case where only one rank has been provided
+        elif len(taxah) == 1:
             # Preallocate container for the ranks
             t_ranks = []
             # First check if multiple taxa have the same rank
@@ -318,73 +318,74 @@ class RemoteNCBIValidator:
                 # Use ID lookup function to generate as a NCBITaxon object
                 mtaxon = self.id_lookup(nnme,tID)
             # Then check whether multiple taxonomic levels have been provided
-            elif len(taxah) == 1:
+            else:
                 # If not raise an error
                 LOGGER.error(f'Taxa {nnme} cannot be found using only one '
                              f'taxonomic level, more should be provided')
                 return
+        # Higher ranks provided
+        else:
+            # Find second from last dictonary key
+            f_key = list(taxah.keys())[-2]
+            # Then find corresponding entry as a search term
+            s_term = taxah[f_key]
+
+            # Then find details of this parent record
+            try:
+                handle = Entrez.esearch(db="taxonomy", term=s_term,
+                                        api_key=user_key)
+            except urllib.error.HTTPError:
+                NCBIError('Connection error to remote server')
+
+            p_record = Entrez.read(handle)
+            handle.close()
+
+            # Store count of the number of records found
+            pc = int(p_record['Count'])
+
+            # Check that single parent taxa exists in records
+            if pc == 0:
+                LOGGER.error(f'Provided parent taxa for {nnme} not found')
+                return
+            elif pc > 1:
+                LOGGER.error(f'More than one possible parent taxa for {nnme} found')
+                return
             else:
-                # Find second from last dictonary key
-                f_key = list(taxah.keys())[-2]
-                # Then find corresponding entry as a search term
-                s_term = taxah[f_key]
+                # Find parent taxa ID as single entry in the list
+                pID = int(p_record['IdList'][0])
+                # Then use ID lookup function to find generate as a NCBITaxon object
+                ptaxon = self.id_lookup("parent",pID)
 
-                # Then find details of this parent record
-                try:
-                    handle = Entrez.esearch(db="taxonomy", term=s_term,
-                                            api_key=user_key)
-                except urllib.error.HTTPError:
-                    NCBIError('Connection error to remote server')
+            # Save parent taxa rank and name
+            p_key = list(ptaxon.taxa_hier.keys())[-1]
+            p_val = ptaxon.taxa_hier[p_key]
 
-                p_record = Entrez.read(handle)
-                handle.close()
+            # Use list comprehension to make list of potential taxa
+            potents = [self.id_lookup(f"c{i}",int(record['IdList'][i]))
+                        for i in range(0,c)]
 
-                # Store count of the number of records found
-                pc = int(p_record['Count'])
+            # Check if relevant rank exists in the child taxa
+            child = [p_key in potents[i].taxa_hier for i in range(0,c)]
 
-                # Check that single parent taxa exists in records
-                if pc == 0:
-                    LOGGER.error(f'Provided parent taxa for {nnme} not found')
-                    return
-                elif pc > 1:
-                    LOGGER.error(f'More than one possible parent taxa for {nnme} found')
-                    return
-                else:
-                    # Find parent taxa ID as single entry in the list
-                    pID = int(p_record['IdList'][0])
-                    # Then use ID lookup function to find generate as a NCBITaxon object
-                    ptaxon = self.id_lookup("parent",pID)
+            # Then look for matching rank name pairs
+            for i in range(0,c):
+                # Only check cases where rank exists in the child taxa
+                if child[i] == True:
+                    child[i] = (potents[i].taxa_hier[f"{p_key}"] == p_val)
 
-                # Save parent taxa rank and name
-                p_key = list(ptaxon.taxa_hier.keys())[-1]
-                p_val = ptaxon.taxa_hier[p_key]
-
-                # Use list comprehension to make list of potential taxa
-                potents = [self.id_lookup(f"c{i}",int(record['IdList'][i]))
-                            for i in range(0,c)]
-
-                # Check if relevant rank exists in the child taxa
-                child = [p_key in potents[i].taxa_hier for i in range(0,c)]
-
-                # Then look for matching rank name pairs
-                for i in range(0,c):
-                    # Only check cases where rank exists in the child taxa
-                    if child[i] == True:
-                        child[i] = (potents[i].taxa_hier[f"{p_key}"] == p_val)
-
-                # Check for errors relating to finding too many or few child taxa
-                if sum(child) == 0:
-                    LOGGER.error(f'Parent taxa not actually a valid parent of {nnme}')
-                    return
-                elif sum(child) > 1:
-                    LOGGER.error(f'Parent taxa for {nnme} refers to multiple '
-                                 f'possible child taxa')
-                    return
-                else:
-                    # Find index corresponding to correct child taxa
-                    tID = int(record['IdList'][child.index(True)])
-                    # Use ID lookup function to find generate as a NCBITaxon object
-                    mtaxon = self.id_lookup(nnme,tID)
+            # Check for errors relating to finding too many or few child taxa
+            if sum(child) == 0:
+                LOGGER.error(f'Parent taxa not actually a valid parent of {nnme}')
+                return
+            elif sum(child) > 1:
+                LOGGER.error(f'Parent taxa for {nnme} refers to multiple '
+                             f'possible child taxa')
+                return
+            else:
+                # Find index corresponding to correct child taxa
+                tID = int(record['IdList'][child.index(True)])
+                # Use ID lookup function to find generate as a NCBITaxon object
+                mtaxon = self.id_lookup(nnme,tID)
 
         # Find last dictonary key
         f_key = list(mtaxon.taxa_hier.keys())[-1]
@@ -398,10 +399,10 @@ class RemoteNCBIValidator:
                              f' not a {list(taxah.keys())[-1]}')
                 return
             # Then check whether orginally supplied name is still used
-            elif taxah[f_key] != mtaxon.taxa_hier[f_key]:
+            elif taxah[f_key] != (mtaxon.taxa_hier[f_key])[0]:
                 # If not print a warning
                 LOGGER.warning(f'{taxah[f_key]} not accepted usage should be '
-                               f'{mtaxon.taxa_hier[f_key]} instead')
+                               f'{(mtaxon.taxa_hier[f_key])[0]} instead')
                 # And record the fact that usage is superseeded
                 mtaxon.superseed = True
         else:

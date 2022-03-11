@@ -142,31 +142,31 @@ def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exceptio
 @pytest.mark.parametrize(
     'test_input,expected',
     [(dict(nnme="E coli",taxah={'genus': 'Escherichia', 'species': 'Escherichia coli'}),
-      ("E coli", 562, None, False, "species", "Escherichia coli")),
+      ("E coli", 562, None, False, "species", "Escherichia coli", 562)),
      (dict(nnme="Entero",taxah={'order': 'Enterobacterales', 'family': 'Enterobacteriaceae'}),
-      ("Entero", 543, None, False, "family", "Enterobacteriaceae")),
+      ("Entero", 543, None, False, "family", "Enterobacteriaceae", 543)),
      (dict(nnme="E coli strain",taxah={'species': 'Escherichia coli', 'strain':
      'Escherichia coli 1-110-08_S1_C1'}),
-      ("E coli strain", 1444049, "strain", False, "species", "Escherichia coli")),
+      ("E coli strain", 1444049, "strain", False, "species", "Escherichia coli", 562)),
      (dict(nnme="Strepto",taxah={'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}),
-      ("Strepto", 131221, "subphylum", False, "phylum", "Streptophyta")),
+      ("Strepto", 131221, "subphylum", False, "phylum", "Streptophyta", 35493)),
      (dict(nnme="Opistho",taxah={'superkingdom': 'Eukaryota', 'clade': 'Opisthokonta'}),
-      ("Opistho", 33154, "clade", False, "superkingdom", "Eukaryota")),
+      ("Opistho", 33154, "clade", False, "superkingdom", "Eukaryota", 2759)),
      (dict(nnme="Vulpes",taxah={'genus': 'Vulpes', 'species': 'Vulpes vulpes'}),
-      ("Vulpes", 9627, None, False, "species", "Vulpes vulpes")),
+      ("Vulpes", 9627, None, False, "species", "Vulpes vulpes", 9627)),
      (dict(nnme="M morus",taxah={'family': 'Moraceae', 'genus': 'Morus'}),
-      ("M morus", 3497, None, False, "genus", "Morus")),
+      ("M morus", 3497, None, False, "genus", "Morus", 3497)),
      (dict(nnme="S morus",taxah={'family': 'Sulidae', 'genus': 'Morus'}),
-      ("S morus", 37577, None, False, "genus", "Morus")),
+      ("S morus", 37577, None, False, "genus", "Morus", 37577)),
      (dict(nnme="C morus",taxah={'phylum': 'Chordata', 'genus': 'Morus'}),
-      ("C morus", 37577, None, False, "genus", "Morus")),
+      ("C morus", 37577, None, False, "genus", "Morus", 37577)),
      (dict(nnme="T maritimum",taxah={'genus': 'Tenacibaculum', 'species':
      'Tenacibaculum maritimum'}),
-      ("T maritimum", 107401, None, False, "species", "Tenacibaculum maritimum")),
+      ("T maritimum", 107401, None, False, "species", "Tenacibaculum maritimum", 107401)),
      (dict(nnme="C marina",taxah={'genus': 'Cytophaga', 'species': 'Cytophaga marina'}),
-      ("C marina", 107401, None, True, "species", "Tenacibaculum maritimum")),
+      ("C marina", 107401, None, True, "species", "Tenacibaculum maritimum", 107401)),
      (dict(nnme="Bacteria",taxah={'superkingdom': 'Bacteria'}),
-      ("Bacteria", 2, None, False, "superkingdom", "Bacteria"))
+      ("Bacteria", 2, None, False, "superkingdom", "Bacteria", 2))
     ])
 def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of searching for a taxa in the NCBI taxonomy
@@ -186,7 +186,7 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     f_key = list(fnd_tx.taxa_hier.keys())[-1]
 
     assert f_key == expected[4]
-    assert fnd_tx.taxa_hier[f_key] == expected[5]
+    assert fnd_tx.taxa_hier[f_key] == (expected[5], expected[6])
 
 # Now test that the search function logs errors correctly
 @pytest.mark.parametrize(
