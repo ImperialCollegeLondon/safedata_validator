@@ -23,11 +23,14 @@ from enforce_typing import enforce_types
 
 from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
                                        loggerinfo_push_pop)
-from safedata_validator import taxa
+# THESE PROBABLY NOT NEEDED IN THE LONG RUN
+from safedata_validator.taxa import (Taxon, GBIFError)
 
-# CHANGE THIS TO A PURPOSE DEFINED EMAIL AT SOMEPOINT
-# MAYBE ADD TO RESOURCE FILE, AS A CHECK THAT USER HAS PROVIDED ONE
-Entrez.email = "jc2017@ic.ac.uk"
+# ADD TO RESOURCE FILE, AS A CHECK THAT USER HAS PROVIDED ONE
+# Key should also be added to the resource file
+Entrez.email = "jacobcook1995@gmail.com"
+# Hard coding api key in for now
+user_key = "1738fe86eba2d8fc287ff0d1dcbfeda44a0a"
 
 # Extended version of backbone ranks to capture superkingdoms
 # WILL NEED THOUGHT ABOUT THE MAPPING
@@ -149,9 +152,8 @@ class RemoteNCBIValidator:
 
         # Use efetch to find taxonomy details based on the index
         try:
-            handle = Entrez.efetch(db="taxonomy",
-                                   id=f"{genbank_id}",
-                                   retmode="xml")
+            handle = Entrez.efetch(db="taxonomy",id=f"{genbank_id}",
+                                   retmode="xml",api_key=user_key)
             tax_dic = Entrez.read(handle)[0]
             handle.close()
         # And case where a connection can't be made to the remote server
@@ -284,7 +286,7 @@ class RemoteNCBIValidator:
 
         # Search the online database
         try:
-            handle = Entrez.esearch(db="taxonomy", term=s_term)
+            handle = Entrez.esearch(db="taxonomy", term=s_term, api_key=user_key)
         except urllib.error.HTTPError:
             NCBIError('Connection error to remote server')
 
@@ -342,7 +344,8 @@ class RemoteNCBIValidator:
 
                 # Then find details of this parent record
                 try:
-                    handle = Entrez.esearch(db="taxonomy", term=s_term)
+                    handle = Entrez.esearch(db="taxonomy", term=s_term,
+                                            api_key=user_key)
                 except urllib.error.HTTPError:
                     NCBIError('Connection error to remote server')
 
@@ -674,7 +677,7 @@ class GenBankTaxa:
         # Otherwise go and use the stored information to searcg
         else:
             # Create a taxon object
-            gbf_taxon = taxa.Taxon(name=list(hr_taxon.taxa_hier.values())[-1],
+            gbf_taxon = Taxon(name=list(hr_taxon.taxa_hier.values())[-1],
                        rank=list(hr_taxon.taxa_hier.keys())[-1], gbif_id=None)
 
             # Look for a match
@@ -688,7 +691,7 @@ class GenBankTaxa:
                 # Check if we are dealing with the superkingdom case
                 if gbf_taxon.rank == "superkingdom":
                     # If so remake the object using kingdom as the rank
-                    gbf_taxon = taxa.Taxon(name=list(hr_taxon.taxa_hier.values())[-1],
+                    gbf_taxon = Taxon(name=list(hr_taxon.taxa_hier.values())[-1],
                                rank="kingdom", gbif_id=None)
                     # Then search for new taxon
                     gbf_taxon = validator.search(gbf_taxon)
@@ -721,35 +724,11 @@ class GenBankTaxa:
 
         # unknown ID numbers return a 404 error
         if taxon_row.status_code == 404:
-            raise taxa.GBIFError()
+            raise GBIFError()
         elif taxon_row.status_code != 200:
-            raise taxa.GBIFError('Connection error to remote server')
+            raise GBIFError('Connection error to remote server')
 
         # Extract the response
         response = taxon_row.json()
 
-        print(response)
-
         return
-
-# ROUGH TESTING BLOCK
-# SHOULD CONVERT THIS INTO PROPER UNIT TESTS AS I GO
-v1 = GenBankTaxa()
-# Use remote GBIF validator
-v2 = taxa.RemoteGBIFValidator()
-
-# Should work fine
-d1 = ['E coli', {'species': 'Escherichia coli'}, 562]
-# OOH IT GIVES AN ERROR, THAT IS INTERESTING
-# A LOT OF COMPLEXITY HERE
-# NOT SURE IF THIS IS A SYNONYMS PROBLEM, A NEW EDGE CASE, A LACK OF TAXONOMIC RESOLUTION PROBLEM,
-# OR AN ERROR THAT I HAVE GENERATED THROUGH MY OWN THOUGHTLESSNESS
-d2 = ['Strepto', {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}, None]
-# IS PLANTS ARE A REALLY THORNY ONE TO SOLVE
-d3 = ['Bacteria', {'superkingdom': 'Bacteria'}, 2]
-# The kingdom metazoa is a synonym of animalia
-# Good to test synonyms
-d4 = ['Metazoa', {'kingdom': 'Metazoa'}, 33208]
-
-# Using this to test searching GBIF
-test = v1.temp_test_function(v2,5219243)
