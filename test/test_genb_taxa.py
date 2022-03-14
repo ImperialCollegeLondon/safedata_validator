@@ -56,6 +56,35 @@ def test_taxon_init_errors(test_input, expected_exception):
         _ = genb_taxa.NCBITaxon(**test_input)
 
 # ------------------------------------------
+# Testing taxa_strip
+# ------------------------------------------
+# Only need to test that output is sensible here
+@pytest.mark.parametrize(
+    'test_input,expected',
+    [(dict(name='Bacteria', rank='Kingdom'),
+      ('Bacteria', True)),
+     (dict(name='k__Bacteria', rank='Kingdom'),
+      ('Bacteria', True)),
+     (dict(name='k__Bacteria', rank='Phylum'),
+      ('Bacteria', False)),
+     (dict(name='p__Acidobacteria', rank='Phylum'),
+      ('Acidobacteria', True)),
+     (dict(name='s__', rank='Species'),
+      ('', True))
+     ])
+def test_taxa_strip(test_input, expected):
+    """This test checks the function that strips taxa strings down to remove k__
+    type notation is functioning properly. This function also checks that the
+    supplied rank matches the rank implied by the notation, we also test this
+    behaviour.
+    """
+
+    s_taxa, match = genb_taxa.taxa_strip(**test_input)
+
+    assert s_taxa == expected[0]
+    assert match == expected[1]
+
+# ------------------------------------------
 # Testing taxon validators
 # ------------------------------------------
 
@@ -263,7 +292,11 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
     with pytest.raises(expected_exception):
         _ = fixture_ncbi_validators.taxa_search(**test_input)
 
-# Then do the same for the validate_and_add_taxon function
+# ------------------------------------------
+# Testing GenBankTaxa
+# ------------------------------------------
+
+# Start with the validate_and_add_taxon function
 
 # SECTION TESTING EXPECTED OUTPUT
 

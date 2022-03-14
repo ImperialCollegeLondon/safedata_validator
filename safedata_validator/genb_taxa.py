@@ -47,6 +47,22 @@ class NCBIError(Exception):
         self.message = message
         super().__init__(self.message)
 
+# New function to remove k__ notation, and to check that rank and
+def taxa_strip(name: str, rank: str):
+    """A function to remove k__ type notation from taxa names. The function also
+    checks that the provided rank is consistent with the rank implied by prefix
+    """
+    if "__" in name:
+        # Strip name down
+        ind = name.rfind("_")
+        s_name = name[ind+1:]
+        # Check if ranks match
+        match = (name[0].lower() == rank[0].lower())
+        return(s_name,match)
+    else:
+        return(name,True)
+
+
 
 # TODO - Correctly read in xslx data
 # Lot of this has already been written by David, main thing is that I will have
@@ -516,12 +532,77 @@ class GenBankTaxa:
             LOGGER.error('Less than two backbone taxonomic ranks are provided')
             return
 
+        # Check that if subspecies has been provided species is provided
+        if 'subspecies' in headers:
+            if 'species' not in headers:
+                LOGGER.error('If subspecies is provided so must species')
+                return
+
+        # Same check
+        if 'species' in headers:
+            if 'genus' not in headers:
+                LOGGER.error('If species is provided so must genus')
+                return
+
         # Any duplication in names
         dupl_taxon_names = HasDuplicates(dframe.data_columns[headers.index('name')])
 
         if dupl_taxon_names:
             LOGGER.error('Duplicated names found: ',
                          extra={'join': dupl_taxon_names.duplicated})
+
+        # get dictionaries of the taxa
+        taxa = [dict(zip(headers, rw)) for rw in zip(*dframe.data_columns)]
+        FORMATTER.pop()
+
+        # check number of taxa found
+        if len(taxa) == 0:
+            LOGGER.info('No taxon rows found')
+            return
+
+        # HOW TO DEAL WITH NANS?
+        # Generate species binomials + subspecies trinominals
+        # Need to ensure that we don't end up with "E E coli"
+
+        # Change data format such that it is appropriate to be used to search
+        # the NCBI database, i.e. convert from k__ notation, generate species
+        # binomials and subspecies trinominals
+
+        for idx, row in enumerate(taxa):
+
+            # Strip k__ notation so that the text is appropriate for the search
+            # NEED TO WRITE A FUNCTION TO DO THIS
+            # INPUT STRING + EXPECTED RANK
+            # RETURNS BOOL AND STRIPPED STRING
+            for rnk in fnd_rnks:
+                print(rnk)
+                output = taxa_strip(row[rnk],rnk)
+                print(output)
+
+            return
+
+        #     # Standardise blank values to None
+        #     row = {ky: None if blank_value(vl) else vl for ky, vl in row.items()}
+        #     # THIS ACTUALLY REQUIRES WRITING TO A DICTONARY
+        #     taxon_info = [row['taxon name'], row['taxon type'], row['taxon id'], row['ignore id']]
+        #
+        #     self.taxon_names.update([row['name']]) # SHOULD I BE USING THE SAME FUNCTION HERE?
+        #     LOGGER.info(f"Validating row {idx + 1}: {row['name']}")
+        #     FORMATTER.push()
+        #     self.validate_and_add_taxon((row['name'], gb_taxon_input))
+        #     FORMATTER.pop()
+        #
+        # # Add the higher taxa
+        # self.index_higher_taxa()
+        #
+        # # summary of processing
+        # self.n_errors = COUNTER_HANDLER.counters['ERROR'] - start_errors
+        # if self.n_errors > 0:
+        #     LOGGER.info('Taxa contains {} errors'.format(self.n_errors))
+        # else:
+        #     LOGGER.info('{} taxa loaded correctly'.format(len(self.taxon_names)))
+        #
+        # FORMATTER.pop()
 
 
 
