@@ -560,10 +560,6 @@ class GenBankTaxa:
             LOGGER.info('No taxon rows found')
             return
 
-        # HOW TO DEAL WITH NANS?
-        # Generate species binomials + subspecies trinominals
-        # Need to ensure that we don't end up with "E E coli"
-
         # Change data format such that it is appropriate to be used to search
         # the NCBI database, i.e. convert from k__ notation, generate species
         # binomials and subspecies trinominals
@@ -571,18 +567,21 @@ class GenBankTaxa:
         for idx, row in enumerate(taxa):
 
             # Strip k__ notation so that the text is appropriate for the search
-            # NEED TO WRITE A FUNCTION TO DO THIS
-            # INPUT STRING + EXPECTED RANK
-            # RETURNS BOOL AND STRIPPED STRING
             for rnk in fnd_rnks:
-                print(rnk)
-                output = taxa_strip(row[rnk],rnk)
-                print(output)
+                row[rnk], match = taxa_strip(row[rnk],rnk)
+                if match == False:
+                    print(f"Implied rank of {row[rnk]} in row {idx + 1} does not"
+                          f" match rank it is assigned")
 
-            return
+            # Standardise blank values to None
+            row = {ky: None if blank_value(vl) else vl for ky, vl in row.items()}
+            # Replace any NA values with None
+            row = {ky: None if vl == "NA" else vl for ky, vl in row.items()}
 
-        #     # Standardise blank values to None
-        #     row = {ky: None if blank_value(vl) else vl for ky, vl in row.items()}
+            # Generate species binomials + subspecies trinominals
+            # Need to ensure that we don't end up with "E E coli"
+            # WHATEVER DICTONARY I GENERATE MUST BE ORDERED
+
         #     # THIS ACTUALLY REQUIRES WRITING TO A DICTONARY
         #     taxon_info = [row['taxon name'], row['taxon type'], row['taxon id'], row['ignore id']]
         #
