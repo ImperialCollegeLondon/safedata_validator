@@ -23,6 +23,8 @@ from enforce_typing import enforce_types
 
 from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
                                        loggerinfo_push_pop)
+from safedata_validator.validators import (GetDataFrame, HasDuplicates,
+                                           IsLower, blank_value)
 
 # ADD TO RESOURCE FILE, AS A CHECK THAT USER HAS PROVIDED ONE
 # Key should also be added to the resource file
@@ -415,11 +417,6 @@ class RemoteNCBIValidator:
 
         return mtaxon
 
-# OKAY SO WHAT DO I NEED THIS TOP LEVEL FUNCTION TO DO?
-# FIRST IT NEEDS TO READ IN WORKSHEET DATA
-# IT SHOULD STORE IT IN NCBI FORMAT (AND VALIDATE)
-# THEN IT SHOULD CONVERT THIS INFO TO GBIF FORM
-# THIS INFO IS STORED FOR OUTPUT
 class GenBankTaxa:
     # REWRITE THIS HEAVILY
     """A class to hold a list of taxon names and a validated taxonomic
@@ -456,16 +453,9 @@ class GenBankTaxa:
     """
 
     def __init__(self):
+        # FILL OUT THIS PROPERLY ONCE I KNOW WHAT IT IS SUPPOSED TO BE
         """Sets the initial properties of a GenBankTaxa object
         """
-
-        # WHAT INFO FROM NCBI SHOULD BE STORED???
-        # name: str ???
-        # taxa_hier: dict NO NEED TO STORE FULL hierarchy
-        # genbank_id: YES
-        # synonyms: list[str] THESE ARE ALSO ONLY OF TRANSIENT INTEREST
-        # diverg: str = dataclasses.field(init=False) # SHOULD GENERATE A WARNING
-        # superseed: # SHOULD GENERATE A WARNING
 
         self.taxon_index = []
         self.taxon_names = set()
@@ -477,8 +467,63 @@ class GenBankTaxa:
         # At the moment we only have one validator defined
         self.validator = RemoteNCBIValidator()
 
-    # def load():
-    # FUNCTION TO LOAD IN A TAXA WORKSHEET SHOULD BE ADDED IN HERE
+    def load(self, worksheet):
+        # THIS PROBABLY NEEDS A BIT OF REWRITING
+        """Loads a set of taxa from the rows of a SAFE formatted NCBITaxa worksheet
+        and then adds the higher taxa for those rows.
+
+        Args:
+            worksheet: An openpyxl worksheet instance following the NCBITaxa formatting
+
+        Returns:
+            Updates the taxon_names and taxon_index attributes of the class instance
+            using the data in the worksheet.
+        """
+
+        start_errors = COUNTER_HANDLER.counters['ERROR']
+
+        # Get the data read in.
+        LOGGER.info("Reading NCBI taxa data")
+        FORMATTER.push()
+        dframe = GetDataFrame(worksheet)
+
+        if not dframe.data_columns:
+            LOGGER.error('No data or only headers in Taxa worksheet')
+            return
+
+        # Dupe headers likely cause serious issues, so stop
+        if 'duplicated' in dframe.bad_headers:
+            LOGGER.error('Cannot parse taxa with duplicated headers')
+            return
+
+        # Get the headers
+        headers = IsLower(dframe.headers).values
+
+        # Field cleaning
+        core_fields = {'name', 'ncbi id'}
+        missing_core = core_fields.difference(headers)
+
+        if missing_core:
+            # core names are not found so can't continue
+            LOGGER.error('Missing core fields: ', extra={'join': missing_core})
+            return
+
+        # Check that at least two backbone taxa have been provided
+        fnd_rnks = set(BACKBONE_RANKS_EX).intersection(headers)
+
+        if len(fnd_rnks) < 2:
+            # can't continue if less than two backbone ranks are provided
+            LOGGER.error('Less than two backbone taxonomic ranks are provided')
+            return
+
+        # Any duplication in names
+        dupl_taxon_names = HasDuplicates(dframe.data_columns[headers.index('name')])
+
+        if dupl_taxon_names:
+            LOGGER.error('Duplicated names found: ',
+                         extra={'join': dupl_taxon_names.duplicated})
+
+
 
     def validate_and_add_taxon(self, gb_taxon_input):
         # REWRITE THIS TO MATCH ALTERED FUNCTION
