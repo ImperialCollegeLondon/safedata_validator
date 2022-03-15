@@ -138,6 +138,63 @@ def test_validate_species_binomial(caplog, test_input, expected_log_entries):
     log_check(caplog, expected_log_entries)
 
 # ------------------------------------------
+# Testing subspecies_trinomial
+# ------------------------------------------
+@pytest.mark.parametrize(
+    'test_input,expected',
+    [(dict(species='Vulpes vulpes', subspecies='japonica'),
+      'Vulpes vulpes japonica'),
+     (dict(species='Candidatus Koribacter versatilis', subspecies='Ellin345'),
+       'Candidatus Koribacter versatilis Ellin345'),
+     (dict(species='Candidatus Koribacter versatilis', subspecies='Candidatus Ellin345'),
+      'Candidatus Koribacter versatilis Ellin345'),
+     (dict(species='Vulpes vulpes', subspecies='Vulpes vulpes schrenckii'),
+      'Vulpes vulpes schrenckii'),
+     (dict(species='Canis vulpes', subspecies='Vulpes vulpes schrenckii'),
+      None),
+     (dict(species='Over long name', subspecies='schrenckii'),
+      None),
+     (dict(species='Vulpes', subspecies='Vulpes vulpes schrenckii'),
+      None),
+     ])
+def test_subspecies_trinomial(test_input, expected):
+    """This test checks the function that strips constructs species binomals from
+    species and genus names. We test that it can catch when the species name is
+    already a binomial, and that it can catch Candidatus names and handle them
+    properly.
+    """
+
+    s_bi = genb_taxa.subspecies_trinomial(**test_input)
+
+    assert s_bi == expected
+
+# Now test that the function logs errors correctly
+@pytest.mark.parametrize(
+    'test_input,expected_log_entries',
+    [(dict(species='Vulpes vulpes', subspecies='Vulpes vulpes japonica'), # Fine so empty
+      ()),
+     # Species name and genus name don't match
+     (dict(species='Canis vulpes', subspecies='Vulpes vulpes schrenckii'),
+      ((ERROR, 'Subspecies name (Vulpes vulpes schrenckii) appears to be trinomal'
+                   f'but does not contain species name (Canis vulpes)'),
+      )),
+     (dict(species='Over long name', subspecies='schrenckii'), # Over long name
+      ((ERROR, 'Species name (Over long name) too long'),
+      )),
+     (dict(species='Vulpes', subspecies='Vulpes vulpes schrenckii'), # Too short
+      ((ERROR, 'Species name (Vulpes) too short'),
+      ))
+     ])
+def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries):
+    """This test checks that the function to construct species binomials logs the
+     correct errors and warnings.
+    """
+
+    s_bi = genb_taxa.subspecies_trinomial(**test_input)
+
+    log_check(caplog, expected_log_entries)
+
+# ------------------------------------------
 # Testing taxon validators
 # ------------------------------------------
 

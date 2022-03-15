@@ -32,6 +32,28 @@ Entrez.email = "jacobcook1995@gmail.com"
 # Hard coding api key in for now
 user_key = "1738fe86eba2d8fc287ff0d1dcbfeda44a0a"
 
+
+# TODO - Correctly read in xslx data
+# Lot of this has already been written by David, main thing is that I will have
+# to decide on the formatting, like what data are we taking in.
+
+# TODO - Think about data output
+# Have to make sure that the indexing is compatibale with David's database
+# Probably have to add in the first databasing steps as well
+
+# POTENTIAL - Take steps to increase the speed
+# Make local copy by downloading the relevant part of NCBI's database and
+# running the validation locally
+
+# TODO - Modify the resource file to ask the user to provide an email address
+# This should only be done if the user actually wants to use this module as it
+# isn't need elsewhere (as far as I know)
+# Also should ask for api key
+
+# QUESTIONS FOR DAVID
+# SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
+# IS THERE A SENSIBLE WAY TO DUMMY CONNECTION ERRORS?
+
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ['superkingdom', 'kingdom', 'phylum', 'class', 'order',
                     'family', 'genus', 'species', 'subspecies']
@@ -64,7 +86,7 @@ def taxa_strip(name: str, rank: str):
 
 # New function to generate species binomial
 def species_binomial(genus: str, species: str):
-    # First check if species is a single names
+    # First check if species is a single name
     if len(species.split()) == 1 and len(genus.split()) == 1:
         return genus.strip() + " " + species.strip()
     # Look for Candidatus formats
@@ -89,28 +111,37 @@ def species_binomial(genus: str, species: str):
         LOGGER.error(f'Genus name ({genus}) appears to be too long')
         return None
 
+# Equivalent function to generate subspecies trinominal
+def subspecies_trinomial(species: str, subspecies: str):
+    # First check if subspecies is a single name
+    if len(subspecies.split()) == 1 and len(species.split()) == 2:
+        return species.strip() + " " + subspecies.strip()
+    # Look for Candidatus formats
+    elif "candidatus" in subspecies.lower() or "candidatus" in species.lower():
+        if "candidatus" in subspecies.lower():
+            # Construct trinominal with first word of subspecies name removed
+            tri = species.strip()
+            for i in range(1,len(subspecies.split())):
+                tri = tri + " " + subspecies.split()[i]
+            return tri
+        else:
+            return species.strip() + " " + subspecies.strip()
+    # Catch too shot species name case
+    elif len(species.split()) == 1:
+        LOGGER.error(f'Species name ({species}) too short')
+        return None
+    # Then check that species name is more words than the genus name
+    elif len(subspecies.split()) > len(species.split()):
+        if species in subspecies:
+            return subspecies
+        else:
+            LOGGER.error(f'Subspecies name ({subspecies}) appears to be trinomal'
+                         f'but does not contain species name ({species})')
+            return None
+    else:
+        LOGGER.error(f'Species name ({species}) too long')
+        return None
 
-
-# TODO - Correctly read in xslx data
-# Lot of this has already been written by David, main thing is that I will have
-# to decide on the formatting, like what data are we taking in.
-
-# TODO - Think about data output
-# Have to make sure that the indexing is compatibale with David's database
-# Probably have to add in the first databasing steps as well
-
-# POTENTIAL - Take steps to increase the speed
-# Make local copy by downloading the relevant part of NCBI's database and
-# running the validation locally
-
-# TODO - Modify the resource file to ask the user to provide an email address
-# This should only be done if the user actually wants to use this module as it
-# isn't need elsewhere (as far as I know)
-# Also should ask for api key
-
-# QUESTIONS FOR DAVID
-# SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
-# IS THERE A SENSIBLE WAY TO DUMMY CONNECTION ERRORS?
 
 @enforce_types
 @dataclasses.dataclass
