@@ -85,6 +85,59 @@ def test_taxa_strip(test_input, expected):
     assert match == expected[1]
 
 # ------------------------------------------
+# Testing species_binomial
+# ------------------------------------------
+@pytest.mark.parametrize(
+    'test_input,expected',
+    [(dict(genus='Escherichia', species='coli'),
+      'Escherichia coli'),
+     (dict(genus='Escherichia', species='Escherichia coli'),
+       'Escherichia coli'),
+     (dict(genus='Gorilla', species='gorilla'),
+      'Gorilla gorilla'),
+     (dict(genus='Candidatus Koribacter', species='Candidatus versatilis'),
+      'Candidatus Koribacter versatilis'),
+     (dict(genus='Candidatus Koribacter', species='versatilis'),
+      'Candidatus Koribacter versatilis'),
+     (dict(genus='Over long genus name', species='vulpes'),
+      None),
+     (dict(genus='Canis', species='Vulpes vulpes'),
+      None),
+     ])
+def test_species_binomial(test_input, expected):
+    """This test checks the function that strips constructs species binomals from
+    species and genus names. We test that it can catch when the species name is
+    already a binomial, and that it can catch Candidatus names and handle them
+    properly.
+    """
+
+    s_bi = genb_taxa.species_binomial(**test_input)
+
+    assert s_bi == expected
+
+# Now test that the function logs errors correctly
+@pytest.mark.parametrize(
+    'test_input,expected_log_entries',
+    [(dict(genus='Escherichia', species='coli'), # Fine so empty
+      ()),
+     (dict(genus='Over long genus name', species='vulpes'), # Over long name
+      ((ERROR, 'Genus name (Over long genus name) appears to be too long'),
+      )),
+     (dict(genus='Canis', species='Vulpes vulpes'), # Genus name not in binomial
+      ((ERROR, 'Species name (Vulpes vulpes) appears to be binomal but does not'
+               ' contain genus name (Canis)'),
+      ))
+     ])
+def test_validate_species_binomial(caplog, test_input, expected_log_entries):
+    """This test checks that the function to construct species binomials logs the
+     correct errors and warnings.
+    """
+
+    s_bi = genb_taxa.species_binomial(**test_input)
+
+    log_check(caplog, expected_log_entries)
+
+# ------------------------------------------
 # Testing taxon validators
 # ------------------------------------------
 

@@ -58,9 +58,36 @@ def taxa_strip(name: str, rank: str):
         s_name = name[ind+1:]
         # Check if ranks match
         match = (name[0].lower() == rank[0].lower())
-        return(s_name,match)
+        return (s_name, match)
     else:
-        return(name,True)
+        return (name, True)
+
+# New function to generate species binomial
+def species_binomial(genus: str, species: str):
+    # First check if species is a single names
+    if len(species.split()) == 1 and len(genus.split()) == 1:
+        return genus.strip() + " " + species.strip()
+    # Look for Candidatus formats
+    elif "candidatus" in species.lower() or "candidatus" in genus.lower():
+        if "candidatus" in species.lower():
+            # Construct binomal with first word of species name removed
+            bi = genus.strip()
+            for i in range(1,len(species.split())):
+                bi = bi + " " + species.split()[i]
+            return bi
+        else:
+            return genus.strip() + " " + species.strip()
+    # Then check that species name is more words than the genus name
+    elif len(species.split()) > len(genus.split()):
+        if genus in species:
+            return species
+        else:
+            LOGGER.error(f'Species name ({species}) appears to be binomal but '
+                         f'does not contain genus name ({genus})')
+            return None
+    else:
+        LOGGER.error(f'Genus name ({genus}) appears to be too long')
+        return None
 
 
 
