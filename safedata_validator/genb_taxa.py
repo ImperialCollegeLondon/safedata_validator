@@ -74,7 +74,9 @@ def taxa_strip(name: str, rank: str):
     """A function to remove k__ type notation from taxa names. The function also
     checks that the provided rank is consistent with the rank implied by prefix
     """
-    if "__" in name:
+    if name == None:
+        return (None, True)
+    elif "__" in name:
         # Strip name down
         ind = name.rfind("_")
         s_name = name[ind+1:]
@@ -590,6 +592,17 @@ class GenBankTaxa:
             LOGGER.error('Less than two backbone taxonomic ranks are provided')
             return
 
+        # Find core field indices and use to isolate non core (i.e. taxonomic) headers
+        core_inds = [headers.index(item) for item in core_fields]
+        non_core = [element for i, element in enumerate(headers) if i not in core_inds]
+
+        # Check that backbone ranks are in the correct order
+        l1 = [v for v in BACKBONE_RANKS_EX if v in fnd_rnks]
+        l2 = [v for v in non_core if v in fnd_rnks]
+
+        if l1 != l2:
+            LOGGER.error('Backbone taxonomic ranks not provided in the correct order')
+
         # Check that if subspecies has been provided species is provided
         if 'subspecies' in headers:
             if 'species' not in headers:
@@ -620,12 +633,13 @@ class GenBankTaxa:
 
         # Change data format such that it is appropriate to be used to search
         # the NCBI database, i.e. convert from k__ notation, generate species
-        # binomials and subspecies trinominals
+        # binomials and subspecies trinominals, this is then all collected in a
+        # dictonary.
 
         for idx, row in enumerate(taxa):
 
             # Strip k__ notation so that the text is appropriate for the search
-            for rnk in fnd_rnks:
+            for rnk in non_core:
                 row[rnk], match = taxa_strip(row[rnk],rnk)
                 if match == False:
                     print(f"Implied rank of {row[rnk]} in row {idx + 1} does not"
@@ -636,8 +650,19 @@ class GenBankTaxa:
             # Replace any NA values with None
             row = {ky: None if vl == "NA" else vl for ky, vl in row.items()}
 
-            # Generate species binomials + subspecies trinominals
-            # Need to ensure that we don't end up with "E E coli"
+            # Start with empty dictonary for taxonomic hierarchy
+            taxa_hier = {}
+
+            # Loop over all ranks to populate the dictonary
+            for rnk in non_core:
+                if row[rnk] != None:
+                    if rnk == "species":
+                        taxa_hier[rnk] = species_binomial(row["genus"], row[rnk])
+                    elif rnk == "subspecies":
+                        taxa_hier[rnk] = subspecies_trinomial(taxa_hier["species"], row[rnk])
+                    else:
+                        taxa_hier[rnk] = row[rnk]
+
             # WHATEVER DICTONARY I GENERATE MUST BE ORDERED
 
         #     # THIS ACTUALLY REQUIRES WRITING TO A DICTONARY
@@ -660,11 +685,11 @@ class GenBankTaxa:
         #     LOGGER.info('{} taxa loaded correctly'.format(len(self.taxon_names)))
         #
         # FORMATTER.pop()
+        return
 
 
 
     def validate_and_add_taxon(self, gb_taxon_input):
-        # REWRITE THIS TO MATCH ALTERED FUNCTION
         """ User information is provided that names a taxon and (optionally) gives
         a NCBI taxonomy ID. This information is then used to find the closest GBIF
         backbone compatible entry in the NCBI database. This information along with
@@ -675,14 +700,10 @@ class GenBankTaxa:
 
         The gb_taxon_input has the form:
 
-        ['worksheet_name',
-         ['name', 'taxa_hier'],
-          'genbank_id']
+        ['worksheet_name', 'taxa_hier', 'genbank_id']
 
         If there is no NCBI ID, the structure is:
-        ['worksheet_name',
-         ['name', 'taxa_hier'],
-          None]
+        ['worksheet_name', 'taxa_hier', None]
 
         Args:
             taxon_input: Taxon information in standard form as above

@@ -70,7 +70,11 @@ def test_taxon_init_errors(test_input, expected_exception):
      (dict(name='p__Acidobacteria', rank='Phylum'),
       ('Acidobacteria', True)),
      (dict(name='s__', rank='Species'),
-      ('', True))
+      ('', True)),
+     (dict(name='s__', rank='Species'),
+      ('', True)),
+     (dict(name=None, rank='Order'),
+      (None, True)),
      ])
 def test_taxa_strip(test_input, expected):
     """This test checks the function that strips taxa strings down to remove k__
