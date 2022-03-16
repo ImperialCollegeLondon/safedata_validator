@@ -663,28 +663,24 @@ class GenBankTaxa:
                     else:
                         taxa_hier[rnk] = row[rnk]
 
-            # WHATEVER DICTONARY I GENERATE MUST BE ORDERED
-
-        #     # THIS ACTUALLY REQUIRES WRITING TO A DICTONARY
-        #     taxon_info = [row['taxon name'], row['taxon type'], row['taxon id'], row['ignore id']]
-        #
-        #     self.taxon_names.update([row['name']]) # SHOULD I BE USING THE SAME FUNCTION HERE?
-        #     LOGGER.info(f"Validating row {idx + 1}: {row['name']}")
-        #     FORMATTER.push()
-        #     self.validate_and_add_taxon((row['name'], gb_taxon_input))
-        #     FORMATTER.pop()
+            self.taxon_names.update([row['name']])
+            LOGGER.info(f"Validating row {idx + 1}: {row['name']}")
+            FORMATTER.push()
+            self.validate_and_add_taxon((row['name'], taxa_hier, row['ncbi id']))
+            FORMATTER.pop()
         #
         # # Add the higher taxa
         # self.index_higher_taxa()
         #
-        # # summary of processing
-        # self.n_errors = COUNTER_HANDLER.counters['ERROR'] - start_errors
-        # if self.n_errors > 0:
-        #     LOGGER.info('Taxa contains {} errors'.format(self.n_errors))
-        # else:
-        #     LOGGER.info('{} taxa loaded correctly'.format(len(self.taxon_names)))
-        #
-        # FORMATTER.pop()
+        # summary of processing
+        self.n_errors = COUNTER_HANDLER.counters['ERROR'] - start_errors
+        if self.n_errors > 0:
+            LOGGER.info('Taxa contains {} errors'.format(self.n_errors))
+        else:
+            LOGGER.info('{} taxa loaded correctly'.format(len(self.taxon_names)))
+
+        FORMATTER.pop()
+
         return
 
 
