@@ -5,8 +5,8 @@ from .conftest import log_check
 
 # TESTS TO PUT IN:
 # NEED TO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
-# NEED TO CHECK THAT REPEATED ENTRIES ARE ACTUALLY SKIPPED
-# UNIT TESTS FOR LOAD FUNCTIONS
+# UNIT TESTS FOR LOAD FUNCTIONS => ADD THIS WHEN I'VE FIXED VALIDATE ETC
+# CAN I TEST INDEX HIGHER TAXA???
 
 # MOVE THIS TO CONFTEST EVENTUALLY
 @pytest.fixture(scope='module')
@@ -23,30 +23,30 @@ def gb_instance():
     'test_input,expected_exception',
     [(dict(),  # no parameters
       TypeError),
-     (dict(name=1, genbank_id=2, taxa_hier={'genus': ('Morus', 37577)}),  # non string name
+     (dict(name=1, ncbi_id=2, taxa_hier={'genus': ('Morus', 37577)}),  # non string name
       TypeError),
-     # non-numeric genbank_id
-     (dict(name='Bombus bombus', genbank_id='error',
+     # non-numeric ncbi_id
+     (dict(name='Bombus bombus', ncbi_id='error',
       taxa_hier={'genus': ('Morus', 37577)}),
       TypeError),
-     # non-integer genbank_id
-     (dict(name='Bombus bombus', genbank_id=3.141, taxa_hier={'genus': ('Morus', 37577)}),
+     # non-integer ncbi_id
+     (dict(name='Bombus bombus', ncbi_id=3.141, taxa_hier={'genus': ('Morus', 37577)}),
       TypeError),
      # string instead of dictonary
-     (dict(name='Bombus bombus', genbank_id=3, taxa_hier="test"),
+     (dict(name='Bombus bombus', ncbi_id=3, taxa_hier="test"),
       TypeError),
-     (dict(name='Bombus bombus', genbank_id=3, taxa_hier={}), # empty dictonary
+     (dict(name='Bombus bombus', ncbi_id=3, taxa_hier={}), # empty dictonary
       ValueError),
      # non-string key
-     (dict(name='Bombus bombus', genbank_id=3, taxa_hier={1: ('Morus', 37577)}),
+     (dict(name='Bombus bombus', ncbi_id=3, taxa_hier={1: ('Morus', 37577)}),
       ValueError),
-     (dict(name='Bombus bombus', genbank_id=3, taxa_hier={'genus': 27}), # non-tuple value
+     (dict(name='Bombus bombus', ncbi_id=3, taxa_hier={'genus': 27}), # non-tuple value
       ValueError),
      # non-tuple value
-     (dict(name='Bombus bombus', genbank_id=3, taxa_hier={'genus': (37577, 'Morus')}),
+     (dict(name='Bombus bombus', ncbi_id=3, taxa_hier={'genus': (37577, 'Morus')}),
       ValueError),
      # 3 elements in tuple
-     (dict(name='Bombus bombus', genbank_id=3,
+     (dict(name='Bombus bombus', ncbi_id=3,
       taxa_hier={'genus': ('Morus', 37577, "extra")}),
       ValueError)])
 def test_taxon_init_errors(test_input, expected_exception):
@@ -205,16 +205,16 @@ def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries)
 # First test the search function
 @pytest.mark.parametrize(
     'test_input,expected',
-    [(dict(nnme='E coli', genbank_id=562),
-      ('E coli', 562, None, False, "species", "Escherichia coli", 562)),
-     (dict(nnme='E coli strain', genbank_id=1444049),
-      ('E coli strain', 1444049, "strain", False, "species", "Escherichia coli", 562)),
-     (dict(nnme='Streptophytina', genbank_id=131221),
-      ('Streptophytina', 131221, "subphylum", False, "phylum", "Streptophyta", 35493)),
-     (dict(nnme='Opisthokonta', genbank_id=33154),
-      ('Opisthokonta', 33154, "clade", False, "superkingdom", "Eukaryota", 2759)),
-     (dict(nnme='Cytophaga marina', genbank_id=1000),
-      ('Cytophaga marina', 1000, None, True, "species", "Tenacibaculum maritimum", 107401))
+    [(dict(nnme='E coli', ncbi_id=562),
+      ('E coli', 562, False, "species", "Escherichia coli", 562)),
+     (dict(nnme='E coli strain', ncbi_id=1444049),
+      ('E coli strain', 1444049, False, "strain", "Escherichia coli 1-110-08_S1_C1", 1444049)),
+     (dict(nnme='Streptophytina', ncbi_id=131221),
+      ('Streptophytina', 131221, False, "subphylum", "Streptophytina", 131221)),
+     (dict(nnme='Opisthokonta', ncbi_id=33154),
+      ('Opisthokonta', 33154, False, "clade", "Opisthokonta", 33154)),
+     (dict(nnme='Cytophaga marina', ncbi_id=1000),
+      ('Cytophaga marina', 1000, True, "species", "Tenacibaculum maritimum", 107401))
      ])
 def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of looking up a specific NCBI taxonomy against
@@ -226,25 +226,24 @@ def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     fnd_tx = fixture_ncbi_validators.id_lookup(**test_input)
 
     assert fnd_tx.name == expected[0]
-    assert fnd_tx.genbank_id == expected[1]
-    assert fnd_tx.diverg == expected[2]
-    assert fnd_tx.superseed == expected[3]
+    assert fnd_tx.ncbi_id == expected[1]
+    assert fnd_tx.superseed == expected[2]
 
     # Find last dictonary key
     f_key = list(fnd_tx.taxa_hier.keys())[-1]
 
-    assert f_key == expected[4]
-    assert fnd_tx.taxa_hier[f_key] == (expected[5], expected[6])
+    assert f_key == expected[3]
+    assert fnd_tx.taxa_hier[f_key] == (expected[4], expected[5])
 
 # Now test that the search function logs errors correctly
 @pytest.mark.parametrize(
     'test_input,expected_log_entries',
-    [(dict(nnme='E coli', genbank_id=562), # Fine so empty
+    [(dict(nnme='E coli', ncbi_id=562), # Fine so empty
       ()),
-     (dict(nnme='Streptophytina', genbank_id=131221), # Non-backbone rank
-      ((WARNING, 'Streptophytina not of backbone rank, instead resolved to phylum level'),
+     (dict(nnme='Streptophytina', ncbi_id=131221), # Non-backbone rank
+      ((WARNING, 'Streptophytina of non-backbone rank: subphylum'),
       )),
-     (dict(nnme='C marina', genbank_id=1000), # Non-backbone rank
+     (dict(nnme='C marina', ncbi_id=1000), # Non-backbone rank
       ((WARNING, 'NCBI ID 1000 has been superseeded by ID 107401'),
       ))
      ])
@@ -264,15 +263,15 @@ def test_validate_id_lookup(caplog, test_input, expected_log_entries, fixture_nc
     'test_input,expected_exception',
     [(None,  # no parameters
       TypeError),
-     (dict(nnme='E coli', genbank_id='invalid_string'),  # a string
+     (dict(nnme='E coli', ncbi_id='invalid_string'),  # a string
       ValueError),
-     (dict(nnme='E coli', genbank_id=27.5),  # non-integer ID
+     (dict(nnme='E coli', ncbi_id=27.5),  # non-integer ID
       ValueError),
-     (dict(nnme=27, genbank_id=27),  # named using a number
+     (dict(nnme=27, ncbi_id=27),  # named using a number
       TypeError),
-     (dict(nnme='E coli', genbank_id=-1),  # bad ID
+     (dict(nnme='E coli', ncbi_id=-1),  # bad ID
       ValueError),
-     (dict(nnme='E coli', genbank_id=100000000000000),  # bad ID
+     (dict(nnme='E coli', ncbi_id=100000000000000),  # bad ID
       genb_taxa.NCBIError)])
 def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exception):
     """This test checks validator.id_lookup inputs throw errors as expected
@@ -321,7 +320,7 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     fnd_tx = fixture_ncbi_validators.taxa_search(**test_input)
 
     assert fnd_tx.name == expected[0]
-    assert fnd_tx.genbank_id == expected[1]
+    assert fnd_tx.ncbi_id == expected[1]
     assert fnd_tx.diverg == expected[2]
     assert fnd_tx.superseed == expected[3]
 

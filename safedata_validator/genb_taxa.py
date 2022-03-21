@@ -154,28 +154,26 @@ class NCBITaxon:
     There are 3 class properties that can be used to create an instance:
         * name
         * taxa_hier: Dictionary of valid taxonomic hierarchy (with ID's)
-        * genbank_id: GenBank ID for full taxa (i.e. including non-backbone ranks)
+        * ncbi_id: NCBI ID for full taxa (i.e. including non-backbone ranks)
     The remaining properties are populated by processing functions not when an
     instance is created.
-        * diverg: does the GenBank ID and stored taxa info diverge, and if so how?
         * superseed: is supplied taxon name/ID still the accepted usage
     """
 
     # Init properties
     name: str
     taxa_hier: dict
-    genbank_id: Optional[Union[int, float]] = None
-    diverg: str = dataclasses.field(init=False)
+    ncbi_id: Optional[Union[int, float]] = None
     superseed: bool = dataclasses.field(init=False)
 
     def __post_init__(self):
         """Sets the defaults for the post-init properties and checks inputs
         """
 
-        if self.genbank_id is not None:
-            if isinstance(self.genbank_id, float) and not self.genbank_id.is_integer():
+        if self.ncbi_id is not None:
+            if isinstance(self.ncbi_id, float) and not self.ncbi_id.is_integer():
                 raise TypeError('GenBank Id is not an integer')
-            self.genbank_id = int(self.genbank_id)
+            self.ncbi_id = int(self.ncbi_id)
 
         if self.taxa_hier is not None:
             if len(self.taxa_hier) == 0:
@@ -188,7 +186,6 @@ class NCBITaxon:
                  self.taxa_hier.values()) == False:
                  raise ValueError('Taxa tuples not all in [string integer] form')
 
-        self.diverg = None
         self.superseed = False
 
 @enforce_types
@@ -197,30 +194,27 @@ class RemoteNCBIValidator:
     NCBI APIs. This doesn't need an __init__ method and just contains methods.
     """
     # Functionality to find taxa information from genbank ID
-    def id_lookup(self, nnme: str, genbank_id: int):
+    def id_lookup(self, nnme: str, ncbi_id: int):
         """Method to return full taxonomic information from a GenBank ID. This
         includes details of any potential synonymus names.
 
         Params:
             nnme: A nickname to identify the taxon
-            genbank_id: An integer
+            ncbi_id: An integer
 
         Returns:
             A NCBITaxon object
         """
 
-        if not isinstance(genbank_id, int):
+        if not isinstance(ncbi_id, int):
             raise ValueError('Non-integer NCBI taxonomy ID')
 
-        if not genbank_id > 0:
+        if not ncbi_id > 0:
             raise ValueError('Negative NCBI taxonomy ID')
-
-        # Set status of taxa validity as initally false
-        valid = False
 
         # Use efetch to find taxonomy details based on the index
         try:
-            handle = Entrez.efetch(db="taxonomy",id=f"{genbank_id}",
+            handle = Entrez.efetch(db="taxonomy",id=f"{ncbi_id}",
                                    retmode="xml",api_key=user_key)
             tax_dic = Entrez.read(handle)[0]
             handle.close()
@@ -240,8 +234,6 @@ class RemoteNCBIValidator:
 
         # Check that the taxon rank provided is a backbone rank
         if tax_dic["Rank"] in BACKBONE_RANKS_EX:
-            # Set as a valid taxa
-            valid = True
             # In this case use provided rank
             rnk = BACKBONE_RANKS_EX.index(tax_dic["Rank"])
 
@@ -261,11 +253,10 @@ class RemoteNCBIValidator:
                     # Add 1 to the rank as only including lineage in this case
                     rnk = r_ID + 1
                     # Warn user that non-backbone rank has been supplied
-                    LOGGER.warning(f'{nnme} not of backbone rank, instead resolved '
-                                   f'to {BACKBONE_RANKS_EX[rnk-1]} level')
+                    LOGGER.warning(f'{nnme} of non-backbone rank: {tax_dic["Rank"]}')
                 # Raise error once backbone ranks have been exhausted
                 elif r_ID < 1:
-                    LOGGER.error(f'Taxon rank of {nnme} cannot be found in backbone')
+                    LOGGER.error(f'Taxon hierarchy for {nnme} contains no backbone ranks')
                     return
                 else:
                     r_ID -= 1
@@ -293,19 +284,12 @@ class RemoteNCBIValidator:
         red_taxa = {f"{actual_bb_rnks[i]}":(str(linx[vinds[i]]["ScientificName"]),
                     int(linx[vinds[i]]["TaxId"])) for i in range(0,rnk-m_rnk)}
 
-        # Then if taxa is valid then add taxa as final entry
-        if valid == True:
-            red_taxa[f"{BACKBONE_RANKS_EX[rnk]}"] = (str(tax_dic["ScientificName"]),
-            int(tax_dic["TaxId"]))
+        # Then add taxa information as a final entry
+        red_taxa[f"{tax_dic['Rank']}"] = (str(tax_dic["ScientificName"]),
+                                                 int(tax_dic["TaxId"]))
 
         # Create and populate microbial taxon
-        mtaxon = NCBITaxon(name=nnme,genbank_id=genbank_id,taxa_hier=red_taxa)
-
-        # Check for non-backbone rank cases
-        if valid == False:
-            # Store (non-standard) taxon rank to explain divergence
-            t = tax_dic["Rank"]
-            mtaxon.diverg=f"{t}"
+        mtaxon = NCBITaxon(name=nnme,ncbi_id=ncbi_id,taxa_hier=red_taxa)
 
         # Check if AkaTaxIds exists in taxonomic information
         if 'AkaTaxIds' in tax_dic.keys():
@@ -473,33 +457,24 @@ class RemoteNCBIValidator:
         f_key = list(mtaxon.taxa_hier.keys())[-1]
 
         # Check if taxonomic rank supplied is used
-        if mtaxon.diverg == None:
-            # Check that this is also the last dictonary key that was supplied
-            if f_key != list(taxah.keys())[-1] and f_key != "superkingdom":
-                # If not raise an error
-                LOGGER.error(f'{list(taxah.values())[-1]} is a {f_key}'
-                             f' not a {list(taxah.keys())[-1]}')
-                return
-            elif list(taxah.keys())[-1] == "kingdom" and f_key == "superkingdom":
-                # If not print a warning
-                LOGGER.warning(f'NCBI records {(mtaxon.taxa_hier[f_key])[0]} as '
-                               f'a superkingdom rather than a kingdom')
-                # And record the fact that usage is superseeded
-                mtaxon.superseed = True
-            # Then check whether orginally supplied name is still used
-            elif taxah[f_key] != (mtaxon.taxa_hier[f_key])[0]:
-                # If not print a warning
-                LOGGER.warning(f'{taxah[f_key]} not accepted usage should be '
-                               f'{(mtaxon.taxa_hier[f_key])[0]} instead')
-                # And record the fact that usage is superseeded
-                mtaxon.superseed = True
-        else:
-            # Check that the divergence rank matches the initially supplied rank
-            if mtaxon.diverg != list(taxah.keys())[-1]:
-                # If not raise an error
-                LOGGER.error(f'{list(taxah.values())[-1]} is a {mtaxon.diverg}'
-                             f' not a {list(taxah.keys())[-1]}')
-                return
+        if f_key != list(taxah.keys())[-1] and f_key != "superkingdom":
+            # If not raise an error
+            LOGGER.error(f'{list(taxah.values())[-1]} is a {f_key}'
+                         f' not a {list(taxah.keys())[-1]}')
+            return
+        elif list(taxah.keys())[-1] == "kingdom" and f_key == "superkingdom":
+            # If not print a warning
+            LOGGER.warning(f'NCBI records {(mtaxon.taxa_hier[f_key])[0]} as '
+                           f'a superkingdom rather than a kingdom')
+            # And record the fact that usage is superseeded
+            mtaxon.superseed = True
+        # Then check whether orginally supplied name is still used
+        elif taxah[f_key] != (mtaxon.taxa_hier[f_key])[0]:
+            # If not print a warning
+            LOGGER.warning(f'{taxah[f_key]} not accepted usage should be '
+                           f'{(mtaxon.taxa_hier[f_key])[0]} instead')
+            # And record the fact that usage is superseeded
+            mtaxon.superseed = True
 
         return mtaxon
 
@@ -703,7 +678,7 @@ class GenBankTaxa:
 
         The gb_taxon_input has the form:
 
-        ['m_name', 'taxon_hier', 'genbank_id']
+        ['m_name', 'taxon_hier', 'ncbi_id']
 
         If there is no NCBI ID, the structure is:
         ['m_name', 'taxon_hier', None]
@@ -716,7 +691,7 @@ class GenBankTaxa:
             Updates the taxon_names and taxon_index attributes of the class instance.
         """
 
-        m_name, taxon_hier, genbank_id = gb_taxon_input
+        m_name, taxon_hier, ncbi_id = gb_taxon_input
 
         # Sanitise worksheet names for taxa - only keep unpadded strings.
         if m_name is None or not isinstance(m_name, str) or m_name.isspace() or not m_name:
@@ -733,9 +708,9 @@ class GenBankTaxa:
         i_fail = False
 
         # ID can be None or an integer (openpyxl loads all values as float)
-        if not(genbank_id is None or
-               (isinstance(genbank_id, float) and genbank_id.is_integer()) or
-               isinstance(genbank_id, int)) :
+        if not(ncbi_id is None or
+               (isinstance(ncbi_id, float) and ncbi_id.is_integer()) or
+               isinstance(ncbi_id, int)) :
             LOGGER.error('NCBI ID contains value that is not an integer')
             i_fail = True
 
@@ -805,9 +780,9 @@ class GenBankTaxa:
 
         # Now that inputs are sanitised, continue with checking...
         # First gather the info needed to index the entry
-        if genbank_id != None:
+        if ncbi_id != None:
             ncbi_info = [list(taxon_hier.values())[-1], list(taxon_hier.keys())[-1],
-                         int(genbank_id)]
+                         int(ncbi_id)]
         else:
             ncbi_info = [list(taxon_hier.values())[-1], list(taxon_hier.keys())[-1],
                          None]
@@ -820,8 +795,8 @@ class GenBankTaxa:
             return
 
         # Then check if a genbank ID number has been provided
-        if genbank_id != None:
-            id_taxon = self.validator.id_lookup(m_name, int(genbank_id))
+        if ncbi_id != None:
+            id_taxon = self.validator.id_lookup(m_name, int(ncbi_id))
             # Check whether this matches what was found using hierarchy
             if id_taxon != hr_taxon:
                 # Check if taxonomy hierarchy superseeded
@@ -833,8 +808,8 @@ class GenBankTaxa:
                     f', using new taxa ID')
                 else:
                     LOGGER.error(f"The NCBI ID supplied for {m_name} does "
-                    f"not match hierarchy: expected {hr_taxon.genbank_id}"
-                    f" got {genbank_id}")
+                    f"not match hierarchy: expected {hr_taxon.ncbi_id}"
+                    f" got {ncbi_id}")
                     return
         else:
             # Warn user that superseeded taxonomy won't be used
@@ -845,9 +820,8 @@ class GenBankTaxa:
         # Store the NCBI taxon keyed by NCBI information (needs tuple)
         f_key = list(hr_taxon.taxa_hier.keys())[-1]
         # THIS INDEX SHOULD INCLUDE SUPERSEEDED TAXA AS A SPECIAL CASE
-        # ALSO CHANGE TO ALLOW USER TO INPUT NON-BACBONE TAXA
         # PARENT ID SHOULD BE INCLUDED TO ALLOW FOR PROPER INDEXING
-        self.taxon_index.append([hr_taxon.name, hr_taxon.genbank_id,
+        self.taxon_index.append([hr_taxon.name, hr_taxon.ncbi_id,
                                     hr_taxon.taxa_hier[f_key], f_key,
                                     hr_taxon.diverg, hr_taxon.superseed])
         self.hierarchy.update(list(hr_taxon.taxa_hier.items()))
@@ -856,7 +830,7 @@ class GenBankTaxa:
         # Check if this has succeded without warnings or errors
         if hr_taxon.superseed == False and hr_taxon.diverg == None:
             # Straight forward when there isn't a genbank id, or previously processed
-            if genbank_id == None:
+            if ncbi_id == None:
                 # If so inform the user of this
                 LOGGER.info(f'Taxon ({m_name}) found in NCBI database')
             # Otherwise need to check for superseeded ID's
