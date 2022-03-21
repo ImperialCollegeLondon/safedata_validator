@@ -284,31 +284,31 @@ def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exceptio
 @pytest.mark.parametrize(
     'test_input,expected',
     [(dict(nnme="E coli",taxah={'genus': 'Escherichia', 'species': 'Escherichia coli'}),
-      ("E coli", 562, None, False, "species", "Escherichia coli", 562)),
+      ("E coli", 562, False, "species", "Escherichia coli", 562)),
      (dict(nnme="Entero",taxah={'order': 'Enterobacterales', 'family': 'Enterobacteriaceae'}),
-      ("Entero", 543, None, False, "family", "Enterobacteriaceae", 543)),
+      ("Entero", 543, False, "family", "Enterobacteriaceae", 543)),
      (dict(nnme="E coli strain",taxah={'species': 'Escherichia coli', 'strain':
      'Escherichia coli 1-110-08_S1_C1'}),
-      ("E coli strain", 1444049, "strain", False, "species", "Escherichia coli", 562)),
+      ("E coli strain", 1444049, False, "strain", "Escherichia coli 1-110-08_S1_C1", 1444049)),
      (dict(nnme="Strepto",taxah={'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}),
-      ("Strepto", 131221, "subphylum", False, "phylum", "Streptophyta", 35493)),
+      ("Strepto", 131221, False, "subphylum", "Streptophytina", 131221)),
      (dict(nnme="Opistho",taxah={'superkingdom': 'Eukaryota', 'clade': 'Opisthokonta'}),
-      ("Opistho", 33154, "clade", False, "superkingdom", "Eukaryota", 2759)),
+      ("Opistho", 33154, False, "clade", "Opisthokonta", 33154)),
      (dict(nnme="Vulpes",taxah={'genus': 'Vulpes', 'species': 'Vulpes vulpes'}),
-      ("Vulpes", 9627, None, False, "species", "Vulpes vulpes", 9627)),
+      ("Vulpes", 9627, False, "species", "Vulpes vulpes", 9627)),
      (dict(nnme="M morus",taxah={'family': 'Moraceae', 'genus': 'Morus'}),
-      ("M morus", 3497, None, False, "genus", "Morus", 3497)),
+      ("M morus", 3497, False, "genus", "Morus", 3497)),
      (dict(nnme="S morus",taxah={'family': 'Sulidae', 'genus': 'Morus'}),
-      ("S morus", 37577, None, False, "genus", "Morus", 37577)),
+      ("S morus", 37577, False, "genus", "Morus", 37577)),
      (dict(nnme="C morus",taxah={'phylum': 'Chordata', 'genus': 'Morus'}),
-      ("C morus", 37577, None, False, "genus", "Morus", 37577)),
+      ("C morus", 37577, False, "genus", "Morus", 37577)),
      (dict(nnme="T maritimum",taxah={'genus': 'Tenacibaculum', 'species':
      'Tenacibaculum maritimum'}),
-      ("T maritimum", 107401, None, False, "species", "Tenacibaculum maritimum", 107401)),
+      ("T maritimum", 107401, False, "species", "Tenacibaculum maritimum", 107401)),
      (dict(nnme="C marina",taxah={'genus': 'Cytophaga', 'species': 'Cytophaga marina'}),
-      ("C marina", 107401, None, True, "species", "Tenacibaculum maritimum", 107401)),
+      ("C marina", 107401, True, "species", "Tenacibaculum maritimum", 107401)),
      (dict(nnme="Bacteria",taxah={'superkingdom': 'Bacteria'}),
-      ("Bacteria", 2, None, False, "superkingdom", "Bacteria", 2))
+      ("Bacteria", 2, False, "superkingdom", "Bacteria", 2))
     ])
 def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of searching for a taxa in the NCBI taxonomy
@@ -321,14 +321,13 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
 
     assert fnd_tx.name == expected[0]
     assert fnd_tx.ncbi_id == expected[1]
-    assert fnd_tx.diverg == expected[2]
-    assert fnd_tx.superseed == expected[3]
+    assert fnd_tx.superseed == expected[2]
 
     # Find last dictonary key
     f_key = list(fnd_tx.taxa_hier.keys())[-1]
 
-    assert f_key == expected[4]
-    assert fnd_tx.taxa_hier[f_key] == (expected[5], expected[6])
+    assert f_key == expected[3]
+    assert fnd_tx.taxa_hier[f_key] == (expected[4], expected[5])
 
 # Now test that the search function logs errors correctly
 @pytest.mark.parametrize(
@@ -364,10 +363,10 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
       ((WARNING, 'Cytophaga marina not accepted usage should be Tenacibaculum'
       ' maritimum instead'),
       )),
-     # Cytophaga marina
+     # E coli strain
      (dict(nnme='E coli strain', taxah={'strain': 'Escherichia coli 1-110-08_S1_C1'}),
       ((WARNING, "No backbone ranks provided in E coli strain's taxa hierarchy"),
-       (WARNING, "E coli strain not of backbone rank, instead resolved to species level"),
+       (WARNING, "E coli strain of non-backbone rank: strain"),
       )),
      ])
 def test_validate_taxa_search(caplog, test_input, expected_log_entries,
