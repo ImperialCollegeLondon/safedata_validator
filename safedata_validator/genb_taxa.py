@@ -385,7 +385,11 @@ class RemoteNCBIValidator:
                 t_ranks.append(list(temp_taxon.taxa_hier.keys())[-1])
 
             # Record whether ranks match expected rank
-            mtch = [True if x == f_key else False for x in t_ranks]
+            if f_key == "kingdom":
+                mtch = [True if x == f_key or x == "superkingdom" else False
+                        for x in t_ranks]
+            else:
+                mtch = [True if x == f_key else False for x in t_ranks]
 
             # If there's only one match, we have determined the correct entry
             if sum(mtch) == 1:
@@ -471,11 +475,17 @@ class RemoteNCBIValidator:
         # Check if taxonomic rank supplied is used
         if mtaxon.diverg == None:
             # Check that this is also the last dictonary key that was supplied
-            if f_key != list(taxah.keys())[-1]:
+            if f_key != list(taxah.keys())[-1] and f_key != "superkingdom":
                 # If not raise an error
                 LOGGER.error(f'{list(taxah.values())[-1]} is a {f_key}'
                              f' not a {list(taxah.keys())[-1]}')
                 return
+            elif list(taxah.keys())[-1] == "kingdom" and f_key == "superkingdom":
+                # If not print a warning
+                LOGGER.warning(f'NCBI records {(mtaxon.taxa_hier[f_key])[0]} as '
+                               f'a superkingdom rather than a kingdom')
+                # And record the fact that usage is superseeded
+                mtaxon.superseed = True
             # Then check whether orginally supplied name is still used
             elif taxah[f_key] != (mtaxon.taxa_hier[f_key])[0]:
                 # If not print a warning
@@ -668,10 +678,10 @@ class GenBankTaxa:
             FORMATTER.push()
             self.validate_and_add_taxon((row['name'], taxa_hier, row['ncbi id']))
             FORMATTER.pop()
-        #
-        # # Add the higher taxa
+
+        # Add the higher taxa
         # self.index_higher_taxa()
-        #
+
         # summary of processing
         self.n_errors = COUNTER_HANDLER.counters['ERROR'] - start_errors
         if self.n_errors > 0:
@@ -680,9 +690,6 @@ class GenBankTaxa:
             LOGGER.info('{} taxa loaded correctly'.format(len(self.taxon_names)))
 
         FORMATTER.pop()
-
-        return
-
 
 
     def validate_and_add_taxon(self, gb_taxon_input):
@@ -696,10 +703,10 @@ class GenBankTaxa:
 
         The gb_taxon_input has the form:
 
-        ['worksheet_name', 'taxa_hier', 'genbank_id']
+        ['m_name', 'taxon_hier', 'genbank_id']
 
         If there is no NCBI ID, the structure is:
-        ['worksheet_name', 'taxa_hier', None]
+        ['m_name', 'taxon_hier', None]
 
         Args:
             taxon_input: Taxon information in standard form as above
@@ -805,55 +812,87 @@ class GenBankTaxa:
             ncbi_info = [list(taxon_hier.values())[-1], list(taxon_hier.keys())[-1],
                          None]
 
-        # Set pre-processing as initially false
-        p_proc = False
+        # Then go straight ahead and search for the taxon
+        hr_taxon = self.validator.taxa_search(m_name, taxon_hier)
+        # Catch case where errors are returned rather than a taxon
+        if hr_taxon == None:
+            LOGGER.error(f'Search based on taxon hierarchy failed')
+            return
 
-        # Check if pair has already been processed
-        if tuple(ncbi_info) in self.ncbi_t:
-            hr_taxon = self.ncbi_t[tuple(ncbi_info)]
-            p_proc = True
-        else:
-            # If not go straight ahead and search for the taxon
-            hr_taxon = self.validator.taxa_search(m_name, taxon_hier)
-            # Catch case where errors are returned rather than a taxon
-            if hr_taxon == None:
-                LOGGER.error(f'Search based on taxon hierarchy failed')
-                return
-
-            # Then check if a genbank ID number has been provided
-            if genbank_id != None:
-                id_taxon = self.validator.id_lookup(m_name, int(genbank_id))
-                # Check whether this matches what was found using hierarchy
-                if id_taxon != hr_taxon:
-                    # Check if taxonomy hierarchy superseeded
-                    if hr_taxon.superseed == True:
-                        LOGGER.warning(f'Taxonomic classification superseeded for '
-                        f'{m_name}, using new taxonomic classification')
-                    elif id_taxon.superseed == True:
-                        LOGGER.warning(f'NCBI taxa ID superseeded for {m_name}'
-                        f', using new taxa ID')
-                    else:
-                        LOGGER.error(f"The NCBI ID supplied for {m_name} does "
-                        f"not match hierarchy: expected {hr_taxon.genbank_id}"
-                        f" got {genbank_id}")
-                        return
-            else:
-                # Warn user that superseeded taxonomy won't be used
-                if hr_taxon.superseed:
+        # Then check if a genbank ID number has been provided
+        if genbank_id != None:
+            id_taxon = self.validator.id_lookup(m_name, int(genbank_id))
+            # Check whether this matches what was found using hierarchy
+            if id_taxon != hr_taxon:
+                # Check if taxonomy hierarchy superseeded
+                if hr_taxon.superseed == True:
                     LOGGER.warning(f'Taxonomic classification superseeded for '
                     f'{m_name}, using new taxonomic classification')
+                elif id_taxon.superseed == True:
+                    LOGGER.warning(f'NCBI taxa ID superseeded for {m_name}'
+                    f', using new taxa ID')
+                else:
+                    LOGGER.error(f"The NCBI ID supplied for {m_name} does "
+                    f"not match hierarchy: expected {hr_taxon.genbank_id}"
+                    f" got {genbank_id}")
+                    return
+        else:
+            # Warn user that superseeded taxonomy won't be used
+            if hr_taxon.superseed:
+                LOGGER.warning(f'Taxonomic classification superseeded for '
+                f'{m_name}, using new taxonomic classification')
 
-            # Store the NCBI taxon keyed by NCBI information (needs tuple)
-            self.ncbi_t[tuple(ncbi_info)] = hr_taxon
+        # Store the NCBI taxon keyed by NCBI information (needs tuple)
+        f_key = list(hr_taxon.taxa_hier.keys())[-1]
+        # THIS INDEX SHOULD INCLUDE SUPERSEEDED TAXA AS A SPECIAL CASE
+        # ALSO CHANGE TO ALLOW USER TO INPUT NON-BACBONE TAXA
+        # PARENT ID SHOULD BE INCLUDED TO ALLOW FOR PROPER INDEXING
+        self.taxon_index.append([hr_taxon.name, hr_taxon.genbank_id,
+                                    hr_taxon.taxa_hier[f_key], f_key,
+                                    hr_taxon.diverg, hr_taxon.superseed])
+        self.hierarchy.update(list(hr_taxon.taxa_hier.items()))
+        print(self.hierarchy)
 
         # Check if this has succeded without warnings or errors
         if hr_taxon.superseed == False and hr_taxon.diverg == None:
             # Straight forward when there isn't a genbank id, or previously processed
-            if genbank_id == None or p_proc == True:
+            if genbank_id == None:
                 # If so inform the user of this
                 LOGGER.info(f'Taxon ({m_name}) found in NCBI database')
             # Otherwise need to check for superseeded ID's
             elif id_taxon.superseed == False:
                 LOGGER.info(f'Taxon ({m_name}) found in NCBI database')
 
-        return
+    @loggerinfo_push_pop('Indexing taxonomic hierarchy')
+    def index_higher_taxa(self):
+
+        # Use the taxon hierarchy entries to add higher taxa
+        # - drop taxa with a GBIF ID already in the index
+
+        # If usage is superseed or the taxonmic level was divergent the taxon
+        # is not included in known
+        known = [tx[1] for tx in self.taxon_index if tx[5] != True]
+        to_add = [tx for tx in self.hierarchy if tx[1] not in known]
+        to_add.sort(key=lambda val: BACKBONE_RANKS_EX.index(val[0]))
+
+        # Look up the taxonomic hierarchy
+        for tx_lev, tx_id in to_add:
+            # OR IS THIS VITAL TO THE VALIDATION
+            higher_taxon = self.validator.id_lookup(tx_id)
+            self.taxon_index.append([None,
+                                     higher_taxon.gbif_id,
+                                     higher_taxon.parent_id,
+                                     higher_taxon.name,
+                                     higher_taxon.rank,
+                                     higher_taxon.taxon_status])
+            LOGGER.info(f'Added {tx_lev} {higher_taxon}')
+
+        # CHECK THAT KINGDOM VS SUPERKINGDOM STORAGE IS WORKING OKAY
+        # MOSTLY DONE, BUT STILL NEED TO KEEP IT IN MIND
+        # NEED A CHECK OF HIEARCHY MATCH
+        # WHAT HAPPENS IF TAXA NOT KNOWN TO NCBI?
+        # Probably need a function here that can step up the hierarchy to find stuff
+        # IS THIS SOMETHING I SHOULD BE ACCOUNTING FOR?
+        # IS OUTDATED HIERACHY REMOVED?
+        # PROBALY SHOULD ALSO CHECK WITH DAVID THAT MY APPROACH TO DIVERGENT AND
+        # SUPERSEEDED TAXA SEEMS REASONABLE TO HIM
