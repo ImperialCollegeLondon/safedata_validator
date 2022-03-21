@@ -513,7 +513,8 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
       )),
      # Right order but non-backbone rank
      (['Strepto', {'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}, None],
-      ((WARNING, "Strepto not of backbone rank, instead resolved to phylum level"),
+      ((WARNING, "Strepto of non-backbone rank: subphylum"),
+       (INFO, "Taxon (Strepto) found in NCBI database"),
       )),
      # Superseeded taxon name used
      (['C marina', {'species': 'Cytophaga marina'}, None],
@@ -541,8 +542,9 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
      # Non-backbone case with code
      (['E coli strain', {'species': 'Escherichia coli', 'strain': 'Escherichia coli 1-110-08_S1_C1'},
        1444049],
-      ((WARNING, "E coli strain not of backbone rank, instead resolved to species level"),
-       (WARNING, "E coli strain not of backbone rank, instead resolved to species level"),
+      ((WARNING, "E coli strain of non-backbone rank: strain"),
+       (WARNING, "E coli strain of non-backbone rank: strain"),
+       (INFO, "Taxon (E coli strain) found in NCBI database"),
       )),
      # Superseeded taxa ID and name
      (['C marina', {'species': 'Cytophaga marina'}, 1000],
@@ -572,7 +574,7 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
       )),
      # Same idea for a non-backbone case
      (['Streptophytina', {'phylum': 'Streptophytina'}, None],
-      ((WARNING, "Streptophytina not of backbone rank, instead resolved to phylum level"),
+      ((WARNING, "Streptophytina of non-backbone rank: subphylum"),
        (ERROR, "Streptophytina is a subphylum not a phylum"),
        (ERROR, "Search based on taxon hierarchy failed"),
       )),

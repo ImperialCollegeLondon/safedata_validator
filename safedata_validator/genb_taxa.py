@@ -823,12 +823,11 @@ class GenBankTaxa:
         # PARENT ID SHOULD BE INCLUDED TO ALLOW FOR PROPER INDEXING
         self.taxon_index.append([hr_taxon.name, hr_taxon.ncbi_id,
                                     hr_taxon.taxa_hier[f_key], f_key,
-                                    hr_taxon.diverg, hr_taxon.superseed])
+                                    hr_taxon.superseed])
         self.hierarchy.update(list(hr_taxon.taxa_hier.items()))
-        print(self.hierarchy)
 
         # Check if this has succeded without warnings or errors
-        if hr_taxon.superseed == False and hr_taxon.diverg == None:
+        if hr_taxon.superseed == False:
             # Straight forward when there isn't a genbank id, or previously processed
             if ncbi_id == None:
                 # If so inform the user of this
@@ -843,8 +842,7 @@ class GenBankTaxa:
         # Use the taxon hierarchy entries to add higher taxa
         # - drop taxa with a GBIF ID already in the index
 
-        # If usage is superseed or the taxonmic level was divergent the taxon
-        # is not included in known
+        # If usage is superseed or the taxon is not included in known
         known = [tx[1] for tx in self.taxon_index if tx[5] != True]
         to_add = [tx for tx in self.hierarchy if tx[1] not in known]
         to_add.sort(key=lambda val: BACKBONE_RANKS_EX.index(val[0]))
