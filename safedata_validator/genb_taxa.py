@@ -520,8 +520,6 @@ class RemoteNCBIValidator:
             # If not print a warning
             LOGGER.warning(f'NCBI records {(mtaxon.taxa_hier[f_key])[0]} as '
                            f'a superkingdom rather than a kingdom')
-            # And record the fact that usage is superseeded
-            mtaxon.superseed = True
         # Then check whether orginally supplied name is still used
         elif mtaxon.orig == None and taxah[f_key] != (mtaxon.taxa_hier[f_key])[0]:
             # If not print a warning
@@ -871,10 +869,14 @@ class NCBITaxa:
                 LOGGER.warning(f'Taxonomic classification superseeded for '
                 f'{m_name}, using new taxonomic classification')
 
+        # Check that the hierachy found matches
+        match = self.compare_hier(hr_taxon,taxon_hier)
+
         # Store the NCBI taxon keyed by NCBI information (needs tuple)
         f_key = list(hr_taxon.taxa_hier.keys())[-1]
         # THIS INDEX SHOULD INCLUDE SUPERSEEDED TAXA AS A SPECIAL CASE
         # PARENT ID SHOULD BE INCLUDED TO ALLOW FOR PROPER INDEXING
+        # ALSO ADD IF IT DIVERGES FROM ORGINAL TAXA
         self.taxon_index.append([hr_taxon.name, hr_taxon.ncbi_id,
                                     hr_taxon.taxa_hier[f_key], f_key,
                                     hr_taxon.superseed])
@@ -913,7 +915,28 @@ class NCBITaxa:
                                      higher_taxon.taxon_status])
             LOGGER.info(f'Added {tx_lev} {higher_taxon}')
 
+    def compare_hier(self, mtaxon: NCBITaxon, taxon_hier: dict):
+        """ Function to compare the hierachy of a taxon with the hierachy that was
+        initially supplied. This function only checks that provided information
+        matches, missing levels or entries into levels are ignored"""
+        # Not worth checking hierachy in superseeded case
+        if mtaxon.superseed == True:
+            return
+
+        # Find all common ranks between the hierarchies
+        rnks = list(set(taxon_hier.keys()) & set(mtaxon.taxa_hier.keys()))
+
+        # Find if all taxa names match
+        t_match = [taxon_hier[r] == (mtaxon.taxa_hier[r])[0] for r in rnks]
+        if all(t_match) == False:
+            # Find indices of non-matching values
+            inds = [i for i in range(len(t_match)) if t_match[i] == False]
+            # Then loop over these indices giving appropriate warnings
+            for ind in inds:
+                LOGGER.warning(f'Hierarchy mismatch for {mtaxon.name} its {rnks[ind]}'
+                               f' should be {(mtaxon.taxa_hier[rnks[ind]])[0]} not '
+                               f'{taxon_hier[rnks[ind]]}')
+
         # CHECK THAT KINGDOM VS SUPERKINGDOM STORAGE IS WORKING OKAY
         # MOSTLY DONE, BUT STILL NEED TO KEEP IT IN MIND
-        # NEED A CHECK OF HIEARCHY MATCH
         # SUPERSEEDED CASE GOING TO BE TRICKY WHEN THERE ARE MULTIPLE AKA IDS

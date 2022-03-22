@@ -619,6 +619,17 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
       ((ERROR, "Taxa Utter nonsense cannot be found and neither can its higher taxonomic hierarchy"),
        (ERROR, "Search based on taxon hierarchy failed")
       )),
+     # Valid species name, but incorrect genus
+     (['E coli', {'genus': 'Escheria', 'species': 'Escherichia coli'}, None],
+      ((WARNING, "Hierarchy mismatch for E coli its genus should be Escherichia not Escheria"),
+       (INFO, "Taxon (E coli) found in NCBI database"),
+      )),
+     # Valid non-bacbone rank but higher taxa wrong
+     (['Strepto', {'phylum': 'Strephyta', 'subphylum': 'Streptophytina'}, None],
+      ((WARNING, "Strepto of non-backbone rank: subphylum"),
+       (WARNING, "Hierarchy mismatch for Strepto its phylum should be Streptophyta not Strephyta"),
+       (INFO, "Taxon (Strepto) found in NCBI database"),
+      )),
      ])
 def test_validate_and_add_taxon(caplog, test_input, expected_log_entries):
     """This test checks that the function that searches the NCBI database to find
