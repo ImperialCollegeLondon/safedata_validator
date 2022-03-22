@@ -11,9 +11,9 @@ from .conftest import log_check
 # MOVE THIS TO CONFTEST EVENTUALLY
 @pytest.fixture(scope='module')
 def gb_instance():
-    """Parameterised fixture to return a GenBankTaxa instance
+    """Parameterised fixture to return a NCBITaxa instance
     """
-    return genb_taxa.GenBankTaxa()
+    return genb_taxa.NCBITaxa()
 
 # ------------------------------------------
 # Testing NCBITaxon
@@ -206,15 +206,15 @@ def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries)
 @pytest.mark.parametrize(
     'test_input,expected',
     [(dict(nnme='E coli', ncbi_id=562),
-      ('E coli', 562, False, "species", "Escherichia coli", 562)),
+      ('E coli', 562, False, "species", "Escherichia coli", 562, None)),
      (dict(nnme='E coli strain', ncbi_id=1444049),
-      ('E coli strain', 1444049, False, "strain", "Escherichia coli 1-110-08_S1_C1", 1444049)),
+      ('E coli strain', 1444049, False, "strain", "Escherichia coli 1-110-08_S1_C1", 1444049, None)),
      (dict(nnme='Streptophytina', ncbi_id=131221),
-      ('Streptophytina', 131221, False, "subphylum", "Streptophytina", 131221)),
+      ('Streptophytina', 131221, False, "subphylum", "Streptophytina", 131221, None)),
      (dict(nnme='Opisthokonta', ncbi_id=33154),
-      ('Opisthokonta', 33154, False, "clade", "Opisthokonta", 33154)),
+      ('Opisthokonta', 33154, False, "clade", "Opisthokonta", 33154, None)),
      (dict(nnme='Cytophaga marina', ncbi_id=1000),
-      ('Cytophaga marina', 1000, True, "species", "Tenacibaculum maritimum", 107401))
+      ('Cytophaga marina', 1000, True, "species", "Tenacibaculum maritimum", 107401, None))
      ])
 def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of looking up a specific NCBI taxonomy against
@@ -234,6 +234,7 @@ def test_id_lookup(fixture_ncbi_validators, test_input, expected):
 
     assert f_key == expected[3]
     assert fnd_tx.taxa_hier[f_key] == (expected[4], expected[5])
+    assert fnd_tx.orig == expected[6]
 
 # Now test that the search function logs errors correctly
 @pytest.mark.parametrize(
@@ -280,35 +281,37 @@ def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exceptio
     with pytest.raises(expected_exception):
         _ = fixture_ncbi_validators.id_lookup(**test_input)
 
-# Then do the same for the taxa serach function
+# Then do the same for the taxa search function
 @pytest.mark.parametrize(
     'test_input,expected',
     [(dict(nnme="E coli",taxah={'genus': 'Escherichia', 'species': 'Escherichia coli'}),
-      ("E coli", 562, False, "species", "Escherichia coli", 562)),
+      ("E coli", 562, False, "species", "Escherichia coli", 562, None)),
      (dict(nnme="Entero",taxah={'order': 'Enterobacterales', 'family': 'Enterobacteriaceae'}),
-      ("Entero", 543, False, "family", "Enterobacteriaceae", 543)),
+      ("Entero", 543, False, "family", "Enterobacteriaceae", 543, None)),
      (dict(nnme="E coli strain",taxah={'species': 'Escherichia coli', 'strain':
      'Escherichia coli 1-110-08_S1_C1'}),
-      ("E coli strain", 1444049, False, "strain", "Escherichia coli 1-110-08_S1_C1", 1444049)),
+      ("E coli strain", 1444049, False, "strain", "Escherichia coli 1-110-08_S1_C1", 1444049, None)),
      (dict(nnme="Strepto",taxah={'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}),
-      ("Strepto", 131221, False, "subphylum", "Streptophytina", 131221)),
+      ("Strepto", 131221, False, "subphylum", "Streptophytina", 131221, None)),
      (dict(nnme="Opistho",taxah={'superkingdom': 'Eukaryota', 'clade': 'Opisthokonta'}),
-      ("Opistho", 33154, False, "clade", "Opisthokonta", 33154)),
+      ("Opistho", 33154, False, "clade", "Opisthokonta", 33154, None)),
      (dict(nnme="Vulpes",taxah={'genus': 'Vulpes', 'species': 'Vulpes vulpes'}),
-      ("Vulpes", 9627, False, "species", "Vulpes vulpes", 9627)),
+      ("Vulpes", 9627, False, "species", "Vulpes vulpes", 9627, None)),
      (dict(nnme="M morus",taxah={'family': 'Moraceae', 'genus': 'Morus'}),
-      ("M morus", 3497, False, "genus", "Morus", 3497)),
+      ("M morus", 3497, False, "genus", "Morus", 3497, None)),
      (dict(nnme="S morus",taxah={'family': 'Sulidae', 'genus': 'Morus'}),
-      ("S morus", 37577, False, "genus", "Morus", 37577)),
+      ("S morus", 37577, False, "genus", "Morus", 37577, None)),
      (dict(nnme="C morus",taxah={'phylum': 'Chordata', 'genus': 'Morus'}),
-      ("C morus", 37577, False, "genus", "Morus", 37577)),
+      ("C morus", 37577, False, "genus", "Morus", 37577, None)),
      (dict(nnme="T maritimum",taxah={'genus': 'Tenacibaculum', 'species':
      'Tenacibaculum maritimum'}),
-      ("T maritimum", 107401, False, "species", "Tenacibaculum maritimum", 107401)),
+      ("T maritimum", 107401, False, "species", "Tenacibaculum maritimum", 107401, None)),
      (dict(nnme="C marina",taxah={'genus': 'Cytophaga', 'species': 'Cytophaga marina'}),
-      ("C marina", 107401, True, "species", "Tenacibaculum maritimum", 107401)),
+      ("C marina", 107401, True, "species", "Tenacibaculum maritimum", 107401, None)),
      (dict(nnme="Bacteria",taxah={'superkingdom': 'Bacteria'}),
-      ("Bacteria", 2, False, "superkingdom", "Bacteria", 2))
+      ("Bacteria", 2, False, "superkingdom", "Bacteria", 2, None)),
+     (dict(nnme="Unknown strain",taxah={'species': 'Escherichia coli', 'strain': 'Nonsense strain'}),
+      ("Unknown strain", 562, False, "species", "Escherichia coli", 562, 'strain')),
     ])
 def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of searching for a taxa in the NCBI taxonomy
@@ -328,6 +331,7 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
 
     assert f_key == expected[3]
     assert fnd_tx.taxa_hier[f_key] == (expected[4], expected[5])
+    assert fnd_tx.orig == expected[6]
 
 # Now test that the search function logs errors correctly
 @pytest.mark.parametrize(
@@ -368,6 +372,24 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
       ((WARNING, "No backbone ranks provided in E coli strain's taxa hierarchy"),
        (WARNING, "E coli strain of non-backbone rank: strain"),
       )),
+     # Unknown E coli strain
+     (dict(nnme="Unknown strain",taxah={'species': 'Escherichia coli', 'strain': 'Nonsense strain'}),
+      ((WARNING, "Nonsense strain not registered with NCBI, using higher level "
+       "taxon Escherichia coli instead"),
+      )),
+     # Ambigious species
+     (dict(nnme="Ambigious taxa",taxah={'genus': 'Morus', 'species': 'Unknown species'}),
+      ((ERROR, "Taxa Ambigious taxa cannot be found and its higher taxonomic "
+       "hierarchy is ambigious"),
+      )),
+     # Nonsense taxonomy
+     (dict(nnme="Utter nonsense",taxah={'species': 'Nonsense species', 'strain': 'Nonsense strain'}),
+      ((ERROR, "Taxa Utter nonsense cannot be found and neither can its higher taxonomic hierarchy"),
+      )),
+     # No higher taxonomy provided
+     (dict(nnme="Nonsense",taxah={'species': 'Nonsense species'}),
+      ((ERROR, "Taxa Nonsense cannot be found and its higher taxonomic hierarchy is absent"),
+      )),
      ])
 def test_validate_taxa_search(caplog, test_input, expected_log_entries,
                               fixture_ncbi_validators):
@@ -405,7 +427,7 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
         _ = fixture_ncbi_validators.taxa_search(**test_input)
 
 # ------------------------------------------
-# Testing GenBankTaxa
+# Testing NCBITaxa
 # ------------------------------------------
 
 # Start with the validate_and_add_taxon function
@@ -586,6 +608,17 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
      (['Bacteria', {'superkingdom': 'Bacteria'}, 2],
       ((INFO, "Taxon (Bacteria) found in NCBI database"),
       )),
+     # Unknown E coli strain
+     (["Unknown strain", {'species': 'Escherichia coli', 'strain': 'Nonsense strain'}, None],
+      ((WARNING, "Nonsense strain not registered with NCBI, using higher level "
+       "taxon Escherichia coli instead"),
+       (INFO, "Taxon (Unknown strain) found in NCBI database")
+      )),
+     # Nonsense taxonomy
+     (["Utter nonsense", {'species': 'Nonsense species', 'strain': 'Nonsense strain'}, None],
+      ((ERROR, "Taxa Utter nonsense cannot be found and neither can its higher taxonomic hierarchy"),
+       (ERROR, "Search based on taxon hierarchy failed")
+      )),
      ])
 def test_validate_and_add_taxon(caplog, test_input, expected_log_entries):
     """This test checks that the function that searches the NCBI database to find
@@ -596,7 +629,7 @@ def test_validate_and_add_taxon(caplog, test_input, expected_log_entries):
     """
 
     # ONLY MAKING A LOCAL VERSION FOR NOW
-    gb_instance = genb_taxa.GenBankTaxa()
+    gb_instance = genb_taxa.NCBITaxa()
     fnd_tx = gb_instance.validate_and_add_taxon(test_input)
 
     log_check(caplog, expected_log_entries)
@@ -622,7 +655,7 @@ def test_validate_and_add_taxon_errors(test_input, expected_exception):
     """
 
     # ONLY MAKING A LOCAL VERSION FOR NOW
-    gb_instance = genb_taxa.GenBankTaxa()
+    gb_instance = genb_taxa.NCBITaxa()
 
     with pytest.raises(expected_exception):
         _ = gb_instance.validate_and_add_taxon(test_input)

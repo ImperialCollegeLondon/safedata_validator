@@ -149,7 +149,7 @@ def subspecies_trinomial(species: str, subspecies: str):
 @dataclasses.dataclass
 class NCBITaxon:
     """Holds taxonomic information from a user on a microbial taxa. This can be
-    populated using NCBI GenBank validation.
+    populated using NCBI validation.
 
     There are 3 class properties that can be used to create an instance:
         * name
@@ -158,6 +158,7 @@ class NCBITaxon:
     The remaining properties are populated by processing functions not when an
     instance is created.
         * superseed: is supplied taxon name/ID still the accepted usage
+        * orig: Records rank of the orginal taxa if it was not found
     """
 
     # Init properties
@@ -165,6 +166,7 @@ class NCBITaxon:
     taxa_hier: dict
     ncbi_id: Optional[Union[int, float]] = None
     superseed: bool = dataclasses.field(init=False)
+    orig: str = dataclasses.field(init=False)
 
     def __post_init__(self):
         """Sets the defaults for the post-init properties and checks inputs
@@ -172,7 +174,7 @@ class NCBITaxon:
 
         if self.ncbi_id is not None:
             if isinstance(self.ncbi_id, float) and not self.ncbi_id.is_integer():
-                raise TypeError('GenBank Id is not an integer')
+                raise TypeError('NCBI Id is not an integer')
             self.ncbi_id = int(self.ncbi_id)
 
         if self.taxa_hier is not None:
@@ -187,6 +189,7 @@ class NCBITaxon:
                  raise ValueError('Taxa tuples not all in [string integer] form')
 
         self.superseed = False
+        self.orig = None
 
 @enforce_types
 class RemoteNCBIValidator:
@@ -195,7 +198,7 @@ class RemoteNCBIValidator:
     """
     # Functionality to find taxa information from genbank ID
     def id_lookup(self, nnme: str, ncbi_id: int):
-        """Method to return full taxonomic information from a GenBank ID. This
+        """Method to return full taxonomic information from a NCBI ID. This
         includes details of any potential synonymus names.
 
         Params:
@@ -237,7 +240,7 @@ class RemoteNCBIValidator:
             # In this case use provided rank
             rnk = BACKBONE_RANKS_EX.index(tax_dic["Rank"])
 
-        # Filter out ID's without ranks (e.g. strains)
+        # Filter out ID's with non-backbone ranks (e.g. strains)
         else:
             # Set as not a valid taxa
             vld_tax = False
@@ -296,7 +299,7 @@ class RemoteNCBIValidator:
             # Warn user that they've given a superseeded taxa ID
             LOGGER.warning(f"NCBI ID {(tax_dic['AkaTaxIds'])[0]} has been "
                             f"superseeded by ID {tax_dic['TaxId']}")
-            # Record that a superseeded GenBank ID has been provided
+            # Record that a superseeded NCBI ID has been provided
             mtaxon.superseed = True
 
         return mtaxon
@@ -353,8 +356,59 @@ class RemoteNCBIValidator:
             mtaxon = self.id_lookup(nnme,tID)
         # Catch cases where no record is found
         elif c == 0:
-            LOGGER.error(f'Taxa {nnme} cannot be found')
-            return
+            # Check if there actually is any higher taxonomy provided
+            if len(taxah.keys()) == 1:
+                LOGGER.error(f'Taxa {nnme} cannot be found and its higher '
+                             f'taxonomic hierarchy is absent')
+                return
+
+            # If there is then set up a loop over it
+            fnshd = False
+            cnt = 1
+            while fnshd == False:
+                # Increment counter
+                cnt += 1
+                # Use to find higher taxonomic level to use in search
+                f_key = list(taxah.keys())[-cnt]
+                new_s_term = taxah[f_key]
+
+                # Search the online database
+                try:
+                    handle = Entrez.esearch(db="taxonomy", term=new_s_term, api_key=user_key)
+                except urllib.error.HTTPError:
+                    NCBIError('Connection error to remote server')
+
+                # Process the response
+                record = Entrez.read(handle)
+                handle.close()
+                c = int(record['Count'])
+
+                # Check how many records have been found
+                if c == 1:
+                    # Find taxa ID as single entry in the list
+                    tID = int(record['IdList'][0])
+                    # Use ID lookup function to generate as a NCBITaxon object
+                    mtaxon = self.id_lookup(nnme,tID)
+                    # Store orginally supplied rank
+                    mtaxon.orig = list(taxah.keys())[-1]
+                    # Warn the user that a higher taxonomic rank is being used
+                    LOGGER.warning(f'{s_term} not registered with NCBI, using '
+                                   f'higher level taxon {new_s_term} instead')
+                    fnshd = True
+                elif c > 1: # Not going to handle ambiguities in this case
+                    LOGGER.error(f'Taxa {nnme} cannot be found and its higher '
+                                 f'taxonomic hierarchy is ambigious')
+                    return
+                # Catch when all the provided hierachy has been exhausted
+                elif cnt == len(taxah.keys()):
+                    fnshd = True
+
+                # If valid higher taxon not found print error
+                if 'mtaxon' not in locals():
+                    LOGGER.error(f'Taxa {nnme} cannot be found and neither can '
+                                 f'its higher taxonomic hierarchy')
+                    return
+
         # Case where only one rank has been provided
         elif len(taxah) == 1:
             # Preallocate container for the ranks
@@ -457,7 +511,7 @@ class RemoteNCBIValidator:
         f_key = list(mtaxon.taxa_hier.keys())[-1]
 
         # Check if taxonomic rank supplied is used
-        if f_key != list(taxah.keys())[-1] and f_key != "superkingdom":
+        if mtaxon.orig == None and f_key != list(taxah.keys())[-1] and f_key != "superkingdom":
             # If not raise an error
             LOGGER.error(f'{list(taxah.values())[-1]} is a {f_key}'
                          f' not a {list(taxah.keys())[-1]}')
@@ -469,7 +523,7 @@ class RemoteNCBIValidator:
             # And record the fact that usage is superseeded
             mtaxon.superseed = True
         # Then check whether orginally supplied name is still used
-        elif taxah[f_key] != (mtaxon.taxa_hier[f_key])[0]:
+        elif mtaxon.orig == None and taxah[f_key] != (mtaxon.taxa_hier[f_key])[0]:
             # If not print a warning
             LOGGER.warning(f'{taxah[f_key]} not accepted usage should be '
                            f'{(mtaxon.taxa_hier[f_key])[0]} instead')
@@ -478,7 +532,7 @@ class RemoteNCBIValidator:
 
         return mtaxon
 
-class GenBankTaxa:
+class NCBITaxa:
     # REWRITE THIS HEAVILY
     """A class to hold a list of taxon names and a validated taxonomic
     index for those taxa and their taxonomic hierarchy. The validate_taxon
@@ -515,7 +569,7 @@ class GenBankTaxa:
 
     def __init__(self):
         # FILL OUT THIS PROPERLY ONCE I KNOW WHAT IT IS SUPPOSED TO BE
-        """Sets the initial properties of a GenBankTaxa object
+        """Sets the initial properties of a NCBITaxa object
         """
 
         self.taxon_index = []
@@ -674,7 +728,7 @@ class GenBankTaxa:
         the NCBI ID for the orginal entry is then saved, along with a list of possible
         synoyms. All this information is then used to find the closest taxa match
         in the GBIF database. This information is then used to update the relevant
-        GenBankTaxa instance.
+        NCBITaxa instance.
 
         The gb_taxon_input has the form:
 
@@ -849,7 +903,7 @@ class GenBankTaxa:
 
         # Look up the taxonomic hierarchy
         for tx_lev, tx_id in to_add:
-            # OR IS THIS VITAL TO THE VALIDATION
+            # REMOVE LOOK UP WHEN I REWRITE THIS FUNCTION
             higher_taxon = self.validator.id_lookup(tx_id)
             self.taxon_index.append([None,
                                      higher_taxon.gbif_id,
@@ -862,9 +916,4 @@ class GenBankTaxa:
         # CHECK THAT KINGDOM VS SUPERKINGDOM STORAGE IS WORKING OKAY
         # MOSTLY DONE, BUT STILL NEED TO KEEP IT IN MIND
         # NEED A CHECK OF HIEARCHY MATCH
-        # WHAT HAPPENS IF TAXA NOT KNOWN TO NCBI?
-        # Probably need a function here that can step up the hierarchy to find stuff
-        # IS THIS SOMETHING I SHOULD BE ACCOUNTING FOR?
-        # IS OUTDATED HIERACHY REMOVED?
-        # PROBALY SHOULD ALSO CHECK WITH DAVID THAT MY APPROACH TO DIVERGENT AND
-        # SUPERSEEDED TAXA SEEMS REASONABLE TO HIM
+        # SUPERSEEDED CASE GOING TO BE TRICKY WHEN THERE ARE MULTIPLE AKA IDS
