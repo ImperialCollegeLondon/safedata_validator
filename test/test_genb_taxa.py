@@ -1,5 +1,5 @@
 import pytest
-from safedata_validator import genb_taxa
+from safedata_validator import ncbi_taxa
 from logging import ERROR, WARNING, INFO
 from .conftest import log_check
 
@@ -13,7 +13,7 @@ from .conftest import log_check
 def gb_instance():
     """Parameterised fixture to return a NCBITaxa instance
     """
-    return genb_taxa.NCBITaxa()
+    return ncbi_taxa.NCBITaxa()
 
 # ------------------------------------------
 # Testing NCBITaxon
@@ -23,37 +23,51 @@ def gb_instance():
     'test_input,expected_exception',
     [(dict(),  # no parameters
       TypeError),
-     (dict(name=1, ncbi_id=2, taxa_hier={'genus': ('Morus', 37577)}),  # non string name
+     # non string name
+     (dict(name=1, rank='genus', ncbi_id=37577, taxa_hier={'genus': ('Morus', 37577)}),
       TypeError),
      # non-numeric ncbi_id
-     (dict(name='Bombus bombus', ncbi_id='error',
+     (dict(name='Morus', rank='genus', ncbi_id='error',
       taxa_hier={'genus': ('Morus', 37577)}),
       TypeError),
      # non-integer ncbi_id
-     (dict(name='Bombus bombus', ncbi_id=3.141, taxa_hier={'genus': ('Morus', 37577)}),
+     (dict(name='Morus', rank='genus', ncbi_id=3.141, taxa_hier={'genus': ('Morus', 37577)}),
       TypeError),
      # string instead of dictonary
-     (dict(name='Bombus bombus', ncbi_id=3, taxa_hier="test"),
+     (dict(name='Morus', rank='genus', ncbi_id=37577, taxa_hier="test"),
       TypeError),
-     (dict(name='Bombus bombus', ncbi_id=3, taxa_hier={}), # empty dictonary
+     # empty dictonary
+     (dict(name='Morus', rank='genus', ncbi_id=37577, taxa_hier={}),
       ValueError),
      # non-string key
-     (dict(name='Bombus bombus', ncbi_id=3, taxa_hier={1: ('Morus', 37577)}),
+     (dict(name='Morus', rank='genus', ncbi_id=37577, taxa_hier={1: ('Morus', 37577)}),
       ValueError),
-     (dict(name='Bombus bombus', ncbi_id=3, taxa_hier={'genus': 27}), # non-tuple value
+     (dict(name='Morus', rank='genus', ncbi_id=37577, taxa_hier={'genus': 27}), # non-tuple value
       ValueError),
      # non-tuple value
-     (dict(name='Bombus bombus', ncbi_id=3, taxa_hier={'genus': (37577, 'Morus')}),
+     (dict(name='Morus', rank='genus', ncbi_id=37577, taxa_hier={'genus': (37577, 'Morus')}),
       ValueError),
      # 3 elements in tuple
-     (dict(name='Bombus bombus', ncbi_id=3,
+     (dict(name='Morus', rank='genus', ncbi_id=37577,
       taxa_hier={'genus': ('Morus', 37577, "extra")}),
+      ValueError),
+     # supplied rank doesn't match
+     (dict(name='Morus', rank='species', ncbi_id=37577,
+      taxa_hier={'genus': ('Morus', 37577)}),
+      ValueError),
+     # supplied name doesn't match
+     (dict(name='Bombus bombus', rank='genus', ncbi_id=37577,
+      taxa_hier={'genus': ('Morus', 37577)}),
+      ValueError),
+     # supplied NCBI ID doesn't match
+     (dict(name='Morus', rank='genus', ncbi_id=27,
+      taxa_hier={'genus': ('Morus', 37577)}),
       ValueError)])
 def test_taxon_init_errors(test_input, expected_exception):
     """This test checks NCBI taxon inputs throw errors as expected
     """
     with pytest.raises(expected_exception):
-        _ = genb_taxa.NCBITaxon(**test_input)
+        _ = ncbi_taxa.NCBITaxon(**test_input)
 
 # ------------------------------------------
 # Testing taxa_strip
@@ -83,7 +97,7 @@ def test_taxa_strip(test_input, expected):
     behaviour.
     """
 
-    s_taxa, match = genb_taxa.taxa_strip(**test_input)
+    s_taxa, match = ncbi_taxa.taxa_strip(**test_input)
 
     assert s_taxa == expected[0]
     assert match == expected[1]
@@ -115,7 +129,7 @@ def test_species_binomial(test_input, expected):
     properly.
     """
 
-    s_bi = genb_taxa.species_binomial(**test_input)
+    s_bi = ncbi_taxa.species_binomial(**test_input)
 
     assert s_bi == expected
 
@@ -137,7 +151,7 @@ def test_validate_species_binomial(caplog, test_input, expected_log_entries):
      correct errors and warnings.
     """
 
-    s_bi = genb_taxa.species_binomial(**test_input)
+    s_bi = ncbi_taxa.species_binomial(**test_input)
 
     log_check(caplog, expected_log_entries)
 
@@ -168,7 +182,7 @@ def test_subspecies_trinomial(test_input, expected):
     properly.
     """
 
-    s_bi = genb_taxa.subspecies_trinomial(**test_input)
+    s_bi = ncbi_taxa.subspecies_trinomial(**test_input)
 
     assert s_bi == expected
 
@@ -194,7 +208,7 @@ def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries)
      correct errors and warnings.
     """
 
-    s_bi = genb_taxa.subspecies_trinomial(**test_input)
+    s_bi = ncbi_taxa.subspecies_trinomial(**test_input)
 
     log_check(caplog, expected_log_entries)
 
@@ -206,15 +220,15 @@ def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries)
 @pytest.mark.parametrize(
     'test_input,expected',
     [(dict(nnme='E coli', ncbi_id=562),
-      ('E coli', 562, False, "species", "Escherichia coli", 562, None)),
+      ('Escherichia coli', "species", 562, False,  None)),
      (dict(nnme='E coli strain', ncbi_id=1444049),
-      ('E coli strain', 1444049, False, "strain", "Escherichia coli 1-110-08_S1_C1", 1444049, None)),
+      ('Escherichia coli 1-110-08_S1_C1', "strain", 1444049, False, None)),
      (dict(nnme='Streptophytina', ncbi_id=131221),
-      ('Streptophytina', 131221, False, "subphylum", "Streptophytina", 131221, None)),
+      ('Streptophytina', "subphylum", 131221, False,  None)),
      (dict(nnme='Opisthokonta', ncbi_id=33154),
-      ('Opisthokonta', 33154, False, "clade", "Opisthokonta", 33154, None)),
+      ('Opisthokonta', "clade", 33154, False, None)),
      (dict(nnme='Cytophaga marina', ncbi_id=1000),
-      ('Cytophaga marina', 1000, True, "species", "Tenacibaculum maritimum", 107401, None))
+      ("Tenacibaculum maritimum", "species", 107401, True, None))
      ])
 def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of looking up a specific NCBI taxonomy against
@@ -226,15 +240,17 @@ def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     fnd_tx = fixture_ncbi_validators.id_lookup(**test_input)
 
     assert fnd_tx.name == expected[0]
-    assert fnd_tx.ncbi_id == expected[1]
-    assert fnd_tx.superseed == expected[2]
+    assert fnd_tx.rank == expected[1]
+    assert fnd_tx.ncbi_id == expected[2]
+    assert fnd_tx.superseed == expected[3]
 
     # Find last dictonary key
     f_key = list(fnd_tx.taxa_hier.keys())[-1]
 
-    assert f_key == expected[3]
-    assert fnd_tx.taxa_hier[f_key] == (expected[4], expected[5])
-    assert fnd_tx.orig == expected[6]
+    assert f_key == expected[1]
+
+    assert fnd_tx.taxa_hier[f_key] == (expected[0], expected[2])
+    assert fnd_tx.orig == expected[4]
 
 # Now test that the search function logs errors correctly
 @pytest.mark.parametrize(
@@ -265,15 +281,15 @@ def test_validate_id_lookup(caplog, test_input, expected_log_entries, fixture_nc
     [(None,  # no parameters
       TypeError),
      (dict(nnme='E coli', ncbi_id='invalid_string'),  # a string
-      ValueError),
+      TypeError),
      (dict(nnme='E coli', ncbi_id=27.5),  # non-integer ID
-      ValueError),
+      TypeError),
      (dict(nnme=27, ncbi_id=27),  # named using a number
       TypeError),
      (dict(nnme='E coli', ncbi_id=-1),  # bad ID
       ValueError),
      (dict(nnme='E coli', ncbi_id=100000000000000),  # bad ID
-      genb_taxa.NCBIError)])
+      ncbi_taxa.NCBIError)])
 def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exception):
     """This test checks validator.id_lookup inputs throw errors as expected
     """
@@ -285,33 +301,33 @@ def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exceptio
 @pytest.mark.parametrize(
     'test_input,expected',
     [(dict(nnme="E coli",taxah={'genus': 'Escherichia', 'species': 'Escherichia coli'}),
-      ("E coli", 562, False, "species", "Escherichia coli", 562, None)),
+      ("Escherichia coli", "species", 562, False, None)),
      (dict(nnme="Entero",taxah={'order': 'Enterobacterales', 'family': 'Enterobacteriaceae'}),
-      ("Entero", 543, False, "family", "Enterobacteriaceae", 543, None)),
+      ("Enterobacteriaceae", "family", 543, False, None)),
      (dict(nnme="E coli strain",taxah={'species': 'Escherichia coli', 'strain':
      'Escherichia coli 1-110-08_S1_C1'}),
-      ("E coli strain", 1444049, False, "strain", "Escherichia coli 1-110-08_S1_C1", 1444049, None)),
+      ("Escherichia coli 1-110-08_S1_C1", "strain", 1444049, False, None)),
      (dict(nnme="Strepto",taxah={'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}),
-      ("Strepto", 131221, False, "subphylum", "Streptophytina", 131221, None)),
+      ("Streptophytina", "subphylum", 131221, False, None)),
      (dict(nnme="Opistho",taxah={'superkingdom': 'Eukaryota', 'clade': 'Opisthokonta'}),
-      ("Opistho", 33154, False, "clade", "Opisthokonta", 33154, None)),
-     (dict(nnme="Vulpes",taxah={'genus': 'Vulpes', 'species': 'Vulpes vulpes'}),
-      ("Vulpes", 9627, False, "species", "Vulpes vulpes", 9627, None)),
+      ("Opisthokonta", "clade", 33154, False, None)),
+     (dict(nnme="Vulpes vulpes",taxah={'genus': 'Vulpes', 'species': 'Vulpes vulpes'}),
+      ("Vulpes vulpes", "species", 9627, False, None)),
      (dict(nnme="M morus",taxah={'family': 'Moraceae', 'genus': 'Morus'}),
-      ("M morus", 3497, False, "genus", "Morus", 3497, None)),
+      ("Morus", "genus", 3497, False, None)),
      (dict(nnme="S morus",taxah={'family': 'Sulidae', 'genus': 'Morus'}),
-      ("S morus", 37577, False, "genus", "Morus", 37577, None)),
+      ("Morus", "genus", 37577, False, None)),
      (dict(nnme="C morus",taxah={'phylum': 'Chordata', 'genus': 'Morus'}),
-      ("C morus", 37577, False, "genus", "Morus", 37577, None)),
+      ("Morus", "genus", 37577, False,  None)),
      (dict(nnme="T maritimum",taxah={'genus': 'Tenacibaculum', 'species':
      'Tenacibaculum maritimum'}),
-      ("T maritimum", 107401, False, "species", "Tenacibaculum maritimum", 107401, None)),
+      ("Tenacibaculum maritimum", "species", 107401, False, None)),
      (dict(nnme="C marina",taxah={'genus': 'Cytophaga', 'species': 'Cytophaga marina'}),
-      ("C marina", 107401, True, "species", "Tenacibaculum maritimum", 107401, None)),
+      ("Tenacibaculum maritimum", "species", 107401, True, None)),
      (dict(nnme="Bacteria",taxah={'superkingdom': 'Bacteria'}),
-      ("Bacteria", 2, False, "superkingdom", "Bacteria", 2, None)),
+      ("Bacteria", "superkingdom", 2, False,  None)),
      (dict(nnme="Unknown strain",taxah={'species': 'Escherichia coli', 'strain': 'Nonsense strain'}),
-      ("Unknown strain", 562, False, "species", "Escherichia coli", 562, 'strain')),
+      ("Escherichia coli", "species", 562, False, 'strain')),
     ])
 def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of searching for a taxa in the NCBI taxonomy
@@ -323,15 +339,17 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     fnd_tx = fixture_ncbi_validators.taxa_search(**test_input)
 
     assert fnd_tx.name == expected[0]
-    assert fnd_tx.ncbi_id == expected[1]
-    assert fnd_tx.superseed == expected[2]
+    assert fnd_tx.rank == expected[1]
+    assert fnd_tx.ncbi_id == expected[2]
+    assert fnd_tx.superseed == expected[3]
 
     # Find last dictonary key
     f_key = list(fnd_tx.taxa_hier.keys())[-1]
 
-    assert f_key == expected[3]
-    assert fnd_tx.taxa_hier[f_key] == (expected[4], expected[5])
-    assert fnd_tx.orig == expected[6]
+    assert f_key == expected[1]
+
+    assert fnd_tx.taxa_hier[f_key] == (expected[0], expected[2])
+    assert fnd_tx.orig == expected[4]
 
 # Now test that the search function logs errors correctly
 @pytest.mark.parametrize(
@@ -640,7 +658,7 @@ def test_validate_and_add_taxon(caplog, test_input, expected_log_entries):
     """
 
     # ONLY MAKING A LOCAL VERSION FOR NOW
-    gb_instance = genb_taxa.NCBITaxa()
+    gb_instance = ncbi_taxa.NCBITaxa()
     fnd_tx = gb_instance.validate_and_add_taxon(test_input)
 
     log_check(caplog, expected_log_entries)
@@ -659,14 +677,14 @@ def test_validate_and_add_taxon(caplog, test_input, expected_log_entries):
       ValueError),
      # Bad code
      (['E coli', {'species': 'Escherichia coli'}, 100000000000000],
-      genb_taxa.NCBIError),
+      ncbi_taxa.NCBIError),
     ])
 def test_validate_and_add_taxon_errors(test_input, expected_exception):
     """This test checks validator.validate_and_add_taxon inputs throw errors as expected
     """
 
     # ONLY MAKING A LOCAL VERSION FOR NOW
-    gb_instance = genb_taxa.NCBITaxa()
+    gb_instance = ncbi_taxa.NCBITaxa()
 
     with pytest.raises(expected_exception):
         _ = gb_instance.validate_and_add_taxon(test_input)

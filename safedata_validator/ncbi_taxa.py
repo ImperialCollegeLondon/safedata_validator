@@ -1,4 +1,4 @@
-"""## The genb_taxa submodule
+"""## The ncbi_taxa submodule
 This module describes classes and methods used to validate taxonomic data against
 the NCBI database and convert it to a form compatible with the GBIF backbone database.
 
@@ -33,15 +33,15 @@ Entrez.email = "jacobcook1995@gmail.com"
 user_key = "1738fe86eba2d8fc287ff0d1dcbfeda44a0a"
 
 
-# TODO - Correctly read in xslx data
-# Lot of this has already been written by David, main thing is that I will have
-# to decide on the formatting, like what data are we taking in.
-
 # TODO - Think about data output
 # Have to make sure that the indexing is compatibale with David's database
 # Probably have to add in the first databasing steps as well
 
-# POTENTIAL - Take steps to increase the speed
+# TODO - Soup up NCBITaxa
+# Basically copy David and have a section for printing out NCBITaxa in a readable
+# way
+
+# TODO - Take steps to increase the speed
 # Make local copy by downloading the relevant part of NCBI's database and
 # running the validation locally
 
@@ -49,6 +49,11 @@ user_key = "1738fe86eba2d8fc287ff0d1dcbfeda44a0a"
 # This should only be done if the user actually wants to use this module as it
 # isn't need elsewhere (as far as I know)
 # Also should ask for api key
+
+# TODO - Work out how this best integrates with taxa
+# Lot of different potential approaches (e.g. making making NCBI and GBIF validators
+# sub-classes of a validator class). Need to establish what the most extensible
+# and stable option is
 
 # QUESTIONS FOR DAVID
 # SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
@@ -163,6 +168,7 @@ class NCBITaxon:
 
     # Init properties
     name: str
+    rank: str
     taxa_hier: dict
     ncbi_id: Optional[Union[int, float]] = None
     superseed: bool = dataclasses.field(init=False)
@@ -188,6 +194,22 @@ class NCBITaxon:
                  self.taxa_hier.values()) == False:
                  raise ValueError('Taxa tuples not all in [string integer] form')
 
+        if self.rank.lower() != list(self.taxa_hier.keys())[-1]:
+            raise ValueError(f'Provided rank ({self.rank.lower()}) does not match'
+                             f' lowest rank in supplied hiearchy ('
+                             f'{list(self.taxa_hier.keys())[-1]})')
+
+        if self.name != (list(self.taxa_hier.values())[-1])[0]:
+            raise ValueError(f'Provided taxon name ({self.name}) does not match'
+                             f' name of the lowest entry in supplied hiearchy ('
+                             f'{(list(self.taxa_hier.values())[-1])[0]})')
+
+        if self.ncbi_id != None and self.ncbi_id != (list(self.taxa_hier.values())[-1])[1]:
+            raise ValueError(f'Provided NCBI ID ({self.ncbi_id}) does not match'
+                             f' ID of the lowest entry in supplied hiearchy ('
+                             f'{(list(self.taxa_hier.values())[-1])[1]})')
+
+        self.rank = self.rank.lower()
         self.superseed = False
         self.orig = None
 
@@ -210,7 +232,10 @@ class RemoteNCBIValidator:
         """
 
         if not isinstance(ncbi_id, int):
-            raise ValueError('Non-integer NCBI taxonomy ID')
+            raise TypeError('Non-integer NCBI taxonomy ID')
+
+        if not isinstance(nnme, str):
+            raise TypeError('Non-string nickname')
 
         if not ncbi_id > 0:
             raise ValueError('Negative NCBI taxonomy ID')
@@ -292,7 +317,8 @@ class RemoteNCBIValidator:
                                                  int(tax_dic["TaxId"]))
 
         # Create and populate microbial taxon
-        mtaxon = NCBITaxon(name=nnme,ncbi_id=ncbi_id,taxa_hier=red_taxa)
+        mtaxon = NCBITaxon(name=tax_dic['ScientificName'],rank=tax_dic['Rank'],
+                           ncbi_id=int(tax_dic["TaxId"]),taxa_hier=red_taxa)
 
         # Check if AkaTaxIds exists in taxonomic information
         if 'AkaTaxIds' in tax_dic.keys():
@@ -849,20 +875,18 @@ class NCBITaxa:
         # Then check if a genbank ID number has been provided
         if ncbi_id != None:
             id_taxon = self.validator.id_lookup(m_name, int(ncbi_id))
-            # Check whether this matches what was found using hierarchy
-            if id_taxon != hr_taxon:
-                # Check if taxonomy hierarchy superseeded
-                if hr_taxon.superseed == True:
-                    LOGGER.warning(f'Taxonomic classification superseeded for '
-                    f'{m_name}, using new taxonomic classification')
-                elif id_taxon.superseed == True:
-                    LOGGER.warning(f'NCBI taxa ID superseeded for {m_name}'
-                    f', using new taxa ID')
-                else:
-                    LOGGER.error(f"The NCBI ID supplied for {m_name} does "
-                    f"not match hierarchy: expected {hr_taxon.ncbi_id}"
-                    f" got {ncbi_id}")
-                    return
+            # Check if taxonomy hierarchy superseeded
+            if hr_taxon.superseed == True:
+                LOGGER.warning(f'Taxonomic classification superseeded for '
+                f'{m_name}, using new taxonomic classification')
+            elif id_taxon.superseed == True:
+                LOGGER.warning(f'NCBI taxa ID superseeded for {m_name}'
+                f', using new taxa ID')
+            elif id_taxon != hr_taxon:
+                LOGGER.error(f"The NCBI ID supplied for {m_name} does "
+                f"not match hierarchy: expected {hr_taxon.ncbi_id}"
+                f" got {ncbi_id}")
+                return
         else:
             # Warn user that superseeded taxonomy won't be used
             if hr_taxon.superseed:
@@ -870,17 +894,28 @@ class NCBITaxa:
                 f'{m_name}, using new taxonomic classification')
 
         # Check that the hierachy found matches
-        match = self.compare_hier(hr_taxon,taxon_hier)
+        match = self.compare_hier(m_name,hr_taxon,taxon_hier)
 
         # Store the NCBI taxon keyed by NCBI information (needs tuple)
         f_key = list(hr_taxon.taxa_hier.keys())[-1]
-        # THIS INDEX SHOULD INCLUDE SUPERSEEDED TAXA AS A SPECIAL CASE
+
         # PARENT ID SHOULD BE INCLUDED TO ALLOW FOR PROPER INDEXING
-        # ALSO ADD IF IT DIVERGES FROM ORGINAL TAXA
-        self.taxon_index.append([hr_taxon.name, hr_taxon.ncbi_id,
-                                    hr_taxon.taxa_hier[f_key], f_key,
-                                    hr_taxon.superseed])
+        # HOW TO FIND PARENT ID?
+
+        if hr_taxon.superseed == False:
+            # self.taxon_index.append([m_name, hr_taxon.ncbi_id, m_taxon.parent_id,
+            #                             hr_taxon.name, hr_taxon.rank,
+            #                             m_taxon.superseed, m_taxon.orig])
+            self.taxon_index.append([hr_taxon.name, hr_taxon.ncbi_id,
+                                        hr_taxon.taxa_hier[f_key], f_key,
+                                        hr_taxon.superseed])
+        else:
+            # DEFINETLY NEED SPECIAL HANDELING FOR SUPERSEEDED CASE
+            print("PLACEHOLDER")
+
         self.hierarchy.update(list(hr_taxon.taxa_hier.items()))
+
+        # DEAL WITH SUPERSEEDED CASE SEPERATELY
 
         # Check if this has succeded without warnings or errors
         if hr_taxon.superseed == False:
@@ -915,7 +950,7 @@ class NCBITaxa:
                                      higher_taxon.taxon_status])
             LOGGER.info(f'Added {tx_lev} {higher_taxon}')
 
-    def compare_hier(self, mtaxon: NCBITaxon, taxon_hier: dict):
+    def compare_hier(self, m_name: str, mtaxon: NCBITaxon, taxon_hier: dict):
         """ Function to compare the hierachy of a taxon with the hierachy that was
         initially supplied. This function only checks that provided information
         matches, missing levels or entries into levels are ignored"""
@@ -933,10 +968,16 @@ class NCBITaxa:
             inds = [i for i in range(len(t_match)) if t_match[i] == False]
             # Then loop over these indices giving appropriate warnings
             for ind in inds:
-                LOGGER.warning(f'Hierarchy mismatch for {mtaxon.name} its {rnks[ind]}'
+                LOGGER.warning(f'Hierarchy mismatch for {m_name} its {rnks[ind]}'
                                f' should be {(mtaxon.taxa_hier[rnks[ind]])[0]} not '
                                f'{taxon_hier[rnks[ind]]}')
 
         # CHECK THAT KINGDOM VS SUPERKINGDOM STORAGE IS WORKING OKAY
         # MOSTLY DONE, BUT STILL NEED TO KEEP IT IN MIND
         # SUPERSEEDED CASE GOING TO BE TRICKY WHEN THERE ARE MULTIPLE AKA IDS
+        # OKAY SO THINKING ABOUT THIS SUPERSEEDED TAXA CASE
+        # SUPERSEEDED TAXA DETAILS SHOULD BE STORED, i.e. name, ID, etc
+        # THEN NON-SUPERSEEDED CASE SHOULD BE ADDITIONALLY STORED
+        # THIS ADDITIONAL STORAGE SHOULD HAVE A FULL HIERACHY ADDED
+        # FOR SUPERSEEDED TAXA WON'T FIND HIERACHY, MAYBE BEST TO JUST GIVE PARENT ID
+        # FOR NON-SUPERSEEDED CASE

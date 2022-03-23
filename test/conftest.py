@@ -11,7 +11,7 @@ from safedata_validator.locations import Locations
 from safedata_validator.field import Dataset
 from safedata_validator.resources import Resources
 from safedata_validator.field import DataWorksheet
-from safedata_validator.genb_taxa import RemoteNCBIValidator
+from safedata_validator.ncbi_taxa import RemoteNCBIValidator
 
 
 def fixture_files():
@@ -63,17 +63,17 @@ parameterisation is clumsy and complex.
 def log_check(caplog, expected_log):
     """
     This helper function checks that the captured log during a test
-    matches the expected log levels and messages. 
+    matches the expected log levels and messages.
 
     Arguments:
         caplog: An instance of the caplog fixture
-        expected_log: An iterable of 2-tuples containing the 
+        expected_log: An iterable of 2-tuples containing the
             log level and message.
     """
 
     assert len(expected_log) == len(caplog.records)
 
-    assert all([exp[0] == rec.levelno 
+    assert all([exp[0] == rec.levelno
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
