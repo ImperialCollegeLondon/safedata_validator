@@ -658,8 +658,8 @@ def test_validate_and_add_taxon(caplog, test_input, expected_log_entries):
     """
 
     # ONLY MAKING A LOCAL VERSION FOR NOW
-    gb_instance = ncbi_taxa.NCBITaxa()
-    fnd_tx = gb_instance.validate_and_add_taxon(test_input)
+    ncbi_instance = ncbi_taxa.NCBITaxa()
+    fnd_tx = ncbi_instance.validate_and_add_taxon(test_input)
 
     log_check(caplog, expected_log_entries)
 
@@ -684,7 +684,7 @@ def test_validate_and_add_taxon_errors(test_input, expected_exception):
     """
 
     # ONLY MAKING A LOCAL VERSION FOR NOW
-    gb_instance = ncbi_taxa.NCBITaxa()
+    ncbi_instance = ncbi_taxa.NCBITaxa()
 
     with pytest.raises(expected_exception):
-        _ = gb_instance.validate_and_add_taxon(test_input)
+        _ = ncbi_instance.validate_and_add_taxon(test_input)

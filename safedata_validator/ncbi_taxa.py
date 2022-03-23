@@ -896,26 +896,43 @@ class NCBITaxa:
         # Check that the hierachy found matches
         match = self.compare_hier(m_name,hr_taxon,taxon_hier)
 
-        # Store the NCBI taxon keyed by NCBI information (needs tuple)
-        f_key = list(hr_taxon.taxa_hier.keys())[-1]
-
-        # PARENT ID SHOULD BE INCLUDED TO ALLOW FOR PROPER INDEXING
-        # HOW TO FIND PARENT ID?
-
-        if hr_taxon.superseed == False:
-            # self.taxon_index.append([m_name, hr_taxon.ncbi_id, m_taxon.parent_id,
-            #                             hr_taxon.name, hr_taxon.rank,
-            #                             m_taxon.superseed, m_taxon.orig])
-            self.taxon_index.append([hr_taxon.name, hr_taxon.ncbi_id,
-                                        hr_taxon.taxa_hier[f_key], f_key,
-                                        hr_taxon.superseed])
+        # Find parent ID
+        if len(hr_taxon.taxa_hier) > 1:
+            # Find taxon one level up
+            f_key = list(hr_taxon.taxa_hier.keys())[-2]
+            parent_id = (hr_taxon.taxa_hier[f_key])[1]
         else:
-            # DEFINETLY NEED SPECIAL HANDELING FOR SUPERSEEDED CASE
-            print("PLACEHOLDER")
+            # Set to root if hierachy is empty
+            parent_id = 1
+
+        # Then check if taxon is superseeded
+        if hr_taxon.superseed == True or (ncbi_id != None and id_taxon.superseed == True):
+            if ncbi_id == None or id_taxon.superseed == False:
+                superseed_id = hr_taxon.ncbi_id
+                # Find supplied name using lowest found rank
+                f_key = list(hr_taxon.taxa_hier.keys())[-1]
+                superseed_name = taxon_hier[f_key]
+            else:
+                # Supplied ID is superseeded
+                superseed_id = ncbi_id
+                # Check if supplied name superseeded
+                if hr_taxon.superseed == True:
+                    f_key = list(hr_taxon.taxa_hier.keys())[-1]
+                    superseed_name = taxon_hier[f_key]
+                else:
+                    superseed_name = hr_taxon.name
+
+            # Add superseeded taxon to the index
+            self.taxon_index.append([m_name, superseed_id, parent_id,
+                                        superseed_name, hr_taxon.rank,
+                                        hr_taxon.superseed, hr_taxon.orig])
+
+        # Then (also) add non-superseeded taxon info to the index
+        self.taxon_index.append([m_name, hr_taxon.ncbi_id, parent_id,
+                                    hr_taxon.name, hr_taxon.rank,
+                                    hr_taxon.superseed, hr_taxon.orig])
 
         self.hierarchy.update(list(hr_taxon.taxa_hier.items()))
-
-        # DEAL WITH SUPERSEEDED CASE SEPERATELY
 
         # Check if this has succeded without warnings or errors
         if hr_taxon.superseed == False:
@@ -971,13 +988,3 @@ class NCBITaxa:
                 LOGGER.warning(f'Hierarchy mismatch for {m_name} its {rnks[ind]}'
                                f' should be {(mtaxon.taxa_hier[rnks[ind]])[0]} not '
                                f'{taxon_hier[rnks[ind]]}')
-
-        # CHECK THAT KINGDOM VS SUPERKINGDOM STORAGE IS WORKING OKAY
-        # MOSTLY DONE, BUT STILL NEED TO KEEP IT IN MIND
-        # SUPERSEEDED CASE GOING TO BE TRICKY WHEN THERE ARE MULTIPLE AKA IDS
-        # OKAY SO THINKING ABOUT THIS SUPERSEEDED TAXA CASE
-        # SUPERSEEDED TAXA DETAILS SHOULD BE STORED, i.e. name, ID, etc
-        # THEN NON-SUPERSEEDED CASE SHOULD BE ADDITIONALLY STORED
-        # THIS ADDITIONAL STORAGE SHOULD HAVE A FULL HIERACHY ADDED
-        # FOR SUPERSEEDED TAXA WON'T FIND HIERACHY, MAYBE BEST TO JUST GIVE PARENT ID
-        # FOR NON-SUPERSEEDED CASE
