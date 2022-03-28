@@ -450,7 +450,79 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
 
 # Start with the validate_and_add_taxon function
 
-# SECTION TESTING EXPECTED OUTPUT
+# First check that expected output is recovered
+@pytest.mark.parametrize(
+    'test_input,expected',
+    # Basic case to begin with
+    [(['E coli', {'genus': 'Escherichia', 'species': 'Escherichia coli'}, 562],
+      (1, 1, 7, 'E coli', ['E coli'], [562], [561], ['Escherichia coli'], ['species'],
+       [False], [None])),
+     # Incorrect genus but should be found fine
+     (['E coli', {'genus': 'Escheria', 'species': 'Escherichia coli'}, 562],
+      (1, 1, 7, 'E coli', ['E coli'], [562], [561], ['Escherichia coli'], ['species'],
+       [False], [None])),
+     # Superseeded species name
+     (['C vulpes', {'genus': 'Canis', 'species': 'Canis vulpes'}, None],
+      (2, 1, 8, 'C vulpes', ['C vulpes', 'C vulpes'], [9627, 9627], [9625, 9625],
+       ['Canis vulpes', 'Vulpes vulpes'], ['species', 'species'], [True, False],
+       [None, None])),
+     # Superseeded species name + ID
+     (['C marina', {'species': 'Cytophaga marina'}, 1000],
+      (2, 1, 7, 'C marina', ['C marina', 'C marina'], [1000, 107401], [104267, 104267],
+       ['Cytophaga marina', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False],
+       [None, None])),
+     # Superseeded ID
+     (['T maritimum', {'species': 'Tenacibaculum maritimum'}, 1000],
+      (2, 1, 7, 'T maritimum', ['T maritimum', 'T maritimum'], [1000, 107401], [104267, 104267],
+       ['Tenacibaculum maritimum', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False],
+       [None, None])),
+     # Superseeded name + correct ID
+     (['C marina', {'species': 'Cytophaga marina'}, 107401],
+      (2, 1, 7, 'C marina', ['C marina', 'C marina'], [107401, 107401], [104267, 104267],
+       ['Cytophaga marina', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False],
+       [None, None])),
+     # Bacteria
+     (['Bacteria', {'kingdom': 'Bacteria'}, 2],
+      (1, 1, 1, 'Bacteria', ['Bacteria'], [2], [None], ['Bacteria'], ['superkingdom'], [False],
+       [None])),
+     # Eukaryota
+     (['Eukaryotes', {'superkingdom': 'Eukaryota'}, 2759],
+      (1, 1, 1, 'Eukaryotes', ['Eukaryotes'], [2759], [None], ['Eukaryota'], ['superkingdom'],
+       [False], [None])),
+     # Fungi
+     (['Fungi', {'superkingdom': 'Eukaryota', 'kingdom': 'Fungi'}, 4751],
+      (1, 1, 2, 'Fungi', ['Fungi'], [4751], [2759], ['Fungi'], ['kingdom'], [False], [None])),
+     # Unknown strain
+     (['Unknown strain', {'species': 'Escherichia coli', 'strain': 'NBAvgdft'}, None],
+      (1, 1, 7, 'Unknown strain', ['Unknown strain'], [562], [561], ['Escherichia coli'],
+       ['species'], [False], ['strain'])),
+    ])
+def test_validate_and_add_taxon(fixture_ncbi_validators, test_input, expected):
+    """This test checks the results of searching for a taxa in the NCBI taxonomy
+    database against what was expected to be found. At the moment this for the
+    Remote validator, but if a local validator is defined this should also be
+    checked against.
+
+    """
+    # ONLY MAKING A LOCAL VERSION FOR NOW
+    ncbi_instance = ncbi_taxa.NCBITaxa()
+    ncbi_instance.validate_and_add_taxon(test_input)
+
+    assert len(ncbi_instance.taxon_index) == expected[0] # Number of taxa added
+    assert len(ncbi_instance.taxon_names) == expected[1] # Number of taxon names
+    assert len(ncbi_instance.hierarchy) == expected[2] # Size of hierachy
+
+    # Check that provided taxon name is used
+    assert list(ncbi_instance.taxon_names)[0] == expected[3]
+    # Check that taxon info recorded is as expected
+    assert [item[0] for item in ncbi_instance.taxon_index] == expected[4]
+    assert [item[1] for item in ncbi_instance.taxon_index] == expected[5]
+    assert [item[2] for item in ncbi_instance.taxon_index] == expected[6]
+    assert [item[3] for item in ncbi_instance.taxon_index] == expected[7]
+    assert [item[4] for item in ncbi_instance.taxon_index] == expected[8]
+    assert [item[5] for item in ncbi_instance.taxon_index] == expected[9]
+    assert [item[6] for item in ncbi_instance.taxon_index] == expected[10]
+
 
 # Now test that the search function logs errors correctly
 @pytest.mark.parametrize(
@@ -649,7 +721,7 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
        (INFO, "Taxon (Strepto) found in NCBI database"),
       )),
      ])
-def test_validate_and_add_taxon(caplog, test_input, expected_log_entries):
+def test_validate_and_add_taxon_validate(caplog, test_input, expected_log_entries):
     """This test checks that the function that searches the NCBI database to find
     information on particular taxa logs the correct errors and warnings. At the
     moment this for the Remote validator, but if a local validator is defined

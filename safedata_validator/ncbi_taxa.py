@@ -598,10 +598,8 @@ class NCBITaxa:
 
         self.taxon_index = []
         self.taxon_names = set()
-        self.ncbi_t = dict()
         self.hierarchy = set()
         self.n_errors = None
-        self.taxon_names_used = set()
 
         # At the moment we only have one validator defined
         self.validator = RemoteNCBIValidator()
@@ -902,8 +900,8 @@ class NCBITaxa:
             f_key = list(hr_taxon.taxa_hier.keys())[-2]
             parent_id = (hr_taxon.taxa_hier[f_key])[1]
         else:
-            # Set to root if hierachy is empty
-            parent_id = 1
+            # Set to None if hierachy is empty (i.e. top level taxa)
+            parent_id = None
 
         # Then check if taxon is superseeded
         if hr_taxon.superseed == True or (ncbi_id != None and id_taxon.superseed == True):
@@ -925,12 +923,12 @@ class NCBITaxa:
             # Add superseeded taxon to the index
             self.taxon_index.append([m_name, superseed_id, parent_id,
                                         superseed_name, hr_taxon.rank,
-                                        hr_taxon.superseed, hr_taxon.orig])
+                                        True, hr_taxon.orig])
 
         # Then (also) add non-superseeded taxon info to the index
         self.taxon_index.append([m_name, hr_taxon.ncbi_id, parent_id,
                                     hr_taxon.name, hr_taxon.rank,
-                                    hr_taxon.superseed, hr_taxon.orig])
+                                    False, hr_taxon.orig])
 
         self.hierarchy.update(list(hr_taxon.taxa_hier.items()))
 
