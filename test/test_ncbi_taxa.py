@@ -5,7 +5,7 @@ from .conftest import log_check
 
 # TESTS TO PUT IN:
 # NEED TO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
-# UNIT TESTS FOR LOAD FUNCTIONS => ADD THIS WHEN I'VE FIXED VALIDATE ETC
+# UNIT TESTS FOR LOAD FUNCTIONS
 # CAN I TEST INDEX HIGHER TAXA???
 
 # MOVE THIS TO CONFTEST EVENTUALLY
@@ -64,7 +64,7 @@ def gb_instance():
       taxa_hier={'genus': ('Morus', 37577)}),
       ValueError)])
 def test_taxon_init_errors(test_input, expected_exception):
-    """This test checks NCBI taxon inputs throw errors as expected
+    """This test checks NCBI taxon inputs expected errors
     """
     with pytest.raises(expected_exception):
         _ = ncbi_taxa.NCBITaxon(**test_input)
@@ -93,8 +93,7 @@ def test_taxon_init_errors(test_input, expected_exception):
 def test_taxa_strip(test_input, expected):
     """This test checks the function that strips taxa strings down to remove k__
     type notation is functioning properly. This function also checks that the
-    supplied rank matches the rank implied by the notation, we also test this
-    behaviour.
+    supplied rank matches the rank implied by the notation.
     """
 
     s_taxa, match = ncbi_taxa.taxa_strip(**test_input)
@@ -123,10 +122,9 @@ def test_taxa_strip(test_input, expected):
       None),
      ])
 def test_species_binomial(test_input, expected):
-    """This test checks the function that strips constructs species binomals from
-    species and genus names. We test that it can catch when the species name is
-    already a binomial, and that it can catch Candidatus names and handle them
-    properly.
+    """This test checks the function that constructs species binomals from species
+    and genus names. We test that it can catch when the species name is already
+    a binomial, and that it catches Candidatus names and handles them properly.
     """
 
     s_bi = ncbi_taxa.species_binomial(**test_input)
@@ -176,10 +174,10 @@ def test_validate_species_binomial(caplog, test_input, expected_log_entries):
       None),
      ])
 def test_subspecies_trinomial(test_input, expected):
-    """This test checks the function that strips constructs species binomals from
-    species and genus names. We test that it can catch when the species name is
-    already a binomial, and that it can catch Candidatus names and handle them
-    properly.
+    """This test checks the function that constructs subspecies trinomals from
+    subspecies and species names. We test that it can catch when the subspecies
+    name is already a trinomial, and that it catches Candidatus names and handles
+    them properly.
     """
 
     s_bi = ncbi_taxa.subspecies_trinomial(**test_input)
@@ -204,8 +202,8 @@ def test_subspecies_trinomial(test_input, expected):
       ))
      ])
 def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries):
-    """This test checks that the function to construct species binomials logs the
-     correct errors and warnings.
+    """This test checks that the function to construct subspecies trinomials logs
+    the correct errors and warnings.
     """
 
     s_bi = ncbi_taxa.subspecies_trinomial(**test_input)
@@ -231,10 +229,8 @@ def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries)
       ("Tenacibaculum maritimum", "species", 107401, True, None, 104267))
      ])
 def test_id_lookup(fixture_ncbi_validators, test_input, expected):
-    """This test checks the results of looking up a specific NCBI taxonomy against
-    the actual returned taxonomy details. At the moment this for the Remote validator,
-    but if a local validator is defined this should also be checked against.
-
+    """This test checks the expected results of looking up a specific NCBI
+    taxonomy ID against the actual returned taxonomy details.
     """
 
     fnd_tx = fixture_ncbi_validators.id_lookup(**test_input)
@@ -265,10 +261,8 @@ def test_id_lookup(fixture_ncbi_validators, test_input, expected):
       ))
      ])
 def test_validate_id_lookup(caplog, test_input, expected_log_entries, fixture_ncbi_validators):
-    """This test checks that the function to generate NCBITaxon objects by searching
-    an ID logs the correct errors and warnings. At the moment this for the Remote
-    validator, but if a local validator is defined this should also be checked against.
-
+    """This test checks that the function to search for a taxon by NCBI ID logs
+    the correct errors and warnings.
     """
 
     fnd_tx = fixture_ncbi_validators.id_lookup(**test_input)
@@ -291,7 +285,7 @@ def test_validate_id_lookup(caplog, test_input, expected_log_entries, fixture_nc
      (dict(nnme='E coli', ncbi_id=100000000000000),  # bad ID
       ncbi_taxa.NCBIError)])
 def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exception):
-    """This test checks validator.id_lookup inputs throw errors as expected
+    """This test checks tvalidator.id_lookup inputs throw errors as expected
     """
 
     with pytest.raises(expected_exception):
@@ -331,10 +325,7 @@ def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exceptio
     ])
 def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of searching for a taxa in the NCBI taxonomy
-    database against what was expected to be found. At the moment this for the
-    Remote validator, but if a local validator is defined this should also be
-    checked against.
-
+    database against what was expected to be found.
     """
     fnd_tx = fixture_ncbi_validators.taxa_search(**test_input)
 
@@ -412,10 +403,7 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
 def test_validate_taxa_search(caplog, test_input, expected_log_entries,
                               fixture_ncbi_validators):
     """This test checks that the function that searches the NCBI database to find
-    information on particular taxa logs the correct errors and warnings. At the
-    moment this for the Remote validator, but if a local validator is defined
-    this should also be checked against.
-
+    information on particular taxa logs the correct errors and warnings.
     """
 
     fnd_tx = fixture_ncbi_validators.taxa_search(**test_input)
@@ -498,11 +486,8 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
        ['species'], [False], ['strain'])),
     ])
 def test_validate_and_add_taxon(fixture_ncbi_validators, test_input, expected):
-    """This test checks the results of searching for a taxa in the NCBI taxonomy
-    database against what was expected to be found. At the moment this for the
-    Remote validator, but if a local validator is defined this should also be
-    checked against.
-
+    """This test checks the function to validate a taxon against the NCBI
+    database actually stores the expected information.
     """
     # ONLY MAKING A LOCAL VERSION FOR NOW
     ncbi_instance = ncbi_taxa.NCBITaxa()
@@ -628,11 +613,6 @@ def test_validate_and_add_taxon(fixture_ncbi_validators, test_input, expected):
       ((WARNING, "Strepto of non-backbone rank: subphylum"),
        (INFO, "Taxon (Strepto) found in NCBI database"),
       )),
-     # Superseeded taxon name used
-     (['C marina', {'species': 'Cytophaga marina'}, None],
-      ((WARNING, "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
-       (WARNING, "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
-      )),
      # Nonsense taxon provided
      (['N garbage', {'species': 'Nonsense garbage'}, None],
       ((ERROR, "Taxa N garbage cannot be found"),
@@ -722,11 +702,8 @@ def test_validate_and_add_taxon(fixture_ncbi_validators, test_input, expected):
       )),
      ])
 def test_validate_and_add_taxon_validate(caplog, test_input, expected_log_entries):
-    """This test checks that the function that searches the NCBI database to find
-    information on particular taxa logs the correct errors and warnings. At the
-    moment this for the Remote validator, but if a local validator is defined
-    this should also be checked against.
-
+    """This test checks the function to validate a taxon against the NCBI
+    database logs the correct information.
     """
 
     # ONLY MAKING A LOCAL VERSION FOR NOW
@@ -760,3 +737,132 @@ def test_validate_and_add_taxon_errors(test_input, expected_exception):
 
     with pytest.raises(expected_exception):
         _ = ncbi_instance.validate_and_add_taxon(test_input)
+
+
+# Then do tests on the index_higher_taxa function
+
+# First test whether sensible output is produced
+@pytest.mark.parametrize(
+    'test_input,expected',
+    # Basic case to begin with
+    [(['E coli', {'genus': 'Escherichia', 'species': 'Escherichia coli'}, 562],
+      (7, 1, 7, 'E coli', ['E coli', None, None, None, None, None, None], [562, 2, 1224, 1236, 91347,
+       543, 561], [561, None, 2, 1224, 1236, 91347, 543], ['Escherichia coli', 'Bacteria',
+       'Proteobacteria', 'Gammaproteobacteria', 'Enterobacterales', 'Enterobacteriaceae',
+       'Escherichia'], ['species', 'superkingdom', 'phylum', 'class', 'order', 'family', 'genus'],
+       [False, False, False, False, False, False, False], [None, None, None, None, None, None, None])),
+     # Superseeded ID
+     (['T maritimum', {'species': 'Tenacibaculum maritimum'}, 1000],
+      (8, 1, 7, 'T maritimum', ['T maritimum', 'T maritimum', None, None, None, None, None, None],
+       [1000, 107401, 2, 976, 117743, 200644, 49546, 104267], [104267, 104267, None, 2, 976, 117743,
+        200644, 49546], ['Tenacibaculum maritimum', 'Tenacibaculum maritimum', 'Bacteria',
+        'Bacteroidetes', 'Flavobacteriia', 'Flavobacteriales', 'Flavobacteriaceae', 'Tenacibaculum'],
+        ['species', 'species', 'superkingdom', 'phylum', 'class', 'order', 'family', 'genus'], [True,
+        False, False, False, False, False, False, False], [None, None, None, None, None, None, None,
+        None])),
+     # Bacteria
+     (['Bacteria', {'kingdom': 'Bacteria'}, 2],
+      (1, 1, 1, 'Bacteria', ['Bacteria'], [2], [None], ['Bacteria'], ['superkingdom'], [False],
+       [None])),
+     # Eukaryota
+     (['Eukaryotes', {'superkingdom': 'Eukaryota'}, 2759],
+      (1, 1, 1, 'Eukaryotes', ['Eukaryotes'], [2759], [None], ['Eukaryota'], ['superkingdom'],
+       [False], [None])),
+     # Fungi
+     (['Fungi', {'superkingdom': 'Eukaryota', 'kingdom': 'Fungi'}, 4751],
+      (2, 1, 2, 'Fungi', ['Fungi', None], [4751, 2759], [2759, None], ['Fungi', 'Eukaryota'],
+       ['kingdom', 'superkingdom'], [False, False], [None, None])),
+    ])
+def test_index_higher_taxa(fixture_ncbi_validators, test_input, expected):
+    """This test checks the function to store higher taxonomic ranks for a taxon
+    actually stores the correct information.
+    """
+    # ONLY MAKING A LOCAL VERSION FOR NOW
+    ncbi_instance = ncbi_taxa.NCBITaxa()
+    ncbi_instance.validate_and_add_taxon(test_input)
+
+    # Then index higher taxa
+    ncbi_instance.index_higher_taxa()
+
+    assert len(ncbi_instance.taxon_index) == expected[0] # Number of taxa added
+    assert len(ncbi_instance.taxon_names) == expected[1] # Number of taxon names
+    assert len(ncbi_instance.hierarchy) == expected[2] # Size of hierachy
+
+    # Check that provided taxon name is used
+    assert list(ncbi_instance.taxon_names)[0] == expected[3]
+    # Check that taxon info recorded is as expected
+    assert [item[0] for item in ncbi_instance.taxon_index] == expected[4]
+    assert [item[1] for item in ncbi_instance.taxon_index] == expected[5]
+    assert [item[2] for item in ncbi_instance.taxon_index] == expected[6]
+    assert [item[3] for item in ncbi_instance.taxon_index] == expected[7]
+    assert [item[4] for item in ncbi_instance.taxon_index] == expected[8]
+    assert [item[5] for item in ncbi_instance.taxon_index] == expected[9]
+    assert [item[6] for item in ncbi_instance.taxon_index] == expected[10]
+
+
+# Now test that the index hierachy function logs correctly
+@pytest.mark.parametrize(
+    'test_input,expected_log_entries',
+    # Test that E coli works fine
+    [(['E coli', {'species': 'Escherichia coli'}, 562],
+      ((INFO, "Taxon (E coli) found in NCBI database"),
+       (INFO, "Indexing taxonomic hierarchy"),
+       (INFO, "Added superkingdom Bacteria"),
+       (INFO, "Added phylum Proteobacteria"),
+       (INFO, "Added class Gammaproteobacteria"),
+       (INFO, "Added order Enterobacterales"),
+       (INFO, "Added family Enterobacteriaceae"),
+       (INFO, "Added genus Escherichia"),
+      )),
+     # Superseeded taxon name used
+     (['C marina', {'species': 'Cytophaga marina'}, None],
+      ((WARNING, "Cytophaga marina not accepted usage should be Tenacibaculum maritimum instead"),
+       (WARNING, "Taxonomic classification superseeded for C marina, using new taxonomic classification"),
+       (INFO, "Indexing taxonomic hierarchy"),
+       (INFO, "Added superkingdom Bacteria"),
+       (INFO, "Added phylum Bacteroidetes"),
+       (INFO, "Added class Flavobacteriia"),
+       (INFO, "Added order Flavobacteriales"),
+       (INFO, "Added family Flavobacteriaceae"),
+       (INFO, "Added genus Tenacibaculum"),
+      )),
+     # Ambigious taxon resolved
+     (['M Morus', {'family': 'Moraceae', 'genus': 'Morus'}, None],
+      ((INFO, "Taxon (M Morus) found in NCBI database"),
+       (INFO, "Indexing taxonomic hierarchy"),
+       (INFO, "Added superkingdom Eukaryota"),
+       (INFO, "Added kingdom Viridiplantae"),
+       (INFO, "Added phylum Streptophyta"),
+       (INFO, "Added class Magnoliopsida"),
+       (INFO, "Added order Rosales"),
+       (INFO, "Added family Moraceae"),
+      )),
+     # Non-backbone case with code
+     (['E coli strain', {'species': 'Escherichia coli', 'strain': 'Escherichia coli 1-110-08_S1_C1'},
+       1444049],
+      ((WARNING, "E coli strain of non-backbone rank: strain"),
+       (WARNING, "E coli strain of non-backbone rank: strain"),
+       (INFO, "Taxon (E coli strain) found in NCBI database"),
+       (INFO, "Indexing taxonomic hierarchy"),
+       (INFO, "Added superkingdom Bacteria"),
+       (INFO, "Added phylum Proteobacteria"),
+       (INFO, "Added class Gammaproteobacteria"),
+       (INFO, "Added order Enterobacterales"),
+       (INFO, "Added family Enterobacteriaceae"),
+       (INFO, "Added genus Escherichia"),
+       (INFO, "Added species Escherichia coli"),
+      )),
+     ])
+def test_validate_index_higher_taxa(caplog, test_input, expected_log_entries):
+    """This test checks the function to store higher taxonomic ranks for a taxon
+    logs the correct information.
+    """
+
+    # ONLY MAKING A LOCAL VERSION FOR NOW
+    ncbi_instance = ncbi_taxa.NCBITaxa()
+    fnd_tx = ncbi_instance.validate_and_add_taxon(test_input)
+
+    # Then index higher taxa
+    ncbi_instance.index_higher_taxa()
+
+    log_check(caplog, expected_log_entries)
