@@ -34,7 +34,10 @@ def fixture_files():
                   ('sqlite_not_gbif', 'database_file_not_gbif.sqlite'),
                   ('json_not_locations', 'notalocationsjson.json'),
                   ('bad_excel_file', 'Test_format_bad.xlsx'),
-                  ('good_excel_file', 'Test_format_good.xlsx')]
+                  ('good_excel_file', 'Test_format_good.xlsx'),
+                  ('bad_ncbi_file', 'Test_NCBItaxa_bad.xlsx'),
+                  ('weird_ncbi_file', 'Test_NCBItaxa_weird.xlsx'),
+                  ('good_ncbi_file', 'Test_NCBItaxa_good.xlsx')]
 
     real_files = {ky: os.path.join(fixture_dir, vl)
                   for ky, vl in real_files}
@@ -230,6 +233,23 @@ def example_excel_files(config_filesystem, request):
         wb = openpyxl.load_workbook(FIXTURE_FILES.rf.bad_excel_file, read_only=True)
         return wb
 
+@pytest.fixture()
+def example_ncbi_files(config_filesystem, request):
+    """This uses indirect parameterisation, to allow the shared fixture
+    to be paired with request specific expectations rather than all pair
+    combinations:
+
+    https://stackoverflow.com/questions/70379640
+    """
+    if request.param == 'good':
+        wb = openpyxl.load_workbook(FIXTURE_FILES.rf.good_ncbi_file, read_only=True)
+        return wb
+    elif request.param == 'bad':
+        wb = openpyxl.load_workbook(FIXTURE_FILES.rf.bad_ncbi_file, read_only=True)
+        return wb
+    elif request.param == 'weird':
+        wb = openpyxl.load_workbook(FIXTURE_FILES.rf.weird_ncbi_file, read_only=True)
+        return wb
 
 
 @pytest.fixture(params=['remote', 'local'])

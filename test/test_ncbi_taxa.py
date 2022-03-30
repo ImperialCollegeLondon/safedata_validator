@@ -4,9 +4,7 @@ from logging import ERROR, WARNING, INFO
 from .conftest import log_check
 
 # TESTS TO PUT IN:
-# NEED TO CHECK THAT GENBANKTAXA INSTANCES ARE INITIALISED CORRECTLY
 # UNIT TESTS FOR LOAD FUNCTIONS
-# CAN I TEST INDEX HIGHER TAXA???
 
 # MOVE THIS TO CONFTEST EVENTUALLY
 @pytest.fixture(scope='module')
@@ -489,7 +487,7 @@ def test_validate_and_add_taxon(fixture_ncbi_validators, test_input, expected):
     """This test checks the function to validate a taxon against the NCBI
     database actually stores the expected information.
     """
-    # ONLY MAKING A LOCAL VERSION FOR NOW
+    # ONLY MAKING A REMOTE VERSION FOR NOW
     ncbi_instance = ncbi_taxa.NCBITaxa()
     ncbi_instance.validate_and_add_taxon(test_input)
 
@@ -706,7 +704,7 @@ def test_validate_and_add_taxon_validate(caplog, test_input, expected_log_entrie
     database logs the correct information.
     """
 
-    # ONLY MAKING A LOCAL VERSION FOR NOW
+    # ONLY MAKING A REMOTE VERSION FOR NOW
     ncbi_instance = ncbi_taxa.NCBITaxa()
     fnd_tx = ncbi_instance.validate_and_add_taxon(test_input)
 
@@ -732,7 +730,7 @@ def test_validate_and_add_taxon_errors(test_input, expected_exception):
     """This test checks validator.validate_and_add_taxon inputs throw errors as expected
     """
 
-    # ONLY MAKING A LOCAL VERSION FOR NOW
+    # ONLY MAKING A REMOTE VERSION FOR NOW
     ncbi_instance = ncbi_taxa.NCBITaxa()
 
     with pytest.raises(expected_exception):
@@ -777,7 +775,7 @@ def test_index_higher_taxa(fixture_ncbi_validators, test_input, expected):
     """This test checks the function to store higher taxonomic ranks for a taxon
     actually stores the correct information.
     """
-    # ONLY MAKING A LOCAL VERSION FOR NOW
+    # ONLY MAKING A REMOTE VERSION FOR NOW
     ncbi_instance = ncbi_taxa.NCBITaxa()
     ncbi_instance.validate_and_add_taxon(test_input)
 
@@ -858,7 +856,7 @@ def test_validate_index_higher_taxa(caplog, test_input, expected_log_entries):
     logs the correct information.
     """
 
-    # ONLY MAKING A LOCAL VERSION FOR NOW
+    # ONLY MAKING A REMOTE VERSION FOR NOW
     ncbi_instance = ncbi_taxa.NCBITaxa()
     fnd_tx = ncbi_instance.validate_and_add_taxon(test_input)
 
@@ -866,3 +864,28 @@ def test_validate_index_higher_taxa(caplog, test_input, expected_log_entries):
     ncbi_instance.index_higher_taxa()
 
     log_check(caplog, expected_log_entries)
+
+# Finally check load function (starting by doing an error overview)
+@pytest.mark.parametrize(
+    'example_ncbi_files, n_errors, n_taxa, t_taxa',
+    [('good', 0, 10, 30),
+     ('weird', 0, 5, 19),
+     ('bad', 12, 5, 0)],
+    indirect = ['example_ncbi_files']  # take actual params from fixture
+)
+def test_taxa_load(example_ncbi_files, n_errors, n_taxa, t_taxa):
+    """This tests the ensemble loading of (ncbi) taxa from a file using
+    indirect parameterisation to access the fixtures containing the
+    sample excel files.
+    """
+
+    # ONLY MAKING A REMOTE VERSION FOR NOW
+    tx = ncbi_taxa.NCBITaxa()
+    tx.load(example_ncbi_files['NCBITaxa'])
+
+    assert tx.n_errors == n_errors
+    # Compare both named taxa and total taxa
+    assert len(tx.taxon_names) == n_taxa
+    assert len(tx.taxon_index) == t_taxa
+
+# Then check that the correct information is logged in each case

@@ -32,11 +32,6 @@ Entrez.email = "jacobcook1995@gmail.com"
 # Hard coding api key in for now
 user_key = "1738fe86eba2d8fc287ff0d1dcbfeda44a0a"
 
-
-# TODO - Think about data output
-# Have to make sure that the indexing is compatibale with David's database
-# Probably have to add in the first databasing steps as well
-
 # TODO - Soup up NCBITaxa
 # Basically copy David and have a section for printing out NCBITaxa in a readable
 # way
@@ -54,10 +49,6 @@ user_key = "1738fe86eba2d8fc287ff0d1dcbfeda44a0a"
 # Lot of different potential approaches (e.g. making making NCBI and GBIF validators
 # sub-classes of a validator class). Need to establish what the most extensible
 # and stable option is
-
-# QUESTIONS FOR DAVID
-# SHOULD A YOU ARE NOT CONNCTED TO THE INTERNET ERROR BE SETUP?
-# IS THERE A SENSIBLE WAY TO DUMMY CONNECTION ERRORS?
 
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ['superkingdom', 'kingdom', 'phylum', 'class', 'order',
