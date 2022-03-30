@@ -190,9 +190,9 @@ class NCBITaxon:
                 raise ValueError('Not all taxa dictionary keys are strings')
             elif all(isinstance(x,tuple) for x in self.taxa_hier.values()) == False:
                 raise ValueError('Not all taxa dictionary values are tuples')
-            elif all(list(map(type,x)) == [str, int] for x in
-                 self.taxa_hier.values()) == False:
-                 raise ValueError('Taxa tuples not all in [string integer] form')
+            elif all(list(map(type,x)) == [str, int, int] or list(map(type,x)) ==
+                 [str, int, type(None)] for x in self.taxa_hier.values()) == False:
+                 raise ValueError('Taxa tuples not all in [string integer integer] form')
 
         if self.rank.lower() != list(self.taxa_hier.keys())[-1]:
             raise ValueError(f'Provided rank ({self.rank.lower()}) does not match'
@@ -309,12 +309,24 @@ class RemoteNCBIValidator:
         vinds = [idx for idx, element in enumerate(rnks) if element in actual_bb_rnks]
 
         # Create dictonary of valid taxa lineage using a list
-        red_taxa = {f"{actual_bb_rnks[i]}":(str(linx[vinds[i]]["ScientificName"]),
-                    int(linx[vinds[i]]["TaxId"])) for i in range(0,rnk-m_rnk)}
+        if len(actual_bb_rnks) != 0:
+            red_taxa = {f"{actual_bb_rnks[0]}":(str(linx[vinds[0]]["ScientificName"]),
+                        int(linx[vinds[0]]["TaxId"]),None)}
 
-        # Then add taxa information as a final entry
-        red_taxa[f"{tax_dic['Rank']}"] = (str(tax_dic["ScientificName"]),
-                                                 int(tax_dic["TaxId"]))
+            # Requersively add all the hierarchy data in
+            for i in range(1,rnk-m_rnk):
+                red_taxa[f"{actual_bb_rnks[i]}"] = (str(linx[vinds[i]]["ScientificName"]),
+                                                    int(linx[vinds[i]]["TaxId"]),
+                                                    int(linx[vinds[i-1]]["TaxId"]))
+
+            # Then add taxa information as a final entry
+            red_taxa[f"{tax_dic['Rank']}"] = (str(tax_dic["ScientificName"]),
+                                              int(tax_dic["TaxId"]),
+                                              int(linx[vinds[-1]]["TaxId"]))
+        else:
+            # Just make taxa with individual rank if no valid lineage provided
+            red_taxa = {f"{tax_dic['Rank']}":(str(tax_dic["ScientificName"]),
+                        int(tax_dic["TaxId"]),None)}
 
         # Create and populate microbial taxon
         mtaxon = NCBITaxon(name=tax_dic['ScientificName'],rank=tax_dic['Rank'],
@@ -731,7 +743,7 @@ class NCBITaxa:
             FORMATTER.pop()
 
         # Add the higher taxa
-        # self.index_higher_taxa()
+        self.index_higher_taxa()
 
         # summary of processing
         self.n_errors = COUNTER_HANDLER.counters['ERROR'] - start_errors
@@ -948,22 +960,17 @@ class NCBITaxa:
         # Use the taxon hierarchy entries to add higher taxa
         # - drop taxa with a GBIF ID already in the index
 
-        # If usage is superseed or the taxon is not included in known
-        known = [tx[1] for tx in self.taxon_index if tx[5] != True]
-        to_add = [tx for tx in self.hierarchy if tx[1] not in known]
+        # Only add if taxon is not already included in known
+        known = [tx[1] for tx in self.taxon_index]
+        to_add = [tx for tx in self.hierarchy if tx[1][1] not in known]
         to_add.sort(key=lambda val: BACKBONE_RANKS_EX.index(val[0]))
 
         # Look up the taxonomic hierarchy
-        for tx_lev, tx_id in to_add:
-            # REMOVE LOOK UP WHEN I REWRITE THIS FUNCTION
-            higher_taxon = self.validator.id_lookup(tx_id)
-            self.taxon_index.append([None,
-                                     higher_taxon.gbif_id,
-                                     higher_taxon.parent_id,
-                                     higher_taxon.name,
-                                     higher_taxon.rank,
-                                     higher_taxon.taxon_status])
-            LOGGER.info(f'Added {tx_lev} {higher_taxon}')
+        for tx_lev, (tx_nme, tx_id, p_id) in to_add:
+            # Add all this to the taxonomy
+            self.taxon_index.append([None, tx_id, p_id, tx_nme, tx_lev,
+                                     False, None])
+            LOGGER.info(f'Added {tx_lev} {tx_nme}')
 
     def compare_hier(self, m_name: str, mtaxon: NCBITaxon, taxon_hier: dict):
         """ Function to compare the hierachy of a taxon with the hierachy that was

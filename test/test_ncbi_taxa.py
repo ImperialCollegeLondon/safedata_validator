@@ -220,15 +220,15 @@ def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries)
 @pytest.mark.parametrize(
     'test_input,expected',
     [(dict(nnme='E coli', ncbi_id=562),
-      ('Escherichia coli', "species", 562, False,  None)),
+      ('Escherichia coli', "species", 562, False,  None, 561)),
      (dict(nnme='E coli strain', ncbi_id=1444049),
-      ('Escherichia coli 1-110-08_S1_C1', "strain", 1444049, False, None)),
+      ('Escherichia coli 1-110-08_S1_C1', "strain", 1444049, False, None, 562)),
      (dict(nnme='Streptophytina', ncbi_id=131221),
-      ('Streptophytina', "subphylum", 131221, False,  None)),
+      ('Streptophytina', "subphylum", 131221, False,  None, 35493)),
      (dict(nnme='Opisthokonta', ncbi_id=33154),
-      ('Opisthokonta', "clade", 33154, False, None)),
+      ('Opisthokonta', "clade", 33154, False, None, 2759)),
      (dict(nnme='Cytophaga marina', ncbi_id=1000),
-      ("Tenacibaculum maritimum", "species", 107401, True, None))
+      ("Tenacibaculum maritimum", "species", 107401, True, None, 104267))
      ])
 def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of looking up a specific NCBI taxonomy against
@@ -249,7 +249,7 @@ def test_id_lookup(fixture_ncbi_validators, test_input, expected):
 
     assert f_key == expected[1]
 
-    assert fnd_tx.taxa_hier[f_key] == (expected[0], expected[2])
+    assert fnd_tx.taxa_hier[f_key] == (expected[0], expected[2], expected[5])
     assert fnd_tx.orig == expected[4]
 
 # Now test that the search function logs errors correctly
@@ -301,33 +301,33 @@ def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exceptio
 @pytest.mark.parametrize(
     'test_input,expected',
     [(dict(nnme="E coli",taxah={'genus': 'Escherichia', 'species': 'Escherichia coli'}),
-      ("Escherichia coli", "species", 562, False, None)),
+      ("Escherichia coli", "species", 562, False, None, 561)),
      (dict(nnme="Entero",taxah={'order': 'Enterobacterales', 'family': 'Enterobacteriaceae'}),
-      ("Enterobacteriaceae", "family", 543, False, None)),
+      ("Enterobacteriaceae", "family", 543, False, None, 91347)),
      (dict(nnme="E coli strain",taxah={'species': 'Escherichia coli', 'strain':
      'Escherichia coli 1-110-08_S1_C1'}),
-      ("Escherichia coli 1-110-08_S1_C1", "strain", 1444049, False, None)),
+      ("Escherichia coli 1-110-08_S1_C1", "strain", 1444049, False, None, 562)),
      (dict(nnme="Strepto",taxah={'phylum': 'Streptophyta', 'subphylum': 'Streptophytina'}),
-      ("Streptophytina", "subphylum", 131221, False, None)),
+      ("Streptophytina", "subphylum", 131221, False, None, 35493)),
      (dict(nnme="Opistho",taxah={'superkingdom': 'Eukaryota', 'clade': 'Opisthokonta'}),
-      ("Opisthokonta", "clade", 33154, False, None)),
+      ("Opisthokonta", "clade", 33154, False, None, 2759)),
      (dict(nnme="Vulpes vulpes",taxah={'genus': 'Vulpes', 'species': 'Vulpes vulpes'}),
-      ("Vulpes vulpes", "species", 9627, False, None)),
+      ("Vulpes vulpes", "species", 9627, False, None, 9625)),
      (dict(nnme="M morus",taxah={'family': 'Moraceae', 'genus': 'Morus'}),
-      ("Morus", "genus", 3497, False, None)),
+      ("Morus", "genus", 3497, False, None, 3487)),
      (dict(nnme="S morus",taxah={'family': 'Sulidae', 'genus': 'Morus'}),
-      ("Morus", "genus", 37577, False, None)),
+      ("Morus", "genus", 37577, False, None, 30446)),
      (dict(nnme="C morus",taxah={'phylum': 'Chordata', 'genus': 'Morus'}),
-      ("Morus", "genus", 37577, False,  None)),
+      ("Morus", "genus", 37577, False,  None, 30446)),
      (dict(nnme="T maritimum",taxah={'genus': 'Tenacibaculum', 'species':
      'Tenacibaculum maritimum'}),
-      ("Tenacibaculum maritimum", "species", 107401, False, None)),
+      ("Tenacibaculum maritimum", "species", 107401, False, None, 104267)),
      (dict(nnme="C marina",taxah={'genus': 'Cytophaga', 'species': 'Cytophaga marina'}),
-      ("Tenacibaculum maritimum", "species", 107401, True, None)),
+      ("Tenacibaculum maritimum", "species", 107401, True, None, 104267)),
      (dict(nnme="Bacteria",taxah={'superkingdom': 'Bacteria'}),
-      ("Bacteria", "superkingdom", 2, False,  None)),
+      ("Bacteria", "superkingdom", 2, False,  None, None)),
      (dict(nnme="Unknown strain",taxah={'species': 'Escherichia coli', 'strain': 'Nonsense strain'}),
-      ("Escherichia coli", "species", 562, False, 'strain')),
+      ("Escherichia coli", "species", 562, False, 'strain', 561)),
     ])
 def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     """This test checks the results of searching for a taxa in the NCBI taxonomy
@@ -348,7 +348,7 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
 
     assert f_key == expected[1]
 
-    assert fnd_tx.taxa_hier[f_key] == (expected[0], expected[2])
+    assert fnd_tx.taxa_hier[f_key] == (expected[0], expected[2], expected[5])
     assert fnd_tx.orig == expected[4]
 
 # Now test that the search function logs errors correctly
