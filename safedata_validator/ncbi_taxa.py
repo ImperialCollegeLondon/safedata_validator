@@ -214,6 +214,15 @@ class NCBITaxon:
         self.superseed = False
         self.orig = None
 
+    def __repr__(self):
+
+        if self.orig != None:
+            return f"{self.name} (resolved as {self.rank} rather than {self.orig})"
+        elif self.superseed:
+            return f"{self.name} (superseeded taxon details provided)"
+        else:
+            return f"{self.name}"
+
 @enforce_types
 class RemoteNCBIValidator:
     """This provides a validate method for a Taxon using the online NCBI Entrez
