@@ -1,16 +1,20 @@
 """## The ncbi_taxa submodule
-This module describes classes and methods used to validate taxonomic data against
-the NCBI database and convert it to a form compatible with the GBIF backbone database.
+This module describes classes and methods used to compile taxonomic data from
+datasets and to validate taxonomy against the GBIF backbone database.
 
-The NCBITaxon dataclass is used to store data about a taxon entry in NCBI (GenBank)
-form. It is initialised with user data and then the taxon Validator class can
-be used to update a NCBITaxon object with the result of NCBI validation. At present
-only online validation is possible through the `RemoteNCBIValidator` class.
+The NCBITaxon dataclass is used to store data about a taxon entry in a dataset. It
+is initialised with user data and then the taxon Validator classes can be used
+to update a NCBITaxon object with the result of NCBI validation. The two validation
+classes use either the online API (`RemoteNCBIValidator`) or faster validation
+against a local copy of the NCBI taxonomy database (`LocalNCBIValidator`). Online
+validation is done via the Entrez tools which we access by making use of BioPython.
 
-FURTHER DETAILS OF STUFF DEFINED.
+The dataset 'NCBITaxa' worksheet provides a set of taxonomic entries and the NCBITaxa
+class is used to load and collate the set of taxonomic entries from a dataset.
 
-THIS IS STILL VERY MUCH A WORK IN PROGRESS SO MORE INFORMATION IS GOING TO BE
-ENTERED HERE
+Supplied taxa of any rank (i.e. strain or clade) which can be successfully validated
+will be recorded. However, associated higher taxa will only be recorded if their ranks
+are either a GBIF backbone rank or superkingdom.
 """
 
 from typing import Union, Optional
@@ -68,7 +72,7 @@ class NCBIError(Exception):
 # New function to remove k__ notation, and to check that rank and
 def taxa_strip(name: str, rank: str):
     """A function to remove k__ type notation from taxa names. The function also
-    checks that the provided rank is consistent with the rank implied by prefix
+    checks that the provided rank is consistent with the rank implied by its prefix.
     """
     if name == None:
         return (None, True)
@@ -84,6 +88,9 @@ def taxa_strip(name: str, rank: str):
 
 # New function to generate species binomial
 def species_binomial(genus: str, species: str):
+    """A function to construct a species binomal from a genus name and a species
+    name.
+    """
     # First check if species is a single name
     if len(species.split()) == 1 and len(genus.split()) == 1:
         return genus.strip() + " " + species.strip()
@@ -111,6 +118,9 @@ def species_binomial(genus: str, species: str):
 
 # Equivalent function to generate subspecies trinominal
 def subspecies_trinomial(species: str, subspecies: str):
+    """A function to construct a subspecies trinomal from a species name and a
+    subspecies name.
+    """
     # First check if subspecies is a single name
     if len(subspecies.split()) == 1 and len(species.split()) == 2:
         return species.strip() + " " + subspecies.strip()
@@ -206,13 +216,16 @@ class NCBITaxon:
 
 @enforce_types
 class RemoteNCBIValidator:
-    """This provides a validate method for a MicrobeTaxon using various online
-    NCBI APIs. This doesn't need an __init__ method and just contains methods.
+    """This provides a validate method for a Taxon using the online NCBI Entrez
+    tools. Unlike the LocalNCBIValidator, this doesn't need an __init__ method
+    and just contains methods, but duplicates the structure so that
+    the two Validators are interchangeable.
     """
     # Functionality to find taxa information from genbank ID
     def id_lookup(self, nnme: str, ncbi_id: int):
-        """Method to return full taxonomic information from a NCBI ID. This
-        includes details of any potential synonymus names.
+        """Method to return full taxonomic information from a NCBI ID. It will
+        raise a NCBIError if the provided ID cannot be found, or if there is a
+        connection error.
 
         Params:
             nnme: A nickname to identify the taxon
@@ -336,11 +349,12 @@ class RemoteNCBIValidator:
     # New function to read in taxa information
     def taxa_search(self, nnme: str, taxah: dict):
         """Method that takes in taxonomic information, and finds the corresponding
-        genbank ID. This genbank ID is then used to generate a NCBITaxon object,
+        NCBI ID. This NCBI ID is then used to generate a NCBITaxon object,
         which is returned. This function also makes use of parent taxa information
         to distinguish between ambigious taxa names.
 
         Params:
+            nnme: A nickname to identify the taxon
             taxah: A dictonary containing taxonomic information
 
         Returns:
@@ -560,43 +574,47 @@ class RemoteNCBIValidator:
         return mtaxon
 
 class NCBITaxa:
-    # REWRITE THIS HEAVILY
-    """A class to hold a list of taxon names and a validated taxonomic
-    index for those taxa and their taxonomic hierarchy. The validate_taxon
-    method checks that taxon details and their optional parent taxon can be
-    matched into the the GBIF backbone and populates two things:
-
-    i)  the taxon_names attribute of the dataset, which is just a set of
-        names used as a validation list for taxon names used in data worksheets.
-    ii) the taxon_index attribute of the dataset, which contains a set
-        of lists structured as:
-
-            [worksheet_name (str),
-            gbif_id (int),
-            gbif_parent_id (int),
-            canonical_name (str),
-            taxonomic_rank (str),
-            status (str)]
-
-        Where a taxon is not accepted or doubtful on GBIF, two entries are
-        inserted for the taxon, one under the canon name and one under the
-        provided name. They will share the same worksheet name and so can
-        be paired back up for description generation. The worksheet name
-        for parent taxa and deeper taxonomic hierarchy is set to None.
-
-    The index_higher_taxa method can be used to extend the taxon_index to
-    include all of the higher taxa linking the validated taxa.
-
-    The index can then be used:
-
-    a) to generate the taxonomic coverage section of the dataset description, and
-    b) as the basis of a SQL dataset_taxa table to index the taxonomic coverage
-    of datasets.
-    """
 
     def __init__(self):
-        # FILL OUT THIS PROPERLY ONCE I KNOW WHAT IT IS SUPPOSED TO BE
-        """Sets the initial properties of a NCBITaxa object
+        """A class to hold a list of taxon names and a validated taxonomic
+        index for those taxa and their taxonomic hierarchy. The validate_taxon
+        method checks that the provided taxon hierarchy and (optional) NCBI ID can be
+        validated against the NCBI database (and both refer to the same taxon).
+        This then populates two things:
+
+        i)  the taxon_names attribute of the dataset, which is just a set of
+            names used as a validation list for taxon names used in data worksheets.
+        ii) the taxon_index attribute of the dataset, which contains a set
+            of lists structured as:
+
+                [worksheet_name (str),
+                 ncbi_id (int),
+                 ncbi_parent_id (int),
+                 canonical_name (str),
+                 taxonomic_rank (str),
+                 taxon_superseeded (bool),
+                 original_taxon_rank (str)]
+
+            We only populate orginal_taxon_rank when the initially supplied taxon is
+            not found in NCBI, but a parent (or grandparent etc) is found. In this case
+            the details of the higher taxon are stored along with the orginal worksheet_name
+            and with the orginal rank stored in orginal_taxon_rank. In all other cases
+            orginal_taxon_rank is set to None.
+
+            Where a taxon is superseeded in the NCBI database, two entries are
+            inserted for the taxon, one under the canon name and one under the
+            provided name. They will share the same worksheet name and so can
+            be paired back up for description generation. The worksheet name
+            for parent taxa and deeper taxonomic hierarchy is set to None.
+
+        The index_higher_taxa method can be used to extend the taxon_index to
+        include all of the higher taxa linking the validated taxa.
+
+        The index can then be used:
+
+        a) to generate the taxonomic coverage section of the dataset description, and
+        b) as the basis of a SQL dataset_taxa table to index the taxonomic coverage
+        of datasets.
         """
 
         self.taxon_index = []
@@ -608,7 +626,6 @@ class NCBITaxa:
         self.validator = RemoteNCBIValidator()
 
     def load(self, worksheet):
-        # THIS PROBABLY NEEDS A BIT OF REWRITING
         """Loads a set of taxa from the rows of a SAFE formatted NCBITaxa worksheet
         and then adds the higher taxa for those rows.
 
@@ -746,16 +763,14 @@ class NCBITaxa:
         FORMATTER.pop()
 
 
-    def validate_and_add_taxon(self, gb_taxon_input):
+    def validate_and_add_taxon(self, ncbi_taxon_input):
         """ User information is provided that names a taxon and (optionally) gives
-        a NCBI taxonomy ID. This information is then used to find the closest GBIF
-        backbone compatible entry in the NCBI database. This information along with
-        the NCBI ID for the orginal entry is then saved, along with a list of possible
-        synoyms. All this information is then used to find the closest taxa match
-        in the GBIF database. This information is then used to update the relevant
-        NCBITaxa instance.
+        a NCBI taxonomy ID. This information is then validated against the NCBI database.
+        This is principally used to process rows found in a NCBITaxa worksheet, but
+        is deliberately separated out so that a NCBITaxa instance can be populated
+        independently of an Excel dataset.
 
-        The gb_taxon_input has the form:
+        The ncbi_taxon_input has the form:
 
         ['m_name', 'taxon_hier', 'ncbi_id']
 
@@ -763,14 +778,13 @@ class NCBITaxa:
         ['m_name', 'taxon_hier', None]
 
         Args:
-            taxon_input: Taxon information in standard form as above
+            taxon_input: NCBITaxon information in standard form as above
 
         Returns:
-            IS THE BELOW CORRECT FOR MY CASE???
             Updates the taxon_names and taxon_index attributes of the class instance.
         """
 
-        m_name, taxon_hier, ncbi_id = gb_taxon_input
+        m_name, taxon_hier, ncbi_id = ncbi_taxon_input
 
         # Sanitise worksheet names for taxa - only keep unpadded strings.
         if m_name is None or not isinstance(m_name, str) or m_name.isspace() or not m_name:
@@ -947,6 +961,9 @@ class NCBITaxa:
 
     @loggerinfo_push_pop('Indexing taxonomic hierarchy')
     def index_higher_taxa(self):
+        """ Function to add higher taxa to the index. The taxa are added are those
+        stored in self.hierarchy that have not already been added to the taxon index.
+        """
 
         # Use the taxon hierarchy entries to add higher taxa
         # - drop taxa with a GBIF ID already in the index
@@ -966,7 +983,7 @@ class NCBITaxa:
     def compare_hier(self, m_name: str, mtaxon: NCBITaxon, taxon_hier: dict):
         """ Function to compare the hierachy of a taxon with the hierachy that was
         initially supplied. This function only checks that provided information
-        matches, missing levels or entries into levels are ignored"""
+        matches, missing levels or entries are not checked for"""
         # Not worth checking hierachy in superseeded case
         if mtaxon.superseed == True:
             return

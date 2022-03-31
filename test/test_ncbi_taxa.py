@@ -887,5 +887,3 @@ def test_taxa_load(example_ncbi_files, n_errors, n_taxa, t_taxa):
     # Compare both named taxa and total taxa
     assert len(tx.taxon_names) == n_taxa
     assert len(tx.taxon_index) == t_taxa
-
-# Then check that the correct information is logged in each case
