@@ -19,6 +19,7 @@ are either a GBIF backbone rank or superkingdom.
 
 from typing import Union, Optional
 import dataclasses
+import sqlite3
 from Bio import Entrez
 
 import requests
@@ -222,6 +223,21 @@ class NCBITaxon:
             return f"{self.name} (superseeded taxon details provided)"
         else:
             return f"{self.name}"
+
+class LocalNCBIValidator:
+    """FILL OUT THIS DOCSTRING AT SOME POINT
+    """
+    def __init__(self, resources):
+
+        # NEED TO CONNECT TO MULTIPLE DATABASES HERE (EVENTUALLY)
+        conn = sqlite3.connect(resources.ncbi_database)
+        conn.row_factory = sqlite3.Row
+        self.ncbi_conn = conn
+
+    def __del__(self):
+
+        self.ncbi_conn.close()
+
 
 @enforce_types
 class RemoteNCBIValidator:
