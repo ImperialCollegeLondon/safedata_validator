@@ -334,9 +334,9 @@ class Resources:
             try:
                 conn = sqlite3.connect(self.ncbi_database)
                 # NOT SURE ABOUT THIS ONE REALLY
-                _ = conn.execute('select count(*) from backbone;')
+                _ = conn.execute('select count(*) from nodes;')
             except sqlite3.OperationalError:
-                log_and_raise('Local NCBI database does not contain the backbone table',
+                log_and_raise('Local NCBI database does not contain the nodes table',
                               RuntimeError)
             except sqlite3.DatabaseError:
                 log_and_raise('Local SQLite database not valid',

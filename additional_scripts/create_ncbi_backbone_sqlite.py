@@ -43,11 +43,10 @@ drop_index = [True if vl[0] in drop_fields else False for vl in file_schema]
 # Create the final schema for the backbone table, including a new field to show
 # deleted taxa and insert statements for both the backbone and deleted files
 output_schema = ', '.join([' '.join(val) for val, drop in zip(file_schema, drop_index) if not drop])
-# NOT SURE WHAT THIS IS FOR, AND WHETHER I NEED TO USE IT
-output_schema = f"CREATE TABLE backbone ({output_schema})"
+output_schema = f"CREATE TABLE nodes ({output_schema})"
 
 insert_placeholders = ','.join(['?'] * (len(drop_index) - sum(drop_index)))
-insert_statement  = f"INSERT INTO backbone VALUES ({insert_placeholders})"
+insert_statement  = f"INSERT INTO nodes VALUES ({insert_placeholders})"
 
 # Create the output file and turn off safety features for speed
 con = sqlite3.connect(db_file)
@@ -69,3 +68,8 @@ with open(nodes) as bbn:
                for val, drp in zip(row, drop_index) if not drp]
 
         con.execute(insert_statement, row)
+
+# Create the indices
+# con.execute('CREATE INDEX backbone_name_rank ON backbone (canonical_name, rank);')
+con.execute('CREATE INDEX node_id ON nodes (tax_id);')
+con.commit()
