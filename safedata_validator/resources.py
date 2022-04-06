@@ -331,12 +331,12 @@ class Resources:
                 log_and_raise('Local NCBI database not found',
                               OSError)
 
-            try:
+            try: # THINK THIS NEEDS TO BE EXTENDED TO CHECK IF THE OTHER TABLES ALSO EXIST
                 conn = sqlite3.connect(self.ncbi_database)
-                # NOT SURE ABOUT THIS ONE REALLY
                 _ = conn.execute('select count(*) from nodes;')
+                _ = conn.execute('select count(*) from names;')
             except sqlite3.OperationalError:
-                log_and_raise('Local NCBI database does not contain the nodes table',
+                log_and_raise('Local NCBI database is missing either the nodes, or names table',
                               RuntimeError)
             except sqlite3.DatabaseError:
                 log_and_raise('Local SQLite database not valid',
