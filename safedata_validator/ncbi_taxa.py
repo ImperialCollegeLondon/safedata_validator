@@ -440,9 +440,14 @@ class RemoteNCBIValidator:
         except IndexError:
             raise NCBIError("No entry found from ID, probably bad ID")
 
-        # Then extract the lineage
-        linx = tax_dic["LineageEx"]
-        print(linx)
+        # Then extract the lineage (if it has one)
+        if tax_dic["ParentTaxId"] != "1":
+            linx = tax_dic["LineageEx"]
+        # Raise and error
+        else:
+            LOGGER.error(f'Taxon hierarchy for {nnme} contains no backbone ranks')
+            return
+
         # Find number of taxonomic ranks
         tx_len = len(linx)
         # Extract parent taxa ranks

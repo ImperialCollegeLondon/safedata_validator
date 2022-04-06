@@ -256,6 +256,9 @@ def test_id_lookup(fixture_ncbi_validators, test_input, expected):
       )),
      (dict(nnme='C marina', ncbi_id=1000), # Non-backbone rank
       ((WARNING, 'NCBI ID 1000 has been superseeded by ID 107401'),
+      )),
+     (dict(nnme='Cells', ncbi_id=131567), # No backbone ranks whatsoever
+      ((ERROR, 'Taxon hierarchy for Cells contains no backbone ranks'),
       ))
      ])
 def test_validate_id_lookup(caplog, test_input, expected_log_entries, fixture_ncbi_validators):
