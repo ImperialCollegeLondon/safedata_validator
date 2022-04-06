@@ -388,8 +388,8 @@ class LocalNCBIValidator:
             red_taxa = {f"{t_rank}":((t_name),int(good_id),None)}
 
         # Create and populate microbial taxon
-        mtaxon = NCBITaxon(name=tax_dic['ScientificName'],rank=tax_dic['Rank'],
-                           ncbi_id=int(tax_dic["TaxId"]),taxa_hier=red_taxa)
+        mtaxon = NCBITaxon(name=t_name, rank=t_rank, ncbi_id=int(good_id),
+                           taxa_hier=red_taxa)
 
         # Record whether a superseeded NCBI ID has been provided
         mtaxon.superseed = superseed
