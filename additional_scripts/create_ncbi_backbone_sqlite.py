@@ -16,11 +16,11 @@ db_file = 'local_db/ncbi/ncbi_database.sqlite3'
 nodes_drop_fields = ['embl_code', 'division_id', 'inherited_div_flag', 'genetic_code_id',
                      'inherited_GC_flag', 'mito_code_id', 'inherited_MGC_flag',
                      'GenBank_hidden_flag', 'hidden_subtree_root_flag']
-names_drop_fields = ['unique name']
-# merged_drop_fields = []
+names_drop_fields = ['unique_name']
+merge_drop_fields = []
 nodes = 'local_db/ncbi/nodes.dmp'
 names = 'local_db/ncbi/names.dmp'
-merged = 'local_db/ncbi/merged.dmp'
+merge = 'local_db/ncbi/merged.dmp'
 
 # Create the schema for the table, using drop fields to remove unwanted fields
 # in the schema and the data tuples. The file_schema list describes the full set
@@ -44,9 +44,13 @@ names_file_schema = [('tax_id', 'int'),
                      ('unique_name', 'text'),
                      ('name_class', 'text')]
 
+merge_file_schema = [('old_tax_id', 'int'),
+                      ('new_tax_id', 'int')]
+
 # Get a logical index of which fields are being kept for each table
 nodes_drop_index = [True if vl[0] in nodes_drop_fields else False for vl in nodes_file_schema]
 names_drop_index = [True if vl[0] in names_drop_fields else False for vl in names_file_schema]
+merge_drop_index = [True if vl[0] in merge_drop_fields else False for vl in merge_file_schema]
 
 # Create the final schema for all three tables
 nodes_output_schema = ', '.join([' '.join(val) for val, drop in zip(nodes_file_schema,
@@ -63,6 +67,13 @@ names_output_schema = f"CREATE TABLE names ({names_output_schema})"
 names_insert_placeholders = ','.join(['?'] * (len(names_drop_index) - sum(names_drop_index)))
 names_insert_statement  = f"INSERT INTO names VALUES ({names_insert_placeholders})"
 
+merge_output_schema = ', '.join([' '.join(val) for val, drop in zip(merge_file_schema,
+                                merge_drop_index) if not drop])
+merge_output_schema = f"CREATE TABLE merge ({merge_output_schema})"
+
+merge_insert_placeholders = ','.join(['?'] * (len(merge_drop_index) - sum(merge_drop_index)))
+merge_insert_statement  = f"INSERT INTO merge VALUES ({merge_insert_placeholders})"
+
 # Create the output file and turn off safety features for speed
 con = sqlite3.connect(db_file)
 con.execute('PRAGMA synchronous = OFF')
@@ -70,6 +81,7 @@ con.execute('PRAGMA synchronous = OFF')
 # Create the tables
 con.execute(nodes_output_schema)
 con.execute(names_output_schema)
+con.execute(merge_output_schema)
 con.commit()
 
 # Import data from the node data
@@ -84,7 +96,7 @@ with open(nodes) as bbn:
 
         con.execute(nodes_insert_statement, row)
 
-# Import data from the node data
+# Import data from the names data
 with open(names) as bbn:
 
     # The files are tab delimited but the quoting is sometimes unclosed,
@@ -96,8 +108,22 @@ with open(names) as bbn:
 
         con.execute(names_insert_statement, row)
 
+# Import data from the merge data
+with open(merge) as bbn:
+
+    # The files are tab delimited but the quoting is sometimes unclosed,
+    # so turning off quoting - includes quotes in the fields where present
+    bb_reader = csv.reader(bbn, delimiter='|', quoting=csv.QUOTE_NONE)
+
+    for row in bb_reader:
+        row = [val.strip() for val, drp in zip(row, merge_drop_index) if not drp]
+
+        con.execute(merge_insert_statement, row)
+
 # Create the indices
+# ALSO NEED TO ADD NEW INDEX HERE
+con.execute('CREATE INDEX node_id ON nodes (tax_id);')
 con.execute('CREATE INDEX all_names ON names (name_txt);')
 con.execute('CREATE INDEX id_name_class ON names (tax_id, name_class);')
-con.execute('CREATE INDEX node_id ON nodes (tax_id);')
+con.execute('CREATE INDEX merged_id ON merge (old_tax_id);')
 con.commit()

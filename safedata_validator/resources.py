@@ -331,12 +331,14 @@ class Resources:
                 log_and_raise('Local NCBI database not found',
                               OSError)
 
-            try: # THINK THIS NEEDS TO BE EXTENDED TO CHECK IF THE OTHER TABLES ALSO EXIST
+            try:
                 conn = sqlite3.connect(self.ncbi_database)
                 _ = conn.execute('select count(*) from nodes;')
                 _ = conn.execute('select count(*) from names;')
+                _ = conn.execute('select count(*) from merge;')
             except sqlite3.OperationalError:
-                log_and_raise('Local NCBI database is missing either the nodes, or names table',
+                log_and_raise('Local NCBI database is missing either the nodes, '
+                              'names or merge table',
                               RuntimeError)
             except sqlite3.DatabaseError:
                 log_and_raise('Local SQLite database not valid',
