@@ -229,7 +229,6 @@ class LocalNCBIValidator:
     """
     def __init__(self, resources):
 
-        # NEED TO CONNECT TO MULTIPLE DATABASES HERE (EVENTUALLY)
         conn = sqlite3.connect(resources.ncbi_database)
         conn.row_factory = sqlite3.Row
         self.ncbi_conn = conn
@@ -237,6 +236,165 @@ class LocalNCBIValidator:
     def __del__(self):
 
         self.ncbi_conn.close()
+
+    # Functionality to find taxa information from genbank ID
+    def id_lookup(self, nnme: str, ncbi_id: int):
+        """Method to return full taxonomic information from a NCBI ID. It will
+        raise a NCBIError if the provided ID cannot be found, or if there is a
+        connection error.
+
+        Params:
+            nnme: A nickname to identify the taxon
+            ncbi_id: An integer
+
+        Returns:
+            A NCBITaxon object
+        """
+
+        if not isinstance(ncbi_id, int):
+            raise TypeError('Non-integer NCBI taxonomy ID')
+
+        if not isinstance(nnme, str):
+            raise TypeError('Non-string nickname')
+
+        if not ncbi_id > 0:
+            raise ValueError('Negative NCBI taxonomy ID')
+
+        superseed = False
+
+        # Look for record associated with the provided ID
+        sql = f"select * from nodes where tax_id = {ncbi_id}"
+        taxon_row = self.ncbi_conn.execute(sql).fetchone()
+
+        # If nothing found check if this ID has been merged
+        if taxon_row == None:
+            sql = f"select * from merge where old_tax_id = {ncbi_id}"
+            taxon_row = self.ncbi_conn.execute(sql).fetchone()
+            # If it's not found then give bad ID error
+            if taxon_row == None:
+                raise NCBIError("No entry found from ID, probably bad ID")
+            else:
+                sql = f"select * from nodes where tax_id = {taxon_row['new_tax_id']}"
+                taxon_row = self.ncbi_conn.execute(sql).fetchone()
+                superseed = True
+                # Warn user that they've given a superseeded taxa ID
+                LOGGER.warning(f"NCBI ID {ncbi_id} has been superseeded by ID "
+                               f"{taxon_row['tax_id']}")
+
+        # Extract relevant info from the taxon row
+        t_rank = taxon_row['rank']
+        good_id = taxon_row['tax_id']
+        # Then use to find and store name
+        sql = f"select * from names where tax_id = {good_id} and "
+        sql += "name_class = 'scientific name'"
+        name_row = self.ncbi_conn.execute(sql).fetchone()
+        t_name = name_row["name_txt"]
+
+        # Then setup loop to find the whole lineage
+        lin_fnd = False
+        linx = []
+
+        while lin_fnd == False:
+            tmp_dic = {}
+            # Find node and name of the parent taxon
+            sql = f"select * from nodes where tax_id = {taxon_row['parent_tax_id']}"
+            taxon_row = self.ncbi_conn.execute(sql).fetchone()
+            sql = f"select * from names where tax_id = {taxon_row['tax_id']} and "
+            sql += "name_class = 'scientific name'"
+            name_row = self.ncbi_conn.execute(sql).fetchone()
+            # Store all relevant info
+            tmp_dic['TaxID'] = taxon_row['tax_id']
+            tmp_dic['ScientificName'] = name_row['name_txt']
+            tmp_dic['Rank'] = taxon_row['rank']
+            # And add all of it to the Lineage
+            linx.append(tmp_dic)
+            # End this when the parent taxon is root (ID=1)
+            if taxon_row['parent_tax_id'] == 1:
+                lin_fnd = True
+
+        # Reverse the order of the lineage
+        linx = list(reversed(linx))
+        # Find number of taxonomic ranks
+        tx_len = len(linx)
+        # Extract parent taxa ranks
+        rnks = [linx[i]["Rank"] for i in range(tx_len)]
+
+        # Check that the taxon rank provided is a backbone rank
+        if t_rank in BACKBONE_RANKS_EX:
+            # In this case use provided rank
+            rnk = BACKBONE_RANKS_EX.index(t_rank)
+
+        # Filter out ID's with non-backbone ranks (e.g. strains)
+        else:
+            # Set as not a valid taxa
+            vld_tax = False
+            # Find lowest index
+            r_ID = len(BACKBONE_RANKS_EX) - 1
+
+            # While loop that runs until valid taxa is found
+            while vld_tax == False:
+                # Check if taxa id is found
+                if any([rnks[i] == f"{BACKBONE_RANKS_EX[r_ID]}" for i in range(tx_len)]):
+                    # Close loop and store rank number
+                    vld_tax = True
+                    # Add 1 to the rank as only including lineage in this case
+                    rnk = r_ID + 1
+                    # Warn user that non-backbone rank has been supplied
+                    LOGGER.warning(f'{nnme} of non-backbone rank: {t_rank}')
+                # Raise error once backbone ranks have been exhausted
+                elif r_ID < 1:
+                    LOGGER.error(f'Taxon hierarchy for {nnme} contains no backbone ranks')
+                    return
+                else:
+                    r_ID -= 1
+
+        # Make list of backbone ranks we are looking for
+        actual_bb_rnks = BACKBONE_RANKS_EX[0:rnk]
+
+        # Number of missing ranks initialised to zero
+        m_rnk = 0
+
+
+        # Check that all desired backbone ranks appear in the lineage
+        if all(item in rnks for item in actual_bb_rnks) == False:
+            # Find all missing ranks
+            miss = list(set(actual_bb_rnks).difference(rnks))
+            # Count missing ranks
+            m_rnk = len(miss)
+            # Remove missing ranks from our list of desired ranks
+            for i in range(0,m_rnk):
+                actual_bb_rnks.remove(miss[i])
+
+        # Find valid indices (e.g. those corresponding to backbone ranks)
+        vinds = [idx for idx, element in enumerate(rnks) if element in actual_bb_rnks]
+
+        # Create dictonary of valid taxa lineage using a list
+        if len(actual_bb_rnks) != 0:
+            red_taxa = {f"{actual_bb_rnks[0]}":(str(linx[vinds[0]]["ScientificName"]),
+                        int(linx[vinds[0]]["TaxID"]),None)}
+
+            # Requersively add all the hierarchy data in
+            for i in range(1,rnk-m_rnk):
+                red_taxa[f"{actual_bb_rnks[i]}"] = (str(linx[vinds[i]]["ScientificName"]),
+                                                    int(linx[vinds[i]]["TaxID"]),
+                                                    int(linx[vinds[i-1]]["TaxID"]))
+
+            # Then add taxa information as a final entry
+            red_taxa[f"{t_rank}"] = (str(t_name),
+                                     int(good_id),
+                                     int(linx[vinds[-1]]["TaxID"]))
+        else:
+            # Just make taxa with individual rank if no valid lineage provided
+            red_taxa = {f"{t_rank}":((t_name),int(good_id),None)}
+
+        # Create and populate microbial taxon
+        mtaxon = NCBITaxon(name=tax_dic['ScientificName'],rank=tax_dic['Rank'],
+                           ncbi_id=int(tax_dic["TaxId"]),taxa_hier=red_taxa)
+
+        # Record whether a superseeded NCBI ID has been provided
+        mtaxon.superseed = superseed
+
+        return mtaxon
 
 
 @enforce_types
@@ -284,6 +442,7 @@ class RemoteNCBIValidator:
 
         # Then extract the lineage
         linx = tax_dic["LineageEx"]
+        print(linx)
         # Find number of taxonomic ranks
         tx_len = len(linx)
         # Extract parent taxa ranks
