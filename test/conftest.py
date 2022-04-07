@@ -11,7 +11,7 @@ from safedata_validator.locations import Locations
 from safedata_validator.field import Dataset
 from safedata_validator.resources import Resources
 from safedata_validator.field import DataWorksheet
-from safedata_validator.ncbi_taxa import RemoteNCBIValidator
+from safedata_validator.ncbi_taxa import RemoteNCBIValidator, LocalNCBIValidator
 
 
 def fixture_files():
@@ -31,6 +31,7 @@ def fixture_files():
 
     real_files = [('loc_file', 'locations.json'),
                   ('gbif_file', 'gbif_backbone_truncated.sqlite'),
+                  ('ncbi_file', 'ncbi_database_truncated.sqlite'),
                   ('sqlite_not_gbif', 'database_file_not_gbif.sqlite'),
                   ('json_not_locations', 'notalocationsjson.json'),
                   ('bad_excel_file', 'Test_format_bad.xlsx'),
@@ -49,7 +50,8 @@ def fixture_files():
                                                  'safedata_validator',
                                                  'safedata_validator.cfg'),
                      'fix_cfg_local': os.path.join(fixture_dir, 'safedata_validator_local.cfg'),
-                     'fix_cfg_remote': os.path.join(fixture_dir, 'safedata_validator_remote.cfg')}
+                     'fix_cfg_remote': os.path.join(fixture_dir, 'safedata_validator_remote.cfg'),
+                     'fix_cfg_local_ncbi': os.path.join(fixture_dir, 'safedata_validator_local_ncbi.cfg')}
 
     return DotMap(dict(rf = real_files, vf=virtual_files,
                        mf = os.path.join(fixture_dir, 'thisfiledoesnotexist')))
@@ -120,6 +122,7 @@ def config_filesystem(fs):
 
     config_contents = ['locations = ',
                        'gbif_database = ',
+                       'ncbi_database = ',
                        '[extents]',
                        'temporal_soft_extent = 2002-02-02, 2030-01-31',
                        'temporal_hard_extent = 2002-02-01, 2030-02-01',
@@ -143,6 +146,11 @@ def config_filesystem(fs):
     # Local config (local GBIF database) in the fixture directory
     config_contents[1] += FIXTURE_FILES.rf.gbif_file
     fs.create_file(FIXTURE_FILES.vf.fix_cfg_local,
+                   contents='\n'.join(config_contents))
+
+    # Local config (local NCBI database) in the fixture directory
+    config_contents[2] += FIXTURE_FILES.rf.ncbi_file
+    fs.create_file(FIXTURE_FILES.vf.fix_cfg_local_ncbi,
                    contents='\n'.join(config_contents))
 
     # # Local user config
@@ -213,6 +221,17 @@ def resources_local_and_remote(request, resources_with_local_gbif, resources_wit
     elif request.param == 'local':
         return resources_with_local_gbif
 
+
+@pytest.fixture()
+def resources_with_local_ncbi(config_filesystem):
+    """ Creates a Resource object configured to use a local NCBI database
+
+    Returns:
+        A safedata_validator.resources.Resources instance
+    """
+
+    return Resources(config=FIXTURE_FILES.vf.fix_cfg_local_ncbi)
+
 ## ------------------------------------------
 # Other fixtures
 ## ------------------------------------------
@@ -263,11 +282,15 @@ def fixture_taxon_validators(resources_with_local_gbif, request):
 
 
 # Only returns a NCBI validator at the moment
-@pytest.fixture()
-def fixture_ncbi_validators():
-    """Parameterised fixture to return local NCBI validator
+@pytest.fixture(params=['remote', 'local'])
+def fixture_ncbi_validators(resources_with_local_ncbi, request):
+    """Parameterised fixture to return local and remote NCBI validator
     """
-    return RemoteNCBIValidator()
+    if request.param == 'remote':
+        return RemoteNCBIValidator()
+
+    elif request.param == 'local':
+        return LocalNCBIValidator(resources_with_local_ncbi)
 
 
 # Fixtures to provide Taxon, Locations, Dataset, Dataworksheet
