@@ -7,10 +7,6 @@ the details of file names etc. change and so it is provided as a recipe.
 import csv
 import sqlite3
 
-# RECKON I MIGHT NEED TO DEFINE MULTIPLE FILE SCHEMA, SEE HOW I GET ON
-# DOES "text[]" MEAN SOMETHING RELATIVE TO "text"?
-# HAVE TO CHECK THAT EMPTY ENTRIES ARE THE SAME FOR OTHER DATABASES
-
 db_file = 'local_db/ncbi/ncbi_database.sqlite3'
 # Set fields to be dropped for each data table
 nodes_drop_fields = ['embl_code', 'division_id', 'inherited_div_flag', 'genetic_code_id',
