@@ -3,9 +3,6 @@ from safedata_validator import ncbi_taxa
 from logging import ERROR, WARNING, INFO
 from .conftest import log_check
 
-# TESTS TO PUT IN:
-# UNIT TESTS FOR LOAD FUNCTIONS
-
 # MOVE THIS TO CONFTEST EVENTUALLY
 @pytest.fixture(scope='module')
 def gb_instance():

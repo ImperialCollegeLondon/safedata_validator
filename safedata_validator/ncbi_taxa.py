@@ -396,6 +396,221 @@ class LocalNCBIValidator:
 
         return mtaxon
 
+    # New function to read in taxa information
+    def taxa_search(self, nnme: str, taxah: dict):
+        """Method that takes in taxonomic information, and finds the corresponding
+        NCBI ID. This NCBI ID is then used to generate a NCBITaxon object,
+        which is returned. This function also makes use of parent taxa information
+        to distinguish between ambigious taxa names.
+
+        Params:
+            nnme: A nickname to identify the taxon
+            taxah: A dictonary containing taxonomic information
+
+        Returns:
+            A NCBITaxon object
+        """
+
+        if isinstance(taxah, dict) == False:
+            raise TypeError('Taxa hierarchy should be a dictonary')
+        elif all(isinstance(x,str) for x in taxah.keys()) == False:
+            raise ValueError('Not all taxa dictionary keys are strings')
+        elif all(isinstance(x,str) for x in taxah.values()) == False:
+            raise ValueError('Not all taxa dictionary values are strings')
+
+        # Warn user if no backbone ranks have been provided
+        if bool(set(taxah.keys()) & set(BACKBONE_RANKS_EX)) == False:
+            LOGGER.warning(f"No backbone ranks provided in {nnme}'s taxa hierarchy")
+
+        # Find last dictionary key
+        f_key = list(taxah.keys())[-1]
+
+        # Then find corresponding entry as a search term
+        s_term = taxah[f_key]
+
+        # Search for name in the local names database
+        sql = f"select * from names where name_txt = '%s'" % s_term
+        taxon_row = self.ncbi_conn.execute(sql).fetchall()
+
+        # Store count of the number of rows found
+        c = len(taxon_row)
+
+        # Check that a singular record has been provided before proceeding
+        if c == 1:
+            # Find taxa ID as single entry in the list
+            taxon_row = self.ncbi_conn.execute(sql).fetchone()
+            tID = taxon_row['tax_id']
+            # Use ID lookup function to generate as a NCBITaxon object
+            mtaxon = self.id_lookup(nnme,tID)
+
+        # Catch cases where no record is found
+        elif c == 0:
+            # Check if there actually is any higher taxonomy provided
+            if len(taxah.keys()) == 1:
+                LOGGER.error(f'Taxa {nnme} cannot be found and its higher '
+                             f'taxonomic hierarchy is absent')
+                return
+
+            # If there is then set up a loop over it
+            fnshd = False
+            cnt = 1
+            while fnshd == False:
+                # Increment counter
+                cnt += 1
+                # Use to find higher taxonomic level to use in search
+                f_key = list(taxah.keys())[-cnt]
+                new_s_term = taxah[f_key]
+
+                # Search for name in the local names database
+                sql = f"select * from names where name_txt = '%s'" % new_s_term
+                taxon_row = self.ncbi_conn.execute(sql).fetchall()
+
+                # Process the response
+                c = len(taxon_row)
+
+                # Check how many records have been found
+                if c == 1:
+                    # Find taxa ID as single entry in the list
+                    taxon_row = self.ncbi_conn.execute(sql).fetchone()
+                    tID = taxon_row['tax_id']
+                    # Use ID lookup function to generate as a NCBITaxon object
+                    mtaxon = self.id_lookup(nnme,tID)
+                    # Store orginally supplied rank
+                    mtaxon.orig = list(taxah.keys())[-1]
+                    # Warn the user that a higher taxonomic rank is being used
+                    LOGGER.warning(f'{s_term} not registered with NCBI, using '
+                                   f'higher level taxon {new_s_term} instead')
+                    fnshd = True
+                elif c > 1: # Not going to handle ambiguities in this case
+                    LOGGER.error(f'Taxa {nnme} cannot be found and its higher '
+                                 f'taxonomic hierarchy is ambigious')
+                    return
+                # Catch when all the provided hierachy has been exhausted
+                elif cnt == len(taxah.keys()):
+                    fnshd = True
+
+                # If valid higher taxon not found print error
+                if 'mtaxon' not in locals():
+                    LOGGER.error(f'Taxa {nnme} cannot be found and neither can '
+                                 f'its higher taxonomic hierarchy')
+                    return
+
+        # Case where only one rank has been provided
+        elif len(taxah) == 1:
+            # Preallocate container for the ranks
+            t_ranks = []
+            # First check if multiple taxa have the same rank
+            for i in range(c):
+                # Find taxa ID as single entry in the list
+                tID = taxon_row[i]['tax_id']
+                # Use ID lookup function to generate a tempoary taxon
+                temp_taxon = self.id_lookup(nnme,tID)
+                # Add rank to list
+                t_ranks.append(list(temp_taxon.taxa_hier.keys())[-1])
+
+            # Record whether ranks match expected rank
+            if f_key == "kingdom":
+                mtch = [True if x == f_key or x == "superkingdom" else False
+                        for x in t_ranks]
+            else:
+                mtch = [True if x == f_key else False for x in t_ranks]
+
+            # If there's only one match, we have determined the correct entry
+            if sum(mtch) == 1:
+                # Find relevant index
+                ind = ([i for i, x in enumerate(mtch) if x])[0]
+                # Find taxa ID as single entry in the list
+                tID = taxon_row[ind]['tax_id']
+                # Use ID lookup function to generate as a NCBITaxon object
+                mtaxon = self.id_lookup(nnme,tID)
+            # Then check whether multiple taxonomic levels have been provided
+            else:
+                # If not raise an error
+                LOGGER.error(f'Taxa {nnme} cannot be found using only one '
+                             f'taxonomic level, more should be provided')
+                return
+        # Higher ranks provided
+        else:
+            # Find second from last dictonary key
+            f_key = list(taxah.keys())[-2]
+            # Then find corresponding entry as a search term
+            s_term = taxah[f_key]
+
+            # Search for name in the local names database
+            sql = f"select * from names where name_txt = '%s'" % s_term
+            p_taxon_row = self.ncbi_conn.execute(sql).fetchall()
+
+            # Store count of the number of records found
+            pc = len(p_taxon_row)
+
+            # Check that single parent taxa exists in records
+            if pc == 0:
+                LOGGER.error(f'Provided parent taxa for {nnme} not found')
+                return
+            elif pc > 1:
+                LOGGER.error(f'More than one possible parent taxa for {nnme} found')
+                return
+            else:
+                # Find parent taxa ID as single entry in the list
+                p_taxon_row = self.ncbi_conn.execute(sql).fetchone()
+                pID = p_taxon_row['tax_id']
+                # Then use ID lookup function to find generate as a NCBITaxon object
+                ptaxon = self.id_lookup("parent",pID)
+
+            # Save parent taxa rank and name
+            p_key = list(ptaxon.taxa_hier.keys())[-1]
+            p_val = ptaxon.taxa_hier[p_key]
+
+            # Use list comprehension to make list of potential taxa
+            potents = [self.id_lookup(f"c{i}",taxon_row[i]['tax_id'])
+                        for i in range(0,c)]
+
+            # Check if relevant rank exists in the child taxa
+            child = [p_key in potents[i].taxa_hier for i in range(0,c)]
+
+            # Then look for matching rank name pairs
+            for i in range(0,c):
+                # Only check cases where rank exists in the child taxa
+                if child[i] == True:
+                    child[i] = (potents[i].taxa_hier[f"{p_key}"] == p_val)
+
+            # Check for errors relating to finding too many or few child taxa
+            if sum(child) == 0:
+                LOGGER.error(f'Parent taxa not actually a valid parent of {nnme}')
+                return
+            elif sum(child) > 1:
+                LOGGER.error(f'Parent taxa for {nnme} refers to multiple '
+                             f'possible child taxa')
+                return
+            else:
+                # Find index corresponding to correct child taxa
+                tID = int(taxon_row[child.index(True)]['tax_id'])
+                # Use ID lookup function to find generate as a NCBITaxon object
+                mtaxon = self.id_lookup(nnme,tID)
+
+        # Find last dictonary key
+        f_key = list(mtaxon.taxa_hier.keys())[-1]
+
+        # Check if taxonomic rank supplied is used
+        if mtaxon.orig == None and f_key != list(taxah.keys())[-1] and f_key != "superkingdom":
+            # If not raise an error
+            LOGGER.error(f'{list(taxah.values())[-1]} is a {f_key}'
+                         f' not a {list(taxah.keys())[-1]}')
+            return
+        elif list(taxah.keys())[-1] == "kingdom" and f_key == "superkingdom":
+            # If not print a warning
+            LOGGER.warning(f'NCBI records {(mtaxon.taxa_hier[f_key])[0]} as '
+                           f'a superkingdom rather than a kingdom')
+        # Then check whether orginally supplied name is still used
+        elif mtaxon.orig == None and taxah[f_key] != (mtaxon.taxa_hier[f_key])[0]:
+            # If not print a warning
+            LOGGER.warning(f'{taxah[f_key]} not accepted usage should be '
+                           f'{(mtaxon.taxa_hier[f_key])[0]} instead')
+            # And record the fact that usage is superseeded
+            mtaxon.superseed = True
+
+        return mtaxon
+
 
 @enforce_types
 class RemoteNCBIValidator:
