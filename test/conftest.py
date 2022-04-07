@@ -232,6 +232,26 @@ def resources_with_local_ncbi(config_filesystem):
 
     return Resources(config=FIXTURE_FILES.vf.fix_cfg_local_ncbi)
 
+@pytest.fixture()
+def resources_with_remote_ncbi(config_filesystem):
+    """ Creates a Resource object configured to use the remote NCBI API
+
+    Returns:
+        A safedata_validator.resources.Resources instance
+    """
+
+    return Resources(config=FIXTURE_FILES.vf.fix_cfg_remote)
+
+@pytest.fixture(params=['remote', 'local'])
+def ncbi_resources_local_and_remote(request, resources_with_local_ncbi, resources_with_remote_ncbi):
+    """Parameterised fixture to run tests using both the local and remote NCBI.
+    """
+
+    if request.param == 'remote':
+        return resources_with_remote_ncbi
+    elif request.param == 'local':
+        return resources_with_local_ncbi
+
 ## ------------------------------------------
 # Other fixtures
 ## ------------------------------------------

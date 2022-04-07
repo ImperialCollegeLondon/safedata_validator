@@ -1,14 +1,8 @@
 import pytest
 from safedata_validator import ncbi_taxa
+from safedata_validator.resources import Resources
 from logging import ERROR, WARNING, INFO
 from .conftest import log_check
-
-# MOVE THIS TO CONFTEST EVENTUALLY
-@pytest.fixture(scope='module')
-def gb_instance():
-    """Parameterised fixture to return a NCBITaxa instance
-    """
-    return ncbi_taxa.NCBITaxa()
 
 # ------------------------------------------
 # Testing NCBITaxon
@@ -483,12 +477,12 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
       (1, 1, 7, 'Unknown strain', ['Unknown strain'], [562], [561], ['Escherichia coli'],
        ['species'], [False], ['strain'])),
     ])
-def test_validate_and_add_taxon(fixture_ncbi_validators, test_input, expected):
+def test_validate_and_add_taxon(ncbi_resources_local_and_remote, test_input, expected):
     """This test checks the function to validate a taxon against the NCBI
     database actually stores the expected information.
     """
-    # ONLY MAKING A REMOTE VERSION FOR NOW
-    ncbi_instance = ncbi_taxa.NCBITaxa()
+
+    ncbi_instance = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
     ncbi_instance.validate_and_add_taxon(test_input)
 
     assert len(ncbi_instance.taxon_index) == expected[0] # Number of taxa added
@@ -699,13 +693,13 @@ def test_validate_and_add_taxon(fixture_ncbi_validators, test_input, expected):
        (INFO, "Taxon (Strepto) found in NCBI database"),
       )),
      ])
-def test_validate_and_add_taxon_validate(caplog, test_input, expected_log_entries):
+def test_validate_and_add_taxon_validate(caplog, test_input, expected_log_entries,
+                                         ncbi_resources_local_and_remote):
     """This test checks the function to validate a taxon against the NCBI
     database logs the correct information.
     """
 
-    # ONLY MAKING A REMOTE VERSION FOR NOW
-    ncbi_instance = ncbi_taxa.NCBITaxa()
+    ncbi_instance = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
     fnd_tx = ncbi_instance.validate_and_add_taxon(test_input)
 
     log_check(caplog, expected_log_entries)
@@ -726,12 +720,12 @@ def test_validate_and_add_taxon_validate(caplog, test_input, expected_log_entrie
      (['E coli', {'species': 'Escherichia coli'}, 100000000000000],
       ncbi_taxa.NCBIError),
     ])
-def test_validate_and_add_taxon_errors(test_input, expected_exception):
+def test_validate_and_add_taxon_errors(ncbi_resources_local_and_remote, test_input,
+                                       expected_exception):
     """This test checks validator.validate_and_add_taxon inputs throw errors as expected
     """
 
-    # ONLY MAKING A REMOTE VERSION FOR NOW
-    ncbi_instance = ncbi_taxa.NCBITaxa()
+    ncbi_instance = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
 
     with pytest.raises(expected_exception):
         _ = ncbi_instance.validate_and_add_taxon(test_input)
@@ -771,12 +765,12 @@ def test_validate_and_add_taxon_errors(test_input, expected_exception):
       (2, 1, 2, 'Fungi', ['Fungi', None], [4751, 2759], [2759, None], ['Fungi', 'Eukaryota'],
        ['kingdom', 'superkingdom'], [False, False], [None, None])),
     ])
-def test_index_higher_taxa(fixture_ncbi_validators, test_input, expected):
+def test_index_higher_taxa(ncbi_resources_local_and_remote, test_input, expected):
     """This test checks the function to store higher taxonomic ranks for a taxon
     actually stores the correct information.
     """
-    # ONLY MAKING A REMOTE VERSION FOR NOW
-    ncbi_instance = ncbi_taxa.NCBITaxa()
+
+    ncbi_instance = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
     ncbi_instance.validate_and_add_taxon(test_input)
 
     # Then index higher taxa
@@ -851,13 +845,13 @@ def test_index_higher_taxa(fixture_ncbi_validators, test_input, expected):
        (INFO, "Added species Escherichia coli"),
       )),
      ])
-def test_validate_index_higher_taxa(caplog, test_input, expected_log_entries):
+def test_validate_index_higher_taxa(caplog, ncbi_resources_local_and_remote,
+                                    test_input, expected_log_entries):
     """This test checks the function to store higher taxonomic ranks for a taxon
     logs the correct information.
     """
 
-    # ONLY MAKING A REMOTE VERSION FOR NOW
-    ncbi_instance = ncbi_taxa.NCBITaxa()
+    ncbi_instance = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
     fnd_tx = ncbi_instance.validate_and_add_taxon(test_input)
 
     # Then index higher taxa
@@ -873,14 +867,14 @@ def test_validate_index_higher_taxa(caplog, test_input, expected_log_entries):
      ('bad', 12, 5, 0)],
     indirect = ['example_ncbi_files']  # take actual params from fixture
 )
-def test_taxa_load(example_ncbi_files, n_errors, n_taxa, t_taxa):
+def test_taxa_load(ncbi_resources_local_and_remote, example_ncbi_files, n_errors,
+                   n_taxa, t_taxa):
     """This tests the ensemble loading of (ncbi) taxa from a file using
     indirect parameterisation to access the fixtures containing the
     sample excel files.
     """
 
-    # ONLY MAKING A REMOTE VERSION FOR NOW
-    tx = ncbi_taxa.NCBITaxa()
+    tx = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
     tx.load(example_ncbi_files['NCBITaxa'])
 
     assert tx.n_errors == n_errors

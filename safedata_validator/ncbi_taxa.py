@@ -26,6 +26,7 @@ import requests
 import urllib
 from enforce_typing import enforce_types
 
+from safedata_validator.resources import Resources
 from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
                                        loggerinfo_push_pop)
 from safedata_validator.validators import (GetDataFrame, HasDuplicates,
@@ -979,7 +980,7 @@ class RemoteNCBIValidator:
 
 class NCBITaxa:
 
-    def __init__(self):
+    def __init__(self, resources: Resources):
         """A class to hold a list of taxon names and a validated taxonomic
         index for those taxa and their taxonomic hierarchy. The validate_taxon
         method checks that the provided taxon hierarchy and (optional) NCBI ID can be
@@ -1027,8 +1028,13 @@ class NCBITaxa:
         self.n_errors = None
 
         # At the moment we only have one validator defined
-        self.validator = RemoteNCBIValidator()
+        # Get a validator instance
+        if resources.use_local_gbif:
+            self.validator = LocalNCBIValidator(resources)
+        else:
+            self.validator = RemoteNCBIValidator()
 
+    @loggerinfo_push_pop('Loading NCBITaxa worksheet')
     def load(self, worksheet):
         """Loads a set of taxa from the rows of a SAFE formatted NCBITaxa worksheet
         and then adds the higher taxa for those rows.
@@ -1207,7 +1213,7 @@ class NCBITaxa:
         # ID can be None or an integer (openpyxl loads all values as float)
         if not(ncbi_id is None or
                (isinstance(ncbi_id, float) and ncbi_id.is_integer()) or
-               isinstance(ncbi_id, int)) :
+                isinstance(ncbi_id, int)) :
             LOGGER.error('NCBI ID contains value that is not an integer')
             i_fail = True
 
@@ -1231,6 +1237,8 @@ class NCBITaxa:
                     LOGGER.error('Empty dictonary key used')
                     h_fail = True
                 elif idx != idx.strip():
+                    print("HERE_2")
+                    print(idx)
                     LOGGER.error(f"Dictonary key has whitespace padding: {repr(idx)}")
                     # Save keys to swap to new translation table
                     translate[idx] = idx.strip()
