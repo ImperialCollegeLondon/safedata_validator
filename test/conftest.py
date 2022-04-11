@@ -165,7 +165,7 @@ def user_config_file(config_filesystem):
     # Local user config as a duplicate of the existing config in the fixture
     # directory
 
-    with open(FIXTURE_FILES.vf.fix_cfg_local) as infile:
+    with open(FIXTURE_FILES.vf.fix_cfg_local_ncbi) as infile:
         config_filesystem.create_file(FIXTURE_FILES.vf.user_config, contents=''.join(infile.readlines()))
 
     yield config_filesystem
@@ -177,7 +177,7 @@ def site_config_file(config_filesystem):
     # Local user config as a duplicate of the existing config in the fixture
     # directory
 
-    with open(FIXTURE_FILES.vf.fix_cfg_local) as infile:
+    with open(FIXTURE_FILES.vf.fix_cfg_local_ncbi) as infile:
         config_filesystem.create_file(FIXTURE_FILES.vf.site_config, contents=''.join(infile.readlines()))
 
     yield config_filesystem

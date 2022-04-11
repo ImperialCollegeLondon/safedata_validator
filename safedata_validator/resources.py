@@ -321,7 +321,7 @@ class Resources:
             LOGGER.info('Using NCBI online API to validate taxonomy')
             self.use_local_ncbi = False
         else:
-            LOGGER.info(f'Validating local GBIF database: {self.ncbi_database}')
+            LOGGER.info(f'Validating local NCBI database: {self.ncbi_database}')
 
             # Does the provided path exist and is it a functional SQLite database
             # with a backbone table? Because sqlite3 can 'connect' to any path,
