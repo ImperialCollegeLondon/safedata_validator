@@ -1237,8 +1237,6 @@ class NCBITaxa:
                     LOGGER.error('Empty dictonary key used')
                     h_fail = True
                 elif idx != idx.strip():
-                    print("HERE_2")
-                    print(idx)
                     LOGGER.error(f"Dictonary key has whitespace padding: {repr(idx)}")
                     # Save keys to swap to new translation table
                     translate[idx] = idx.strip()
