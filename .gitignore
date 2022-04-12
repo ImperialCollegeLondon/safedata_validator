@@ -24,9 +24,13 @@ dist
 # mkdocs local site build
 site
 
-# Do not include the local copy of the taxon database
+# Do not include the local copy of the taxon databases
 local_db/backbone-current-simple.sqlite
 local_db/taxdump.tar.gz
+local_db/ncbi/ncbi_database.sqlite3
+local_db/ncbi/merged.dmp
+local_db/ncbi/names.dmp
+local_db/ncbi/nodes.dmp
 
 # ignore the local example inputs folder
 local_example_inputs/*
