@@ -18,16 +18,33 @@ rdr = csv.DictReader(filter(lambda row: row[0] != '#', fp))
 data = list(rdr)
 fp.close()
 
-# Get unique, non-user GBIF IDs from the data
-ncbi_ids = set([int(d['ncbi_id']) for d in data])
-
-# NEED TO WRITE SOMETHING THAT 1) FINDS AND STORES PARENT IDS 2) DELETES REPEATED
-# ELEMENTS
-# MIGHT AS WELL USE THE LOCAL DATABASE FOR THIS TO SPEED THINGS UP
-
 # Copy truncated database from local non-git copy.
 source_db = sqlite3.connect('local_db/ncbi/ncbi_database.sqlite3')
 dest_db = sqlite3.connect('test/fixtures/ncbi_database_truncated.sqlite')
+
+# Get unique, non-user GBIF IDs from the data
+ncbi_ids = set([int(d['ncbi_id']) for d in data])
+
+# Store user provided IDs to iterate over
+prov_ids = list(ncbi_ids)
+
+# Then setup loop to find the whole lineage for each id
+for ind in range(0,len(prov_ids)):
+    # Find details of provided ID
+    sql = f"select * from nodes where tax_id = {prov_ids[ind]}"
+    taxon_row = source_db.execute(sql).fetchone()
+
+    # Setup while loop to find lineage
+    lin_fnd = False
+    while lin_fnd == False:
+        # Find node and name of the parent taxon
+        sql = f"select * from nodes where tax_id = {taxon_row[1]}"
+        taxon_row = source_db.execute(sql).fetchone()
+        # Store all relevant info
+        ncbi_ids.add(taxon_row[0])
+        # End this when the parent taxon is root (ID=1)
+        if taxon_row[1] == 1:
+            lin_fnd = True
 
 # create the three tables
 tables = ['nodes', 'names', 'merge']
@@ -47,7 +64,7 @@ for each_id in ncbi_ids:
     for ind in range(0,len(rqst)):
         ins = dest_db.execute('insert into names values (' + ','.join(['?'] * 3) + ')' , rqst[ind])
     # Search for all IDs that have been merged into this ID
-    cur = source_db.execute(f"SELECT * FROM merge WHERE old_tax_id = {each_id}")
+    cur = source_db.execute(f"SELECT * FROM merge WHERE new_tax_id = {each_id}")
     rqst = cur.fetchall()
     for ind in range(0,len(rqst)):
         ins = dest_db.execute('insert into merge values (' + ','.join(['?'] * 2) + ')' , rqst[ind])
