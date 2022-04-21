@@ -375,8 +375,7 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
       )),
      # Unknown E coli strain
      (dict(nnme="Unknown strain",taxah={'species': 'Escherichia coli', 'strain': 'Nonsense strain'}),
-      ((WARNING, "Nonsense strain not registered with NCBI, using higher level "
-       "taxon Escherichia coli instead"),
+      ((WARNING, "Nonsense strain not registered with NCBI, but higher level taxon Escherichia coli is"),
       )),
      # Ambigious species
      (dict(nnme="Ambigious taxa",taxah={'genus': 'Morus', 'species': 'Unknown species'}),
@@ -436,46 +435,41 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
     # Basic case to begin with
     [(['E coli', {'genus': 'Escherichia', 'species': 'Escherichia coli'}, 562],
       (1, 1, 7, 'E coli', ['E coli'], [562], [561], ['Escherichia coli'], ['species'],
-       [False], [None])),
+       [False])),
      # Incorrect genus but should be found fine
      (['E coli', {'genus': 'Escheria', 'species': 'Escherichia coli'}, 562],
       (1, 1, 7, 'E coli', ['E coli'], [562], [561], ['Escherichia coli'], ['species'],
-       [False], [None])),
+       [False])),
      # Superseeded species name
      (['C vulpes', {'genus': 'Canis', 'species': 'Canis vulpes'}, None],
       (2, 1, 8, 'C vulpes', ['C vulpes', 'C vulpes'], [9627, 9627], [9625, 9625],
-       ['Canis vulpes', 'Vulpes vulpes'], ['species', 'species'], [True, False],
-       [None, None])),
+       ['Canis vulpes', 'Vulpes vulpes'], ['species', 'species'], [True, False])),
      # Superseeded species name + ID
      (['C marina', {'species': 'Cytophaga marina'}, 1000],
       (2, 1, 7, 'C marina', ['C marina', 'C marina'], [1000, 107401], [104267, 104267],
-       ['Cytophaga marina', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False],
-       [None, None])),
+       ['Cytophaga marina', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False])),
      # Superseeded ID
      (['T maritimum', {'species': 'Tenacibaculum maritimum'}, 1000],
       (2, 1, 7, 'T maritimum', ['T maritimum', 'T maritimum'], [1000, 107401], [104267, 104267],
-       ['Tenacibaculum maritimum', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False],
-       [None, None])),
+       ['Tenacibaculum maritimum', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False])),
      # Superseeded name + correct ID
      (['C marina', {'species': 'Cytophaga marina'}, 107401],
       (2, 1, 7, 'C marina', ['C marina', 'C marina'], [107401, 107401], [104267, 104267],
-       ['Cytophaga marina', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False],
-       [None, None])),
+       ['Cytophaga marina', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False])),
      # Bacteria
      (['Bacteria', {'kingdom': 'Bacteria'}, 2],
-      (1, 1, 1, 'Bacteria', ['Bacteria'], [2], [None], ['Bacteria'], ['superkingdom'], [False],
-       [None])),
+      (1, 1, 1, 'Bacteria', ['Bacteria'], [2], [None], ['Bacteria'], ['superkingdom'], [False])),
      # Eukaryota
      (['Eukaryotes', {'superkingdom': 'Eukaryota'}, 2759],
       (1, 1, 1, 'Eukaryotes', ['Eukaryotes'], [2759], [None], ['Eukaryota'], ['superkingdom'],
-       [False], [None])),
+       [False])),
      # Fungi
      (['Fungi', {'superkingdom': 'Eukaryota', 'kingdom': 'Fungi'}, 4751],
-      (1, 1, 2, 'Fungi', ['Fungi'], [4751], [2759], ['Fungi'], ['kingdom'], [False], [None])),
+      (1, 1, 2, 'Fungi', ['Fungi'], [4751], [2759], ['Fungi'], ['kingdom'], [False])),
      # Unknown strain
      (['Unknown strain', {'species': 'Escherichia coli', 'strain': 'NBAvgdft'}, None],
-      (1, 1, 7, 'Unknown strain', ['Unknown strain'], [562], [561], ['Escherichia coli'],
-       ['species'], [False], ['strain'])),
+      (1, 1, 7, 'Unknown strain', ['Unknown strain'], [-1], [562], ['NBAvgdft'],
+       ['strain'], [False])),
     ])
 def test_validate_and_add_taxon(ncbi_resources_local_and_remote, test_input, expected):
     """This test checks the function to validate a taxon against the NCBI
@@ -498,8 +492,6 @@ def test_validate_and_add_taxon(ncbi_resources_local_and_remote, test_input, exp
     assert [item[3] for item in ncbi_instance.taxon_index] == expected[7]
     assert [item[4] for item in ncbi_instance.taxon_index] == expected[8]
     assert [item[5] for item in ncbi_instance.taxon_index] == expected[9]
-    assert [item[6] for item in ncbi_instance.taxon_index] == expected[10]
-
 
 # Now test that the search function logs errors correctly
 @pytest.mark.parametrize(
@@ -672,9 +664,9 @@ def test_validate_and_add_taxon(ncbi_resources_local_and_remote, test_input, exp
       )),
      # Unknown E coli strain
      (["Unknown strain", {'species': 'Escherichia coli', 'strain': 'Nonsense strain'}, None],
-      ((WARNING, "Nonsense strain not registered with NCBI, using higher level "
-       "taxon Escherichia coli instead"),
-       (INFO, "Taxon (Unknown strain) found in NCBI database")
+      ((WARNING, "Nonsense strain not registered with NCBI, but higher level taxon "
+       "Escherichia coli is"),
+       (INFO, "Higher taxon for (Unknown strain) resolved in NCBI")
       )),
      # Nonsense taxonomy
      (["Utter nonsense", {'species': 'Nonsense species', 'strain': 'Nonsense strain'}, None],
@@ -742,7 +734,7 @@ def test_validate_and_add_taxon_errors(ncbi_resources_local_and_remote, test_inp
        543, 561], [561, None, 2, 1224, 1236, 91347, 543], ['Escherichia coli', 'Bacteria',
        'Proteobacteria', 'Gammaproteobacteria', 'Enterobacterales', 'Enterobacteriaceae',
        'Escherichia'], ['species', 'superkingdom', 'phylum', 'class', 'order', 'family', 'genus'],
-       [False, False, False, False, False, False, False], [None, None, None, None, None, None, None])),
+       [False, False, False, False, False, False, False])),
      # Superseeded ID
      (['T maritimum', {'species': 'Tenacibaculum maritimum'}, 1000],
       (8, 1, 7, 'T maritimum', ['T maritimum', 'T maritimum', None, None, None, None, None, None],
@@ -750,20 +742,18 @@ def test_validate_and_add_taxon_errors(ncbi_resources_local_and_remote, test_inp
         200644, 49546], ['Tenacibaculum maritimum', 'Tenacibaculum maritimum', 'Bacteria',
         'Bacteroidetes', 'Flavobacteriia', 'Flavobacteriales', 'Flavobacteriaceae', 'Tenacibaculum'],
         ['species', 'species', 'superkingdom', 'phylum', 'class', 'order', 'family', 'genus'], [True,
-        False, False, False, False, False, False, False], [None, None, None, None, None, None, None,
-        None])),
+        False, False, False, False, False, False, False])),
      # Bacteria
      (['Bacteria', {'kingdom': 'Bacteria'}, 2],
-      (1, 1, 1, 'Bacteria', ['Bacteria'], [2], [None], ['Bacteria'], ['superkingdom'], [False],
-       [None])),
+      (1, 1, 1, 'Bacteria', ['Bacteria'], [2], [None], ['Bacteria'], ['superkingdom'], [False])),
      # Eukaryota
      (['Eukaryotes', {'superkingdom': 'Eukaryota'}, 2759],
       (1, 1, 1, 'Eukaryotes', ['Eukaryotes'], [2759], [None], ['Eukaryota'], ['superkingdom'],
-       [False], [None])),
+       [False])),
      # Fungi
      (['Fungi', {'superkingdom': 'Eukaryota', 'kingdom': 'Fungi'}, 4751],
       (2, 1, 2, 'Fungi', ['Fungi', None], [4751, 2759], [2759, None], ['Fungi', 'Eukaryota'],
-       ['kingdom', 'superkingdom'], [False, False], [None, None])),
+       ['kingdom', 'superkingdom'], [False, False])),
     ])
 def test_index_higher_taxa(ncbi_resources_local_and_remote, test_input, expected):
     """This test checks the function to store higher taxonomic ranks for a taxon
@@ -789,7 +779,6 @@ def test_index_higher_taxa(ncbi_resources_local_and_remote, test_input, expected
     assert [item[3] for item in ncbi_instance.taxon_index] == expected[7]
     assert [item[4] for item in ncbi_instance.taxon_index] == expected[8]
     assert [item[5] for item in ncbi_instance.taxon_index] == expected[9]
-    assert [item[6] for item in ncbi_instance.taxon_index] == expected[10]
 
 
 # Now test that the index hierachy function logs correctly
@@ -863,7 +852,7 @@ def test_validate_index_higher_taxa(caplog, ncbi_resources_local_and_remote,
 @pytest.mark.parametrize(
     'example_ncbi_files, n_errors, n_taxa, t_taxa',
     [('good', 0, 10, 30),
-     ('weird', 0, 5, 19),
+     ('weird', 0, 5, 20),
      ('bad', 12, 5, 0)],
     indirect = ['example_ncbi_files']  # take actual params from fixture
 )

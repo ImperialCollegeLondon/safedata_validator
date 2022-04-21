@@ -17,6 +17,8 @@ will be recorded. However, associated higher taxa will only be recorded if their
 are either a GBIF backbone rank or superkingdom.
 """
 
+# NEED TO SORT OUT THE DOCSTRINGS HERE, THEY ARE NOT QUITE FINISHED
+
 from typing import Union, Optional
 import dataclasses
 import sqlite3
@@ -37,14 +39,6 @@ from safedata_validator.validators import (GetDataFrame, HasDuplicates,
 Entrez.email = "jacobcook1995@gmail.com"
 # Hard coding api key in for now
 user_key = "1738fe86eba2d8fc287ff0d1dcbfeda44a0a"
-
-# TODO - Soup up NCBITaxa
-# Basically copy David and have a section for printing out NCBITaxa in a readable
-# way
-
-# TODO - Take steps to increase the speed
-# Make local copy by downloading the relevant part of NCBI's database and
-# running the validation locally
 
 # TODO - Modify the resource file to ask the user to provide an email address
 # This should only be done if the user actually wants to use this module as it
@@ -479,8 +473,8 @@ class LocalNCBIValidator:
                     # Store orginally supplied rank
                     mtaxon.orig = list(taxah.keys())[-1]
                     # Warn the user that a higher taxonomic rank is being used
-                    LOGGER.warning(f'{s_term} not registered with NCBI, using '
-                                   f'higher level taxon {new_s_term} instead')
+                    LOGGER.warning(f'{s_term} not registered with NCBI, but '
+                                   f'higher level taxon {new_s_term} is')
                     fnshd = True
                 elif c > 1: # Not going to handle ambiguities in this case
                     LOGGER.error(f'Taxa {nnme} cannot be found and its higher '
@@ -840,8 +834,8 @@ class RemoteNCBIValidator:
                     # Store orginally supplied rank
                     mtaxon.orig = list(taxah.keys())[-1]
                     # Warn the user that a higher taxonomic rank is being used
-                    LOGGER.warning(f'{s_term} not registered with NCBI, using '
-                                   f'higher level taxon {new_s_term} instead')
+                    LOGGER.warning(f'{s_term} not registered with NCBI, but '
+                                   f'higher level taxon {new_s_term} is')
                     fnshd = True
                 elif c > 1: # Not going to handle ambiguities in this case
                     LOGGER.error(f'Taxa {nnme} cannot be found and its higher '
@@ -997,8 +991,7 @@ class NCBITaxa:
                  ncbi_parent_id (int),
                  canonical_name (str),
                  taxonomic_rank (str),
-                 taxon_superseeded (bool),
-                 original_taxon_rank (str)]
+                 taxon_superseeded (bool)]
 
             We only populate orginal_taxon_rank when the initially supplied taxon is
             not found in NCBI, but a parent (or grandparent etc) is found. In this case
@@ -1292,16 +1285,7 @@ class NCBITaxa:
                 LOGGER.error(f'Taxon hierarchy not in correct order')
                 return
 
-        # Now that inputs are sanitised, continue with checking...
-        # First gather the info needed to index the entry
-        if ncbi_id != None:
-            ncbi_info = [list(taxon_hier.values())[-1], list(taxon_hier.keys())[-1],
-                         int(ncbi_id)]
-        else:
-            ncbi_info = [list(taxon_hier.values())[-1], list(taxon_hier.keys())[-1],
-                         None]
-
-        # Then go straight ahead and search for the taxon
+        # Go straight ahead and search for the taxon
         hr_taxon = self.validator.taxa_search(m_name, taxon_hier)
         # Catch case where errors are returned rather than a taxon
         if hr_taxon == None:
@@ -1341,37 +1325,43 @@ class NCBITaxa:
             # Set to None if hierachy is empty (i.e. top level taxa)
             parent_id = None
 
-        # Then check if taxon is superseeded
-        if hr_taxon.superseed == True or (ncbi_id != None and id_taxon.superseed == True):
-            if ncbi_id == None or id_taxon.superseed == False:
-                superseed_id = hr_taxon.ncbi_id
-                # Find supplied name using lowest found rank
-                f_key = list(hr_taxon.taxa_hier.keys())[-1]
-                superseed_name = taxon_hier[f_key]
-            else:
-                # Supplied ID is superseeded
-                superseed_id = ncbi_id
-                # Check if supplied name superseeded
-                if hr_taxon.superseed == True:
+        # Catch cases where orginal taxon has not been found
+        if hr_taxon.orig != None:
+            self.taxon_index.append([m_name, -1, hr_taxon.ncbi_id,
+                                     list(taxon_hier.values())[-1], hr_taxon.orig,
+                                     False])
+        else:
+            # Then check if taxon is superseeded
+            if hr_taxon.superseed == True or (ncbi_id != None and id_taxon.superseed == True):
+                if ncbi_id == None or id_taxon.superseed == False:
+                    superseed_id = hr_taxon.ncbi_id
+                    # Find supplied name using lowest found rank
                     f_key = list(hr_taxon.taxa_hier.keys())[-1]
                     superseed_name = taxon_hier[f_key]
                 else:
-                    superseed_name = hr_taxon.name
+                    # Supplied ID is superseeded
+                    superseed_id = ncbi_id
+                    # Check if supplied name superseeded
+                    if hr_taxon.superseed == True:
+                        f_key = list(hr_taxon.taxa_hier.keys())[-1]
+                        superseed_name = taxon_hier[f_key]
+                    else:
+                        superseed_name = hr_taxon.name
 
-            # Add superseeded taxon to the index
-            self.taxon_index.append([m_name, superseed_id, parent_id,
-                                        superseed_name, hr_taxon.rank,
-                                        True, hr_taxon.orig])
+                # Add superseeded taxon to the index
+                self.taxon_index.append([m_name, superseed_id, parent_id,
+                                            superseed_name, hr_taxon.rank,
+                                            True])
 
-        # Then (also) add non-superseeded taxon info to the index
-        self.taxon_index.append([m_name, hr_taxon.ncbi_id, parent_id,
-                                    hr_taxon.name, hr_taxon.rank,
-                                    False, hr_taxon.orig])
+            # Then (also) add non-superseeded taxon info to the index
+            self.taxon_index.append([m_name, hr_taxon.ncbi_id, parent_id,
+                                        hr_taxon.name, hr_taxon.rank,
+                                        False])
 
         self.hierarchy.update(list(hr_taxon.taxa_hier.items()))
 
         # Check if this has succeded without warnings or errors
-        if hr_taxon.superseed == False:
+        if hr_taxon.superseed == False and hr_taxon.orig == None:
             # Straight forward when there isn't a genbank id, or previously processed
             if ncbi_id == None:
                 # If so inform the user of this
@@ -1379,6 +1369,8 @@ class NCBITaxa:
             # Otherwise need to check for superseeded ID's
             elif id_taxon.superseed == False:
                 LOGGER.info(f'Taxon ({m_name}) found in NCBI database')
+        elif hr_taxon.superseed == False:
+            LOGGER.info(f'Higher taxon for ({m_name}) resolved in NCBI')
 
     @loggerinfo_push_pop('Indexing taxonomic hierarchy')
     def index_higher_taxa(self):
@@ -1398,7 +1390,7 @@ class NCBITaxa:
         for tx_lev, (tx_nme, tx_id, p_id) in to_add:
             # Add all this to the taxonomy
             self.taxon_index.append([None, tx_id, p_id, tx_nme, tx_lev,
-                                     False, None])
+                                     False])
             LOGGER.info(f'Added {tx_lev} {tx_nme}')
 
     def compare_hier(self, m_name: str, mtaxon: NCBITaxon, taxon_hier: dict):
