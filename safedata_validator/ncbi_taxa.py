@@ -136,11 +136,11 @@ def subspecies_trinomial(species: str, subspecies: str):
             return tri
         else:
             return species.strip() + " " + subspecies.strip()
-    # Catch too shot species name case
+    # Catch too short species name case
     elif len(species.split()) == 1:
         LOGGER.error(f'Species name ({species}) too short')
         return None
-    # Then check that species name is more words than the genus name
+    # Then check that subspecies name is more words than the species name
     elif len(subspecies.split()) > len(species.split()):
         if species in subspecies:
             return subspecies
@@ -1086,6 +1086,17 @@ class NCBITaxa:
         # Find core field indices and use to isolate non core (i.e. taxonomic) headers
         core_inds = [headers.index(item) for item in core_fields]
         non_core = [element for i, element in enumerate(headers) if i not in core_inds]
+
+        # Check to see if comments is provided
+        if "comments" in non_core:
+            # Check that it is the last header
+            if non_core[-1] != "comments":
+                LOGGER.error(f"If 'Comments' is provided as a field it must be "
+                             f"the last column")
+                return
+            else:
+                # If it's the last header go ahead and delete it
+                del non_core[-1]
 
         # Check that backbone ranks are in the correct order
         l1 = [v for v in BACKBONE_RANKS_EX if v in fnd_rnks]
