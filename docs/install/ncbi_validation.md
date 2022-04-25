@@ -12,8 +12,8 @@ with a warning being provided to the user.
 
 We want three things from validation:
 
-* Whether the name provided by the user refers to an existing taxon.
-* Whether or not this taxon is superseded.
+* To know whether the name provided by the user refers to an existing taxon.
+* To know whether or not this taxon is superseded.
 * The backbone taxonomic hierarchy for the taxa, so we can index at higher
   taxonomic levels. Taxa do not always neatly hook into the backbone taxonomic
   rank immediately above. However, this isn't too much of a problem in the NCBI
