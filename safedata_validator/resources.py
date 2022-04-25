@@ -128,6 +128,7 @@ class Resources:
                 'init_dict', 'init_list', 'init_file', 'user_config' or 'site_config'.
             locations: The path to the locations file
             gbif_database: The path to the GBIF database file or None
+            ncbi_database: The path to the NCBI database file or None
             use_local_gbif: Is a local file used or should the GBIF API be used
             ncbi_database: The path to the NCBI database file or None
             use_local_ncbi: Is a local file used or should the NCBI API be used
