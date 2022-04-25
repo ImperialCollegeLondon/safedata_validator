@@ -12,6 +12,7 @@ the details below:
 ```
 locations = /path/to/locations.json
 gbif_database = /path/to/local/backbone.sqlite3
+ncbi_database = /path/to/local/ncbi_database.sqlite3
 [extents]
 temporal_soft_extent = 2002-02-01, 2030-02-01
 temporal_hard_extent = 2002-02-01, 2030-02-01
@@ -39,6 +40,13 @@ the package will use the online GBIF API for taxon validation. Alternatively,
 the `gbif_database` entry can be used to point to a local copy of the GBIF
 backbone database, which is _very_ much faster but requires the database to be
 built (see [here](build_local_gbif))
+
+The `ncbi_database` value can also be left empty (`ncbi_database = `), in which case
+the package will access the online NCBI database using the [Entrez system](https://www.ncbi.nlm.nih.gov/Web/Search/entrezfs.html). For convience we access these tools via a [package](https://biopython.org/docs/1.75/api/Bio.Entrez.html)
+that forms part of the [Biopython](https://biopython.org) set of tools. Alternatively,
+the `ncbi_database` entry can be used to point to a local copy of the NCBI
+database, which is _very_ much faster but requires the database to be
+built (see [here](build_local_ncbi)).
 
 ### Extents
 
@@ -86,7 +94,7 @@ user and site config folders are:
 /Library/Application Support/safedata_validator/safedata_validator.cfg
 ```
 
-### Windows 
+### Windows
 
 The repeated directory name is not an error:
 
@@ -100,4 +108,3 @@ C:\Users\username\AppData\Local\safedata_validator\safedata_validator\safedata_v
 /home/username/.config/safedata_validator/safedata_validator.cfg
 /etc/xdg/safedata_validator/safedata_validator.cfg
 ```
-
