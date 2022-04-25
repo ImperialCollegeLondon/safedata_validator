@@ -117,7 +117,6 @@ with open(merge) as bbn:
         con.execute(merge_insert_statement, row)
 
 # Create the indices
-# ALSO NEED TO ADD NEW INDEX HERE
 con.execute('CREATE INDEX node_id ON nodes (tax_id);')
 con.execute('CREATE INDEX all_names ON names (name_txt);')
 con.execute('CREATE INDEX id_name_class ON names (tax_id, name_class);')

@@ -42,11 +42,9 @@ backbone database, which is _very_ much faster but requires the database to be
 built (see [here](build_local_gbif))
 
 The `ncbi_database` value can also be left empty (`ncbi_database = `), in which case
-the package will access the online NCBI database using the [Entrez system](https://www.ncbi.nlm.nih.gov/Web/Search/entrezfs.html). For convience we access these tools via a [package](https://biopython.org/docs/1.75/api/Bio.Entrez.html)
-that forms part of the [Biopython](https://biopython.org) set of tools. Alternatively,
-the `ncbi_database` entry can be used to point to a local copy of the NCBI
-database, which is _very_ much faster but requires the database to be
-built (see [here](build_local_ncbi)).
+the package will access the online NCBI taxonomy database using the [Entrez system](https://www.ncbi.nlm.nih.gov/Web/Search/entrezfs.html). For convience we access these tools via a [package](https://biopython.org/docs/1.75/api/Bio.Entrez.html) that forms part of the [Biopython](https://biopython.org) set of tools.
+Alternatively, the `ncbi_database` entry can be used to point to a local copy of the NCBI
+database, which is _very_ much faster but requires the database to be built (see [here](build_local_ncbi)).
 
 ### Extents
 
