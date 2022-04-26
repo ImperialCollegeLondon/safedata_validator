@@ -1,3 +1,5 @@
+import os
+import sys
 import argparse
 import textwrap
 from safedata_validator.version import __version__
@@ -15,6 +17,10 @@ def _safedata_validator_cli():
     using this program requires you to provide a configuration file for these
     resources or to have installed a configuration file in a standard location
     (see the package website API for details.)
+
+    If validation is successful, then a JSON format file containing key metadata
+    will be saved to the same location as the valdiated file. The JSON metadata
+    is used in the dataset publication process.
     """
 
     desc = textwrap.dedent(_safedata_validator_cli.__doc__)
@@ -41,3 +47,13 @@ def _safedata_validator_cli():
     ds = Dataset()
     ds.load_from_workbook(filename=args.filename, valid_pid=args.valid_pid,
                           validate_doi=args.validate_doi, chunk_size=args.chunk_size)
+
+    if ds.passed:
+        json_file =   os.path.splitext(args.filename)[0] + '.json'
+
+        with open(json_file, 'w') as json_out:
+            json_out.write(ds.to_json())
+        
+        sys.stdout.write('------------------------\n')
+        sys.stdout.write(f'JSON metadata written to {json_file}\n')
+        sys.stdout.write('------------------------\n')
