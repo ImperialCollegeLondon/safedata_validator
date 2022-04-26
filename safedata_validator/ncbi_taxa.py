@@ -1021,7 +1021,7 @@ class NCBITaxa:
 
         # At the moment we only have one validator defined
         # Get a validator instance
-        if resources.use_local_gbif:
+        if resources.use_local_ncbi:
             self.validator = LocalNCBIValidator(resources)
         else:
             self.validator = RemoteNCBIValidator()
