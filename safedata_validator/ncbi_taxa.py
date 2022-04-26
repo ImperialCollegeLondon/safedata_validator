@@ -17,8 +17,6 @@ will be recorded. However, associated higher taxa will only be recorded if their
 are either a GBIF backbone rank or superkingdom.
 """
 
-# NEED TO SORT OUT THE DOCSTRINGS HERE, THEY ARE NOT QUITE FINISHED
-
 from typing import Union, Optional
 import dataclasses
 import sqlite3
@@ -58,7 +56,7 @@ class NCBIError(Exception):
     """Exception class for remote NCBI errors
 
     Attributes:
-        message -- explanation of the error
+        message: explanation of the error
     """
 
     def __init__(self, message="NCBI taxa ID not found"):
@@ -220,7 +218,8 @@ class NCBITaxon:
             return f"{self.name}"
 
 class LocalNCBIValidator:
-    """FILL OUT THIS DOCSTRING AT SOME POINT
+    """This provides a validate method for a NCBITaxon using SQLite queries on a
+    locally downloaded copy of the NCBI database.
     """
     def __init__(self, resources):
 
@@ -240,10 +239,10 @@ class LocalNCBIValidator:
 
         Params:
             nnme: A nickname to identify the taxon
-            ncbi_id: An integer
+            ncbi_id: Unique identifer for the taxon
 
         Returns:
-            A NCBITaxon object
+            NCBITaxon: Complete taxon info
         """
 
         if not isinstance(ncbi_id, int):
@@ -403,7 +402,7 @@ class LocalNCBIValidator:
             taxah: A dictonary containing taxonomic information
 
         Returns:
-            A NCBITaxon object
+            NCBITaxon: Complete taxon info
         """
 
         if isinstance(taxah, dict) == False:
@@ -609,7 +608,7 @@ class LocalNCBIValidator:
 
 @enforce_types
 class RemoteNCBIValidator:
-    """This provides a validate method for a Taxon using the online NCBI Entrez
+    """This provides a validate method for a NCBITaxon using the online NCBI Entrez
     tools. Unlike the LocalNCBIValidator, this doesn't need an __init__ method
     and just contains methods, but duplicates the structure so that
     the two Validators are interchangeable.
@@ -622,10 +621,10 @@ class RemoteNCBIValidator:
 
         Params:
             nnme: A nickname to identify the taxon
-            ncbi_id: An integer
+            ncbi_id: Unique identifer for the taxon
 
         Returns:
-            A NCBITaxon object
+            NCBITaxon: Complete taxon info
         """
 
         if not isinstance(ncbi_id, int):
@@ -757,7 +756,7 @@ class RemoteNCBIValidator:
             taxah: A dictonary containing taxonomic information
 
         Returns:
-            A NCBITaxon object
+            NCBITaxon: Complete taxon info
         """
 
         if isinstance(taxah, dict) == False:
@@ -993,17 +992,17 @@ class NCBITaxa:
                  taxonomic_rank (str),
                  taxon_superseeded (bool)]
 
-            We only populate orginal_taxon_rank when the initially supplied taxon is
-            not found in NCBI, but a parent (or grandparent etc) is found. In this case
-            the details of the higher taxon are stored along with the orginal worksheet_name
-            and with the orginal rank stored in orginal_taxon_rank. In all other cases
-            orginal_taxon_rank is set to None.
+        We only populate orginal_taxon_rank when the initially supplied taxon is
+        not found in NCBI, but a parent (or grandparent etc) is found. In this case
+        the details of the higher taxon are stored along with the orginal worksheet_name
+        and with the orginal rank stored in orginal_taxon_rank. In all other cases
+        orginal_taxon_rank is set to None.
 
-            Where a taxon is superseeded in the NCBI database, two entries are
-            inserted for the taxon, one under the canon name and one under the
-            provided name. They will share the same worksheet name and so can
-            be paired back up for description generation. The worksheet name
-            for parent taxa and deeper taxonomic hierarchy is set to None.
+        Where a taxon is superseeded in the NCBI database, two entries are
+        inserted for the taxon, one under the canon name and one under the
+        provided name. They will share the same worksheet name and so can
+        be paired back up for description generation. The worksheet name
+        for parent taxa and deeper taxonomic hierarchy is set to None.
 
         The index_higher_taxa method can be used to extend the taxon_index to
         include all of the higher taxa linking the validated taxa.
@@ -1036,7 +1035,7 @@ class NCBITaxa:
             worksheet: An openpyxl worksheet instance following the NCBITaxa formatting
 
         Returns:
-            Updates the taxon_names and taxon_index attributes of the class instance
+            None: Updates the taxon_names and taxon_index attributes of the class instance
             using the data in the worksheet.
         """
 
@@ -1177,7 +1176,7 @@ class NCBITaxa:
         FORMATTER.pop()
 
 
-    def validate_and_add_taxon(self, ncbi_taxon_input):
+    def validate_and_add_taxon(self, ncbi_taxon_input: list):
         """ User information is provided that names a taxon and (optionally) gives
         a NCBI taxonomy ID. This information is then validated against the NCBI database.
         This is principally used to process rows found in a NCBITaxa worksheet, but
@@ -1192,10 +1191,10 @@ class NCBITaxa:
         ['m_name', 'taxon_hier', None]
 
         Args:
-            taxon_input: NCBITaxon information in standard form as above
+            ncbi_taxon_input: NCBITaxon information in standard form as above
 
         Returns:
-            Updates the taxon_names and taxon_index attributes of the class instance.
+            None: Updates the taxon_names and taxon_index attributes of the class instance.
         """
 
         m_name, taxon_hier, ncbi_id = ncbi_taxon_input
