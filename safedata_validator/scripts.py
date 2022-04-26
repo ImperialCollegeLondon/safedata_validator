@@ -4,6 +4,8 @@ import argparse
 import textwrap
 from safedata_validator.version import __version__
 from safedata_validator.field import Dataset
+from safedata_validator.zenodo import download_ris_data
+from safedata_validator.logger import LOGGER
 
 def _safedata_validator_cli():
     """
@@ -57,3 +59,44 @@ def _safedata_validator_cli():
         sys.stdout.write('------------------------\n')
         sys.stdout.write(f'JSON metadata written to {json_file}\n')
         sys.stdout.write('------------------------\n')
+
+
+
+
+
+def _safedata_download_ris_cli():
+    """
+    This program maintains a RIS format bibliography file of the datasets
+    uploaded to a Zenodo community. It can update an existing RIS format file
+    to add new records or it can create the file from scratch.
+
+    The program uses both the Zenodo API (to find the records in the community)
+    and the Datacite API to access machine readable biblioigraphic records.
+    """
+
+    desc = textwrap.dedent(_safedata_download_ris_cli.__doc__)
+    fmt = argparse.RawDescriptionHelpFormatter
+    parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
+    
+    # positional argument inputs
+    parser.add_argument('ris_file', type=str,
+                        help="The file path to populate with RIS records. If this file "
+                             "already exists, it is assumed to be RIS file to update "
+                             "with any new records not already included in the file.")
+
+    args = parser.parse_args()
+
+    # Run the download RIS data function
+    data = download_ris_data(ris_file=args.ris_file)
+    if data is None:
+        LOGGER.info(f'No new records found')
+    elif os.path.exists(args.ris_file):
+        LOGGER.info(f'Appending RIS data for {len(data)} new records')
+        write_mode = 'a'
+    else:
+        LOGGER.info(f'Downloading RIS data for {len(data)} records')
+        write_mode = 'w'
+
+    with open(args.ris_file, write_mode) as ris_file:
+        for this_entry in data:
+            ris_file.write(this_entry)

@@ -3,200 +3,22 @@ import datetime
 from lxml import etree
 import simplejson
 import copy
-import safedata_validator
 from io import StringIO
 import requests
-from safe_web_global_functions import safe_mailer
+# from safe_web_global_functions import safe_mailer
 from itertools import groupby
 from shapely import geometry
 import hashlib
-from gluon.serializers import json
+# from gluon.serializers import json
+import rispy
 
-# The web2py HTML helpers are provided by gluon. This also provides the 'current' object, which
-# provides the web2py 'request' API (note the single letter difference from the requests package!).
-# The 'current' object is also extended by models/db.py to include the current 'db' DAL object
-# and the 'myconf' AppConfig object so that they can accessed by this module
 
-from gluon import *
-
+from safedata_validator.resources import Resources
+from safedata_validator.logger import LOGGER, FORMATTER
 """
-This module provides functions to handle datasets within the SAFE website. 
-These are called from the datasets controller but are also needed from other locations, 
-such as the scheduler, so are defined here in their own module.
+This module provides functions to handle the publication of datasets after they
+have been validated using safedata_validate.
 """
-
-
-def verify_dataset(record_id, email=False):
-    """
-    Function to run safedata_validator on an uploaded file. There
-    are three possible outcomes for a dataset: PASS; FAIL, if the check
-    catches known formatting problems; and ERROR if check hits an exception,
-    which probably means an update to the checker code to handle the new
-    and exciting way of getting the file wrong.
-
-    This assumes that the local python has safedata_validator installed and
-    correctly configured with local file resources. See the documentation
-    for that package for details.
-
-    The email argument allows the function to be run by admins directly
-    using the administer_datasets controller without spamming the uploader.
-    Useful in error checking problem uploads.
-
-    This function is also used as a scheduler task, so needs some extra
-    care to make sure it runs in the environment of a scheduler worker
-    as well as in the environment of the website.
-
-    Args:
-        record_id: The id of the record from the dataset table that is to be checked.
-        email: Should the dataset uploader be emailed the outcome?
-
-    Returns:
-        A string describing the outcome of the check that gets stored in the
-        scheduler results or sent back to the administer_datasets controller.
-        This is primarily a user friendly bit of text for popping up in a
-        website flash, not an Exception message, so those are stored elsewhere
-        for an admin to look at.
-    """
-
-    # Load the host name from the configuration. When run from a controller,
-    # the URL(host=TRUE) has access to the host name from requests. This isn't
-    # true when it is run by a scheduler worker, which isn't operating as part
-    # of the website. So rather than hardcoding, store the host name in the config
-    try:
-        host = current.myconf.take('host.host_name')
-    except BaseException:
-        raise RuntimeError('Site config does provide not the host name')
-
-    # get the record
-    record = current.db.submitted_datasets[record_id]
-
-    # track errors to avoid hideous nested try statements
-    error = False
-
-    if record is None:
-        # not a valid record? Can't email anyone so turn that off
-        ret_msg = 'Verifying dataset {}: unknown record ID'.format(record_id)
-        email = False
-        error = True
-    else:
-        # otherwise, create a return dictionary for all remaining failure
-        # modes (no report, but file, uploader and URL should fine) and
-        # set the default outcome
-        ret_dict = {'report': '',
-                    'filename': record.file_name,
-                    'name': record.uploader_id.first_name,
-                    'dataset_url': URL('datasets', 'submitted_dataset_status',
-                                       vars={'id': record.id},
-                                       scheme=True, host=host)}
-        outcome = 'ERROR'
-
-    # Initialise the dataset checker:
-    if not error:
-        # - get paths to dataset file. Failure to find is handled by safedata_validator methods.
-        fname = os.path.join(current.request.folder, 'uploads', 'submitted_datasets', record.file)
-        # get the Dataset object from the file checker
-        try:
-            dataset = safedata_validator.Dataset(fname, verbose=False)
-        except Exception as e:
-            # We don't want to bail here because we might want to email the uploader,
-            # but we do want to record what went wrong. We store it in the dataset record, which
-            # is the only venue when run from a controller. If I could work out where the scheduler
-            # run output comes from, I'd do that too.
-            record.update_record(dataset_check_outcome='ERROR',
-                                 dataset_check_error=repr(e))
-            ret_msg = 'Verifying dataset {}: error initialising dataset checker'
-            ret_msg = ret_msg.format(record.id)
-            error = True
-
-    # main processing of the dataset
-    if not error:
-        try:
-            # load the metadata sheets
-            dataset.load_summary(validate_doi=True, project_id=record.project_id)
-
-            dataset.load_taxa()
-            dataset.load_locations()
-
-            # check the dataset worksheets, after checking there are some
-            # as the metadata might only document external data files
-            if dataset.dataworksheet_summaries is not None:
-                for ws in dataset.dataworksheet_summaries:
-                    dataset.load_data_worksheet(ws)
-
-            # cross check the taxa and locations
-            dataset.final_checks()
-
-        except Exception as e:
-            ret_msg = 'Verifying dataset {}: error running dataset checking'
-            ret_msg = ret_msg.format(record.id)
-            dataset_check_error = repr(e)
-        else:
-            if dataset.passed:
-                outcome = 'PASS'
-                ret_msg = 'Verifying dataset {}: dataset checking PASSED'.format(record.id)
-            else:
-                outcome = 'FAIL'
-                ret_msg = 'Verifying dataset {}: dataset checking FAILED'.format(record.id)
-
-            dataset_check_error = ''
-
-        # At this point, we have a Dataset object, so can populate the record with
-        # what information is available, regardless of Error, Fail or Pass
-        # - The DAL handles conversion of the python structure into JSON, so
-        #   can just pass the objects. Previously, used simplejson.dumps, which
-        #   meant they were stored as a string, so needed reloading rather than
-        #   being saved natively as JSON
-
-        # First, need to extract the check report from the StringIO object and
-        # substitute in the user filename for the local web2py filename. Also,
-        # wrap it in <pre> for display purposes.
-        if outcome == 'ERROR':
-            report_text = ""
-        else:
-            # TODO - something about the safedata_validator logger setup is causing
-            #        large numbers of null characters to be included in the report
-            #        text, which then prevents things from being written to the DB
-            #        The replace here is a hack to clear them out, but this needs
-            #        to be fixed upstream.
-            report_text = dataset.report().getvalue().replace('\x00', '')
-            report_text = PRE(report_text.replace(fname, record.file_name))
-            # Update the ret_dict to insert the report text
-            ret_dict['report'] = report_text
-
-        # get the dataset_metadata and update to store the actual filename
-        dataset_metadata = dataset.export_metadata_dict()
-        dataset_metadata['filename'] = record.file_name
-
-        # In the submitted datasets table, taxa, locations and metadata are
-        # all stored in dataset_metadata. When a dataset is published, taxa
-        # and locations are separated out into the dataset_* tables.
-        record.update_record(dataset_check_outcome=outcome,
-                             dataset_check_report=report_text,
-                             dataset_check_error=dataset_check_error,
-                             dataset_title=dataset.title,
-                             dataset_metadata={'metadata': dataset_metadata,
-                                               'taxa': dataset.taxon_index,
-                                               'locations': dataset.location_index})
-
-    # notify the user
-    if email:
-        opts = {'PASS': ['Dataset passed checks', 'dataset_check_pass.html'],
-                'FAIL': ['Dataset failed checks', 'dataset_check_fail.html'],
-                'ERROR': ['Error checking dataset', 'dataset_check_error.html']}
-
-        safe_mailer(to=record.uploader_id.email,
-                    cc=['data@safeproject.net'],
-                    reply_to='data@safeproject.net',
-                    cc_info=False,
-                    subject=opts[outcome][0],
-                    template=opts[outcome][1],
-                    template_dict=ret_dict)
-
-    # A task run by a worker does not automatically commit changes, so
-    # save any by changes before ending
-    current.db.commit()
-
-    return ret_msg
 
 
 def get_zenodo_api():
@@ -763,7 +585,7 @@ def update_published_metadata(zenodo_record_id, new_values):
         success_so_far = 0 if pub.status_code != 202 else 1
         ret = pub.json()
 
-    # If all steps have been succesful, return a 0 code, otherwise
+    # If all steps have been successful, return a 0 code, otherwise
     # try to discard the edits and return the most recent failure
     # notice
 
@@ -1349,381 +1171,105 @@ def generate_inspire_xml(record):
     return etree.tostring(tree)
 
 
-# API search functions
+def download_ris_data(resources: Resources = None, ris_file: str = None) -> list:
+    """Downloads SAFE records into a RIS format bibliography file
 
-def dataset_query_to_json(qry, most_recent=False, ids=None,
-                          fields=[('published_datasets', 'zenodo_concept_id'),
-                                  ('published_datasets', 'zenodo_record_id'),
-                                  ('published_datasets', 'dataset_title')]):
-    """
-    Shared function to take a Query including rows in db.published datasets
-    and return a standardised set of attributes and a count.
-    """
-
-    db = current.db
-
-    if most_recent:
-        qry &= (db.published_datasets.most_recent == True)
-
-    if ids is not None:
-        qry &= (db.published_datasets.zenodo_record_id.belongs(ids))
-
-    # Turn fields argument into fields references and select
-    fields = [db[t][f] for t, f in fields]
-    rows = db(qry).select(*fields, distinct=True)
-
-    return {'count': len(rows), 'entries': rows}
-
-
-def dataset_taxon_search(gbif_id=None, name=None, rank=None):
-    """Search for datasets by taxon information
-
-    Examples:
-        /api/search/taxa?name=Formicidae
-        /api/search/taxa?gbif_id=4342
-        /api/search/taxa?rank=Family
+    This function is used to maintain a bibliography file of the records
+    uploaded to a safedata community on Zenodo. It accesses the Zenodo community
+    specified in the resource configuration and downloads all records. It then
+    optinally checks the list of downloaded DOIs against the content of an
+    existing RIS file and then downloads citations for all new DOIs from
+    datacite.org.
 
     Args:
-        gbif_id (int): A GBIF taxon id.
-        name (str): A scientific name
-        rank (str): A taxonomic rank. Note that GBIF only provides
-            kingdom, phylum, order, class, family, genus and species.
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
+        ris_file: The path to an existing RIS format file containing previously
+            downloaded records.
+    
+    Returns:
+        A list of strings containing RIS formatted citation data.
     """
 
-    db = current.db
-    qry = (db.published_datasets.id == db.dataset_taxa.dataset_id)
+    if resources is None:
+        resources = Resources()
 
-    if gbif_id is not None:
-        qry &= (db.dataset_taxa.gbif_id == gbif_id)
+    # Get a list of known DOI records from an existing RIS file if one is
+    # provided
+    known_recids = []
+    new_doi = []
 
-    if name is not None:
-        qry &= (db.dataset_taxa.taxon_name == name)
+    if os.path.exists(ris_file):
+        with open(ris_file, 'r') as bibliography_file:
+            entries = rispy.load(bibliography_file)
+            for entry in entries:
+                record_id = int(entry['url'].split('/')[-1])
+                known_recids.append(record_id)
 
-    if rank is not None:
-        qry &= (db.dataset_taxa.taxon_rank == rank.lower())
-
-    return qry
-
-
-def dataset_author_search(name=None):
-    """Search for datasets by author name
-
-    Examples:
-        /api/search/authors?name=Wilk
-
-    Args:
-        name (str): An author name or part of a name
-    """
-
-    db = current.db
-    qry = (db.published_datasets.id == db.dataset_authors.dataset_id)
-
-    if name is not None:
-        qry &= (db.dataset_authors.name.contains(name.lower()))
-
-    return qry
-
-
-def dataset_locations_search(name=None):
-    """Search for datasets with data at a named location
-
-    Examples:
-        /api/search/location?name=A_1
-
-    Args:
-        name (str): A location name
-    """
-
-    db = current.db
-    qry = (db.published_datasets.id == db.dataset_locations.dataset_id)
-
-    if name is not None:
-        qry &= (db.dataset_locations.name.contains(name.lower()))
-
-    return qry
-
-
-def dataset_date_search(date=None, match_type='intersect'):
-    """Search for datasets by temporal extent
-
-    Examples:
-        /api/search/dates?date=2014-06-12
-        /api/search/dates?date=2014-06-12,2015-06-12
-        /api/search/dates?date=2014-06-12,2015-06-12&match_type=contains
-        /api/search/dates?date=2014-06-12,2015-06-12&match_type=within
-
-    Args:
-        date (str): A string containing one or two (comma separated) dates in ISO format (2019-06-12)
-        match_type (str): One of 'intersect', 'contain' and 'within' to match the provided dates to
-            the temporal extents of datasets. The 'contain' option returns datasets that span a date
-            range and 'within' returns datasets that fall within that date range.
-    """
-
-    db = current.db
-
-    # parse the data query: can be a single iso date or a comma separated pair.
-    try:
-        date_vals = date.split(',')
-        date_vals = [datetime.datetime.strptime(dt, '%Y-%m-%d').date() for dt in date_vals]
-    except ValueError:
-        return {'error': 400, 'message': 'Could not parse dates: {}'.format(date)}
-
-    # Check the number of dates and enforce order
-    if len(date_vals) > 2:
-        return {'error': 400, 'message': 'date contains more than two values: {}'.format(date)}
-    elif len(date_vals) == 2:
-        date_vals.sort()
+    # Zenodo API call to return the records associated with the SAFE community
+    if resources.zenodo.use_sandbox:
+        api = resources.zenodo.zenodo_sandbox_api
     else:
-        # make singular dates a 'range' to use same predicate mechanisms
-        date_vals += date_vals
+        api = resources.zenodo.zenodo_api
 
-    # check the dates against the temporal extents of the datasets
-    if match_type == 'intersect':
-        qry = (~ ((db.published_datasets.temporal_extent_start >= date_vals[1]) |
-                  (db.published_datasets.temporal_extent_end <= date_vals[0])))
-    elif match_type == 'contain':
-        qry = ((db.published_datasets.temporal_extent_start >= date_vals[0]) &
-               (db.published_datasets.temporal_extent_end <= date_vals[1]))
-    elif match_type == 'within':
-        qry = ((db.published_datasets.temporal_extent_start <= date_vals[0]) &
-               (db.published_datasets.temporal_extent_end >= date_vals[1]))
-    else:
-        return {'error': 400, 'message': 'Unknown date match type: {}'.format(match_type)}
+    api = f'{api}/records/?q=communities:{resources.zenodo.community_name}'
 
-    return qry
+    # Provide feedback on DOI collection
+    LOGGER.info(f'Fetching record DOIs from {api}:')
+    FORMATTER.push()
 
+    # The API is paged - it contains a set of records and a link that points 
+    # to the next page of records, so keep looping until there are no more next
+    n_records = 0
+    while True:
 
-def dataset_field_search(text=None, ftype=None):
-    """Search for datasets by data field information
+        # Get the data
+        safe_data = requests.get(api)
 
-    Examples:
-        /api/search/fields?text=temperature
-        /api/search/fields?ftype=numeric
-        /api/search/fields?text=temperature&ftype=numeric
-
-    Args:
-        text (str): A string to look for within the field name and description.
-        ftype (str): A field type to match.
-    """
-
-    db = current.db
-    qry = (db.published_datasets.id == db.dataset_fields.dataset_id)
-
-    if text is not None:
-        qry &= ((db.dataset_fields.field_name.contains(text)) |
-                (db.dataset_fields.description.contains(text)))
-
-    if ftype is not None:
-        qry &= (db.dataset_fields.field_type.ilike(ftype))
-
-    return qry
-
-
-def dataset_text_search(text=None):
-    """Search for datasets by free text search
-
-    Examples:
-        /api/search/text?text=humus
-
-    Args:
-        text (str): A string to look within dataset, worksheet and field
-        descriptions and titles and in dataset keywords.
-    """
-
-    db = current.db
-
-    qry = ((db.published_datasets.id == db.dataset_fields.dataset_id) &
-           (db.published_datasets.id == db.dataset_worksheets.dataset_id) &
-           (db.published_datasets.id == db.dataset_keywords.dataset_id) &
-           ((db.dataset_fields.field_name.contains(text)) |
-            (db.dataset_fields.description.contains(text)) |
-            (db.dataset_worksheets.title.contains(text)) |
-            (db.dataset_worksheets.description.contains(text)) |
-            (db.published_datasets.dataset_title.contains(text)) |
-            (db.published_datasets.dataset_description.contains(text)) |
-            (db.dataset_keywords.keyword.contains(text))
-            ))
-
-    return qry
-
-
-def dataset_parse_spatial(wkt=None, location=None):
-    """
-    Shared function to parse query geometry options - either a location or a WKT - and get
-    # the query geometry as a UTM 50N geometry.
-    """
-    db = current.db
-
-    if (location is not None) and (wkt is not None):
-        return {'error': 400, 'message': 'Provide a location name or a WKT geometry, not both'}
-    elif location is None and wkt is None:
-        return {'error': 400, 'message': 'Provide either a location name or a WKT geometry'}
-    elif location is not None:
-        gazetteer_location = gazetteer_location = db(db.gazetteer.location == location).select(
-            db.gazetteer.wkt_utm50n.st_aswkb().with_alias('wkb')).first()
-        if gazetteer_location is not None:
-            query_geom = gazetteer_location.wkb
+        if safe_data.status_code != 200:
+            raise IOError('Cannot access Zenodo API')
         else:
-            return {'error': 400, 'message': "Unknown location"}
-    elif wkt is not None:
-        # Validate the geometry - there isn't currently a validator, so use the DB (?shapely)
-        # i) Does the WKT parse correctly to a WKB string, assuming WGS84 for now
-        try:
-            query_geom = db.executesql("select st_geomfromtext('{}', 4326);".format(wkt))[0][0]
-        except (db._adapter.driver.ProgrammingError, db._adapter.driver.InternalError):
-            return {'error': 400, 'message': "Could not parse WKT geometry"}
+            # Retrieve the record data and store the DOI for each record
+            safe_data = safe_data.json()
+            for hit in safe_data['hits']['hits']:
+                if hit['id'] not in known_recids:
+                    new_doi.append(hit['doi'])
+            
+            # Reporting
+            n_records += len(safe_data['hits']['hits'])
+            LOGGER.info(f'{n_records}')
 
-        # ii) Do the coordinates seem like lat long?
-        is_lat_long = db.executesql("SELECT ST_XMin(g) >= -180 AND ST_XMax(g) <= 180 AND "
-                                    "   ST_YMin(g) >= -90 AND ST_YMax(g) <= 90 "
-                                    "   FROM (SELECT st_geomfromwkb(decode('{0}', 'hex')) "
-                                    "AS g) AS sel ;".format(query_geom))[0][0]
-        if not is_lat_long:
-            return {'error': 400, 'message': "WKT geometry coordinates not as lat/long"}
+            # Update the link for the next page, unless there is no next page
+            if 'next' in safe_data['links']:
+                api = safe_data['links']['next']
+            else:
+                break
 
-        # iii) Convert to UTM50N
-        query_geom = \
-        db.executesql("SELECT st_transform(st_geomfromwkb(decode('{0}', 'hex')), 32650);".format(query_geom))[0][0]
+    # Use the datacite API to retrieve the citation data associated with the DOI
+    # and save it out to a RIS format file
+    if not new_doi:
+        LOGGER.info('No new DOIs found')
+        return
 
-    return query_geom
+    # Get the DOI data
+    data = []
 
+    FORMATTER.pop()
+    LOGGER.info('Retrieving citation data from Datacite')
+    FORMATTER.push()
 
-def dataset_spatial_search(wkt=None, location=None, distance=0):
-    """Spatial search for sampling locations.
+    for doi in new_doi:
+        
+        ris_data = requests.get(f'https://data.datacite.org/application/x-research-info-systems/{doi}')
+                
+        if ris_data.status_code != 200:
+            LOGGER.warning(f'DOI {doi} not found in datacite.org')
+        else:
+            # Write the response content to the data list. It comes in as byte
+            # data so needs to be decoded to a string variable
+            LOGGER.info(f'Retrieved citation for DOI {doi}')
+            data.append(ris_data.content.decode("utf-8") + '\r\n')
 
-    This endpoint can search for datasets using either a user-provided geometry or the geometry
-    of a named location from the SAFE gazetteer. The sampling locations provided in each dataset
-    are tested to see if they intersect the search geometry and a buffer distance can also be
-    provided to search around the query geometry.
-
-    Note that this endpoint will not retrieve datasets that have not provided sampling locations
-    or use new locations that are missing coordinate information. The bounding box endpoint
-    uses the dataset geographic extent, which is provided for all datasets.
-
-    Examples:
-        /api/search/spatial?location=A_1
-        /api/search/spatial?location=A_1&distance=50
-        /api/search/spatial?wkt=Point(116.5 4.75)
-        /api/search/spatial?wkt=Point(116.5 4.75)&distance=50000
-        /api/search/spatial?wkt=Polygon((110 0, 110 10,120 10,120 0,110 0))
-
-    Args:
-        wkt (str): A well-known text geometry. This is assumed to use latitude and longitude
-            coordinates in WGS84 (EPSG:4326).
-        location (str): A location name used to select a query geometry from the SAFE gazetteer.
-        distance (float): A search distance in metres. All geometries are converted to the
-            UTM 50N projection to provide appopriate distance searching.
-    """
-
-    db = current.db
-
-    # validate the query geometry options and report back if there is an error
-    query_geom = dataset_parse_spatial(wkt, location)
-    if isinstance(query_geom, dict):
-        return query_geom
-
-    qry = ((db.published_datasets.id == db.dataset_locations.dataset_id) &
-           (db.dataset_locations.name == db.gazetteer.location) &
-           ((db.gazetteer.wkt_utm50n.st_distance(query_geom) <= distance) |
-            (db.dataset_locations.wkt_utm50n.st_distance(query_geom) <= distance)))
-
-    return qry
-
-
-def dataset_spatial_bbox_search(wkt=None, location=None, match_type='intersect', distance=None):
-    """Spatial search for dataset bounding boxes
-
-    The endpoint can search for datasets using either a user-provided geometry or a location
-    name from the SAFE gazetteer. This endpoint uses only the dataset bounding box, which is
-    provided for all datasets, rather than sampling location information which may not be
-    recorded for some datasets.
-
-    Examples:
-        /api/search/bbox?wkt=Polygon((110 0, 110 10,120 10,120 0,110 0))
-        /api/search/bbox?wkt=Polygon((116 4.5,116 5,117 5,117 4.5,116 4.5))
-        /api/search/bbox?wkt=Polygon((116 4.5,116 5,117 5,117 4.5,116 4.5))&match_type=contain
-        /api/search/bbox?wkt=Point(116.5 4.75)&match_type=within
-
-    Args:
-        wkt (str): A well-known text geometry. This is assumed to use latitude and longitude
-            coordinates in WGS84 (EPSG:4326).
-        location (str): A location name used to select a query geometry from the SAFE gazetteer.
-        match_type (str): One of 'intersect', 'contain' and 'within' to match the provided geometry
-            to the geographic extents of datasets. The 'contain' option returns datasets that
-            completely cover the query geometry and 'within' returns datasets that fall entirely
-            within the query geometry.
-
-    """
-
-    db = current.db
-
-    # validate the query geometry options and report back if there is an error
-    query_geom = dataset_parse_spatial(wkt, location)
-    if isinstance(query_geom, dict):
-        return query_geom
-
-    # validate the match type
-    if match_type not in ['intersect', 'contain', 'within', 'distance']:
-        return {'error': 400, 'message': "Unknown spatial match type: {}".format(match_type)}
-
-        # Query the geographic extents with the appropriate predicate
-    if match_type == 'intersect':
-        qry = (db.published_datasets.geographic_extent_utm50n.st_intersects(query_geom))
-    elif match_type == 'contain':
-        qry = (db.published_datasets.geographic_extent_utm50n.st_contains(query_geom))
-    elif match_type == 'within':
-        qry = (db.published_datasets.geographic_extent_utm50n.st_within(query_geom))
-    elif match_type == 'distance':
-        qry = (db.published_datasets.geographic_extent_utm50n.st_distance(query_geom) <= distance)
-
-    return qry
-
-
-def get_index():
-    """
-    Function to generate a JSON string containing the formatted contents of the dataset files
-    table. This is used as the core index of the safedata package, so is cached in a file
-    like format along with MD5 hashes of the index and other files to speed up checking for
-    updates and refreshing the index.
-    """
-
-    # version of the data contained in the dataset description
-    db = current.db
-    qry = (db.published_datasets.id == db.dataset_files.dataset_id)
-    val = dataset_query_to_json(qry,
-                                fields=[('published_datasets', 'publication_date'),
-                                        ('published_datasets', 'zenodo_concept_id'),
-                                        ('published_datasets', 'zenodo_record_id'),
-                                        ('published_datasets', 'dataset_access'),
-                                        ('published_datasets', 'dataset_embargo'),
-                                        ('published_datasets', 'dataset_title'),
-                                        ('published_datasets', 'most_recent'),
-                                        ('dataset_files', 'checksum'),
-                                        ('dataset_files', 'filename'),
-                                        ('dataset_files', 'filesize')])
-
-    # repackage the db output into a single dictionary per file
-    entries = val['entries'].as_list()
-    [r['published_datasets'].update(r.pop('dataset_files')) for r in entries]
-    val['entries'] = [r['published_datasets'] for r in entries]
-
-    # Find the hashes
-    index_hash = hashlib.md5(json(val).encode('utf-8')).hexdigest()
-
-    # Use the file hash of the static gazetteer geojson
-    gazetteer_file = os.path.join(current.request.folder, 'static', 'files', 'gis', 'gazetteer.geojson')
-    with open(gazetteer_file) as f:
-        gazetteer_hash = hashlib.md5(f.read().encode('utf-8')).hexdigest()
-
-    # Use the file hash of the static locations alias csv
-    location_aliases_file = os.path.join(current.request.folder, 'static', 'files', 'gis', 'location_aliases.csv')
-    with open(location_aliases_file) as f:
-        location_aliases_hash = hashlib.md5(f.read().encode('utf-8')).hexdigest()
-
-    return dict(hashes=dict(index=index_hash,
-                            gazetteer=gazetteer_hash,
-                            location_aliases=location_aliases_hash),
-                index=val)
-
-    # return the dictionary - this will be json serialised by the API when it is returned
-    return val
+    FORMATTER.pop()
+    
+    return data
