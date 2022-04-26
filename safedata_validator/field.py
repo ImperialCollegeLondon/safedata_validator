@@ -215,8 +215,8 @@ class Dataset:
                   ((dataset_extent.extent[0] < summary_extent.extent[0]) or
                    (dataset_extent.extent[1] > summary_extent.extent[1]))):
 
-                LOGGER.error(f'The {label} extent provided in the dataset Summary '
-                             f'is narrower than the provided data {dataset_extent.extent}')
+                LOGGER.error(f'{label} extent values from the data fall outside the extents '
+                             f'set in the Summary sheet ({[str(x) for x in dataset_extent.extent]})')
             elif dataset_extent.populated and summary_extent.populated:
 
                 LOGGER.warning(f'The {label} extent is set in Summary but also '
@@ -284,11 +284,11 @@ class Dataset:
         for ext in ('temporal_extent', 'latitudinal_extent', 'longitudinal_extent'):
             sum_ext = getattr(self.summary, ext)
             if sum_ext is not None:
-                json_dict[sum_ext] = sum_ext.extent
+                json_dict[ext] = sum_ext.extent
             else:
-                json_dict[sum_ext] = self.extent
+                json_dict[ext] = self.extent
 
-        return simplejson.dumps(json_dict)
+        return simplejson.dumps(json_dict, default=str, indent=2)
 
 class DataWorksheet:
 
