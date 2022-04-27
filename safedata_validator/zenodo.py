@@ -11,7 +11,7 @@ from shapely import geometry
 import hashlib
 # from gluon.serializers import json
 import rispy
-
+import shutil
 
 from safedata_validator.resources import Resources
 from safedata_validator.logger import LOGGER, FORMATTER
@@ -1271,5 +1271,186 @@ def download_ris_data(resources: Resources = None, ris_file: str = None) -> list
             data.append(ris_data.content.decode("utf-8") + '\r\n')
 
     FORMATTER.pop()
-    
+
     return data
+
+
+
+
+
+
+
+
+
+
+
+def sync_local_dir(datadir: str, resources: Resources = None, api: str = None, 
+                   xlsx_only: bool = True) -> None:
+
+    """
+    The safedata R package defines a directory structure used to store metadata
+    and files downloaded from a safedata community on Zenodo and from a safedata
+    metadata server. This tool allows a safedata developer or community
+    maintainer to create or update such a directory with _all_ of the resources
+    in the Zenodo community, regardless of their public access status. This
+    forms a backup (although Zenodo is heavily backed up) but also provides
+    local copies of the files for testing and development of the code packages.
+
+    You need to provide a Zenodo API token to use this script. That is obtained
+    by logging into the Zenodo account managing the community and going to the
+    Applications tab and creating a personal access token. These allow root
+    level access to the community files so must be treated carefully!
+
+    If this is a new data directory, you also need to provide the API url for
+    the safedata metadata server.
+
+    Args:
+        datadir: The path to a local directory containing an existing safedata
+            directory or an empty folder in which to create one.
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
+        api: An API from which JSON dataset metadata can be downloaded. If 
+            datadir is an existing safedata directory, then the API will be read
+            from `url.json`.
+        xlsx_only: Should the download ignore large non-xlsx files, defaulting
+            to True.
+    """
+
+    # Private helper functions
+    def _get_file(url: str, outf:str, params: dict=None) -> None:
+        """Download a file from a URL
+        """
+        resource = requests.get(url, params=params, stream=True)
+
+        with open(outf, 'wb') as outf_obj:
+            shutil.copyfileobj(resource.raw, outf_obj)
+
+    def _md5(fname:str) -> str:
+        """Calculate a local file md5 hash
+        """
+        hash_md5 = hashlib.md5()
+        with open(fname, "rb") as fname_obj:
+            for chunk in iter(lambda: fname_obj.read(4096), b""):
+                hash_md5.update(chunk)
+        return hash_md5.hexdigest()
+
+    # Get resource configuration
+    if resources is None:
+        resources = Resources()
+
+    # Get the Zenodo API 
+    if resources.zenodo.use_sandbox:
+        zenodo_api = resources.zenodo.zenodo_sandbox_api
+        token = resources.zenodo.zenodo_sandbox_token
+    else:
+        zenodo_api = resources.zenodo.zenodo_api
+        token = resources.zenodo.zenodo_token
+
+    # The dir argument should be an existing path
+    if not (os.path.exists(datadir) and os.path.isdir(datadir)):
+        raise IOError(f'{datadir} is not an existing directory')
+
+    # Check for an existing API url file and then see what is provided and resolve
+    url_file = os.path.join(datadir, 'url.json')
+
+    if os.path.exists(url_file):
+        with open(url_file, 'r') as urlf:
+            dir_api = simplejson.load(urlf)['url'][0]
+    else:
+        dir_api = None
+
+    if api is None and dir_api is None:
+        raise RuntimeError('API not provided or found in directory')
+
+    if api is not None and dir_api is not None and api != dir_api:
+        raise RuntimeError('Provided api does not match existing api in directory')
+    
+    if api is not None and dir_api is None:
+        with open(url_file, 'w') as urlf:
+            simplejson.dump({'url': [api]}, urlf)
+    else:
+        api = dir_api
+    
+    # Download index files - don't bother to check for updates, this isn't
+    # a frequent thing to do
+    LOGGER.info("Downloading index files")
+    _get_file(f'{api}/api/index', os.path.join(datadir, 'index.json'))
+    _get_file(f'{api}/api/gazetteer', os.path.join(datadir, 'gazetteer.geojson'))
+    _get_file(f'{api}/api/location_aliases', os.path.join(datadir, 'location_aliases.csv'))
+
+    # Get the deposits associated with the account, which includes a list of download links
+    params = {'access_token': token, 'page': 1}
+    deposits = []
+
+    LOGGER.info("Scanning Zenodo deposits")
+    while True:
+        this_page = requests.get(zenodo_api + '/deposit/depositions',
+                                 params=params,
+                                 json={},
+                                 headers={"Content-Type": "application/json"})
+
+        if not this_page.ok:
+            raise RuntimeError('Could not connect to Zenodo API. Invalid token?')
+
+        if this_page.json():
+            deposits += this_page.json()
+            print(f" - Page {params['page']}")
+            params['page'] += 1
+        else:
+            break
+
+    LOGGER.info(f"Processing {len(deposits)} deposits")
+
+    # Download the files
+    for dep in deposits:
+
+        con_rec_id = str(dep['conceptrecid'])
+        rec_id = str(dep['record_id'])
+
+        if not dep['submitted']:
+            LOGGER.info(f'Unsubmitted draft {con_rec_id}/{rec_id}')
+            continue
+
+        LOGGER.info(f'Processing deposit {con_rec_id}/{rec_id}')
+        FORMATTER.push()
+
+        # Create the directory structure if needed
+        rec_dir = os.path.join(datadir, con_rec_id, rec_id)
+        if not os.path.exists(rec_dir):
+            LOGGER.info('Creating directory')
+            os.makedirs(rec_dir)
+        else:
+            LOGGER.info('Directory found')
+
+        # loop over the files in the record
+        for this_file in dep['files']:
+
+            if xlsx_only and not this_file['filename'].endswith('.xlsx'):
+                LOGGER.info(f"Skipping non-excel file {this_file['filename']}")
+                continue
+
+            LOGGER.info(f"Processing {this_file['filename']}")
+            FORMATTER.push()
+
+            outf = os.path.join(rec_dir, this_file['filename'])
+            local_copy = os.path.exists(outf)
+
+            if not local_copy:
+                LOGGER.info("Downloading")
+                _get_file(this_file['links']['download'], outf, params=params)
+            elif local_copy and _md5(outf) != this_file['checksum']:
+                LOGGER.warning("Local copy modified")
+            else:
+                LOGGER.info("Already present")
+            
+            FORMATTER.pop()
+        
+        # Get the metadata json
+        metadata = os.path.join(rec_dir, f"{rec_id}.json")
+        if os.path.exists(metadata):
+            LOGGER.info("JSON Metadata found")
+        else:
+            LOGGER.info("Downloading JSON metadata ")
+            _get_file(f'{api}/record/{rec_id}', metadata)
+        
+        FORMATTER.pop()

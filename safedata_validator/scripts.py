@@ -4,7 +4,7 @@ import argparse
 import textwrap
 from safedata_validator.version import __version__
 from safedata_validator.field import Dataset
-from safedata_validator.zenodo import download_ris_data
+from safedata_validator.zenodo import download_ris_data, sync_local_dir
 from safedata_validator.logger import LOGGER
 
 def _safedata_validator_cli():
@@ -61,9 +61,6 @@ def _safedata_validator_cli():
         sys.stdout.write('------------------------\n')
 
 
-
-
-
 def _safedata_download_ris_cli():
     """
     This program maintains a RIS format bibliography file of the datasets
@@ -100,3 +97,41 @@ def _safedata_download_ris_cli():
     with open(args.ris_file, write_mode) as ris_file:
         for this_entry in data:
             ris_file.write(this_entry)
+
+
+def _safedata_sync_local_dir():
+
+    """
+    The safedata R package defines a directory structure used to store metadata
+    and files downloaded from a safedata community on Zenodo and from a safedata
+    metadata server. This tool allows a safedata developer or community
+    maintainer to create or update such a directory with _all_ of the resources
+    in the Zenodo community, regardless of their public access status. This
+    forms a backup (although Zenodo is heavily backed up) but also provides
+    local copies of the files for testing and development of the code packages.
+
+    You need to provide a Zenodo API token to use this script. That is obtained
+    by logging into the Zenodo account managing the community and going to the
+    Applications tab and creating a personal access token. These allow root
+    level access to the community files so must be treated carefully!
+
+    If this is a new data directory, you also need to provide the API url for
+    the safedata metadata server.
+    """
+
+    desc = textwrap.dedent(_safedata_sync_local_dir.__doc__)
+    fmt = argparse.RawDescriptionHelpFormatter
+    parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
+    
+    parser.add_argument('datadir', type=str, help='The path to a local directory containing '
+                        'an existing safedata directory or an empty folder in which to create one')
+    parser.add_argument('--api', type=str, default=None,
+                        help='An API from which JSON dataset metadata can be downloaded. If '
+                        'datadir is an existing safedata directory, then the API will be read '
+                        'from `url.json`.')
+    parser.add_argument('--xlsx_only', type=bool, default=True,
+                        help='Should the download ignore large non-xlsx files, defaulting '
+                        'to True.')
+
+    args = parser.parse_args()
+    sync_local_dir(**vars(args))
