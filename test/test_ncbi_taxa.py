@@ -1,4 +1,5 @@
 import pytest
+import copy
 from safedata_validator import ncbi_taxa
 from safedata_validator.resources import Resources
 from logging import ERROR, WARNING, INFO
@@ -691,6 +692,7 @@ def test_validate_and_add_taxon_validate(caplog, test_input, expected_log_entrie
     database logs the correct information.
     """
 
+    test_input = copy.deepcopy(test_input)
     ncbi_instance = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
     fnd_tx = ncbi_instance.validate_and_add_taxon(test_input)
 
