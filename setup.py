@@ -20,9 +20,8 @@ setuptools.setup(
     entry_points = {
             'console_scripts':
              ['safedata_validate=safedata_validator.scripts:_safedata_validator_cli',
-              'safedata_download_ris=safedata_validator.scripts:_safedata_download_ris_cli',
-              'safedata_sync_local_dir=safedata_validator.scripts:_safedata_sync_local_dir',
-              ]
+              'safedata_zenodo=safedata_validator.scripts:_safedata_zenodo_cli',
+             ]
     },
     license='MIT',
     classifiers=[
