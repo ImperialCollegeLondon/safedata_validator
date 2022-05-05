@@ -5,9 +5,8 @@ datasets and to validate taxonomy against the GBIF backbone database.
 The NCBITaxon dataclass is used to store data about a taxon entry in a dataset. It
 is initialised with user data and then the taxon Validator classes can be used
 to update a NCBITaxon object with the result of NCBI validation. The two validation
-classes use either the online API (`RemoteNCBIValidator`) or faster validation
-against a local copy of the NCBI taxonomy database (`LocalNCBIValidator`). Online
-validation is done via the Entrez tools which we access by making use of BioPython.
+classes use either the set of online NCBI Entrez Eutils (`RemoteNCBIValidator`) or
+faster validation against a local copy of the NCBI taxonomy database (`LocalNCBIValidator`).
 
 The dataset 'NCBITaxa' worksheet provides a set of taxonomic entries and the NCBITaxa
 class is used to load and collate the set of taxonomic entries from a dataset.
@@ -24,7 +23,7 @@ import time
 from lxml import etree
 
 import urllib
-from urllib.request import urlopen
+import requests
 from enforce_typing import enforce_types
 
 from safedata_validator.resources import Resources
@@ -643,15 +642,13 @@ class RemoteNCBIValidator:
         while success == False and att < 5:
             # Increment counter and make the request
             att += 1
-            handle = urlopen(url)
-            text = handle.read()
-            handle.close()
+            recrd = requests.get(url)
 
             # Wait a 10th of a second after each request
             time.sleep(0.1)
 
             # exit loop if a proper response is recived
-            if handle.status == 200:
+            if recrd.status_code == 200:
                 success = True
 
         # raise error if a successful response hasn't been obtaines
@@ -659,14 +656,13 @@ class RemoteNCBIValidator:
             raise NCBIError('Connection error to remote server')
 
         # Parse the xml
-        root = etree.fromstring(text)
+        root = etree.fromstring(recrd.content)
 
         # Check to see if the xml contains any information
         if len(root) == 0:
             # If not delete it
             root = None
 
-        print(type(root))
         return root
 
     # Functionality to find taxa information from genbank ID
