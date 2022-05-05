@@ -20,10 +20,11 @@ are either a GBIF backbone rank or superkingdom.
 from typing import Union, Optional
 import dataclasses
 import sqlite3
-from Bio import Entrez
+import time
+from lxml import etree
 
-import requests
 import urllib
+from urllib.request import urlopen
 from enforce_typing import enforce_types
 
 from safedata_validator.resources import Resources
@@ -31,12 +32,6 @@ from safedata_validator.logger import (COUNTER_HANDLER, FORMATTER, LOGGER,
                                        loggerinfo_push_pop)
 from safedata_validator.validators import (GetDataFrame, HasDuplicates,
                                            IsLower, blank_value)
-
-# ADD TO RESOURCE FILE, AS A CHECK THAT USER HAS PROVIDED ONE
-# Key should also be added to the resource file
-Entrez.email = "jacobcook1995@gmail.com"
-# Hard coding api key in for now
-user_key = "1738fe86eba2d8fc287ff0d1dcbfeda44a0a"
 
 # TODO - Modify the resource file to ask the user to provide an email address
 # This should only be done if the user actually wants to use this module as it
@@ -59,7 +54,7 @@ class NCBIError(Exception):
         message: explanation of the error
     """
 
-    def __init__(self, message="NCBI taxa ID not found"):
+    def __init__(self, message="No entry found for ID, probably bad ID"):
         self.message = message
         super().__init__(self.message)
 
@@ -266,7 +261,7 @@ class LocalNCBIValidator:
             taxon_row = self.ncbi_conn.execute(sql).fetchone()
             # If it's not found then give bad ID error
             if taxon_row == None:
-                raise NCBIError("No entry found from ID, probably bad ID")
+                raise NCBIError()
             else:
                 sql = f"select * from nodes where tax_id = {taxon_row['new_tax_id']}"
                 taxon_row = self.ncbi_conn.execute(sql).fetchone()
@@ -613,6 +608,67 @@ class RemoteNCBIValidator:
     and just contains methods, but duplicates the structure so that
     the two Validators are interchangeable.
     """
+    # COULD SET THIS UP TO POPULATE FROM THE RESOURCE FILE
+    # HOWEVER NCBI SAY THAT THIS SHOULD BE DEVELOPER DEFINED RATHER THAN USER DEFINED
+    # (SEE LINK BELOW) "https://www.ncbi.nlm.nih.gov/books/NBK25497/"
+    # NEED TO THINK ABOUT TOOL NAME AND EMAIL IF SO
+    def __init__(self):
+
+        # Question as to whether I need email and tool here
+        # THINK WE NEED TO DEFINE THEM AND REGISTER WITH NCBI, BUT NOT NEEDED BEFORE THEN
+        # THINK I NEED TO ADD TOOL AND EMAIL TO THE
+        self.email = "jacobcook1995@gmail.com"
+        self.tool = "SAFE_data_validator"
+        self.api_key = "1738fe86eba2d8fc287ff0d1dcbfeda44a0a"
+
+    def taxonomy_efetch(self, ncbi_id: int):
+        """A function that uses the online NCBI eutils function efetch to fetch
+        the entry for a specific NCBI ID. This function checks for connection
+        errors, and rate limits to ensure that only 10 requests per second are
+        made. If this is successful the xml output is stored as an element tree.
+
+        Params:
+            ncbi_id: The NCBI ID to fetch the record for
+
+        Returns:
+            lxml.etree._Element: Output XML stored as an element tree
+        """
+        # Construct url
+        url = (f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db='
+               f'taxonomy&id={ncbi_id}&api_key={self.api_key}')
+
+        # Set up while loop to make the request up to 5 times if neccessary
+        success = False
+        att = 0
+        while success == False and att < 5:
+            # Increment counter and make the request
+            att += 1
+            handle = urlopen(url)
+            text = handle.read()
+            handle.close()
+
+            # Wait a 10th of a second after each request
+            time.sleep(0.1)
+
+            # exit loop if a proper response is recived
+            if handle.status == 200:
+                success = True
+
+        # raise error if a successful response hasn't been obtaines
+        if success == False:
+            raise NCBIError('Connection error to remote server')
+
+        # Parse the xml
+        root = etree.fromstring(text)
+
+        # Check to see if the xml contains any information
+        if len(root) == 0:
+            # If not delete it
+            root = None
+
+        print(type(root))
+        return root
+
     # Functionality to find taxa information from genbank ID
     def id_lookup(self, nnme: str, ncbi_id: int):
         """Method to return full taxonomic information from a NCBI ID. It will
@@ -637,22 +693,31 @@ class RemoteNCBIValidator:
             raise ValueError('Negative NCBI taxonomy ID')
 
         # Use efetch to find taxonomy details based on the index
-        try:
-            handle = Entrez.efetch(db="taxonomy",id=f"{ncbi_id}",
-                                   retmode="xml",api_key=user_key)
-            tax_dic = Entrez.read(handle)[0]
-            handle.close()
-        # And case where a connection can't be made to the remote server
-        except urllib.error.HTTPError:
-            raise NCBIError('Connection error to remote server')
-        # Catch case where the index isn't found
-        except IndexError:
-            raise NCBIError("No entry found from ID, probably bad ID")
+        taxon_row = self.taxonomy_efetch(ncbi_id)
 
-        # Then extract the lineage (if it has one)
-        if tax_dic["ParentTaxId"] != "1":
-            linx = tax_dic["LineageEx"]
-        # Raise and error
+        # Catch case where no entry was found
+        if taxon_row == None:
+            raise NCBIError()
+
+        # Track down parent ID
+        PID = taxon_row.findall("./Taxon/ParentTaxId")
+
+        # Use this to decide whether to track down the lineage
+        if PID[0].text != "1":
+            # Preallocate list to store lineage
+            linx = []
+            # Find full lineage
+            Lin = taxon_row.findall("./Taxon/LineageEx/Taxon")
+            # Then loop over elements in the lineage
+            for ind in range (0,len(Lin)):
+                tmp_dic = {}
+                # Store all relevant info
+                tmp_dic['TaxID'] = Lin[ind][0].text
+                tmp_dic['ScientificName'] = Lin[ind][1].text
+                tmp_dic['Rank'] = Lin[ind][2].text
+                # And add all of it to the Lineage
+                linx.append(tmp_dic)
+        # If no lineage raise an error
         else:
             LOGGER.error(f'Taxon hierarchy for {nnme} contains no backbone ranks')
             return
@@ -662,10 +727,13 @@ class RemoteNCBIValidator:
         # Extract parent taxa ranks
         rnks = [linx[i]["Rank"] for i in range(tx_len)]
 
+        # Find rank of the taxon
+        RNK = taxon_row.findall("./Taxon/Rank")
+
         # Check that the taxon rank provided is a backbone rank
-        if tax_dic["Rank"] in BACKBONE_RANKS_EX:
+        if RNK[0].text in BACKBONE_RANKS_EX:
             # In this case use provided rank
-            rnk = BACKBONE_RANKS_EX.index(tax_dic["Rank"])
+            rnk = BACKBONE_RANKS_EX.index(RNK[0].text)
 
         # Filter out ID's with non-backbone ranks (e.g. strains)
         else:
@@ -683,7 +751,7 @@ class RemoteNCBIValidator:
                     # Add 1 to the rank as only including lineage in this case
                     rnk = r_ID + 1
                     # Warn user that non-backbone rank has been supplied
-                    LOGGER.warning(f'{nnme} of non-backbone rank: {tax_dic["Rank"]}')
+                    LOGGER.warning(f'{nnme} of non-backbone rank: {RNK[0].text}')
                 # Raise error once backbone ranks have been exhausted
                 elif r_ID < 1:
                     LOGGER.error(f'Taxon hierarchy for {nnme} contains no backbone ranks')
@@ -710,35 +778,39 @@ class RemoteNCBIValidator:
         # Find valid indices (e.g. those corresponding to backbone ranks)
         vinds = [idx for idx, element in enumerate(rnks) if element in actual_bb_rnks]
 
+        # Find scientific name and ID of the taxon
+        SNME = taxon_row.findall("./Taxon/ScientificName")
+        TID = taxon_row.findall("./Taxon/TaxId")
+
         # Create dictonary of valid taxa lineage using a list
         if len(actual_bb_rnks) != 0:
             red_taxa = {f"{actual_bb_rnks[0]}":(str(linx[vinds[0]]["ScientificName"]),
-                        int(linx[vinds[0]]["TaxId"]),None)}
+                        int(linx[vinds[0]]["TaxID"]),None)}
 
             # Requersively add all the hierarchy data in
             for i in range(1,rnk-m_rnk):
                 red_taxa[f"{actual_bb_rnks[i]}"] = (str(linx[vinds[i]]["ScientificName"]),
-                                                    int(linx[vinds[i]]["TaxId"]),
-                                                    int(linx[vinds[i-1]]["TaxId"]))
+                                                    int(linx[vinds[i]]["TaxID"]),
+                                                    int(linx[vinds[i-1]]["TaxID"]))
 
             # Then add taxa information as a final entry
-            red_taxa[f"{tax_dic['Rank']}"] = (str(tax_dic["ScientificName"]),
-                                              int(tax_dic["TaxId"]),
-                                              int(linx[vinds[-1]]["TaxId"]))
+            red_taxa[f"{RNK[0].text}"] = (str(SNME[0].text),int(TID[0].text),
+                                          int(linx[vinds[-1]]["TaxID"]))
         else:
             # Just make taxa with individual rank if no valid lineage provided
-            red_taxa = {f"{tax_dic['Rank']}":(str(tax_dic["ScientificName"]),
-                        int(tax_dic["TaxId"]),None)}
+            red_taxa = {f"{RNK[0].text}":(str(SNME[0].text),
+                        int(TID[0].text),None)}
 
         # Create and populate microbial taxon
-        mtaxon = NCBITaxon(name=tax_dic['ScientificName'],rank=tax_dic['Rank'],
-                           ncbi_id=int(tax_dic["TaxId"]),taxa_hier=red_taxa)
+        mtaxon = NCBITaxon(name=SNME[0].text,rank=RNK[0].text,ncbi_id=int(TID[0].text),
+                           taxa_hier=red_taxa)
 
         # Check if AkaTaxIds exists in taxonomic information
-        if 'AkaTaxIds' in tax_dic.keys():
+        AKA = taxon_row.findall("./Taxon/AkaTaxIds")
+        if len(AKA) != 0:
             # Warn user that they've given a superseeded taxa ID
-            LOGGER.warning(f"NCBI ID {(tax_dic['AkaTaxIds'])[0]} has been "
-                            f"superseeded by ID {tax_dic['TaxId']}")
+            LOGGER.warning(f"NCBI ID {ncbi_id} has been superseeded by ID "
+                            f"{TID[0].text}")
             # Record that a superseeded NCBI ID has been provided
             mtaxon.superseed = True
 
@@ -1019,7 +1091,6 @@ class NCBITaxa:
         self.hierarchy = set()
         self.n_errors = None
 
-        # At the moment we only have one validator defined
         # Get a validator instance
         if resources.use_local_ncbi:
             self.validator = LocalNCBIValidator(resources)
