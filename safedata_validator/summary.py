@@ -371,7 +371,7 @@ class Summary:
                 for is_doi in pub_doi_re:
                     if is_doi:
                         api_call = f'https://doi.org/api/handles/{is_doi.string[is_doi.end():]}'
-                        r = requests.get(api_call, verify=False)
+                        r = requests.get(api_call)
                         if r.json()['responseCode'] != 1:
                             LOGGER.error(f'DOI not found: {is_doi.string}')
 
