@@ -1,648 +1,153 @@
 import os
 import datetime
 from lxml import etree
+from regex import P
 import simplejson
 import copy
-import safedata_validator
 from io import StringIO
 import requests
-from safe_web_global_functions import safe_mailer
+# from safe_web_global_functions import safe_mailer
 from itertools import groupby
 from shapely import geometry
 import hashlib
-from gluon.serializers import json
+# from gluon.serializers import json
+import rispy
+import shutil
 
-# The web2py HTML helpers are provided by gluon. This also provides the 'current' object, which
-# provides the web2py 'request' API (note the single letter difference from the requests package!).
-# The 'current' object is also extended by models/db.py to include the current 'db' DAL object
-# and the 'myconf' AppConfig object so that they can accessed by this module
+from tqdm import tqdm
+from tqdm.utils import CallbackIOWrapper
+from contextlib import nullcontext
 
-from gluon import *
+from typing import Tuple, Union
 
+
+from safedata_validator.resources import Resources
+from safedata_validator.logger import LOGGER, FORMATTER
 """
-This module provides functions to handle datasets within the SAFE website. 
-These are called from the datasets controller but are also needed from other locations, 
-such as the scheduler, so are defined here in their own module.
+This module provides functions to:
+1. handle the publication of datasets after they have been validated 
+   using safedata_validate,
+2. maintain local copies of datasets in the folder structure expected 
+   by the safedata R package.
+3. compile a RIS format bibliographic file for published datasets.
 """
 
-
-def verify_dataset(record_id, email=False):
-    """
-    Function to run safedata_validator on an uploaded file. There
-    are three possible outcomes for a dataset: PASS; FAIL, if the check
-    catches known formatting problems; and ERROR if check hits an exception,
-    which probably means an update to the checker code to handle the new
-    and exciting way of getting the file wrong.
-
-    This assumes that the local python has safedata_validator installed and
-    correctly configured with local file resources. See the documentation
-    for that package for details.
-
-    The email argument allows the function to be run by admins directly
-    using the administer_datasets controller without spamming the uploader.
-    Useful in error checking problem uploads.
-
-    This function is also used as a scheduler task, so needs some extra
-    care to make sure it runs in the environment of a scheduler worker
-    as well as in the environment of the website.
-
-    Args:
-        record_id: The id of the record from the dataset table that is to be checked.
-        email: Should the dataset uploader be emailed the outcome?
-
-    Returns:
-        A string describing the outcome of the check that gets stored in the
-        scheduler results or sent back to the administer_datasets controller.
-        This is primarily a user friendly bit of text for popping up in a
-        website flash, not an Exception message, so those are stored elsewhere
-        for an admin to look at.
+def _resources_to_zenodo_api(resources: Resources = None):
+    """Private function to return the Zenodo API and access token
+    from the configuration.
     """
 
-    # Load the host name from the configuration. When run from a controller,
-    # the URL(host=TRUE) has access to the host name from requests. This isn't
-    # true when it is run by a scheduler worker, which isn't operating as part
-    # of the website. So rather than hardcoding, store the host name in the config
-    try:
-        host = current.myconf.take('host.host_name')
-    except BaseException:
-        raise RuntimeError('Site config does provide not the host name')
+    # Get resource configuration
+    if resources is None:
+        resources = Resources()
 
-    # get the record
-    record = current.db.submitted_datasets[record_id]
-
-    # track errors to avoid hideous nested try statements
-    error = False
-
-    if record is None:
-        # not a valid record? Can't email anyone so turn that off
-        ret_msg = 'Verifying dataset {}: unknown record ID'.format(record_id)
-        email = False
-        error = True
+    # Get the Zenodo API 
+    if resources.zenodo.use_sandbox:
+        zenodo_api = resources.zenodo.zenodo_sandbox_api
+        token = resources.zenodo.zenodo_sandbox_token
     else:
-        # otherwise, create a return dictionary for all remaining failure
-        # modes (no report, but file, uploader and URL should fine) and
-        # set the default outcome
-        ret_dict = {'report': '',
-                    'filename': record.file_name,
-                    'name': record.uploader_id.first_name,
-                    'dataset_url': URL('datasets', 'submitted_dataset_status',
-                                       vars={'id': record.id},
-                                       scheme=True, host=host)}
-        outcome = 'ERROR'
+        zenodo_api = resources.zenodo.zenodo_api
+        token = resources.zenodo.zenodo_token
 
-    # Initialise the dataset checker:
-    if not error:
-        # - get paths to dataset file. Failure to find is handled by safedata_validator methods.
-        fname = os.path.join(current.request.folder, 'uploads', 'submitted_datasets', record.file)
-        # get the Dataset object from the file checker
-        try:
-            dataset = safedata_validator.Dataset(fname, verbose=False)
-        except Exception as e:
-            # We don't want to bail here because we might want to email the uploader,
-            # but we do want to record what went wrong. We store it in the dataset record, which
-            # is the only venue when run from a controller. If I could work out where the scheduler
-            # run output comes from, I'd do that too.
-            record.update_record(dataset_check_outcome='ERROR',
-                                 dataset_check_error=repr(e))
-            ret_msg = 'Verifying dataset {}: error initialising dataset checker'
-            ret_msg = ret_msg.format(record.id)
-            error = True
+    return zenodo_api, {'access_token': token}, resources.zenodo.community_name
 
-    # main processing of the dataset
-    if not error:
-        try:
-            # load the metadata sheets
-            dataset.load_summary(validate_doi=True, project_id=record.project_id)
-
-            dataset.load_taxa()
-            dataset.load_locations()
-
-            # check the dataset worksheets, after checking there are some
-            # as the metadata might only document external data files
-            if dataset.dataworksheet_summaries is not None:
-                for ws in dataset.dataworksheet_summaries:
-                    dataset.load_data_worksheet(ws)
-
-            # cross check the taxa and locations
-            dataset.final_checks()
-
-        except Exception as e:
-            ret_msg = 'Verifying dataset {}: error running dataset checking'
-            ret_msg = ret_msg.format(record.id)
-            dataset_check_error = repr(e)
-        else:
-            if dataset.passed:
-                outcome = 'PASS'
-                ret_msg = 'Verifying dataset {}: dataset checking PASSED'.format(record.id)
-            else:
-                outcome = 'FAIL'
-                ret_msg = 'Verifying dataset {}: dataset checking FAILED'.format(record.id)
-
-            dataset_check_error = ''
-
-        # At this point, we have a Dataset object, so can populate the record with
-        # what information is available, regardless of Error, Fail or Pass
-        # - The DAL handles conversion of the python structure into JSON, so
-        #   can just pass the objects. Previously, used simplejson.dumps, which
-        #   meant they were stored as a string, so needed reloading rather than
-        #   being saved natively as JSON
-
-        # First, need to extract the check report from the StringIO object and
-        # substitute in the user filename for the local web2py filename. Also,
-        # wrap it in <pre> for display purposes.
-        if outcome == 'ERROR':
-            report_text = ""
-        else:
-            # TODO - something about the safedata_validator logger setup is causing
-            #        large numbers of null characters to be included in the report
-            #        text, which then prevents things from being written to the DB
-            #        The replace here is a hack to clear them out, but this needs
-            #        to be fixed upstream.
-            report_text = dataset.report().getvalue().replace('\x00', '')
-            report_text = PRE(report_text.replace(fname, record.file_name))
-            # Update the ret_dict to insert the report text
-            ret_dict['report'] = report_text
-
-        # get the dataset_metadata and update to store the actual filename
-        dataset_metadata = dataset.export_metadata_dict()
-        dataset_metadata['filename'] = record.file_name
-
-        # In the submitted datasets table, taxa, locations and metadata are
-        # all stored in dataset_metadata. When a dataset is published, taxa
-        # and locations are separated out into the dataset_* tables.
-        record.update_record(dataset_check_outcome=outcome,
-                             dataset_check_report=report_text,
-                             dataset_check_error=dataset_check_error,
-                             dataset_title=dataset.title,
-                             dataset_metadata={'metadata': dataset_metadata,
-                                               'taxa': dataset.taxon_index,
-                                               'locations': dataset.location_index})
-
-    # notify the user
-    if email:
-        opts = {'PASS': ['Dataset passed checks', 'dataset_check_pass.html'],
-                'FAIL': ['Dataset failed checks', 'dataset_check_fail.html'],
-                'ERROR': ['Error checking dataset', 'dataset_check_error.html']}
-
-        safe_mailer(to=record.uploader_id.email,
-                    cc=['data@safeproject.net'],
-                    reply_to='data@safeproject.net',
-                    cc_info=False,
-                    subject=opts[outcome][0],
-                    template=opts[outcome][1],
-                    template_dict=ret_dict)
-
-    # A task run by a worker does not automatically commit changes, so
-    # save any by changes before ending
-    current.db.commit()
-
-    return ret_msg
-
-
-def get_zenodo_api():
+def _compute_md5(fname:str) -> str:
+    """Calculate a local file md5 hash
     """
-    Function to provide the zenodo API endpoint and the access token
-    from the site config. The config specifies whether the testing
-    sandbox or the live site is to be used.
-    """
-
-    try:
-        sandbox = int(current.myconf.take('zenodo.use_sandbox'))
-    except BaseException:
-        raise RuntimeError('Site config does not provide zenodo.use_sandbox')
-
-    if sandbox:
-        try:
-            token = {'access_token': current.myconf.take('zenodo.sandbox_access_token')}
-        except BaseException:
-            raise RuntimeError('Site config does not provide zenodo.sandbox_access_token')
-
-        api = 'https://sandbox.zenodo.org/api/'
-    else:
-        try:
-            token = {'access_token': current.myconf.take('zenodo.access_token')}
-        except BaseException:
-            raise RuntimeError('Site config does not provide zenodo.access_token')
-
-        api = 'https://zenodo.org/api/'
-
-    return api, token
-
-
-def submit_dataset_to_zenodo(record_id, deposit_id=None):
-    """
-    Function that attempts to publish a dataset record to Zenodo and
-    to populate the published_datasets table with result of that attempt.
-    This handles the logic of selecting which method to use: create excel,
-    update excel or adopt external.
-
-    Args:
-        record_id: The id of the dataset table record to be submitted
-        deposit_id: An integer giving the id of an existing Zenodo deposit to adopt
-            using this dataset record.
-    Returns:
-        A string describing the outcome.
-    """
-
-    # get the current db
-    db = current.db
-
-    # check the record exists and hasn't already been submitted
-    record = db.submitted_datasets[record_id]
-
-    if record is None:
-        return 'Publishing dataset: unknown record ID {}'.format(record_id)
-    elif record.dataset_check_outcome != 'PASS':
-        return 'Publishing dataset: record ID {} has not passed format checking'.format(record_id)
-    elif record.zenodo_submission_status == 'ZEN_PASS':
-        return 'Publishing dataset: record ID {} already published'.format(record_id)
-
-    # load the correct API and token
-    api, token = get_zenodo_api()
-
-    # There are then four possible options of things that could be published:
-    # 1) a brand new excel-only dataset,
-    # 2) an update to an existing excel-only dataset,
-    # 3) a brand new dataset with external files and
-    # 4) an update to an existing dataset with online files.
-
-    metadata = record.dataset_metadata['metadata']
-
-    # external_files contains an empty list or a list of dictionaries
-    if metadata['external_files']:
-        code, links, response = adopt_external_zenodo(api, token, record, deposit_id)
-        external = True
-    else:
-        if record.concept_id is None:
-            code, links, response = create_excel_zenodo(api, token, record)
-        else:
-            code, links, response = update_excel_zenodo(api, token, record)
-        external = False
-
-    if code > 0:
-        # There has been a problem. If this is an internal Excel file only, then try
-        # and delete the failed deposit and update the record
-        if links is not None and not external:
-            # This can fail and leave a hanging deposit, but we won't let that stop the function
-            _, _ = delete_deposit(links, token)
-
-        # update the record
-        record.update_record(zenodo_submission_status='ZEN_FAIL',
-                             zenodo_submission_date=datetime.datetime.now(),
-                             zenodo_error=response)
-        return "Failed to publish record"
-    else:
-
-        # Set the most recent flag for existing published versions to False
-        if record.concept_id is not None:
-            db(db.published_datasets.zenodo_concept_id == record.concept_id
-               ).update(most_recent=False)
-
-        # remove the dataset metadata from the zenodo response, since the
-        # contents is information we have already, so we can store the rest
-        del response['metadata']
-
-        # Now create a published datasets entry
-        published_record = db.published_datasets.insert(
-            uploader_id=record.uploader_id,
-            upload_datetime=record.upload_datetime,
-            submission_id=record.id,
-            dataset_title=metadata['title'],
-            dataset_access=metadata['access'],
-            dataset_embargo=metadata['embargo_date'],
-            dataset_conditions=metadata['access_conditions'],
-            dataset_description=metadata['description'],
-            dataset_metadata=record.dataset_metadata['metadata'],
-            temporal_extent_start=metadata['temporal_extent'][0],
-            temporal_extent_end=metadata['temporal_extent'][1],
-            geographic_extent=geometry.box(metadata['longitudinal_extent'][0],
-                                           metadata['latitudinal_extent'][0],
-                                           metadata['longitudinal_extent'][1],
-                                           metadata['latitudinal_extent'][1]).wkt,
-            publication_date=datetime.datetime.now(),
-            most_recent=True,
-            zenodo_record_id=response['record_id'],
-            zenodo_record_doi=response['doi_url'],
-            zenodo_record_badge=response['links']['badge'],
-            zenodo_concept_id=response['conceptrecid'],
-            zenodo_concept_doi=response['links']['conceptdoi'],
-            zenodo_concept_badge=response['links']['conceptbadge'],
-            zenodo_metadata=response)
-
-        # add an associated project link to the dataset concept
-        # if one does not already exist
-        project_link = db((db.project_datasets.project_id == record.project_id) &
-                          (db.project_datasets.concept_id == response['conceptrecid'])
-                          ).select()
-
-        if not project_link:
-            db.project_datasets.insert(project_id=record.project_id,
-                                       concept_id=response['conceptrecid'],
-                                       user_id=record.uploader_id,
-                                       date_added=datetime.date.today())
-
-        # update to include the UTM 50N bbox geometry
-        db(db.published_datasets.id == published_record).update(
-            geographic_extent_utm50n=db.published_datasets.geographic_extent.st_transform(32650))
-
-        # populate index tables
-        # A) Taxa
-        taxa = record.dataset_metadata['taxa']
-        taxa = [dict(list(zip(['dataset_id', 'worksheet_name', 'gbif_id', 'gbif_parent_id',
-                               'taxon_name', 'taxon_rank', 'gbif_status'],
-                              [published_record] + tx))) for tx in taxa]
-
-        db.dataset_taxa.bulk_insert(taxa)
-
-        # B) Files, using the Zenodo response
-        files = response['files']
-        for each_file in files:
-            each_file['dataset_id'] = published_record
-            each_file['download_link'] = each_file['links']['download']
-            each_file['file_zenodo_id'] = each_file.pop('id')
-
-        db.dataset_files.bulk_insert(files)
-
-        # C) Locations
-        locations = record.dataset_metadata['locations']
-        locations = [dict(list(zip(['dataset_id', 'name', 'new_location', 'type', 'wkt_wgs84'],
-                                   [published_record] + loc))) for loc in locations]
-
-        new_locs = db.dataset_locations.bulk_insert(locations)
-
-        # update the UTM 50 N geometry where possible
-        db(db.dataset_locations.id.belongs(new_locs)).update(
-            wkt_utm50n=db.dataset_locations.wkt_wgs84.st_transform(32650))
-
-        # D) Dataworksheets and fields
-        for data in metadata['dataworksheets']:
-
-            worksheet_id = db.dataset_worksheets.insert(dataset_id=published_record, **data)
-
-            for fld in data['fields']:
-                fld['dataset_id'] = published_record
-                fld['worksheet_id'] = worksheet_id
-
-            db.dataset_fields.bulk_insert(data['fields'])
-
-        # E) Authors
-        for auth in metadata['authors']:
-            db.dataset_authors.insert(dataset_id=published_record, **auth)
-
-        # F) Funders
-        if metadata['funders'] is not None:
-            for fndr in metadata['funders']:
-                db.dataset_funders.insert(dataset_id=published_record, **fndr)
-
-        # G) Permits
-        if metadata['permits'] is not None:
-            for perm in metadata['permits']:
-                db.dataset_permits.insert(dataset_id=published_record, **perm)
-
-        # K) Keywords
-        if metadata['keywords'] is not None:
-            for kywd in metadata['keywords']:
-                db.dataset_keywords.insert(dataset_id=published_record, keyword=kywd)
-
-        # remove the dataset from the submitted_datasets table
-        record.delete_record()
-
-        # Flush the cached index of published datasets
-        current.cache.ram('index', None)
-
-        return "Published dataset to {}".format(response['doi_url'])
-
-
-def create_excel_zenodo(api, token, record):
-    """
-    A function to work through the Zenodo API steps to publish an new Excel only dataset.
-    It works through the publication steps as long as each step keeps returning a zero
-    success code, otherwise we get to the end with the most recent failure
-
-    Args:
-        api: The API URL to use: sandbox or main site
-        token: A dictionary containing the key 'access_token'
-        record: The dataset row for the record to publish
-    Returns:
-        i) An integer code indicating success or failure,
-        ii) the links object for the deposit - which is needed to delete
-            partially created deposits and
-        iii) A response object from Zenodo - which will contain either a
-            failure message or the publication details.
-    """
-
-    # create the new deposit
-    code, response, zenodo_id = create_deposit(api, token)
-
-    # upload the record metadata
-    if code == 0:
-        # store previous response containing the links dictionary
-        links = response
-        code, response = upload_metadata(links, token, record, zenodo_id)
-    else:
-        links = None
-
-    # upload the file
-    if code == 0:
-        code, response = upload_file(links, token, record)
-
-    # publish the deposit
-    if code == 0:
-        code, response = publish_deposit(links, token)
-
-    # Return what we've got
-    if code > 0:
-        return 1, links, response
-    else:
-        return 0, links, response
-
-
-def update_excel_zenodo(api, token, record):
-    """
-    A function to work through the Zenodo API steps to publish a new version of an Excel
-    only dataset. It works through the publication steps as long as each step keeps returning
-    a zero success code, otherwise we get to the end with the most recent failure
-
-    Args:
-        api: The API URL to use: sandbox or main site
-        token: A dictionary containing the key 'access_token'
-        record: The dataset row for the record to publish
-    Returns:
-        i) An integer code indicating success or failure,
-        ii) the links object for the deposit - which is needed to delete
-            partially created deposits and
-        iii) A response object from Zenodo - which will contain either a
-            failure message or the publication details.
-    """
-    # get a new draft of the existing record from the zenodo id of the
-    # most recent published record (can't create a draft from a concept id)
-    most_recent = current.db((current.db.published_datasets.zenodo_concept_id == record.concept_id) &
-                             (current.db.published_datasets.most_recent == True)
-                             ).select().first()
-
-    code, response, zenodo_id = create_deposit_draft(api, token, most_recent.zenodo_record_id)
-
-    # upload the record metadata
-    if code == 0:
-        # store previous response containing the links dictionary
-        links = response
-        code, response = upload_metadata(links, token, record, zenodo_id)
-    else:
-        links = None
-
-    # delete the existing file
-    if code == 0:
-        code, response = delete_previous_file(links, token)
-
-    # upload the new file
-    if code == 0:
-        code, response = upload_file(links, token, record)
-
-    # publish the deposit
-    if code == 0:
-        code, response = publish_deposit(links, token)
-
-    # Return what we've got
-    if code > 0:
-        return 1, links, response
-    else:
-        return 0, links, response
-
-
-def adopt_external_zenodo(api, token, record, deposit_id):
-    """
-    A function to work through the Zenodo API steps to publish a dataset that adopts
-    external files in an existing deposit. It works through the publication steps as
-    long as each step keeps returning a zero success code, otherwise we get to the end
-    with the most recent failure
-
-    Args:
-        api: The API URL to use: sandbox or main site
-        token: A dictionary containing the key 'access_token'
-        record: The dataset row for the record to publish
-        deposit_id: An integer giving the id of an existing Zenodo deposit to adopt
-            using this dataset record.
-    Returns:
-        i) An integer code indicating success or failure,
-        ii) the links object for the deposit - which is needed to delete
-            partially created deposits and
-        iii) A response object from Zenodo - which will contain either a
-            failure message or the publication details.
-    """
-
-    # get the deposit
-    code, response = get_deposit(api, token, deposit_id)
-
-    # upload the record metadata
-    if code == 0:
-        # store previous response containing the links dictionary
-        # and the list of remote files
-        remote_files = response['files']
-        links = response['links']
-        code, response = upload_metadata(links, token, record, deposit_id)
-
-        # If we got a deposit, check the files found in the deposit match
-        # with the external files specified in the record metadata.
-        remote_filenames = {rfile['filename'] for rfile in remote_files}
-        external_files = set([r['file'] for r in record.dataset_metadata['metadata']['external_files']])
-
-        if not remote_filenames == external_files:
-            code = 1
-            response = "Files in deposit do not match external files listed in Excel file"
-            links = None
-    else:
-        links = None
-
-    # Upload the Excel file - the expectation here is that the Excel file
-    # associated with previous drafts is deleted as part of the manual file
-    # update process, so we only have to upload the one submitted to the website
-    if code == 0:
-        code, response = upload_file(links, token, record)
-
-    # publish the deposit
-    if code == 0:
-        code, response = publish_deposit(links, token)
-
-    # Return what we've got
-    if code > 0:
-        return 1, links, response
-    else:
-        return 0, links, response
-
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as fname_obj:
+        for chunk in iter(lambda: fname_obj.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+def _zenodo_error_message(response) -> str:
+    
+    return f"{response.json()['message']} ({response.json()['status']})"
 
 """
 Zenodo action functions
 """
 
+def get_deposit(deposit_id: int,
+                resources: Resources = None
+                ) -> Tuple[Union[dict, None], Union[str, None]]:
+    """
+    Download the metadata of a Zenodo deposit.
 
-def get_deposit(api, token, deposit_id):
+    Args:
+        deposit_id: The Zenodo record id of an existing dataset.
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
+    
+    Returns:
+        A 2 tuple:
+            * A dictionary containing the response content or None on error
+            * An error message on failure or None on success
+    """
+
+    zenodo_api, params, _ = _resources_to_zenodo_api(resources)
+
     # request the deposit
-    dep = requests.get(api + 'deposit/depositions/{}'.format(deposit_id), params=token, json={},
-                       headers={"Content-Type": "application/json"})
+    dep = requests.get(f'{zenodo_api}/deposit/depositions/{deposit_id}',
+                       params=params, json={})
 
     # check for success and return the information.
-    if dep.status_code != 200:
-        return 1, dep.json()
+    if dep.status_code == 200:
+        return dep.json(), None
     else:
-        return 0, dep.json()
+        return None, _zenodo_error_message(dep)
 
 
-def create_deposit(api, token):
+def create_deposit(deposit_id: int = None,
+                   resources: Resources = None
+                    ) -> Tuple[Union[dict, None], Union[str, None]]:
     """
-    Function to create a new deposit
+    Function to create a new deposit draft, possibly as a new version of an
+    existing published record
+
     Args:
-        api: The api URL to be used (standard or sandbox)
-        token: The access token to be usedz
+        deposit_id: An optional id of a published record to create a new version
+            of an existing dataset
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
     Returns:
-        An integer indicating success (0) or failure (1) and either the
-        deposit links dictionary or an error message
+        A 2 tuple:
+            * A dictionary containing the response content or None on error
+            * An error message on failure or None on success
     """
 
-    # get a new deposit resource
-    dep = requests.post(api + '/deposit/depositions', params=token, json={},
-                        headers={"Content-Type": "application/json"})
+    # Get resource configuration
+    zenodo_api, params, _ = _resources_to_zenodo_api(resources)
 
-    # trap errors in creating the resource - successful creation of new deposits returns 201
-    if dep.status_code != 201:
-        return 1, dep.json(), None
+    # get the correct draft api
+    if deposit_id is None:
+        api = f'{zenodo_api}/deposit/depositions'
     else:
-        return 0, dep.json()['links'], dep.json()['id']
+        api = f'{zenodo_api}/deposit/depositions/{deposit_id}/actions/newversion'
+    
+    # Create the draft
+    new_draft = requests.post(api, params=params, json={})
 
-
-def create_deposit_draft(api, token, deposit_id):
-    """
-    Function to create a new draft of an existing published record
-    Args:
-        api: The api URL to be used (standard or sandbox)
-        token: The access token to be used
-        deposit_id: The id of the published record
-    Returns:
-        An integer indicating success (0) or failure (1) and either the
-        deposit links dictionary for the new draft or an error message
-    """
-
-    # get the draft api
-    new_draft = requests.post(api + '/deposit/depositions/{}/actions/newversion'.format(deposit_id),
-                              params=token, json={},
-                              headers={"Content-Type": "application/json"})
-
-    # trap errors in creating the new version
+    # trap errors in creating the new version (not 201: created)
     if new_draft.status_code != 201:
-        return 1, new_draft.json(), None
+        return None, _zenodo_error_message(new_draft)
 
-    # now get the newly created version
+    if deposit_id is None:
+        return new_draft.json(), None
+
+    # For new versions, the response is an update to the existing copy,
+    # so need to separately retrieve the new draft
     api = new_draft.json()['links']['latest_draft']
-    dep = requests.get(api, params=token, json={},
-                       headers={"Content-Type": "application/json"})
+    dep = requests.get(api, params=params, json={})
 
     # trap errors in creating the resource - successful creation of new version
     #  drafts returns 200
     if dep.status_code != 200:
-        return 1, dep.json(), None
+        return None, _zenodo_error_message(dep)
     else:
-        return 0, dep.json()['links'], dep.json()['id']
+        return dep.json(), None
 
-
+# FIXME
 def upload_metadata(links, token, record, zenodo_id):
     """
     Function to turn a dataset row record into a Zenodo metadata JSON and upload
@@ -712,6 +217,7 @@ def upload_metadata(links, token, record, zenodo_id):
         return 0, 'success'
 
 
+# FIXME
 def update_published_metadata(zenodo_record_id, new_values):
     """
     Function to update the metadata on a published deposit. Currently used to
@@ -763,7 +269,7 @@ def update_published_metadata(zenodo_record_id, new_values):
         success_so_far = 0 if pub.status_code != 202 else 1
         ret = pub.json()
 
-    # If all steps have been succesful, return a 0 code, otherwise
+    # If all steps have been successful, return a 0 code, otherwise
     # try to discard the edits and return the most recent failure
     # notice
 
@@ -778,77 +284,99 @@ def update_published_metadata(zenodo_record_id, new_values):
         return 1, ret
 
 
-# # Untested snippet from: https://gist.github.com/tyhoff/b757e6af83c1fd2b7b83057adf02c139
-# # possibly of use when and if this module gets built into safedata_validator,
-# # to provide user feedback on uploading bulk data to drafts.
-#
-# from tqdm import tqdm
-# from tqdm.utils import CallbackIOWrapper
-#
-# file_path = os.path.abspath(__file__)
-# upload_url = https://some-bucket.s3.amazonaws.com
-#
-# file_size = os.stat(file_path).st_size
-# with open(file_path, "rb") as f:
-#     with tqdm(total=file_size, unit="B", unit_scale=True, unit_divisor=1024) as t:
-#         wrapped_file = CallbackIOWrapper(t.update, f, "read")
-#         requests.put(upload_url, data=wrapped_file)
-
-def upload_file(links, token, record):
+def upload_file(metadata: dict, 
+                filepath: str, 
+                zenodo_filename: str = None,
+                progress_bar: bool = True,
+                resources: Resources = None) -> Tuple[Union[dict, None], Union[str, None]]:
     """
-    Function to upload the Excel datafile submitted for a record to Zenodo deposit.
+    Upload the contents of a specified file to an unpublished Zenodo deposit,
+    optionally using an alternative filename. If the file already exists in the
+    deposit, it will be replaced.
 
     Args:
-        links: The links dictionary from a created deposit
-        token: The access token to be used
-        record: The database record containing the metadata to be uploaded.
+        metadata: The Zenodo metadata dictionary for a deposit
+        file: The path to the file to be uploaded
+        zenodo_filename: An optional alternative file name to be used on Zenodo
+        progress_bar: Should the upload progress be displayed
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
 
     Returns:
-        An integer indicating success (0) or failure (1) and either the
-        deposit links dictionary or an error message
+        A 2 tuple:
+            * A dictionary containing the response content or None on error
+            * An error message on failure or None on success
     """
 
-    # upload the new file
-    bucket_url = links['bucket']
-    fname = os.path.join(current.request.folder, 'uploads', 'submitted_datasets', record.file)
+    # Get resource configuration
+    _, params, _ = _resources_to_zenodo_api(resources)
 
-    with open(fname, 'rb') as fp:
-        fls = requests.put(bucket_url + '/' + record.file_name,
-                           data=fp,
-                           params=token)
+    # Check the file and get the filename if an alternative is not provided
+    if not (os.path.exists(filepath) and os.path.isfile(filepath)):
+        raise IOError(f'The file path is either a directory or not found: {filepath} ')
+
+    if zenodo_filename is None:
+        file_name = os.path.basename(filepath)
+    else:
+        file_name = zenodo_filename
+    
+    # upload the file
+    file_size = os.stat(filepath).st_size
+    api = f"{metadata['links']['bucket']}/{file_name}"
+
+    with open(filepath, 'rb') as fp:
+
+        if progress_bar:
+            with tqdm(total=file_size, unit="B", unit_scale=True, unit_divisor=1024) as cm:
+                # Upload the wrapped file
+                wrapped_file = CallbackIOWrapper(cm.update, fp, "read")
+                fls = requests.put(api, data=fp, params=params)
+        else:
+            fls = requests.put(api, data=fp, params=params)
 
     # trap errors in uploading file
     # - no success or mismatch in md5 checksums
     if fls.status_code != 200:
-        return 1, fls.json()
-    elif fls.json()['checksum'] != 'md5:' + record.file_hash:
-        return 1, "Mismatch in local and uploaded MD5 hashes"
+        return None, _zenodo_error_message(fls)
+
+    # TODO - could this be inside with above? - both are looping over the file contents
+    local_hash = _compute_md5(filepath)
+    
+    if fls.json()['checksum'] != f'md5:{local_hash}':
+        return None, "Mismatch in local and uploaded MD5 hashes"
     else:
-        return 0, 'success'
+        return fls, None
 
 
-def delete_deposit(links, token):
+
+def discard_deposit(metadata: dict,
+                    resources: Resources = None
+                    ) -> Tuple[Union[dict, None], Union[str, None]]:
     """
-    Function to delete an (unpublished) partially created deposit if the publication
-    process fails.
+    Discard an _unpublished_ deposit.
 
     Args:
-        links: The links dictionary from a created deposit
-        token: The access token to be used
+        metadata: The Zenodo metadata dictionary for a deposit
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
 
     Returns:
-        An integer indicating success (0) or failure (1) and either the
-        deposit links dictionary or an error message
+        A 2 tuple:
+            * A dictionary containing the response content or None on error
+            * An error message on failure or None on success
     """
 
-    delete = requests.delete(links['self'], params=token)
+    # Get resource configuration
+    _, params, _ = _resources_to_zenodo_api(resources)
 
-    if delete.status_code != 204:
-        return 1, delete.json()
+    delete = requests.delete(metadata['links']['self'], params=params)
+
+    if delete.status_code == 204:
+        return {'result': 'success'}, None
     else:
-        return 0, 'success'
+        return None, _zenodo_error_message(delete)
 
-
+# FIXME
 def publish_deposit(links, token):
     """
     Function to publish a created deposit .
@@ -872,39 +400,52 @@ def publish_deposit(links, token):
         return 0, pub.json()
 
 
-def delete_previous_file(links, token):
+def delete_file(metadata: dict,
+                filename: str,
+                resources: Resources = None
+                ) -> Tuple[Union[dict, None], Union[str, None]]:
     """
-    Function to delete a previously uploaded file from a new version of a deposit,
-    prior to replacing it with an updated one.
+    Delete an uploaded file from an unpublished Zenodo deposit.
 
     Args:
-        links: The links dictionary from a created deposit
-        token: The access token to be used
+        metadata: The Zenodo metadata dictionary for a deposit
+        filename: The file to delete from the deposit
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
 
     Returns:
-        An integer indicating success (0) or failure (1) and either the
-        deposit links dictionary or an error message
+        A 2 tuple:
+            * A dictionary containing the response content or None on error
+            * An error message on failure or None on success
     """
 
-    # get the existing files
-    files = requests.get(links['files'], params=token)
+    # Get resource configuration
+    _, params, _ = _resources_to_zenodo_api(resources)
+
+    # get an up to date list of existing files (metadata
+    # might be outdated)
+    files = requests.get(metadata['links']['files'], params=params)
 
     # check the result of the files request
     if files.status_code != 200:
         # failed to get the files
-        return 1, files.json()
-    elif len(files.json()) != 1:
-        # multiple files
-        return 1, files.json()
+        return None, _zenodo_error_message(files)
 
+    # get a dictionary of file links
+    files = {f['filename']: f['links']['self'] for f in files.json()}
+
+    if filename not in files:
+        return None, f"{filename} is not a file in the deposit"
+    
     # get the delete link to the file and call
-    delete_api = files.json()[0]['links']['self']
-    file_del = requests.delete(delete_api, params=token)
+    delete_api = files[filename]
+    file_del = requests.delete(delete_api, params=params)
 
     if file_del.status_code != 204:
-        return 1, file_del.json()
+        return None, _zenodo_error_message(file_del)
     else:
-        return 0, 'success'
+        return {'result': 'success'}, None
+
 
 
 """
@@ -1349,381 +890,266 @@ def generate_inspire_xml(record):
     return etree.tostring(tree)
 
 
-# API search functions
+def download_ris_data(resources: Resources = None, ris_file: str = None) -> list:
+    """Downloads SAFE records into a RIS format bibliography file
 
-def dataset_query_to_json(qry, most_recent=False, ids=None,
-                          fields=[('published_datasets', 'zenodo_concept_id'),
-                                  ('published_datasets', 'zenodo_record_id'),
-                                  ('published_datasets', 'dataset_title')]):
-    """
-    Shared function to take a Query including rows in db.published datasets
-    and return a standardised set of attributes and a count.
-    """
-
-    db = current.db
-
-    if most_recent:
-        qry &= (db.published_datasets.most_recent == True)
-
-    if ids is not None:
-        qry &= (db.published_datasets.zenodo_record_id.belongs(ids))
-
-    # Turn fields argument into fields references and select
-    fields = [db[t][f] for t, f in fields]
-    rows = db(qry).select(*fields, distinct=True)
-
-    return {'count': len(rows), 'entries': rows}
-
-
-def dataset_taxon_search(gbif_id=None, name=None, rank=None):
-    """Search for datasets by taxon information
-
-    Examples:
-        /api/search/taxa?name=Formicidae
-        /api/search/taxa?gbif_id=4342
-        /api/search/taxa?rank=Family
+    This function is used to maintain a bibliography file of the records
+    uploaded to a safedata community on Zenodo. It accesses the Zenodo community
+    specified in the resource configuration and downloads all records. It then
+    optinally checks the list of downloaded DOIs against the content of an
+    existing RIS file and then downloads citations for all new DOIs from
+    datacite.org.
 
     Args:
-        gbif_id (int): A GBIF taxon id.
-        name (str): A scientific name
-        rank (str): A taxonomic rank. Note that GBIF only provides
-            kingdom, phylum, order, class, family, genus and species.
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
+        ris_file: The path to an existing RIS format file containing previously
+            downloaded records.
+    
+    Returns:
+        A list of strings containing RIS formatted citation data.
     """
 
-    db = current.db
-    qry = (db.published_datasets.id == db.dataset_taxa.dataset_id)
+    if resources is None:
+        resources = Resources()
 
-    if gbif_id is not None:
-        qry &= (db.dataset_taxa.gbif_id == gbif_id)
+    # Get a list of known DOI records from an existing RIS file if one is
+    # provided
+    known_recids = []
+    new_doi = []
 
-    if name is not None:
-        qry &= (db.dataset_taxa.taxon_name == name)
+    if os.path.exists(ris_file):
+        with open(ris_file, 'r') as bibliography_file:
+            entries = rispy.load(bibliography_file)
+            for entry in entries:
+                record_id = int(entry['url'].split('/')[-1])
+                known_recids.append(record_id)
 
-    if rank is not None:
-        qry &= (db.dataset_taxa.taxon_rank == rank.lower())
+    # Zenodo API call to return the records associated with the SAFE community
+    z_api, _, z_cname = _resources_to_zenodo_api(resources)
+    api = f'{z_api}/records/?q=communities:{z_cname}'
 
-    return qry
+    # Provide feedback on DOI collection
+    LOGGER.info(f'Fetching record DOIs from {api}:')
+    FORMATTER.push()
 
+    # The API is paged - it contains a set of records and a link that points 
+    # to the next page of records, so keep looping until there are no more next
+    n_records = 0
+    while True:
 
-def dataset_author_search(name=None):
-    """Search for datasets by author name
+        # Get the data
+        safe_data = requests.get(api)
 
-    Examples:
-        /api/search/authors?name=Wilk
-
-    Args:
-        name (str): An author name or part of a name
-    """
-
-    db = current.db
-    qry = (db.published_datasets.id == db.dataset_authors.dataset_id)
-
-    if name is not None:
-        qry &= (db.dataset_authors.name.contains(name.lower()))
-
-    return qry
-
-
-def dataset_locations_search(name=None):
-    """Search for datasets with data at a named location
-
-    Examples:
-        /api/search/location?name=A_1
-
-    Args:
-        name (str): A location name
-    """
-
-    db = current.db
-    qry = (db.published_datasets.id == db.dataset_locations.dataset_id)
-
-    if name is not None:
-        qry &= (db.dataset_locations.name.contains(name.lower()))
-
-    return qry
-
-
-def dataset_date_search(date=None, match_type='intersect'):
-    """Search for datasets by temporal extent
-
-    Examples:
-        /api/search/dates?date=2014-06-12
-        /api/search/dates?date=2014-06-12,2015-06-12
-        /api/search/dates?date=2014-06-12,2015-06-12&match_type=contains
-        /api/search/dates?date=2014-06-12,2015-06-12&match_type=within
-
-    Args:
-        date (str): A string containing one or two (comma separated) dates in ISO format (2019-06-12)
-        match_type (str): One of 'intersect', 'contain' and 'within' to match the provided dates to
-            the temporal extents of datasets. The 'contain' option returns datasets that span a date
-            range and 'within' returns datasets that fall within that date range.
-    """
-
-    db = current.db
-
-    # parse the data query: can be a single iso date or a comma separated pair.
-    try:
-        date_vals = date.split(',')
-        date_vals = [datetime.datetime.strptime(dt, '%Y-%m-%d').date() for dt in date_vals]
-    except ValueError:
-        return {'error': 400, 'message': 'Could not parse dates: {}'.format(date)}
-
-    # Check the number of dates and enforce order
-    if len(date_vals) > 2:
-        return {'error': 400, 'message': 'date contains more than two values: {}'.format(date)}
-    elif len(date_vals) == 2:
-        date_vals.sort()
-    else:
-        # make singular dates a 'range' to use same predicate mechanisms
-        date_vals += date_vals
-
-    # check the dates against the temporal extents of the datasets
-    if match_type == 'intersect':
-        qry = (~ ((db.published_datasets.temporal_extent_start >= date_vals[1]) |
-                  (db.published_datasets.temporal_extent_end <= date_vals[0])))
-    elif match_type == 'contain':
-        qry = ((db.published_datasets.temporal_extent_start >= date_vals[0]) &
-               (db.published_datasets.temporal_extent_end <= date_vals[1]))
-    elif match_type == 'within':
-        qry = ((db.published_datasets.temporal_extent_start <= date_vals[0]) &
-               (db.published_datasets.temporal_extent_end >= date_vals[1]))
-    else:
-        return {'error': 400, 'message': 'Unknown date match type: {}'.format(match_type)}
-
-    return qry
-
-
-def dataset_field_search(text=None, ftype=None):
-    """Search for datasets by data field information
-
-    Examples:
-        /api/search/fields?text=temperature
-        /api/search/fields?ftype=numeric
-        /api/search/fields?text=temperature&ftype=numeric
-
-    Args:
-        text (str): A string to look for within the field name and description.
-        ftype (str): A field type to match.
-    """
-
-    db = current.db
-    qry = (db.published_datasets.id == db.dataset_fields.dataset_id)
-
-    if text is not None:
-        qry &= ((db.dataset_fields.field_name.contains(text)) |
-                (db.dataset_fields.description.contains(text)))
-
-    if ftype is not None:
-        qry &= (db.dataset_fields.field_type.ilike(ftype))
-
-    return qry
-
-
-def dataset_text_search(text=None):
-    """Search for datasets by free text search
-
-    Examples:
-        /api/search/text?text=humus
-
-    Args:
-        text (str): A string to look within dataset, worksheet and field
-        descriptions and titles and in dataset keywords.
-    """
-
-    db = current.db
-
-    qry = ((db.published_datasets.id == db.dataset_fields.dataset_id) &
-           (db.published_datasets.id == db.dataset_worksheets.dataset_id) &
-           (db.published_datasets.id == db.dataset_keywords.dataset_id) &
-           ((db.dataset_fields.field_name.contains(text)) |
-            (db.dataset_fields.description.contains(text)) |
-            (db.dataset_worksheets.title.contains(text)) |
-            (db.dataset_worksheets.description.contains(text)) |
-            (db.published_datasets.dataset_title.contains(text)) |
-            (db.published_datasets.dataset_description.contains(text)) |
-            (db.dataset_keywords.keyword.contains(text))
-            ))
-
-    return qry
-
-
-def dataset_parse_spatial(wkt=None, location=None):
-    """
-    Shared function to parse query geometry options - either a location or a WKT - and get
-    # the query geometry as a UTM 50N geometry.
-    """
-    db = current.db
-
-    if (location is not None) and (wkt is not None):
-        return {'error': 400, 'message': 'Provide a location name or a WKT geometry, not both'}
-    elif location is None and wkt is None:
-        return {'error': 400, 'message': 'Provide either a location name or a WKT geometry'}
-    elif location is not None:
-        gazetteer_location = gazetteer_location = db(db.gazetteer.location == location).select(
-            db.gazetteer.wkt_utm50n.st_aswkb().with_alias('wkb')).first()
-        if gazetteer_location is not None:
-            query_geom = gazetteer_location.wkb
+        if safe_data.status_code != 200:
+            raise IOError('Cannot access Zenodo API')
         else:
-            return {'error': 400, 'message': "Unknown location"}
-    elif wkt is not None:
-        # Validate the geometry - there isn't currently a validator, so use the DB (?shapely)
-        # i) Does the WKT parse correctly to a WKB string, assuming WGS84 for now
-        try:
-            query_geom = db.executesql("select st_geomfromtext('{}', 4326);".format(wkt))[0][0]
-        except (db._adapter.driver.ProgrammingError, db._adapter.driver.InternalError):
-            return {'error': 400, 'message': "Could not parse WKT geometry"}
+            # Retrieve the record data and store the DOI for each record
+            safe_data = safe_data.json()
+            for hit in safe_data['hits']['hits']:
+                if hit['id'] not in known_recids:
+                    new_doi.append(hit['doi'])
+            
+            # Reporting
+            n_records += len(safe_data['hits']['hits'])
+            LOGGER.info(f'{n_records}')
 
-        # ii) Do the coordinates seem like lat long?
-        is_lat_long = db.executesql("SELECT ST_XMin(g) >= -180 AND ST_XMax(g) <= 180 AND "
-                                    "   ST_YMin(g) >= -90 AND ST_YMax(g) <= 90 "
-                                    "   FROM (SELECT st_geomfromwkb(decode('{0}', 'hex')) "
-                                    "AS g) AS sel ;".format(query_geom))[0][0]
-        if not is_lat_long:
-            return {'error': 400, 'message': "WKT geometry coordinates not as lat/long"}
+            # Update the link for the next page, unless there is no next page
+            if 'next' in safe_data['links']:
+                api = safe_data['links']['next']
+            else:
+                break
 
-        # iii) Convert to UTM50N
-        query_geom = \
-        db.executesql("SELECT st_transform(st_geomfromwkb(decode('{0}', 'hex')), 32650);".format(query_geom))[0][0]
+    # Use the datacite API to retrieve the citation data associated with the DOI
+    # and save it out to a RIS format file
+    if not new_doi:
+        LOGGER.info('No new DOIs found')
+        return
 
-    return query_geom
+    # Get the DOI data    
+    data = []
+
+    FORMATTER.pop()
+    LOGGER.info(f'Retrieving citation data from Datacite for {len(new_doi)} new records')
+    FORMATTER.push()
+
+    for doi in new_doi:
+        
+        ris_data = requests.get(f'https://data.datacite.org/application/x-research-info-systems/{doi}')
+                
+        if ris_data.status_code != 200:
+            LOGGER.warning(f'DOI {doi} not found in datacite.org')
+        else:
+            # Write the response content to the data list. It comes in as byte
+            # data so needs to be decoded to a string variable
+            LOGGER.info(f'Retrieved citation for DOI {doi}')
+            data.append(ris_data.content.decode("utf-8") + '\r\n')
+
+    FORMATTER.pop()
+
+    if os.path.exists(ris_file):
+        LOGGER.info(f'Appending RIS data for {len(data)} new records to {ris_file}')
+        write_mode = 'a'
+    else:
+        LOGGER.info(f'Writing RIS data for {len(data)} records to {ris_file}')
+        write_mode = 'w'
+
+    with open(ris_file, write_mode) as ris_file:
+        for this_entry in data:
+            ris_file.write(this_entry)
 
 
-def dataset_spatial_search(wkt=None, location=None, distance=0):
-    """Spatial search for sampling locations.
 
-    This endpoint can search for datasets using either a user-provided geometry or the geometry
-    of a named location from the SAFE gazetteer. The sampling locations provided in each dataset
-    are tested to see if they intersect the search geometry and a buffer distance can also be
-    provided to search around the query geometry.
 
-    Note that this endpoint will not retrieve datasets that have not provided sampling locations
-    or use new locations that are missing coordinate information. The bounding box endpoint
-    uses the dataset geographic extent, which is provided for all datasets.
+def sync_local_dir(datadir: str, api: str = None, 
+                   xlsx_only: bool = True, resources: Resources = None) -> None:
 
-    Examples:
-        /api/search/spatial?location=A_1
-        /api/search/spatial?location=A_1&distance=50
-        /api/search/spatial?wkt=Point(116.5 4.75)
-        /api/search/spatial?wkt=Point(116.5 4.75)&distance=50000
-        /api/search/spatial?wkt=Polygon((110 0, 110 10,120 10,120 0,110 0))
+    """
+    The safedata R package defines a directory structure used to store metadata
+    and files downloaded from a safedata community on Zenodo and from a safedata
+    metadata server. This tool allows a safedata developer or community
+    maintainer to create or update such a directory with _all_ of the resources
+    in the Zenodo community, regardless of their public access status. This
+    forms a backup (although Zenodo is heavily backed up) but also provides
+    local copies of the files for testing and development of the code packages.
+
+    You need to provide a Zenodo API token to use this script. That is obtained
+    by logging into the Zenodo account managing the community and going to the
+    Applications tab and creating a personal access token. These allow root
+    level access to the community files so must be treated carefully!
+
+    If this is a new data directory, you also need to provide the API url for
+    the safedata metadata server.
 
     Args:
-        wkt (str): A well-known text geometry. This is assumed to use latitude and longitude
-            coordinates in WGS84 (EPSG:4326).
-        location (str): A location name used to select a query geometry from the SAFE gazetteer.
-        distance (float): A search distance in metres. All geometries are converted to the
-            UTM 50N projection to provide appopriate distance searching.
+        datadir: The path to a local directory containing an existing safedata
+            directory or an empty folder in which to create one.
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
+        api: An API from which JSON dataset metadata can be downloaded. If 
+            datadir is an existing safedata directory, then the API will be read
+            from `url.json`.
+        xlsx_only: Should the download ignore large non-xlsx files, defaulting
+            to True.
     """
 
-    db = current.db
+    # Private helper functions
+    def _get_file(url: str, outf:str, params: dict=None) -> None:
+        """Download a file from a URL
+        """
+        resource = requests.get(url, params=params, stream=True)
 
-    # validate the query geometry options and report back if there is an error
-    query_geom = dataset_parse_spatial(wkt, location)
-    if isinstance(query_geom, dict):
-        return query_geom
+        with open(outf, 'wb') as outf_obj:
+            shutil.copyfileobj(resource.raw, outf_obj)
 
-    qry = ((db.published_datasets.id == db.dataset_locations.dataset_id) &
-           (db.dataset_locations.name == db.gazetteer.location) &
-           ((db.gazetteer.wkt_utm50n.st_distance(query_geom) <= distance) |
-            (db.dataset_locations.wkt_utm50n.st_distance(query_geom) <= distance)))
+    # Get resource configuration
+    zenodo_api, params, _ = _resources_to_zenodo_api(resources)
 
-    return qry
+    # The dir argument should be an existing path
+    if not (os.path.exists(datadir) and os.path.isdir(datadir)):
+        raise IOError(f'{datadir} is not an existing directory')
 
+    # Check for an existing API url file and then see what is provided and resolve
+    url_file = os.path.join(datadir, 'url.json')
 
-def dataset_spatial_bbox_search(wkt=None, location=None, match_type='intersect', distance=None):
-    """Spatial search for dataset bounding boxes
+    if os.path.exists(url_file):
+        with open(url_file, 'r') as urlf:
+            dir_api = simplejson.load(urlf)['url'][0]
+    else:
+        dir_api = None
 
-    The endpoint can search for datasets using either a user-provided geometry or a location
-    name from the SAFE gazetteer. This endpoint uses only the dataset bounding box, which is
-    provided for all datasets, rather than sampling location information which may not be
-    recorded for some datasets.
+    if api is None and dir_api is None:
+        raise RuntimeError('API not provided or found in directory')
 
-    Examples:
-        /api/search/bbox?wkt=Polygon((110 0, 110 10,120 10,120 0,110 0))
-        /api/search/bbox?wkt=Polygon((116 4.5,116 5,117 5,117 4.5,116 4.5))
-        /api/search/bbox?wkt=Polygon((116 4.5,116 5,117 5,117 4.5,116 4.5))&match_type=contain
-        /api/search/bbox?wkt=Point(116.5 4.75)&match_type=within
+    if api is not None and dir_api is not None and api != dir_api:
+        raise RuntimeError('Provided api does not match existing api in directory')
+    
+    if api is not None and dir_api is None:
+        with open(url_file, 'w') as urlf:
+            simplejson.dump({'url': [api]}, urlf)
+    else:
+        api = dir_api
+    
+    # Download index files - don't bother to check for updates, this isn't
+    # a frequent thing to do
+    LOGGER.info("Downloading index files")
+    _get_file(f'{api}/api/index', os.path.join(datadir, 'index.json'))
+    _get_file(f'{api}/api/gazetteer', os.path.join(datadir, 'gazetteer.geojson'))
+    _get_file(f'{api}/api/location_aliases', os.path.join(datadir, 'location_aliases.csv'))
 
-    Args:
-        wkt (str): A well-known text geometry. This is assumed to use latitude and longitude
-            coordinates in WGS84 (EPSG:4326).
-        location (str): A location name used to select a query geometry from the SAFE gazetteer.
-        match_type (str): One of 'intersect', 'contain' and 'within' to match the provided geometry
-            to the geographic extents of datasets. The 'contain' option returns datasets that
-            completely cover the query geometry and 'within' returns datasets that fall entirely
-            within the query geometry.
+    # Get the deposits associated with the account, which includes a list of download links
+    params['page'] = 1
+    deposits = []
 
-    """
+    LOGGER.info("Scanning Zenodo deposits")
+    while True:
+        this_page = requests.get(zenodo_api + '/deposit/depositions',
+                                 params=params,
+                                 json={},
+                                 headers={"Content-Type": "application/json"})
 
-    db = current.db
+        if not this_page.ok:
+            raise RuntimeError('Could not connect to Zenodo API. Invalid token?')
 
-    # validate the query geometry options and report back if there is an error
-    query_geom = dataset_parse_spatial(wkt, location)
-    if isinstance(query_geom, dict):
-        return query_geom
+        if this_page.json():
+            deposits += this_page.json()
+            print(f" - Page {params['page']}")
+            params['page'] += 1
+        else:
+            break
 
-    # validate the match type
-    if match_type not in ['intersect', 'contain', 'within', 'distance']:
-        return {'error': 400, 'message': "Unknown spatial match type: {}".format(match_type)}
+    LOGGER.info(f"Processing {len(deposits)} deposits")
 
-        # Query the geographic extents with the appropriate predicate
-    if match_type == 'intersect':
-        qry = (db.published_datasets.geographic_extent_utm50n.st_intersects(query_geom))
-    elif match_type == 'contain':
-        qry = (db.published_datasets.geographic_extent_utm50n.st_contains(query_geom))
-    elif match_type == 'within':
-        qry = (db.published_datasets.geographic_extent_utm50n.st_within(query_geom))
-    elif match_type == 'distance':
-        qry = (db.published_datasets.geographic_extent_utm50n.st_distance(query_geom) <= distance)
+    # Download the files
+    for dep in deposits:
 
-    return qry
+        con_rec_id = str(dep['conceptrecid'])
+        rec_id = str(dep['record_id'])
 
+        if not dep['submitted']:
+            LOGGER.info(f'Unsubmitted draft {con_rec_id}/{rec_id}')
+            continue
 
-def get_index():
-    """
-    Function to generate a JSON string containing the formatted contents of the dataset files
-    table. This is used as the core index of the safedata package, so is cached in a file
-    like format along with MD5 hashes of the index and other files to speed up checking for
-    updates and refreshing the index.
-    """
+        LOGGER.info(f'Processing deposit {con_rec_id}/{rec_id}')
+        FORMATTER.push()
 
-    # version of the data contained in the dataset description
-    db = current.db
-    qry = (db.published_datasets.id == db.dataset_files.dataset_id)
-    val = dataset_query_to_json(qry,
-                                fields=[('published_datasets', 'publication_date'),
-                                        ('published_datasets', 'zenodo_concept_id'),
-                                        ('published_datasets', 'zenodo_record_id'),
-                                        ('published_datasets', 'dataset_access'),
-                                        ('published_datasets', 'dataset_embargo'),
-                                        ('published_datasets', 'dataset_title'),
-                                        ('published_datasets', 'most_recent'),
-                                        ('dataset_files', 'checksum'),
-                                        ('dataset_files', 'filename'),
-                                        ('dataset_files', 'filesize')])
+        # Create the directory structure if needed
+        rec_dir = os.path.join(datadir, con_rec_id, rec_id)
+        if not os.path.exists(rec_dir):
+            LOGGER.info('Creating directory')
+            os.makedirs(rec_dir)
+        else:
+            LOGGER.info('Directory found')
 
-    # repackage the db output into a single dictionary per file
-    entries = val['entries'].as_list()
-    [r['published_datasets'].update(r.pop('dataset_files')) for r in entries]
-    val['entries'] = [r['published_datasets'] for r in entries]
+        # loop over the files in the record
+        for this_file in dep['files']:
 
-    # Find the hashes
-    index_hash = hashlib.md5(json(val).encode('utf-8')).hexdigest()
+            if xlsx_only and not this_file['filename'].endswith('.xlsx'):
+                LOGGER.info(f"Skipping non-excel file {this_file['filename']}")
+                continue
 
-    # Use the file hash of the static gazetteer geojson
-    gazetteer_file = os.path.join(current.request.folder, 'static', 'files', 'gis', 'gazetteer.geojson')
-    with open(gazetteer_file) as f:
-        gazetteer_hash = hashlib.md5(f.read().encode('utf-8')).hexdigest()
+            LOGGER.info(f"Processing {this_file['filename']}")
+            FORMATTER.push()
 
-    # Use the file hash of the static locations alias csv
-    location_aliases_file = os.path.join(current.request.folder, 'static', 'files', 'gis', 'location_aliases.csv')
-    with open(location_aliases_file) as f:
-        location_aliases_hash = hashlib.md5(f.read().encode('utf-8')).hexdigest()
+            outf = os.path.join(rec_dir, this_file['filename'])
+            local_copy = os.path.exists(outf)
 
-    return dict(hashes=dict(index=index_hash,
-                            gazetteer=gazetteer_hash,
-                            location_aliases=location_aliases_hash),
-                index=val)
-
-    # return the dictionary - this will be json serialised by the API when it is returned
-    return val
+            if not local_copy:
+                LOGGER.info("Downloading")
+                _get_file(this_file['links']['download'], outf, params=params)
+            elif local_copy and _compute_md5(outf) != this_file['checksum']:
+                LOGGER.warning("Local copy modified")
+            else:
+                LOGGER.info("Already present")
+            
+            FORMATTER.pop()
+        
+        # Get the metadata json
+        metadata = os.path.join(rec_dir, f"{rec_id}.json")
+        if os.path.exists(metadata):
+            LOGGER.info("JSON Metadata found")
+        else:
+            LOGGER.info("Downloading JSON metadata ")
+            _get_file(f'{api}/record/{rec_id}', metadata)
+        
+        FORMATTER.pop()

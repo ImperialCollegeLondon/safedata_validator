@@ -5,6 +5,7 @@ import appdirs
 import openpyxl
 import pytest
 from dotmap import DotMap
+import certifi
 
 from safedata_validator.taxa import Taxa, RemoteGBIFValidator, LocalGBIFValidator
 from safedata_validator.locations import Locations
@@ -42,6 +43,9 @@ def fixture_files():
 
     real_files = {ky: os.path.join(fixture_dir, vl)
                   for ky, vl in real_files}
+
+    # Need to provide the path to the certifi CA bundle or requests breaks!
+    real_files['certifi'] = certifi.where()
 
     virtual_files = {'user_config': os.path.join(appdirs.user_config_dir(),
                                                  'safedata_validator',
