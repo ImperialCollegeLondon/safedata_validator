@@ -665,6 +665,47 @@ class RemoteNCBIValidator:
 
         return root
 
+    def taxonomy_esearch(self, t_name: str):
+        """A function that uses the online NCBI eutils function esearch to search
+        for a particular taxon name, and to return information on all matching records.
+        This function checks for connection errors, and rate limits to ensure that
+        only 10 requests per second are made. If this is successful the xml output
+        is stored as an element tree.
+
+        Params:
+            t_name: taxon name to search for
+
+        Returns:
+            lxml.etree._Element: Output XML stored as an element tree
+        """
+        # Construct url
+        url = (f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db='
+               f'taxonomy&term={t_name}&api_key={self.api_key}')
+
+        # Set up while loop to make the request up to 5 times if neccessary
+        success = False
+        att = 0
+        while success == False and att < 5:
+            # Increment counter and make the request
+            att += 1
+            recrd = requests.get(url)
+
+            # Wait a 10th of a second after each request
+            time.sleep(0.1)
+
+            # exit loop if a proper response is recived
+            if recrd.status_code == 200:
+                success = True
+
+        # raise error if a successful response hasn't been obtaines
+        if success == False:
+            raise NCBIError('Connection error to remote server')
+
+        # Parse the xml
+        root = etree.fromstring(recrd.content)
+
+        return root
+
     # Functionality to find taxa information from genbank ID
     def id_lookup(self, nnme: str, ncbi_id: int):
         """Method to return full taxonomic information from a NCBI ID. It will
@@ -845,22 +886,17 @@ class RemoteNCBIValidator:
         s_term = taxah[f_key]
 
         # Search the online database
-        try:
-            handle = Entrez.esearch(db="taxonomy", term=s_term, api_key=user_key)
-        except urllib.error.HTTPError:
-            NCBIError('Connection error to remote server')
+        rcrds = self.taxonomy_esearch(s_term)
 
-        # If it works then save the response
-        record = Entrez.read(handle)
-        handle.close()
-
-        # Store count of the number of records found
-        c = int(record['Count'])
+        # Track down record count
+        CNT = rcrds.findall("./Count")
+        c = int(CNT[0].text)
 
         # Check that a singular record has been provided before proceeding
         if c == 1:
             # Find taxa ID as single entry in the list
-            tID = int(record['IdList'][0])
+            ID = rcrds.findall("./IdList/Id")
+            tID = int(ID[0].text)
             # Use ID lookup function to generate as a NCBITaxon object
             mtaxon = self.id_lookup(nnme,tID)
         # Catch cases where no record is found
@@ -882,20 +918,17 @@ class RemoteNCBIValidator:
                 new_s_term = taxah[f_key]
 
                 # Search the online database
-                try:
-                    handle = Entrez.esearch(db="taxonomy", term=new_s_term, api_key=user_key)
-                except urllib.error.HTTPError:
-                    NCBIError('Connection error to remote server')
+                rcrds = self.taxonomy_esearch(new_s_term)
 
-                # Process the response
-                record = Entrez.read(handle)
-                handle.close()
-                c = int(record['Count'])
+                # Track down record count
+                CNT = rcrds.findall("./Count")
+                c = int(CNT[0].text)
 
                 # Check how many records have been found
                 if c == 1:
                     # Find taxa ID as single entry in the list
-                    tID = int(record['IdList'][0])
+                    ID = rcrds.findall("./IdList/Id")
+                    tID = int(ID[0].text)
                     # Use ID lookup function to generate as a NCBITaxon object
                     mtaxon = self.id_lookup(nnme,tID)
                     # Store orginally supplied rank
@@ -922,10 +955,12 @@ class RemoteNCBIValidator:
         elif len(taxah) == 1:
             # Preallocate container for the ranks
             t_ranks = []
+            # Find all the taxa ID's
+            ID = rcrds.findall("./IdList/Id")
             # First check if multiple taxa have the same rank
             for i in range(c):
-                # Find taxa ID as single entry in the list
-                tID = int(record['IdList'][i])
+                # Find taxa ID as specific entry in the list
+                tID = int(ID[i].text)
                 # Use ID lookup function to generate a tempoary taxon
                 temp_taxon = self.id_lookup(nnme,tID)
                 # Add rank to list
@@ -943,7 +978,7 @@ class RemoteNCBIValidator:
                 # Find relevant index
                 ind = ([i for i, x in enumerate(mtch) if x])[0]
                 # Find taxa ID as single entry in the list
-                tID = int(record['IdList'][ind])
+                tID = int(ID[ind].text)
                 # Use ID lookup function to generate as a NCBITaxon object
                 mtaxon = self.id_lookup(nnme,tID)
             # Then check whether multiple taxonomic levels have been provided
@@ -959,18 +994,12 @@ class RemoteNCBIValidator:
             # Then find corresponding entry as a search term
             s_term = taxah[f_key]
 
-            # Then find details of this parent record
-            try:
-                handle = Entrez.esearch(db="taxonomy", term=s_term,
-                                        api_key=user_key)
-            except urllib.error.HTTPError:
-                NCBIError('Connection error to remote server')
+            # Search the online database for parent record
+            p_rcrds = self.taxonomy_esearch(s_term)
 
-            p_record = Entrez.read(handle)
-            handle.close()
-
-            # Store count of the number of records found
-            pc = int(p_record['Count'])
+            # Track down record count
+            PCNT = p_rcrds.findall("./Count")
+            pc = int(PCNT[0].text)
 
             # Check that single parent taxa exists in records
             if pc == 0:
@@ -981,7 +1010,8 @@ class RemoteNCBIValidator:
                 return
             else:
                 # Find parent taxa ID as single entry in the list
-                pID = int(p_record['IdList'][0])
+                PAR = p_rcrds.findall("./IdList/Id")
+                pID = int(PAR[0].text)
                 # Then use ID lookup function to find generate as a NCBITaxon object
                 ptaxon = self.id_lookup("parent",pID)
 
@@ -989,8 +1019,11 @@ class RemoteNCBIValidator:
             p_key = list(ptaxon.taxa_hier.keys())[-1]
             p_val = ptaxon.taxa_hier[p_key]
 
+            # Find ID's of potential child taxa
+            ID = rcrds.findall("./IdList/Id")
+
             # Use list comprehension to make list of potential taxa
-            potents = [self.id_lookup(f"c{i}",int(record['IdList'][i]))
+            potents = [self.id_lookup(f"c{i}",int(ID[i].text))
                         for i in range(0,c)]
 
             # Check if relevant rank exists in the child taxa
@@ -1012,7 +1045,7 @@ class RemoteNCBIValidator:
                 return
             else:
                 # Find index corresponding to correct child taxa
-                tID = int(record['IdList'][child.index(True)])
+                tID = int(ID[child.index(True)].text)
                 # Use ID lookup function to find generate as a NCBITaxon object
                 mtaxon = self.id_lookup(nnme,tID)
 
