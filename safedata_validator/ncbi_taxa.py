@@ -603,8 +603,7 @@ class LocalNCBIValidator:
 @enforce_types
 class RemoteNCBIValidator:
     """This provides a validate method for a NCBITaxon using the online NCBI Entrez
-    tools. Unlike the LocalNCBIValidator, this doesn't need an __init__ method
-    and just contains methods, but duplicates the structure so that
+    tools. This validator duplicates the structure of LocalNCBIValidator so that
     the two Validators are interchangeable.
     """
     # COULD SET THIS UP TO POPULATE FROM THE RESOURCE FILE
