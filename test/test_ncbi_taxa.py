@@ -1,6 +1,6 @@
 import pytest
 import copy
-from safedata_validator import ncbi_taxa
+from safedata_validator import taxa
 from safedata_validator.resources import Resources
 from logging import ERROR, WARNING, INFO
 from .conftest import log_check
@@ -57,7 +57,7 @@ def test_taxon_init_errors(test_input, expected_exception):
     """This test checks NCBI taxon inputs expected errors
     """
     with pytest.raises(expected_exception):
-        _ = ncbi_taxa.NCBITaxon(**test_input)
+        _ = taxa.NCBITaxon(**test_input)
 
 # ------------------------------------------
 # Testing taxa_strip
@@ -86,7 +86,7 @@ def test_taxa_strip(test_input, expected):
     supplied rank matches the rank implied by the notation.
     """
 
-    s_taxa, match = ncbi_taxa.taxa_strip(**test_input)
+    s_taxa, match = taxa.taxa_strip(**test_input)
 
     assert s_taxa == expected[0]
     assert match == expected[1]
@@ -117,7 +117,7 @@ def test_species_binomial(test_input, expected):
     a binomial, and that it catches Candidatus names and handles them properly.
     """
 
-    s_bi = ncbi_taxa.species_binomial(**test_input)
+    s_bi = taxa.species_binomial(**test_input)
 
     assert s_bi == expected
 
@@ -139,7 +139,7 @@ def test_validate_species_binomial(caplog, test_input, expected_log_entries):
      correct errors and warnings.
     """
 
-    s_bi = ncbi_taxa.species_binomial(**test_input)
+    s_bi = taxa.species_binomial(**test_input)
 
     log_check(caplog, expected_log_entries)
 
@@ -170,7 +170,7 @@ def test_subspecies_trinomial(test_input, expected):
     them properly.
     """
 
-    s_bi = ncbi_taxa.subspecies_trinomial(**test_input)
+    s_bi = taxa.subspecies_trinomial(**test_input)
 
     assert s_bi == expected
 
@@ -196,7 +196,7 @@ def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries)
     the correct errors and warnings.
     """
 
-    s_bi = ncbi_taxa.subspecies_trinomial(**test_input)
+    s_bi = taxa.subspecies_trinomial(**test_input)
 
     log_check(caplog, expected_log_entries)
 
@@ -276,7 +276,7 @@ def test_validate_id_lookup(caplog, test_input, expected_log_entries, fixture_nc
      (dict(nnme='E coli', ncbi_id=-1),  # bad ID
       ValueError),
      (dict(nnme='E coli', ncbi_id=100000000000000),  # bad ID
-      ncbi_taxa.NCBIError)])
+      taxa.NCBIError)])
 def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exception):
     """This test checks tvalidator.id_lookup inputs throw errors as expected
     """
@@ -477,7 +477,7 @@ def test_validate_and_add_taxon(ncbi_resources_local_and_remote, test_input, exp
     database actually stores the expected information.
     """
 
-    ncbi_instance = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
     ncbi_instance.validate_and_add_taxon(test_input)
 
     assert len(ncbi_instance.taxon_index) == expected[0] # Number of taxa added
@@ -693,7 +693,7 @@ def test_validate_and_add_taxon_validate(caplog, test_input, expected_log_entrie
     """
 
     test_input = copy.deepcopy(test_input)
-    ncbi_instance = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
     fnd_tx = ncbi_instance.validate_and_add_taxon(test_input)
 
     log_check(caplog, expected_log_entries)
@@ -712,14 +712,14 @@ def test_validate_and_add_taxon_validate(caplog, test_input, expected_log_entrie
       ValueError),
      # Bad code
      (['E coli', {'species': 'Escherichia coli'}, 100000000000000],
-      ncbi_taxa.NCBIError),
+      taxa.NCBIError),
     ])
 def test_validate_and_add_taxon_errors(ncbi_resources_local_and_remote, test_input,
                                        expected_exception):
     """This test checks validator.validate_and_add_taxon inputs throw errors as expected
     """
 
-    ncbi_instance = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
 
     with pytest.raises(expected_exception):
         _ = ncbi_instance.validate_and_add_taxon(test_input)
@@ -762,7 +762,7 @@ def test_index_higher_taxa(ncbi_resources_local_and_remote, test_input, expected
     actually stores the correct information.
     """
 
-    ncbi_instance = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
     ncbi_instance.validate_and_add_taxon(test_input)
 
     # Then index higher taxa
@@ -842,7 +842,7 @@ def test_validate_index_higher_taxa(caplog, ncbi_resources_local_and_remote,
     logs the correct information.
     """
 
-    ncbi_instance = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
     fnd_tx = ncbi_instance.validate_and_add_taxon(test_input)
 
     # Then index higher taxa
@@ -865,7 +865,7 @@ def test_taxa_load(ncbi_resources_local_and_remote, example_ncbi_files, n_errors
     sample excel files.
     """
 
-    tx = ncbi_taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    tx = taxa.NCBITaxa(ncbi_resources_local_and_remote)
     tx.load(example_ncbi_files['NCBITaxa'])
 
     assert tx.n_errors == n_errors

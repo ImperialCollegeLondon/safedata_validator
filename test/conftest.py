@@ -7,12 +7,12 @@ import pytest
 from dotmap import DotMap
 import certifi
 
-from safedata_validator.taxa import Taxa, RemoteGBIFValidator, LocalGBIFValidator
+from safedata_validator.taxa import (GBIFTaxa, RemoteGBIFValidator, LocalGBIFValidator,
+                                     RemoteNCBIValidator, LocalNCBIValidator)
 from safedata_validator.locations import Locations
 from safedata_validator.field import Dataset
 from safedata_validator.resources import Resources
 from safedata_validator.field import DataWorksheet
-from safedata_validator.ncbi_taxa import RemoteNCBIValidator, LocalNCBIValidator
 
 
 def fixture_files():
