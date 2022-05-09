@@ -2286,10 +2286,13 @@ class NCBITaxa:
                                f' should be {(mtaxon.taxa_hier[rnks[ind]])[0]} not '
                                f'{taxon_hier[rnks[ind]]}')
 
-@enforce_types
+    @property
+    def is_empty(self):
+        return len(self.taxon_names) == 0
+
 class Taxa:
 
-    def __init__(self):
+    def __init__(self, resources: Resources):
         """A class that combines information stored in seperate lower level GBIFTaxa
         and NCBITaxa worksheets. We are interested in checking that no worksheet
         names are reused when both Taxa sheets are provided, that every worksheet
@@ -2301,14 +2304,20 @@ class Taxa:
         any names defined in the Taxa worksheets which are not used in any Data
         worksheet and `missing_names` which records any name used in the Data
         worksheets not defined in either Taxa worksheet.
+
+        In addition, GBIFTaxa and NCBITaxa instances are generated and stored within
+        this overarching class.
         """
 
         self.repeat_names = []
         self.unused_names = []
         self.missing_names = []
+        self.gbif_taxa = GBIFTaxa(resources)
+        self.ncbi_taxa = NCBITaxa(resources)
 
-
-    # OKAY AND THEN PUT MORE FUNCTIONS IN HERE
+    @property
+    def is_empty(self):
+        return (self.gbif_taxa.is_empty and self.ncbi_taxa.is_empty)
 
 def taxon_index_to_text(taxon_index, html=False, indent_width=4):
     """
