@@ -579,6 +579,9 @@ class Summary:
         core = self._read_block(*self.fields['core'])
         core = core[0]
 
+        self.title = core['title']
+        self.description = core['description']
+        
         # Project ID specific validation
         pid = core['pid']
 

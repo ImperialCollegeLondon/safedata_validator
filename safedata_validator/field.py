@@ -5,7 +5,7 @@ from itertools import groupby, islice
 from collections import OrderedDict
 import datetime
 from dateutil import parser
-from typing import List
+from typing import List, Type
 from logging import CRITICAL, ERROR, WARNING, INFO
 
 from openpyxl import worksheet, load_workbook
@@ -261,6 +261,8 @@ class Dataset:
         to populate a dataset database and publish datasets to Zenodo.
         """
 
+        # TODO - continue with class.to_dict() methods?
+
         json_dict = dict(
             # Summary information
             title = self.summary.title,
@@ -274,6 +276,7 @@ class Dataset:
             funders = self.summary.funders,
             permits = self.summary.permits,
             keywords = self.summary.keywords,
+            dataworksheets = [dwsh.to_dict() for dwsh in self.dataworksheets],
 
             # Taxa
             # TODO: remember that DB API should populate:
@@ -359,6 +362,7 @@ class DataWorksheet:
         self.field_types = None
         self.n_fields = None
         self.n_descriptors = None
+        self.descriptors = None
         self.fields = None
         self.taxa_fields = None
 
@@ -399,6 +403,8 @@ class DataWorksheet:
             cleaned_entries = [(ky, val) for ky, val
                                in zip(clean_descriptors, field_meta.values())]
             field_meta = OrderedDict(cleaned_entries)
+
+        self.descriptors = list(field_meta.keys())
 
         # * Expected descriptors - do _not_ preclude user defined descriptors
         #   but warn about them to alert to typos. Missing descriptors vary
@@ -765,6 +771,24 @@ class DataWorksheet:
                     else:
                         LOGGER.error('Un-numbered rows at end of worksheet contain data')
                         break
+
+    def to_dict(self):
+        """Method to return a dictionary representation of a DataWorksheet
+        instance"""
+
+        output = dict(taxa_fields = self.taxa_fields,
+                      max_row = self.n_row + self.n_descriptors ,
+                      max_col = self.n_fields,
+                      name = self.name,
+                      title = self.title,
+                      description = self.description,
+                      descriptors = self.descriptors,
+                      external = self.external,
+                      fields = [field_to_dict(fld, idx + 1) for idx, fld in enumerate(self.fields)],
+                      field_name_row = self.n_descriptors,
+                      n_data_row = self.n_row)
+
+        return output
 
 
 class BaseField:
@@ -1215,6 +1239,52 @@ class BaseField:
             LOGGER.error(f'{self.n_excel_error} cells contain Excel formula errors')
 
         FORMATTER.pop()
+
+def field_to_dict(fld: Type[BaseField], col_idx: int) -> dict:
+    """Function to return a dictionary representation of a field object. This
+    would more naturally be a method of BaseField, but needs to include the
+    extended attributes of subclasses of BaseField
+
+    Args:
+        fld: An instance inheriting from BaseField
+        col_idx: The column index of the field
+
+    Returns:
+        A dictionary representation of the field attributes.
+    """
+
+    output = dict(field_name = fld.field_name,
+                  description = fld.meta['description'],
+                  field_type = fld.meta['field_type'],
+                  units = None,
+                  method = None,
+                  levels = None,
+                  taxon_field = None,
+                  taxon_name = None,
+                  interaction_field = None,
+                  interaction_name = None,
+                  range = None,
+                  col_idx = col_idx)
+
+    if hasattr(fld, 'units'):
+                  output['units'] = getattr(fld, 'units')
+                  output['method'] = getattr(fld, 'method')
+
+    if hasattr(fld, 'levels'):
+                  output['levels'] = getattr(fld, 'levels')
+
+    if hasattr(fld, 'taxon_field'):
+                  output['levels'] = getattr(fld, 'taxon_field')
+
+    if hasattr(fld, 'interaction_name'):
+                  output['interaction_name'] = getattr(fld, 'interaction_name')
+
+    if hasattr(fld, 'interaction_field'):
+                  output['interaction_field'] = getattr(fld, 'interaction_field')
+
+    if hasattr(fld, 'range'):
+                  output['range'] = getattr(fld, 'range')
+
 
 
 class CommentField(BaseField):
