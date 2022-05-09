@@ -2286,6 +2286,30 @@ class NCBITaxa:
                                f' should be {(mtaxon.taxa_hier[rnks[ind]])[0]} not '
                                f'{taxon_hier[rnks[ind]]}')
 
+@enforce_types
+class Taxa:
+
+    def __init__(self):
+        """A class that combines information stored in seperate lower level GBIFTaxa
+        and NCBITaxa worksheets. We are interested in checking that no worksheet
+        names are reused when both Taxa sheets are provided, that every worksheet
+        name is used somewhere in the Data worksheets, and that every taxon name
+        used across the Data worksheets is defined in a Taxa worksheet.
+
+        To perform this check three lists are populated: `repeat_names` which records
+        any worksheet name used in both Taxa worksheets, `unused_names` which records
+        any names defined in the Taxa worksheets which are not used in any Data
+        worksheet and `missing_names` which records any name used in the Data
+        worksheets not defined in either Taxa worksheet.
+        """
+
+        self.repeat_names = []
+        self.unused_names = []
+        self.missing_names = []
+
+
+    # OKAY AND THEN PUT MORE FUNCTIONS IN HERE
+
 def taxon_index_to_text(taxon_index, html=False, indent_width=4):
     """
     Turns the taxon index from a GBIFTaxa instance into a text representation
