@@ -54,9 +54,7 @@ class Dataset:
         self.filename = None
         self.resources = resources
         self.summary = Summary(resources)
-        self.gbif_taxa = GBIFTaxa(resources)
-        self.ncbi_taxa = NCBITaxa(resources)
-        self.taxa = Taxa()
+        self.taxa = Taxa(resources)
         self.dataworksheets = []
         self.n_errors = 0
         self.passed = False
@@ -142,14 +140,14 @@ class Dataset:
         # Setup check for existence of either Taxa sheet
         taxa_sheet = False
 
-        # Populate taxa
+        # Populate gbif taxa
         if 'GBIFTaxa' in wb.sheetnames:
-            self.gbif_taxa.load(wb['GBIFTaxa'])
+            self.taxa.gbif_taxa.load(wb['GBIFTaxa'])
             taxa_sheet = True
 
-        # Populate taxa
+        # Populate ncbi taxa
         if 'NCBITaxa' in wb.sheetnames:
-            self.ncbi_taxa.load(wb['NCBITaxa'])
+            self.taxa.ncbi_taxa.load(wb['NCBITaxa'])
             taxa_sheet = True
 
         if taxa_sheet == False:
@@ -851,6 +849,7 @@ class BaseField:
         # Shortcuts to main components
         self.dataset = dataset
         if self.dataset:
+            # HOW DO I OVER WRITE THIS????
             self.taxa = getattr(self.dataset, 'taxa')
             self.locations = getattr(self.dataset, 'locations')
             self.summary = getattr(self.dataset, 'summary')

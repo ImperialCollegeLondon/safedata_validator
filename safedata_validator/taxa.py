@@ -2299,25 +2299,28 @@ class Taxa:
         name is used somewhere in the Data worksheets, and that every taxon name
         used across the Data worksheets is defined in a Taxa worksheet.
 
+        THIS ISN'T ACTUALLY WHAT IS DONE, UPDATE THIS
         To perform this check three lists are populated: `repeat_names` which records
         any worksheet name used in both Taxa worksheets, `unused_names` which records
         any names defined in the Taxa worksheets which are not used in any Data
-        worksheet and `missing_names` which records any name used in the Data
-        worksheets not defined in either Taxa worksheet.
+        worksheet and `taxon_names_used` which records all names used in the Data
+        worksheets.
 
         In addition, GBIFTaxa and NCBITaxa instances are generated and stored within
         this overarching class.
         """
 
-        self.repeat_names = []
-        self.unused_names = []
-        self.missing_names = []
         self.gbif_taxa = GBIFTaxa(resources)
         self.ncbi_taxa = NCBITaxa(resources)
+        self.taxon_names_used = set()
 
     @property
     def is_empty(self):
         return (self.gbif_taxa.is_empty and self.ncbi_taxa.is_empty)
+
+    @property
+    def taxon_names(self):
+        return self.gbif_taxa.taxon_names.union(self.ncbi_taxa.taxon_names)
 
 def taxon_index_to_text(taxon_index, html=False, indent_width=4):
     """

@@ -374,7 +374,7 @@ def fixture_dataset(resources_with_local_gbif):
             None),]
 
     for tx in test_taxa:
-        dataset.gbif_taxa.validate_and_add_taxon(tx)
+        dataset.taxa.gbif_taxa.validate_and_add_taxon(tx)
 
     test_locs = ['A_1', 'A_2', 1, 2]
 
