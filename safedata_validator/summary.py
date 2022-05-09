@@ -150,10 +150,10 @@ class Summary:
         else:
             LOGGER.error("Provided project id must be an integer or list of integers")
             self.valid_pid = None
-        
+
         self.validate_doi = validate_doi
 
-        # load worksheet rows, removing blank rows 
+        # load worksheet rows, removing blank rows
         # TODO - make 'internal' blank rows an error.
         rows = []
         for this_row in worksheet.iter_rows(values_only=True):
@@ -405,16 +405,16 @@ class Summary:
                     isinstance(end_date, datetime.datetime)):
                 LOGGER.error('Temporal extents are not date values')
                 return
-            
+
             if not (start_date.time() == datetime.time(0,0) and
                     end_date.time() == datetime.time(0,0)):
                 LOGGER.error('Temporal extents should be date not datetime values')
                 return
-            
+
             if start_date > end_date:
                 LOGGER.error('Start date is after end date')
                 return
-            
+
             self.temporal_extent.update([start_date.date(), end_date.date()])
 
     @loggerinfo_push_pop('Loading geographic extent metadata')
@@ -426,7 +426,7 @@ class Summary:
         if geo_extent is not None:
 
             bbox = geo_extent[0]
-            
+
             if all([isinstance(v, float) for v in bbox.values()]):
                 if bbox['south'] > bbox['north']:
                     LOGGER.error('South limit is greater than north limit')
@@ -488,7 +488,7 @@ class Summary:
         elif data_worksheets is None:
             LOGGER.info("Only external file descriptions provided")
             return
-        
+
         # Check sheet names in list of sheets
         cited_sheets = {ws['name'] for ws in data_worksheets}
 
@@ -499,7 +499,7 @@ class Summary:
                 if each_ws['external'] is not None:
                     LOGGER.info(f"Worksheet summary {each_ws['name']} recognized as placeholder for "
                                 f"external file {each_ws['external']}")
-                else: 
+                else:
                     LOGGER.error(f"Data worksheet {each_ws['name']} not found")
 
         # bad external files
@@ -516,11 +516,11 @@ class Summary:
                             extra={'join': bad_externals})
 
         # Check for existing sheets without description
-        extra_names = set(sheetnames) - {'Summary', 'Taxa', 'Locations'} - cited_sheets
+        extra_names = set(sheetnames) - {'Summary', 'GBIFTaxa', 'NCBITaxa', 'Locations'} - cited_sheets
         if extra_names:
             LOGGER.error('Undocumented sheets found in workbook: ',
                          extra={'join': extra_names})
-        
+
         self.data_worksheets = data_worksheets
 
     @loggerinfo_push_pop('Loading access metadata')
@@ -539,9 +539,9 @@ class Summary:
 
             if status not in ['open', 'embargo', 'restricted']:
                 LOGGER.error(f"Access status must be Open, Embargo or Restricted not {access['access']}")
-            
+
             if status == 'embargo':
-                
+
                 if embargo_date is None:
                     LOGGER.error('Dataset embargoed but no embargo date provided')
                 elif isinstance(embargo_date, datetime.datetime):
@@ -553,7 +553,7 @@ class Summary:
                         LOGGER.error('Embargo date more than two years in the future.')
                     else:
                         LOGGER.info(f'Dataset access: embargoed until {embargo_date }')
-                
+
                 if access['access_conditions'] is not None:
                     LOGGER.error('Access conditions cannot be set on embargoed data.')
 
@@ -562,14 +562,14 @@ class Summary:
 
                 if embargo_date is not None:
                     LOGGER.error('Do not set an embargo date with restricted datasets')
-                
+
                 if access_conditions is None:
                     LOGGER.error('Dataset restricted but no access conditions specified')
                 else:
                     LOGGER.info(f'Dataset access: restricted with conditions {access_conditions}')
             else:
                 LOGGER.info(f'Dataset access: {status}')
-        
+
         self.access = access
 
     @loggerinfo_push_pop('Loading core metadata')
