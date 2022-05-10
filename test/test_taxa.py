@@ -421,6 +421,6 @@ def test_taxa_load(example_excel_files, resources_with_local_gbif, n_errors, n_t
     """
 
     tx = taxa.GBIFTaxa(resources_with_local_gbif)
-    tx.load(example_excel_files['GBIFTaxa'])
+    tx.load(example_excel_files['Taxa'])
 
     assert tx.n_errors == n_errors
