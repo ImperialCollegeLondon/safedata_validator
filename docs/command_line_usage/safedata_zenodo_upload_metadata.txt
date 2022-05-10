@@ -1,0 +1,12 @@
+cl_prompt $ safedata_zenodo upload_metadata -h
+usage: safedata_zenodo upload_metadata [-h] deposit_json dataset_json
+
+Uploads the required Zenodo metadata for an unpublished deposit, using the
+deposit metadata file.
+
+positional arguments:
+  deposit_json  Path to a Zenodo metadata file
+  dataset_json  Path to a dataset metadata file
+
+optional arguments:
+  -h, --help    show this help message and exit

@@ -1,0 +1,28 @@
+cl_prompt $ safedata_zenodo sync_local_dir -h
+usage: safedata_zenodo sync_local_dir [-h] [-a API] [--xlsx_only XLSX_ONLY]
+                                      datadir
+
+The safedata R package defines a directory structure used to store metadata
+and files downloaded from a safedata community on Zenodo and from a safedata
+metadata server. This tool allows a safedata developer or community
+maintainer to create or update such a directory with _all_ of the resources
+in the Zenodo community, regardless of their public access status. This
+forms a backup (although Zenodo is heavily backed up) but also provides
+local copies of the files for testing and development of the code packages.
+
+If this is a new data directory, you also need to provide the API url for
+the a server providing safedata metadata.
+
+positional arguments:
+  datadir               The path to a local directory containing an existing
+                        safedata directory or an empty folder in which to
+                        create one
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -a API, --api API     An API from which JSON dataset metadata can be
+                        downloaded. If datadir is an existing safedata
+                        directory, then the API will be read from `url.json`.
+  --xlsx_only XLSX_ONLY
+                        Should the download ignore large non-xlsx files,
+                        defaulting to True.
