@@ -37,9 +37,9 @@ def fixture_files():
                   ('json_not_locations', 'notalocationsjson.json'),
                   ('bad_excel_file', 'Test_format_bad.xlsx'),
                   ('good_excel_file', 'Test_format_good.xlsx'),
-                  ('bad_ncbi_file', 'Test_NCBItaxa_bad.xlsx'),
-                  ('weird_ncbi_file', 'Test_NCBItaxa_weird.xlsx'),
-                  ('good_ncbi_file', 'Test_NCBItaxa_good.xlsx')]
+                  ('bad_ncbi_file', 'Test_format_bad_NCBI.xlsx'),
+                  ('weird_ncbi_file', 'Test_format_weird_NCBI.xlsx'),
+                  ('good_ncbi_file', 'Test_format_good_NCBI.xlsx')]
 
     real_files = {ky: os.path.join(fixture_dir, vl)
                   for ky, vl in real_files}
