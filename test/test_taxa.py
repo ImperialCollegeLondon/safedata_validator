@@ -414,13 +414,13 @@ def test_validate_taxon_lookup(caplog, resources_local_and_remote,
      ('bad', 20, 20)],
     indirect = ['example_excel_files']  # take actual params from fixture
 )
-def test_taxa_load(example_excel_files, resources_with_local_gbif, n_errors, n_taxa):
+def test_taxa_load(example_excel_files, resources_local_and_remote, n_errors, n_taxa):
     """This tests the ensemble loading of taxa from a file using
     indirect parameterisation to access the fixtures containing the
     sample excel files.
     """
 
-    tx = taxa.GBIFTaxa(resources_with_local_gbif)
+    tx = taxa.GBIFTaxa(resources_local_and_remote)
     tx.load(example_excel_files['Taxa'])
 
     assert tx.n_errors == n_errors
