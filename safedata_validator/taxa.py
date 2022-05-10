@@ -2036,7 +2036,7 @@ class NCBITaxa:
         # summary of processing
         self.n_errors = COUNTER_HANDLER.counters['ERROR'] - start_errors
         if self.n_errors > 0:
-            LOGGER.info('Taxa contains {} errors'.format(self.n_errors))
+            LOGGER.info('NCBITaxa contains {} errors'.format(self.n_errors))
         else:
             LOGGER.info('{} taxa loaded correctly'.format(len(self.taxon_names)))
 

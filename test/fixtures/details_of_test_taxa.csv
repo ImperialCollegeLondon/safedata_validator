@@ -94,6 +94,8 @@ gbif_id,parent_id,taxon_name,taxon_rank,status
 1324306,4342,Crematogaster,genus,accepted
 1317499,4342,Aenictus,genus,accepted
 2435194,9703,Panthera,genus,accepted
+6640,691,Moraceae,family,accepted
+691,220,Rosales,order,accepted
 # ------------------------------------------------------------------------
 # Additions from test_taxa.py
 # ------------------------------------------------------------------------

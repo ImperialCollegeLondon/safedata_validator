@@ -179,8 +179,9 @@ class Dataset:
         """
         A method to run final checks:
         i) The locations and taxa provided have been used in the data worksheets scanned.
-        ii) Extents in the data are congruent with the summary extents
-        iii) Report the total number of errors and warnings
+        ii) That no taxa names are defined twice (i.e. in GBIFTaxa and NCBITaxa)
+        iii) Extents in the data are congruent with the summary extents
+        iv) Report the total number of errors and warnings
         """
 
         LOGGER.info('Checking provided locations and taxa all used in data worksheets')
@@ -203,11 +204,16 @@ class Dataset:
         if not self.taxa.is_empty:
             if self.summary.external_files:
                 LOGGER.warning('Taxon list cannot be validated when external data files are used')
-            elif self.taxa.taxon_names_used == self.taxa.taxon_names:
-                LOGGER.info('Provided taxa all used in datasets')
-            elif self.taxa.taxon_names_used == (self.taxa.taxon_names & self.taxa.taxon_names_used):
-                LOGGER.error('Provided taxa not used: ',
-                             extra={'join': self.taxa.taxon_names - self.taxa.taxon_names_used})
+            else:
+                if self.taxa.taxon_names_used == self.taxa.taxon_names:
+                    LOGGER.info('Provided taxa all used in datasets')
+                elif self.taxa.taxon_names_used != self.taxa.taxon_names.union(self.taxa.taxon_names_used):
+                    LOGGER.error('Provided taxa not used: ',
+                                 extra={'join': self.taxa.taxon_names - self.taxa.taxon_names_used})
+
+                if self.taxa.repeat_names != set():
+                    LOGGER.error('The following taxa are defined in both GBIFTaxa and NCBITaxa: ',
+                                 extra={'join': self.taxa.repeat_names})
 
         # Check the extents - there are both summary and dataset extents so
         # check at least one is populated for each extent and that they are
