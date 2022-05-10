@@ -56,11 +56,6 @@ BACKBONE_RANKS_EX = ['superkingdom', 'kingdom', 'phylum', 'class', 'order',
 # isn't need elsewhere (as far as I know)
 # Also should ask for api key
 
-# TODO - Work out how this best integrates with taxa
-# Lot of different potential approaches (e.g. making making NCBI and GBIF validators
-# sub-classes of a validator class). Need to establish what the most extensible
-# and stable option is
-
 # TODO - A lot of complexity could be lost here if the two validation
 #        sources had more similar structure. Could have a row return method
 #        that is used within a generic id_lookup and search class.
@@ -2299,15 +2294,13 @@ class Taxa:
         name is used somewhere in the Data worksheets, and that every taxon name
         used across the Data worksheets is defined in a Taxa worksheet.
 
-        THIS ISN'T ACTUALLY WHAT IS DONE, UPDATE THIS
-        To perform this check three lists are populated: `repeat_names` which records
-        any worksheet name used in both Taxa worksheets, `unused_names` which records
-        any names defined in the Taxa worksheets which are not used in any Data
-        worksheet and `taxon_names_used` which records all names used in the Data
-        worksheets.
-
-        In addition, GBIFTaxa and NCBITaxa instances are generated and stored within
-        this overarching class.
+        This overarching class stores instances of the two lower level classes (GBIFTaxa,
+        NCBITaxa). It can also store (as `taxon_names_used`) the set of all names used
+        across the Data worksheets. The property `is_empty` can be used to check whether
+        both of the lower level classes are empty, and the property `taxon_names` can be
+        used to find the set of all taxon names defined in either GBIFTaxa or NCBITaxa.
+        Finally, the property `repeat_names` can be used to find if any names are used
+        in both GBIFTaxa and NCBITaxa worksheets.
         """
 
         self.gbif_taxa = GBIFTaxa(resources)
@@ -2321,6 +2314,10 @@ class Taxa:
     @property
     def taxon_names(self):
         return self.gbif_taxa.taxon_names.union(self.ncbi_taxa.taxon_names)
+
+    @property
+    def repeat_names(self):
+        return self.gbif_taxa.taxon_names.intersection(self.ncbi_taxa.taxon_names)
 
 def taxon_index_to_text(taxon_index, html=False, indent_width=4):
     """

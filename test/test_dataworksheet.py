@@ -531,7 +531,7 @@ def test_DataWorksheet_load_from_file(caplog, resources_with_local_gbif, example
 
     # Load the taxa and locations
     ds = Dataset(resources_with_local_gbif)
-    ds.taxa.gbif_taxa.load(example_excel_files['GBIFTaxa'])
+    ds.taxa.gbif_taxa.load(example_excel_files['Taxa'])
     ds.locations.load(example_excel_files['Locations'])
 
     caplog.clear()

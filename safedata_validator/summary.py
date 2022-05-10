@@ -516,7 +516,7 @@ class Summary:
                             extra={'join': bad_externals})
 
         # Check for existing sheets without description
-        extra_names = set(sheetnames) - {'Summary', 'GBIFTaxa', 'NCBITaxa', 'Locations'} - cited_sheets
+        extra_names = set(sheetnames) - {'Summary', 'Taxa', 'GBIFTaxa', 'NCBITaxa', 'Locations'} - cited_sheets
         if extra_names:
             LOGGER.error('Undocumented sheets found in workbook: ',
                          extra={'join': extra_names})
@@ -581,7 +581,7 @@ class Summary:
 
         self.title = core['title']
         self.description = core['description']
-        
+
         # Project ID specific validation
         pid = core['pid']
 
