@@ -17,7 +17,8 @@ nav:
   - 'Other file formats': 'data_format/other_formats.md'
   - 'Excel format details':
     - 'Summary worksheet': 'data_format/summary.md'
-    - 'Taxa worksheet': 'data_format/taxa.md'
+    - 'Taxa worksheets': 'data_format/taxa.md'
+    - 'GBIFTaxa worksheet': 'data_format/gbif_taxa.md'
     - 'NCBITaxa worksheet': 'data_format/ncbi_taxa.md'
     - 'Locations worksheet': 'data_format/locations.md'
     - 'Data worksheets': 'data_format/data.md'
@@ -39,5 +40,4 @@ nav:
     - 'Locations': 'api/locations.md'
     - 'Fields and dataworksheets': 'api/field.md'
     - 'Taxa': 'api/taxa.md'
-    - 'NCBITaxa': 'api/ncbi_taxa.md'
   - 'Build notes': build_notes.md
