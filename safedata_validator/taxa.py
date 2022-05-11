@@ -13,7 +13,11 @@ Faster validation may be performed using local copies of the databases
 (`LocalGBIFValidator` and `LocalNCBIValidator`).
 
 Parallel 'Taxa' worksheets (GBIFTaxa and NCBITaxa) are defined, which are used to
-load and collate the set of taxonomic entries from a dataset.
+load and collate the set of taxonomic entries from a dataset. These are then collected
+in a higher level Taxa object, which additionally records the names used in the
+Data worksheets. This allows us to check that all defined names are used, all used
+names are defined, and that no names are defined in both Taxa worksheets (if both
+sheets are provided).
 
 Note that we explicitly exclude form and variety from the set of GBIF backbone
 taxonomic levels because they cannot be matched into the backbone hierarchy
@@ -69,7 +73,7 @@ class GBIFError(Exception):
     """Exception class for remote GBIF errors
 
     Attributes:
-        message -- explanation of the error
+        message: explanation of the error
     """
 
     def __init__(self, message="GBIF ID not found"):
@@ -254,7 +258,7 @@ class LocalGBIFValidator:
             taxon: A GBIFTaxon instance
 
         Returns:
-            A GBIFTaxon instance
+            GBIFTaxon: A GBIFTaxon instance
         """
 
         if not taxon.is_backbone:
@@ -337,7 +341,7 @@ class LocalGBIFValidator:
             gbif_id: An integer
 
         Returns:
-            A GBIFTaxon object.
+            GBIFTaxon: Complete taxon info
         """
 
         if not isinstance(gbif_id, int):
@@ -408,7 +412,7 @@ class RemoteGBIFValidator:
             taxon (GBIFTaxon): A GBIFTaxon to be validated
 
         Returns:
-            An updated GBIFTaxon object.
+            GBIFTaxon: An updated GBIFTaxon object.
         """
 
         if not taxon.is_backbone:
@@ -465,7 +469,7 @@ class RemoteGBIFValidator:
             gbif_id: An integer
 
         Returns:
-            A GBIFTaxon object.
+            GBIFTaxon: A GBIFTaxon object.
         """
 
         if not isinstance(gbif_id, int):
@@ -1436,7 +1440,7 @@ class GBIFTaxa:
             worksheet: An openpyxl worksheet instance following the GBIFTaxa formatting
 
         Returns:
-            Updates the taxon_names and taxon_index attributes of the class instance
+            None: Updates the taxon_names and taxon_index attributes of the class instance
             using the data in the worksheet.
         """
 
@@ -1553,7 +1557,7 @@ class GBIFTaxa:
             taxon_input: GBIFTaxon information in standard form as above
 
         Returns:
-            Updates the taxon_names and taxon_index attributes of the class instance.
+            None: Updates the taxon_names and taxon_index attributes of the class instance.
         """
 
         m_name, taxon_info, parent_info = taxon_input
@@ -2294,13 +2298,14 @@ class Taxa:
         name is used somewhere in the Data worksheets, and that every taxon name
         used across the Data worksheets is defined in a Taxa worksheet.
 
-        This overarching class stores instances of the two lower level classes (GBIFTaxa,
-        NCBITaxa). It can also store (as `taxon_names_used`) the set of all names used
-        across the Data worksheets. The property `is_empty` can be used to check whether
-        both of the lower level classes are empty, and the property `taxon_names` can be
-        used to find the set of all taxon names defined in either GBIFTaxa or NCBITaxa.
-        Finally, the property `repeat_names` can be used to find if any names are used
-        in both GBIFTaxa and NCBITaxa worksheets.
+        This overarching class stores instances of the two lower level classes
+        (GBIFTaxa, NCBITaxa). It can also store (as `taxon_names_used`) the set
+        of all names used across the Data worksheets. The property `is_empty` can
+        be used to check whether both of the lower level classes are empty, and
+        the property `taxon_names` can be used to find the set of all taxon names
+        defined in either GBIFTaxa or NCBITaxa. Finally, the property `repeat_names`
+        can be used to find if any names are used in both GBIFTaxa and NCBITaxa
+        worksheets.
         """
 
         self.gbif_taxa = GBIFTaxa(resources)
