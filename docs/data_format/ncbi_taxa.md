@@ -1,10 +1,8 @@
 # The NCBITaxa worksheet
 
-This worksheet plays a similar role to the Taxa worksheet, that is recording the taxonomic information for organisms referred to in the Data worksheets. The key difference is that taxonomic information is recorded using NCBI taxonomy rather than GBIF taxonomy. This taxonomy better matches the output of sequencing data, and so this worksheet is recommended for this class of data. If taxa are used anywhere in the dataset either this worksheet or the Taxa worksheet must be included. It is also an option to provide both a Taxa worksheet and a NCBITaxa worksheet, e.g. in cases where both sequencing and observational data are being reported.
+This worksheet plays a similar role to the GBIFTaxa worksheet, that is recording the taxonomic information for organisms referred to in the Data worksheets. The key difference is that taxonomic information is recorded using NCBI taxonomy rather than GBIF taxonomy. This taxonomy better matches the output of sequencing data, and so this worksheet is recommended for this class of data. If taxa are used anywhere in the dataset either this worksheet or the GBIFTaxa worksheet must be included. It is also an option to provide both a GBIFTaxa worksheet and a NCBITaxa worksheet, e.g. in cases where both sequencing and observational data are being reported.
 
-Note that you must only provide details for taxa actually used in the data worksheets. This ensures that the taxonomic index for a dataset is accurate and also double checks that it the omission of a taxon from the data worksheets is not an error.
-
-# Taxon validation
+# NCBI Taxon validation
 
 In order to help keep the taxonomy as clean as possible and to allow us to index the taxonomic coverage of datasets, we will check all taxon names in NCBITaxa worksheet against the NCBI taxonomy database. If you want to check your taxon names and ranks, then the search engine is here:
 

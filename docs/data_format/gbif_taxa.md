@@ -1,19 +1,11 @@
+# The GBIFTaxa worksheet
 
-# The Taxa worksheet
+This worksheet exists to record taxonomic in information for organisms referred to in the Data worksheets. This taxonomic information should be recorded in a format that can be validated against the GBIF backbone taxonomy. Generally the GBIF backbone taxonomy is most suitable for taxa discovered via direct observation (rather than sequencing), so this worksheet is most appropriate for storing the details of directly observed taxa. If taxa are used anywhere in the dataset either this worksheet or the NCBITaxa worksheet must be included. It is also an option to provide both a GBIFTaxa worksheet and a NCBITaxa worksheet, e.g. in cases where both sequencing and direct observational data are being reported.
 
-Many datasets will involve data taken from organisms, whether that is a count of the number of
-individuals or measurement of a trait such as body length. In order to help us keep track of
-taxa, all datasets using taxa **must** contain a Taxa spreadsheet, providing taxonomic
-information.
-
-Note that you must only provide details for taxa actually used in the data worksheets. This
-ensures that the taxonomic index for a dataset is accurate and also double checks that it the
-omission of a taxon from the data worksheets is not an error.
-
-# Taxon validation
+# GBIF Taxon validation
 
 In order to help keep the taxonomy as clean as possible and to allow us to index the taxonomic
-coverage of datasets, we will check all taxon names in Taxa worksheet against the GBIF backbone
+coverage of datasets, we will check all taxon names in GBIFTaxa worksheet against the GBIF backbone
 taxonomy database. If you want to check your taxon names and ranks, then the search engine is
 here:
 
