@@ -76,9 +76,9 @@ Locations are validated against a set of known location names and possible alias
 
     safedata_validate MyData.xlsx -l /path/to/validator_locations.json
 
-## Taxa
+## GBIFTaxa
 
-If you  want to speed up taxon checking and allow offline use then you will need to download a copy of the backbone taxonomy and build a SQLite3 database from it. Using a local database is  much faster than using the GBIF API online. This isn't particularly hard and is described in detail [here](build_local_gbif.md), but the resulting database is around 1.6GB, so you'll need file space!
+If you want to speed up taxon checking and allow offline use then you will need to download a copy of the backbone taxonomy and build a SQLite3 database from it. Using a local database is  much faster than using the GBIF API online. This isn't particularly hard and is described in detail [here](build_local_gbif.md), but the resulting database is around 1.6GB, so you'll need file space!
 
 Once you have this file, you can use it like this:
 
@@ -86,7 +86,11 @@ Once you have this file, you can use it like this:
 
 ## NCBITaxa
 
-TODO - ADD AN EXPLANATION HERE ONCE WE'VE DECIDED HOW THIS SHOULD ACTUALLY BE USED. OR ALTERNATIVELY JUST DELETE THIS SECTION.
+Taxon checking against NCBI can be similarly sped up by downloading a copy of the online database and building a SQLite3 database from it. Using a local database is substantially faster than using the online NCBI Entrez tools. Instructions on how to construct the local database are given [here](build_local_ncbi.md), again the resulting database is large so you'll need to ensure you have sufficient file space!
+
+Once you have this file, you can use it like this:
+
+    TODO - INSERT USAGE HERE
 
 ## Fully offline use
 
