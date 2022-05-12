@@ -1,32 +1,29 @@
 import os
-import datetime
 from lxml import etree
-from regex import P
 import simplejson
 import copy
-from io import StringIO
 import requests
-# from safe_web_global_functions import safe_mailer
 from itertools import groupby
-from shapely import geometry
 import hashlib
-# from gluon.serializers import json
 import rispy
 import shutil
+from dominate import tags
+from dominate.util import raw
 
 from tqdm import tqdm
 from tqdm.utils import CallbackIOWrapper
-from contextlib import nullcontext
 
-from typing import Tuple, Union
+from typing import Tuple, Union, List, Dict
 
 
 from safedata_validator.resources import Resources
 from safedata_validator.logger import LOGGER, FORMATTER
+
 """
 This module provides functions to:
 1. handle the publication of datasets after they have been validated 
-   using safedata_validate,
+   using safedata_validate, including the generation of HTML descriptions
+   of datasets.
 2. maintain local copies of datasets in the folder structure expected 
    by the safedata R package.
 3. compile a RIS format bibliographic file for published datasets.
@@ -42,14 +39,46 @@ def _resources_to_zenodo_api(resources: Resources = None):
         resources = Resources()
 
     # Get the Zenodo API 
-    if resources.zenodo.use_sandbox:
+    config_fail = False
+
+    if resources.zenodo.use_sandbox is None:
+        config_fail = True
+    elif resources.zenodo.use_sandbox:
         zenodo_api = resources.zenodo.zenodo_sandbox_api
         token = resources.zenodo.zenodo_sandbox_token
     else:
         zenodo_api = resources.zenodo.zenodo_api
         token = resources.zenodo.zenodo_token
 
-    return zenodo_api, {'access_token': token}, resources.zenodo.community_name
+    if zenodo_api is None or token is None:
+        config_fail = True
+
+    # Get the contact details if used 
+    contact_name = resources.zenodo.contact_name
+    contact_affiliation = None
+    contact_orcid = None
+
+    if contact_name is not None:
+        contact_affiliation = resources.zenodo.contact_affiliation
+        contact_orcid = resources.zenodo.contact_orcid
+
+    # Get the metadata api
+    metadata_api = resources.metadata.api
+    metadata_token = resources.metadata.token
+    if metadata_api is None or metadata_token is None: 
+        config_fail = True
+
+    if config_fail:
+        raise RuntimeError('safedata_validator not configured for Zenodo functions')
+    
+    return {'zapi': zenodo_api, 
+            'ztoken': {'access_token': token}, 
+            'zcomm': resources.zenodo.community_name,
+            'zcname': contact_name,
+            'zcaffil': contact_affiliation,
+            'zcorc': contact_orcid,
+            'mdapi': metadata_api,
+            'mdtoken': metadata_token}
 
 def _compute_md5(fname:str) -> str:
     """Calculate a local file md5 hash
@@ -85,7 +114,9 @@ def get_deposit(deposit_id: int,
             * An error message on failure or None on success
     """
 
-    zenodo_api, params, _ = _resources_to_zenodo_api(resources)
+    zres = _resources_to_zenodo_api(resources)
+    zenodo_api = zres['zapi']
+    params = zres['ztoken']
 
     # request the deposit
     dep = requests.get(f'{zenodo_api}/deposit/depositions/{deposit_id}',
@@ -117,7 +148,9 @@ def create_deposit(deposit_id: int = None,
     """
 
     # Get resource configuration
-    zenodo_api, params, _ = _resources_to_zenodo_api(resources)
+    zres = _resources_to_zenodo_api(resources)
+    zenodo_api = zres['zapi']
+    params = zres['ztoken']
 
     # get the correct draft api
     if deposit_id is None:
@@ -147,43 +180,48 @@ def create_deposit(deposit_id: int = None,
     else:
         return dep.json(), None
 
-# FIXME
-def upload_metadata(links, token, record, zenodo_id):
+
+def upload_metadata(metadata: dict,
+                    zenodo: dict,
+                    resources: Resources = None
+                    ) -> Tuple[Union[dict, None], Union[str, None]]:
     """
-    Function to turn a dataset row record into a Zenodo metadata JSON and upload
-    it to a deposit.
+    Function to take dataset metadata, convert to Zenodo metadata JSON and
+    upload it to a deposit.
 
     Args:
-        links: The links dictionary from a created deposit
-        token: The access token to be used
-        record: The database record containing the metadata to be uploaded.
-        zenodo_id: The ID of the zenodo draft being created, to be used as a
-            key for the GEMINI XML link.
-
+        metadata: The dataset metadata dictionary for a dataset
+        zenodo: The dataset metadata dictionary for a deposit
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
     Returns:
-        An integer indicating success (0) or failure (1) and either the
-        deposit links dictionary or an error message
+        A 2 tuple:
+            * A dictionary containing the response content or None on error
+            * An error message on failure or None on success
     """
 
-    # extract the metadata from the record
-    metadata = record.dataset_metadata['metadata']
+    # Get resource configuration
+    zres = _resources_to_zenodo_api(resources)
 
     # basic contents
     zen_md = {
         'metadata': {
             "upload_type": "dataset",
-            "publication_date": datetime.date.today().isoformat(),
+            # "publication_date": datetime.date.today().isoformat(),
             "title": metadata['title'],
             "keywords": metadata['keywords'],
             "license": 'cc-by',
-            "contributors": [
-                {"name": "The SAFE Project", "type": "ContactPerson",
-                 "affiliation": "Imperial College London",
-                 "orcid": "0000-0003-3378-2814"},
-            ],
-            "communities": [{"identifier": "safe"}]
+            "communities": [{"identifier": zres['zcomm']}]
         }
     }
+
+    # Add a contact name to contributors if provided in config
+    if zres['zcname'] is not None:
+        zen_md['metadata']['contributors'] = [
+                {"name": zres['zcname'], 
+                 "type": "ContactPerson",
+                 "affiliation": zres['zcaffil'],
+                 "orcid": zres['zcorc']}]
 
     # set up the access rights
     if metadata['access'].lower() == 'embargo':
@@ -204,17 +242,20 @@ def upload_metadata(links, token, record, zenodo_id):
         {ky: auth[ky] for ky in auth if auth[ky] is not None and ky != 'email'}
         for auth in metadata['authors']]
 
-    zen_md['metadata']['description'] = str(dataset_description(record, gemini_id=zenodo_id))
+    zen_md['metadata']['description'] = dataset_description(metadata, zenodo, render=True)
+
+    simplejson.dump(zen_md, open('tmpzenmd.json', 'w'), indent="   ")
 
     # attach the metadata to the deposit resource
-    mtd = requests.put(links['self'], params=token, data=simplejson.dumps(zen_md),
-                       headers={"Content-Type": "application/json"})
+    mtd = requests.put(zenodo['links']['self'], 
+                       params=zres['ztoken'], 
+                       json=zen_md)
 
     # trap errors in uploading metadata and tidy up
     if mtd.status_code != 200:
-        return 1, mtd.json()
+        return None, mtd.json()
     else:
-        return 0, 'success'
+        return 'success', None
 
 
 # FIXME
@@ -309,7 +350,8 @@ def upload_file(metadata: dict,
     """
 
     # Get resource configuration
-    _, params, _ = _resources_to_zenodo_api(resources)
+    zres = _resources_to_zenodo_api(resources)
+    params = zres['ztoken']
 
     # Check the file and get the filename if an alternative is not provided
     if not (os.path.exists(filepath) and os.path.isfile(filepath)):
@@ -348,7 +390,6 @@ def upload_file(metadata: dict,
         return fls, None
 
 
-
 def discard_deposit(metadata: dict,
                     resources: Resources = None
                     ) -> Tuple[Union[dict, None], Union[str, None]]:
@@ -367,7 +408,8 @@ def discard_deposit(metadata: dict,
     """
 
     # Get resource configuration
-    _, params, _ = _resources_to_zenodo_api(resources)
+    zres = _resources_to_zenodo_api(resources)
+    params = zres['ztoken']
 
     delete = requests.delete(metadata['links']['self'], params=params)
 
@@ -376,28 +418,35 @@ def discard_deposit(metadata: dict,
     else:
         return None, _zenodo_error_message(delete)
 
-# FIXME
-def publish_deposit(links, token):
+
+def publish_deposit(zenodo: dict,
+                    resources: Resources = None
+                    ) -> Tuple[Union[dict, None], Union[str, None]]:
     """
     Function to publish a created deposit .
 
     Args:
-        links: The links dictionary from a created deposit
-        token: The access token to be used
-
+        zenodo: The dataset metadata dictionary for a deposit
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
     Returns:
-        An integer indicating success (0) or failure (1) and either the
-        deposit links dictionary or an error message
+        A 2 tuple:
+            * A dictionary containing the response content or None on error
+            * An error message on failure or None on success
     """
 
+    # Get resource configuration
+    zres = _resources_to_zenodo_api(resources)
+    params = zres['ztoken']
+
     # publish
-    pub = requests.post(links['publish'], params=token)
+    pub = requests.post(zenodo['links']['publish'], params=params)
 
     # trap errors in publishing, otherwise return the publication metadata
     if pub.status_code != 202:
-        return 1, pub.json()
+        return None, pub.json()
     else:
-        return 0, pub.json()
+        return pub.json(), None
 
 
 def delete_file(metadata: dict,
@@ -420,7 +469,8 @@ def delete_file(metadata: dict,
     """
 
     # Get resource configuration
-    _, params, _ = _resources_to_zenodo_api(resources)
+    zres = _resources_to_zenodo_api(resources)
+    params = zres['ztoken']
 
     # get an up to date list of existing files (metadata
     # might be outdated)
@@ -448,36 +498,73 @@ def delete_file(metadata: dict,
 
 
 
-"""
-Description functions
-"""
-
-
-def taxon_index_to_text(taxa):
+def post_metadata(metadata: dict,
+                    zenodo: dict,
+                    resources: Resources = None
+                    ) -> Tuple[Union[dict, None], Union[str, None]]:
     """
-    Turns the taxon index for a dataset into a text representation
-    of the taxonomic hierarchy used in the dataset. Takes a list
-    of dicts keyed by the fields of dataset_taxa - this could come
-    from db.datasets_taxa for a published dataset but also from
-    the dataset_metadata of submitted datasets.
+    Function to post the dataset and zenodo metadata to the metadata server.
+
+    Args:
+        metadata: The dataset metadata dictionary for a dataset
+        zenodo: The dataset metadata dictionary for a deposit
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
+    Returns:
+        A 2 tuple:
+            * A dictionary containing the response content or None on error
+            * An error message on failure or None on success
     """
 
-    def indent(n):
+    # Get resource configuration
+    zres = _resources_to_zenodo_api(resources)
 
-        return ('&ensp;-&ensp;' * n)
+    payload = {'metadata': metadata, 'zenodo': zenodo}
 
-    def format_name(tx):
+    # post the metadata to the server
+    mtd = requests.post(zres['mdapi'], 
+                        params={'token': zres['mdtoken']}, 
+                        json=payload)
+
+    # trap errors in uploading metadata and tidy up
+    if mtd.status_code != 200:
+        return None, mtd.content
+    else:
+        return mtd.json(), None
+
+"""
+Dataset description generation (HTML and GEMINI XML)
+"""
+
+def taxon_index_to_div(taxa: List[Dict]) -> tags.div:
+    """
+    Takes a taxon index - a list containing taxon dictionaries - and converts into
+    an dominate.tags.div() object containing a simple HTML representation of the
+    taxonomy. The representation uses indentation to show taxonomic depth.
+
+    Arguments:
+        taxa: A list of taxon dictionaries containing the taxa for a dataset.
+    
+    Returns:
+        A `dominate.tags.div` object containing an HTML representation of the taxa.
+    """
+
+    def _indent(n):
+
+        return raw('&ensp;-&ensp;' * n)
+
+    def _format_name(tx):
 
         # format the canonical name
         if tx['taxon_rank'] in ['genus', 'species', 'subspecies']:
-            return '<i>{}</i>'.format(tx['taxon_name'])
+            return tags.i(tx['taxon_name'])
         elif tx['taxon_rank'] in ['morphospecies', 'functional group']:
-            return '[{}]'.format(tx['taxon_name'])
+            return f"[{tx['taxon_name']}]"
         else:
             return tx['taxon_name']
 
     # Container to hold the output
-    html = StringIO()
+    html = tags.div()
 
     # group by parent taxon, subsitituting 0 for None
     taxa.sort(key=lambda x: x['gbif_parent_id'] or 0)
@@ -490,7 +577,7 @@ def taxon_index_to_text(taxa):
 
         # Handle the current top of the stack: format the canonical name
         current = stack[-1]['current']
-        canon_name = format_name(current)
+        canon_name = _format_name(current)
 
         # Look for a non-None entry in next that shares the same worksheet name
         next_ws_names = [tx['worksheet_name'] for tx in stack[-1]['next']
@@ -500,18 +587,19 @@ def taxon_index_to_text(taxa):
             # pop out the matching entry and find which is 'accepted'
             name_pair = stack[-1]['next'].pop(next_ws_names.index(current['worksheet_name']))
             if current['gbif_status'] == 'accepted':
-                as_name = format_name(name_pair)
+                as_name = _format_name(name_pair)
                 as_status = name_pair['gbif_status']
             else:
                 as_name = canon_name
                 as_status = current['gbif_status']
-                canon_name = format_name(name_pair)
+                canon_name = _format_name(name_pair)
 
-            txt = '{} {} (as {}: {})<br>'.format(indent(len(stack)), canon_name, as_status, as_name)
+            txt = [_indent(len(stack)), canon_name,
+                   ' (as ', as_status,  ': ', as_name, ')', tags.br()]
         else:
-            txt = '{} {} <br>'.format(indent(len(stack)), canon_name)
+            txt = [_indent(len(stack)), canon_name, tags.br()]
 
-        html.write(txt)
+        html += txt
 
         # Is this taxon a parent for other taxa - if so add that taxon to the top of
         # the stack, otherwise start looking for a next taxon to push onto the stack.
@@ -526,171 +614,189 @@ def taxon_index_to_text(taxa):
                     stack.append({'current': push['next'][0], 'next': push['next'][1:]})
                     break
 
-    return XML(html.getvalue())
+    return html
 
 
-def dataset_description(record, gemini_id=None):
+def dataset_description(metadata: dict,
+                        zenodo: dict,
+                        render: bool = True,
+                        extra: str = None,
+                        resources: Resources = None) -> Union[tags.div, str]:
     """
-    Function to turn a dataset metadata JSON into html to send to Zenodo,
-    to populate the dataset view and to provide for submitted datasets.
-    Zenodo has a limited set of permitted HTML tags, so this is quite simple
-    HTML, but having the exact same information and layout makes sense.
+    Function to turn a dataset metadata JSON into html for inclusion in
+    published datasets. This content is used to populate the dataset description
+    section in the Zenodo metadata. Zenodo has a limited set of permitted HTML 
+    tags, so this is quite simple HTML.
 
-    Available tags:
-    a, p, br, blockquote, strong, b, u, i, em, ul, ol, li, sub, sup, div, strike.
+    The available tags are: a, p, br, blockquote, strong, b, u, i, em, ul, ol, 
+    li, sub, sup, div, strike. Note that <a> is currently only available on
+    Zenodo when descriptions are uploaded programatically as a bug in their
+    web interface strips links.
 
-    Note that <a> is currently only available on Zenodo when descriptions are
-    uploaded programatically. A bug in their web interface strips links.
+    The description can be modified for specific uses by including HTML via the
+    extra argument. This content is inserted below the dataset descrription.
 
     Args:
-        record: The db record for the dataset (a row from db.submitted_datasets or db.published_datasets)
-        gemini_id: Should the description include a link to the GEMINI XML
-            service? This isn't available on the site datasets page until a dataset
-            is published as it contains links to Zenodo, but should also be included
-            in the description uploaded to Zenodo.
+        metadata: The dataset metadata
+        zenodo: The Zenodo deposit metadata
+        render: Should the html be returned as text or as the underlying
+            dominate.tags.div object.
+        extra: Additional HTML content to include in the description.
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
     """
 
-    db = current.db
+    zres = _resources_to_zenodo_api(resources)
+    metadata_api = zres['mdapi']
 
-    # Get shortcut to metadata and taxon_index, handling different data structures
-    # published and submitted datasets
-    if 'taxa' in record.dataset_metadata:
-        metadata = record.dataset_metadata['metadata']
-        taxon_index = record.dataset_metadata['taxa']
-        taxon_index = [dict(list(zip(['worksheet_name', 'gbif_id', 'gbif_parent_id',
-                                      'taxon_name', 'taxon_rank', 'gbif_status'],
-                                     tx))) for tx in taxon_index]
-    else:
-        metadata = record.dataset_metadata
-        taxon_index = record.dataset_taxa.select().as_list()
+    # PROJECT Title and authors are added by Zenodo from zenodo metadata
+    # TODO - option to include here?
 
-    # - get a project link back to the safe website
-    qry = db((db.project_id.id == metadata['project_id']))
-    proj = qry.select(
-        left=db.project_id.on(db.project_id.project_details_id == db.project_details.id))
-    title = proj.first().project_details.title
+    desc = tags.div()
 
-    # dataset summary
-    desc = CAT(B('Description: '), P(XML(metadata['description'].replace('\n', '<br>'))))
+    # Dataset summary
+    desc += tags.b('Description: ')
+    desc += tags.p(metadata['description'].replace('\n', '<br>'))
 
-    proj_url = URL('projects', 'project_view', args=[metadata['project_id']],
-                   scheme=True, host=True)
-    desc += P(B('Project: '), 'This dataset was collected as part of the following '
-                              'SAFE research project: ', A(B(title), _href=proj_url))
+    # Extra
+    if extra is not None:
+        desc += raw(extra)
+
+    #proj_url = URL('projects', 'project_view', args=[metadata['project_id']],
+    #               scheme=True, host=True)
+    #desc += P(B('Project: '), 'This dataset was collected as part of the following '
+    #                          'SAFE research project: ', A(B(title), _href=proj_url))
+    ##
 
     # Funding information
     if metadata['funders']:
         funder_info = []
+        
         for fnd in metadata['funders']:
-            this_funder = fnd['type']
+            funder_details = [fnd['body'], '(', fnd['type']]
+
             if fnd['ref']:
-                this_funder = CAT(this_funder, ', ' + str(fnd['ref']))
+                funder_details.append(str(fnd['ref']))
             if fnd['url']:
-                this_funder = CAT(this_funder, ', ', A(fnd['url'], _href=fnd['url']))
+                funder_details.append(tags.a(fnd['url'], _href=fnd['url']))
 
-            funder_info.append(LI(CAT(fnd['body'], ' (', this_funder, ')')))
+            funder_details.append(')')
+            funder_info.append(tags.li(funder_details))
 
-        desc += P(B('Funding: '), 'These data were collected as part of '
-                                  'research funded by: ', UL(funder_info),
-                  P('This dataset is released under the CC-BY 4.0 licence, requiring that '
+        desc += [tags.p(
+                    tags.b('Funding: '), 
+                    'These data were collected as part of research funded by: ', 
+                    tags.ul(funder_info)),
+                 tags.p('This dataset is released under the CC-BY 4.0 licence, requiring that '
                     'you cite the dataset in any outputs, but has the additional condition '
-                    'that you acknowledge the contribution of these funders in any outputs.'))
+                    'that you acknowledge the contribution of these funders in any outputs.')]
 
     # Permits
     if metadata['permits']:
-        desc += P(B('Permits: '), 'These data were collected under permit from the following authorities:',
-                  UL([LI('{authority} ({type} licence {number})'.format(**pmt)) for pmt in metadata['permits']]))
+        desc += tags.p(
+                    tags.b('Permits: '), 
+                    'These data were collected under permit from the following authorities:',
+                    tags.ul([tags.li(f"{pmt['authority']} ({pmt['type']} licence {pmt['number']})") 
+                              for pmt in metadata['permits']]))
 
-    # Can't get the XML metadata link unless it is published, since that
-    # contains references to the zenodo record
-    if gemini_id is not None:
-        md_url = URL('datasets', 'xml_metadata', vars={'id': gemini_id}, scheme=True, host=True)
-        desc += P(B('XML metadata: '),
-                  'GEMINI compliant metadata for this dataset is available ',
-                  A('here', _href=md_url))
+    # XML link
+    xml_url = f"{metadata_api}/api/xml/{zenodo['record_id']}"
+
+    desc += tags.p(
+                tags.b('XML metadata: '),
+                'GEMINI compliant metadata for this dataset is available ',
+                 tags.a('here', href=xml_url))
 
     # Present a description of the file or files including 'external' files
     # (data files loaded directly to Zenodo).
+    ds_files = [metadata['filename']]
+    n_ds_files = 1
+    ex_files = []
+
     if metadata['external_files']:
         ex_files = metadata['external_files']
-        desc += P(B('Files: '), 'This dataset consists of ', len(ex_files) + 1, ' files: ',
-                  ', '.join([metadata['filename']] + [f['file'] for f in ex_files]))
-    else:
-        ex_files = []
-        desc += P(B('Files: '), 'This consists of 1 file: ', metadata['filename'])
+        ds_files += [f['file'] for f in ex_files]
+        n_ds_files += len(ex_files)
+    
+    desc += tags.p(
+            tags.b('Files: '), 
+            f'This dataset consists of {n_ds_files} files: ',
+            ', '.join(ds_files))
 
     # Group the sheets by their 'external' file - which is None for sheets
-    # in the submitted workbook - and collect them into a dictionary by source file
+    # in the submitted workbook - and collect them into a dictionary by source
+    # file. get() is used here for older data where external was not present.
+    
     tables_by_source = metadata['dataworksheets']
 
-    # Files submitted using early versions of the dataset submission process
-    # don't have external in their worksheet dictionaries (but none of those will
-    # have external files).
-    for tab in tables_by_source:
-        if 'external' not in tab:
-            tab['external'] = None
-
-    # now group into a dictionary keyed by source file, substituting empty string
-    # for None if required.
-    tables_by_source.sort(key=lambda sh: sh['external'] or '')
-    tables_by_source = groupby(tables_by_source, key=lambda sh: sh['external'])
+    # Now group into a dictionary keyed by external source file - cannot sort
+    # None (no comparison operators) so use a substitue
+    tables_by_source.sort(key=lambda sh: sh.get('external') or False)
+    tables_by_source = groupby(tables_by_source, key=lambda sh: sh.get('external') or False)
     tables_by_source = {g: list(v) for g, v in tables_by_source}
 
     # We've now got a set of files (worksheet + externals) and a dictionary of table
     # descriptions that might have an entry for each file.
 
     # Report the worksheet first
-    desc += P(B(metadata['filename']))
+    desc += tags.p(tags.b(metadata['filename']))
 
-    if None in tables_by_source:
-        # Report internal tables
-        desc += P('This file contains dataset metadata and '
-                  '{} data tables:'.format(len(tables_by_source[None])))
-        table_ol = OL()
-        for tab in tables_by_source[None]:
-            table_ol.append(LI(table_description(tab)))
-
-        desc += table_ol
+    # Report internal tables
+    if False in tables_by_source:
+        int_tabs = tables_by_source[False]
+        desc += tags.p(f'This file contains dataset metadata and {len(int_tabs)} data tables:')
+        desc += tags.ol([tags.li(table_description(tab)) for tab in int_tabs])
     else:
         # No internal tables at all.
-        desc += P('This file only contains metadata for the files below')
+        desc += tags.p('This file only contains metadata for the files below')
 
     # Report on the other files
     for exf in ex_files:
-        desc += P(B(exf['file'])) + P('Description: ' + exf['description'])
+        desc += tags.p(
+                    tags.b(exf['file']),
+                     tags.p(f"Description: {exf['description']}"))
 
         if exf['file'] in tables_by_source:
             # Report table description
-            desc += P('This file contains {} data tables:'.format(len(tables_by_source[exf['file']])))
-            table_ol = OL()
-            for tab in tables_by_source[exf['file']]:
-                table_ol.append(LI(P(table_description(tab))))
+            ext_tabs = tables_by_source[exf['file']]
+            desc += tags.p(f'This file contains {len(ext_tabs)} data tables:')
+            desc += tags.ol([tags.li(table_description(tab)) for tab in ext_tabs])
 
-            desc += table_ol
 
     # Add extents if populated
     if metadata['temporal_extent'] is not None:
-        desc += P(B('Date range: '),
-                  '{0[0]} to {0[1]}'.format([x[:10] for x in metadata['temporal_extent']]))
+        desc += tags.p(
+                    tags.b('Date range: '),
+                    '{0[0]} to {0[1]}'.format([x[:10] for x in metadata['temporal_extent']]))
     if metadata['latitudinal_extent'] is not None:
-        desc += P(B('Latitudinal extent: '),
-                  '{0[0]:.4f} to {0[1]:.4f}'.format(metadata['latitudinal_extent']))
+        desc += tags.p(
+                    tags.b('Latitudinal extent: '),
+                    '{0[0]:.4f} to {0[1]:.4f}'.format(metadata['latitudinal_extent']))
     if metadata['longitudinal_extent'] is not None:
-        desc += P(B('Longitudinal extent: '),
+        desc += tags.p(
+                  tags.b('Longitudinal extent: '),
                   '{0[0]:.4f} to {0[1]:.4f}'.format(metadata['longitudinal_extent']))
+    
+    # Add taxa
+    taxon_index = metadata.get('taxa')
     if taxon_index:
-        desc += CAT(P(B('Taxonomic coverage: '), BR(),
-                      ' All taxon names are validated against the GBIF backbone taxonomy. If a '
-                      'dataset uses a synonym, the accepted usage is shown followed by the dataset '
-                      'usage in brackets. Taxa that cannot be validated, including new species and '
-                      'other unknown taxa, morphospecies, functional groups and taxonomic levels '
-                      'not used in the GBIF backbone are shown in square brackets.',
-                      DIV(taxon_index_to_text(taxon_index))))
+        desc += tags.p(
+                    tags.b('Taxonomic coverage: '), 
+                    tags.br(),
+                    ' All taxon names are validated against the GBIF backbone taxonomy. If a '
+                    'dataset uses a synonym, the accepted usage is shown followed by the dataset '
+                    'usage in brackets. Taxa that cannot be validated, including new species and '
+                    'other unknown taxa, morphospecies, functional groups and taxonomic levels '
+                    'not used in the GBIF backbone are shown in square brackets.',
+                    taxon_index_to_div(taxon_index))
 
-    return desc
+    if render:
+        return desc.render()
+    else:
+        return desc
 
 
-def table_description(tab):
+def table_description(tab: Dict) -> tags.div:
     """
     Function to return a description for an individual source file in a dataset.
     Typically datasets only have a single source file - the Excel workbook that
@@ -701,61 +807,81 @@ def table_description(tab):
         tab: A dict describing a data table
 
     Returns:
-        A gluon object containing an HTML description of the table
+        A `dominate.tags.div` instant containing an HTML description of the table
     """
 
     # table summary
-    tab_desc = CAT(P(B(tab['title']), ' (described in worksheet ', tab['name'], ')'),
-                   P('Description: ', tab['description']),
-                   P('Number of fields: ', tab['max_col'] - 1))
+    tab_desc = tags.div(
+                    tags.p(
+                        tags.b(tab['title']), 
+                        f" (described in worksheet {tab['name']})"),
+                    tags.p(f"Description: {tab['description']}"),
+                    tags.p(f"Number of fields: {tab['max_col'] - 1}"))
 
     # The explicit n_data_row key isn't available for older records
     if 'n_data_row' in tab:
         if tab['n_data_row'] == 0:
-            tab_desc += P('Number of data rows: Unavailable (table metadata description only).')
+            tab_desc += tags.p('Number of data rows: Unavailable (table metadata description only).')
         else:
-            tab_desc += P('Number of data rows: {}'.format(tab['n_data_row']))
+            tab_desc += tags.p(f"Number of data rows: {tab['n_data_row']}")
     else:
-        tab_desc += P('Number of data rows: {}'.format(tab['max_row'] - len(tab['descriptors'])))
+        tab_desc += tags.p(f"Number of data rows: {tab['max_row'] - len(tab['descriptors'])}")
 
     # add fields
-    tab_desc += P('Fields: ')
+    tab_desc += tags.p('Fields: ')
 
     # fields summary
-    flds = UL()
+    flds = tags.ul()
     for each_fld in tab['fields']:
-        flds.append(LI(B(each_fld['field_name']),
-                       ': ', each_fld['description'],
-                       ' (Field type: ', each_fld['field_type'], ')'))
+        flds += tags.li(
+                    tags.b(each_fld['field_name']),
+                    f": {each_fld['description']} (Field type: {each_fld['field_type']})")
 
-    return tab_desc + flds
+    tab_desc += flds
+
+    return tab_desc
 
 
-def generate_inspire_xml(record):
+def generate_inspire_xml(metadata: Dict,
+                         zenodo_metadata: dict,
+                         ds_url: str = None, 
+                         lineage_statement: str = None) -> str:
+
     """
-    Produces an INSPIRE/GEMINI formatted XML record from a published
-    dataset record, using a template XML file stored in the static files
-    """
+    Produces an INSPIRE/GEMINI formatted XML record from dataset metadata, 
+    and Zenodo record metadata using a template XML file. The dataset URL
+    defaults to the Zenodo record but can be replaced if a separate URL (such as
+    a project specific website) is used. The Gemini XML standard requires a
+    statement about the lineage of a dataset - if this is not provided to this
+    function it will appear as "Not provided".
 
-    # get the dataset and zenodo metadata
-    dataset_md = record.dataset_metadata
-    zenodo_md = record.zenodo_metadata
+    Args:
+        metadata: A dictionary of the dataset metadata
+        zenodo_metadata: A dictionary of the Zenodo record metadata
+        ds_url: An optional alternative URL for the dataset.
+        lineage_statement: An optional lineage statement about the data.
+
+    Returns:
+        A string containing GEMINI compliant XML.
+    """
 
     # parse the XML template and get the namespace map
-    template = os.path.join(current.request.folder, 'static', 'files', 'gemini_xml_template.xml')
+    template = os.path.join(__file__, 'gemini_xml_template.xml')
     tree = etree.parse(template)
     root = tree.getroot()
     nsmap = root.nsmap
+
+    pub_date = metadata['publication_date']
 
     # Use find and XPATH to populate the template, working through from the top of the file
 
     # file identifier
     root.find('./gmd:fileIdentifier/gco:CharacterString',
-              nsmap).text = 'zenodo.' + str(record.zenodo_record_id)
+              nsmap).text = 'zenodo.' + str(metadata['zenodo_record_id'])
 
     # date stamp (not clear what this is - taken as publication date)
     root.find('./gmd:dateStamp/gco:DateTime',
-              nsmap).text = record.publication_date.isoformat()
+              nsmap).text = pub_date.isoformat()
 
     # Now zoom to the data identication section
     data_id = root.find('.//gmd:MD_DataIdentification', nsmap)
@@ -763,32 +889,32 @@ def generate_inspire_xml(record):
     # CITATION
     citation = data_id.find('gmd:citation/gmd:CI_Citation', nsmap)
     citation.find('gmd:title/gco:CharacterString',
-                  nsmap).text = dataset_md['title']
+                  nsmap).text = metadata['title']
     citation.find('gmd:date/gmd:CI_Date/gmd:date/gco:Date',
-                  nsmap).text = record.publication_date.date().isoformat()
+                  nsmap).text = pub_date.date().isoformat()
 
-    # two identifiers - the safe project website and the DOI.
-    safe_url = URL('datasets', 'view_dataset', vars={'id': record.zenodo_record_id}, scheme=True, host=True)
+    # URIs - a dataset URL and the DOI
+    dataset_url = URL('datasets', 'view_dataset', vars={'id': metadata['zenodo_record_id']}, scheme=True, host=True)
     citation.find('gmd:identifier/gmd:MD_Identifier/gmd:code/gco:CharacterString',
-                  nsmap).text = safe_url
+                  nsmap).text = dataset_url
     citation.find('gmd:identifier/gmd:RS_Identifier/gmd:code/gco:CharacterString',
-                  nsmap).text = record.zenodo_record_doi
+                  nsmap).text = metadata['zenodo_record_doi']
 
     # The citation string
-    authors = [au['name'] for au in dataset_md['authors']]
+    authors = [au['name'] for au in metadata['authors']]
     author_string = ', '.join(authors)
     if len(authors) > 1:
         author_string = author_string.replace(', ' + authors[-1], ' & ' + authors[-1])
 
     cite_string = '{} ({}) {} [Dataset] {}'.format(author_string,
-                                                   record.publication_date.year,
-                                                   record.dataset_title,
-                                                   record.zenodo_record_doi)
+                                                   pub_date.year,
+                                                   metadata['title'],
+                                                   metadata['zenodo_record_doi'])
 
     citation.find('gmd:otherCitationDetails/gco:CharacterString', nsmap).text = cite_string
 
     # ABSTRACT
-    data_id.find('gmd:abstract/gco:CharacterString', nsmap).text = dataset_md['description']
+    data_id.find('gmd:abstract/gco:CharacterString', nsmap).text = metadata['description']
 
     # KEYWORDS
     # - find the container node for the free keywords
@@ -796,10 +922,10 @@ def generate_inspire_xml(record):
     # - get the placeholder node
     keywd_node = keywords.getchildren()[0]
     # - duplicate it if needed
-    for new_keywd in range(len(dataset_md['keywords']) - 1):
+    for new_keywd in range(len(metadata['keywords']) - 1):
         keywords.append(copy.deepcopy(keywd_node))
     # populate the nodes
-    for key_node, val in zip(keywords.getchildren(), dataset_md['keywords']):
+    for key_node, val in zip(keywords.getchildren(), metadata['keywords']):
         key_node.find('./gco:CharacterString', nsmap).text = val
 
     # AUTHORS - find the point of contact with author role from the template and its index
@@ -809,14 +935,14 @@ def generate_inspire_xml(record):
     au_idx = data_id.index(au_node)
 
     # - duplicate it if needed into the tree
-    for n in range(len(dataset_md['authors']) - 1):
+    for n in range(len(metadata['authors']) - 1):
         data_id.insert(au_idx, copy.deepcopy(au_node))
 
     # now populate the author nodes, there should now be one for each author
     au_ls_xpath = "./gmd:pointOfContact[gmd:CI_ResponsibleParty/gmd:role/gmd:CI_RoleCode='author']"
     au_node_list = data_id.xpath(au_ls_xpath, namespaces=nsmap)
 
-    for au_data, au_node in zip(dataset_md['authors'], au_node_list):
+    for au_data, au_node in zip(metadata['authors'], au_node_list):
         resp_party = au_node.find('gmd:CI_ResponsibleParty', nsmap)
         resp_party.find('gmd:individualName/gco:CharacterString',
                         nsmap).text = au_data['name']
@@ -843,31 +969,31 @@ def generate_inspire_xml(record):
     # embargo or not?
     embargo_path = ('gmd:resourceConstraints/gmd:MD_LegalConstraints/'
                     'gmd:otherConstraints/gco:CharacterString')
-    if dataset_md['access'] == 'embargo':
-        data_id.find(embargo_path, nsmap).text = ('This data is under embargo until {}. After '
-                                                  'that date there are no restrictions to public '
-                                                  'access.').format(dataset_md['embargo_date'])
-    elif dataset_md['access'] == 'closed':
-        data_id.find(embargo_path, nsmap).text = ('This dataset is currently not publicly '
-                                                  'available, please contact the authors to '
-                                                  'request access.')
+    if metadata['access'] == 'embargo':
+        data_id.find(embargo_path, nsmap).text = (
+            f"This data is under embargo until {metadata['embargo_date']}. After "
+             'that date there are no restrictions to public access.')
+    elif metadata['access'] == 'closed':
+        data_id.find(embargo_path, nsmap).text = (
+            'This dataset is currently not publicly available, please contact the '
+            'authors to request access.')
     else:
         data_id.find(embargo_path, nsmap).text = 'There are no restrictions to public access.'
 
     # EXTENTS
     temp_extent = root.find('.//gmd:EX_TemporalExtent', nsmap)
-    temp_extent.find('.//gml:beginPosition', nsmap).text = dataset_md['temporal_extent'][0][:10]
-    temp_extent.find('.//gml:endPosition', nsmap).text = dataset_md['temporal_extent'][1][:10]
+    temp_extent.find('.//gml:beginPosition', nsmap).text = metadata['temporal_extent'][0][:10]
+    temp_extent.find('.//gml:endPosition', nsmap).text = metadata['temporal_extent'][1][:10]
 
     geo_extent = root.find('.//gmd:EX_GeographicBoundingBox', nsmap)
     geo_extent.find('./gmd:westBoundLongitude/gco:Decimal',
-                    nsmap).text = str(dataset_md['longitudinal_extent'][0])
+                    nsmap).text = str(metadata['longitudinal_extent'][0])
     geo_extent.find('./gmd:eastBoundLongitude/gco:Decimal',
-                    nsmap).text = str(dataset_md['longitudinal_extent'][1])
+                    nsmap).text = str(metadata['longitudinal_extent'][1])
     geo_extent.find('./gmd:southBoundLatitude/gco:Decimal',
-                    nsmap).text = str(dataset_md['latitudinal_extent'][0])
+                    nsmap).text = str(metadata['latitudinal_extent'][0])
     geo_extent.find('./gmd:northBoundLatitude/gco:Decimal',
-                    nsmap).text = str(dataset_md['latitudinal_extent'][1])
+                    nsmap).text = str(metadata['latitudinal_extent'][1])
 
     # Dataset transfer options: direct download and dataset view on SAFE website
     distrib = root.find('gmd:distributionInfo/gmd:MD_Distribution', nsmap)
@@ -875,7 +1001,7 @@ def generate_inspire_xml(record):
                   'gmd:CI_OnlineResource/gmd:linkage/gmd:URL'),
                  nsmap).text = zenodo_md['files'][0]['links']['download']
     distrib.find(('gmd:transferOptions[2]/gmd:MD_DigitalTransferOptions/gmd:onLine/'
-                  'gmd:CI_OnlineResource/gmd:linkage/gmd:URL'), nsmap).text += str(record.zenodo_record_id)
+                  'gmd:CI_OnlineResource/gmd:linkage/gmd:URL'), nsmap).text += str(metadata['zenodo_record_id'])
 
     # LINEAGE STATEMENT
     lineage = ("This dataset was collected as part of a research project based at The"
@@ -926,7 +1052,10 @@ def download_ris_data(resources: Resources = None, ris_file: str = None) -> list
                 known_recids.append(record_id)
 
     # Zenodo API call to return the records associated with the SAFE community
-    z_api, _, z_cname = _resources_to_zenodo_api(resources)
+    zres = _resources_to_zenodo_api(resources)
+    z_api = zres['zapi']
+    z_cname = zres['zcomm']
+
     api = f'{z_api}/records/?q=communities:{z_cname}'
 
     # Provide feedback on DOI collection
@@ -999,8 +1128,6 @@ def download_ris_data(resources: Resources = None, ris_file: str = None) -> list
             ris_file.write(this_entry)
 
 
-
-
 def sync_local_dir(datadir: str, api: str = None, 
                    xlsx_only: bool = True, resources: Resources = None) -> None:
 
@@ -1043,7 +1170,9 @@ def sync_local_dir(datadir: str, api: str = None,
             shutil.copyfileobj(resource.raw, outf_obj)
 
     # Get resource configuration
-    zenodo_api, params, _ = _resources_to_zenodo_api(resources)
+    zres = _resources_to_zenodo_api(resources)
+    zenodo_api = zres['zapi']
+    params = zres['ztoken']
 
     # The dir argument should be an existing path
     if not (os.path.exists(datadir) and os.path.isdir(datadir)):
@@ -1093,7 +1222,7 @@ def sync_local_dir(datadir: str, api: str = None,
 
         if this_page.json():
             deposits += this_page.json()
-            print(f" - Page {params['page']}")
+            LOGGER.info(f"Page {params['page']}")
             params['page'] += 1
         else:
             break
@@ -1150,6 +1279,6 @@ def sync_local_dir(datadir: str, api: str = None,
             LOGGER.info("JSON Metadata found")
         else:
             LOGGER.info("Downloading JSON metadata ")
-            _get_file(f'{api}/record/{rec_id}', metadata)
+            _get_file(f'{api}/api/record/{rec_id}', metadata)
         
         FORMATTER.pop()

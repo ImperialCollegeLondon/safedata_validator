@@ -56,12 +56,19 @@ CONFIGSPEC = {
         'zenodo_sandbox_api':  'string(default=None)',
         'zenodo_sandbox_token':  'string(default=None)',
         'zenodo_api':  'string(default=None)',
-        'zenodo_token':  'string(default=None)'}}
+        'zenodo_token':  'string(default=None)',
+        'contact_name':  'string(default=None)',
+        'contact_affiliation':  'string(default=None)',
+        'contact_orcid':  'string(default=None)'
+        },
+    'metadata': {
+        'api': 'string(default=None)',
+        'token': 'string(default=None)'}
+    }
 """dict: The safedata_validator package use the `configobj.ConfigObj`
-package to handle the loading and initial validation of resource configuration.
-This dict defines the basic expected specification for the configuration and
-allows the ConfigObj.validate() method to do basic validation and type
-conversions.
+package to handle resource configuration. This dict defines the basic expected
+specification for the configuration and allows the ConfigObj.validate() method
+to do basic validation and type conversions.
 """
 
 def date_list(value, min, max):
@@ -172,7 +179,11 @@ class Resources:
         # Try and load the found configuration
         config = self._load_config(config, config_type)
 
-        # Set attributes
+        # Set attributes -
+        # HACK - this now seems clumsy - the ConfigObj instance is already a
+        #        class containing the config attributes. Having a _function_
+        #        that returns a modified ConfigObj instance seems more direct
+        #        than having to patch this list of attributes.
         self.locations = config.locations
         self.gbif_database = config.gbif_database
         self.ncbi_database = config.ncbi_database
@@ -181,6 +192,7 @@ class Resources:
 
         self.extents = config.extents
         self.zenodo = config.zenodo
+        self.metadata = config.metadata
 
         self.use_local_gbif = None
         self.use_local_ncbi = None

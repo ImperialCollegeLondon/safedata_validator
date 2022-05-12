@@ -4,6 +4,7 @@ theme:
   name: material
 markdown_extensions:
   - admonition
+  - markdown_include.include
 plugins:
   - search
   - mkdocstrings
@@ -32,6 +33,7 @@ nav:
     - 'NCBI validation notes': 'install/ncbi_validation.md'
   - 'Commands':
     - 'safedata_validate': 'usage/usage.md'
+    - 'safedata_zenodo': 'zenodo_tools/overview.md'
   - 'API Reference':
     - 'Resources': 'api/resources.md'
     - 'Logger': 'api/logger.md'

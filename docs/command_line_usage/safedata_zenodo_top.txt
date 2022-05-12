@@ -1,0 +1,33 @@
+cl_prompt $ safedata_zenodo -h
+usage: safedata_zenodo [-h] [-d] [-r RESOURCES] [-q]
+                       {create,upload_file,delete_file,upload_metadata,discard,publish,info,sync_local_dir,ris,html_description,post_metadata}
+                       ...
+
+This is a the command line interface for publishing safedata 
+validated datasets to Zenodo, downloading information and maintaining a
+local copy of the datasets in the file structure required by the R safedata
+package.
+
+See the individual help for each of the subcommands
+
+positional arguments:
+  {create,upload_file,delete_file,upload_metadata,discard,publish,info,sync_local_dir,ris,html_description,post_metadata}
+    create              Create a new deposit
+    upload_file         Upload a file to an unpublished deposit
+    delete_file         Delete a file from an unpublished deposit
+    upload_metadata     Populate the Zenodo metadata
+    discard             Discard an unpublished deposit
+    publish             Publish a draft deposit
+    info                Display and download deposit metadata
+    sync_local_dir      Create or update a local safedata directory
+    ris                 Maintain a RIS bibliography file for datasets
+    html_description    Generate an HTML dataset description
+    post_metadata       Post metadata to the metadata server
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -d, --debug           Show debugging for resource loading
+  -r RESOURCES, --resources RESOURCES
+                        Path to a safedata_validator resource configuration
+                        file
+  -q, --quiet           Surpress normal information messages.

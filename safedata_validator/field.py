@@ -1299,6 +1299,7 @@ def field_to_dict(fld: Type[BaseField], col_idx: int) -> dict:
     if hasattr(fld, 'range'):
                   output['range'] = getattr(fld, 'range')
 
+    return output
 
 
 class CommentField(BaseField):
