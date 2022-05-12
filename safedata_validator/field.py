@@ -142,9 +142,10 @@ class Dataset:
 
         # Throw a critical error if both Taxa and GBIFTaxa have been given as worksheet names
         if 'GBIFTaxa' in wb.sheetnames and 'Taxa' in wb.sheetnames:
-            LOGGER.critical("Both Taxa and GBIFTaxa provided as sheet names, "
-                            "this is not allowed!")
-            return
+            LOGGER.error("Both Taxa and GBIFTaxa provided as sheet names, this "
+                            "is not allowed! Only checking GBIFTaxa sheet")
+            self.taxa.gbif_taxa.load(wb['GBIFTaxa'])
+            taxa_sheet = True
         # Otherwise populate gbif_taxa from the one that has been provided
         elif 'GBIFTaxa' in wb.sheetnames:
             self.taxa.gbif_taxa.load(wb['GBIFTaxa'])
