@@ -1,0 +1,17 @@
+cl_prompt $ safedata_zenodo ris -h
+usage: safedata_zenodo ris [-h] ris_file
+
+This command maintains a RIS format bibliography file of the datasets
+uploaded to a Zenodo community. It can update an existing RIS format file
+to add new records or it can create the file from scratch.
+
+The program uses both the Zenodo API (to find the records in the community)
+and the Datacite API to access machine readable biblioigraphic records.
+
+positional arguments:
+  ris_file    The file path to populate with RIS records. If this file already
+              exists, it is assumed to be RIS file to update with any new
+              records not already included in the file.
+
+optional arguments:
+  -h, --help  show this help message and exit

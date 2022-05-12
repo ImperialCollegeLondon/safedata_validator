@@ -1,0 +1,10 @@
+cl_prompt $ safedata_zenodo publish -h
+usage: safedata_zenodo publish [-h] deposit_json
+
+Publishes a Zenodo deposit, creating a permanent DOI
+
+positional arguments:
+  deposit_json  Path to a Zenodo metadata file
+
+optional arguments:
+  -h, --help    show this help message and exit

@@ -70,6 +70,11 @@ pip install mkdocs
 In order to build and deploy the documentation.
 
 * Edit the source files in the `docs` folder.
+* Some of the documentation presents the command line help for the script tools
+  in the package. To keep these synchronized with the codebase, the
+  `docs/command_line_usage` directory contains a shell script that saves these
+  outputs to file, so they can be included in the documentation. If the script
+  commands are updated, these inputs need to be recreated.
 * From the package root, run `mkdocs build`. This will create the docs site in
   the `site` folder - note that this folder is not included in the git repo.
 * Once you have checked the local copy of the documentation, then commiting the
