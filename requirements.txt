@@ -5,7 +5,10 @@ shapely
 appdirs
 python-dateutil
 dataclasses
-sqlite3
+dotmap
+enforce_typing
+configobj
+sympy
 
 pytest
 pyfakefs
