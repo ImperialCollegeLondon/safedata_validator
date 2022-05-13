@@ -4,6 +4,11 @@ simplejson
 shapely
 appdirs
 python-dateutil
+dataclasses
+dotmap
+enforce_typing
+configobj
+sympy
+lxml
 
-pytest
 pyfakefs
