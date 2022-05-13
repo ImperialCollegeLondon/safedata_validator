@@ -307,11 +307,11 @@ def fixture_taxon_validators(resources_with_local_gbif, request):
 
 # Only returns a NCBI validator at the moment
 @pytest.fixture(params=['remote', 'local'])
-def fixture_ncbi_validators(resources_with_local_ncbi, request):
+def fixture_ncbi_validators(resources_with_local_ncbi, resources_with_remote_ncbi, request):
     """Parameterised fixture to return local and remote NCBI validator
     """
     if request.param == 'remote':
-        return RemoteNCBIValidator()
+        return RemoteNCBIValidator(resources_with_remote_ncbi)
 
     elif request.param == 'local':
         return LocalNCBIValidator(resources_with_local_ncbi)
