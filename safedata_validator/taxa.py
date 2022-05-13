@@ -909,24 +909,17 @@ class LocalNCBIValidator:
         return mtaxon
 
 
-@enforce_types
 class RemoteNCBIValidator:
     """This provides a validate method for a NCBITaxon using the online NCBI Entrez
     tools. This validator duplicates the structure of LocalNCBIValidator so that
     the two Validators are interchangeable.
     """
-    # COULD SET THIS UP TO POPULATE FROM THE RESOURCE FILE
-    # HOWEVER NCBI SAY THAT THIS SHOULD BE DEVELOPER DEFINED RATHER THAN USER DEFINED
-    # (SEE LINK BELOW) "https://www.ncbi.nlm.nih.gov/books/NBK25497/"
-    # NEED TO THINK ABOUT TOOL NAME AND EMAIL IF SO
-    def __init__(self):
+    def __init__(self, resources: Resources):
 
-        # Question as to whether I need email and tool here
-        # THINK WE NEED TO DEFINE THEM AND REGISTER WITH NCBI, BUT NOT NEEDED BEFORE THEN
-        # THINK I NEED TO ADD TOOL AND EMAIL TO THE
-        self.email = "jacobcook1995@gmail.com"
+        self.api_key = resources.ncbi_api_key
+        # self.email = "WORK HOW TO ADD AN EMAIL SECRETLY"
+        # ALSO NEED PROVIDE TOOL TO THE REQUESTS AT SOMEPOINT
         self.tool = "SAFE_data_validator"
-        self.api_key = "1738fe86eba2d8fc287ff0d1dcbfeda44a0a"
 
     def taxonomy_efetch(self, ncbi_id: int):
         """A function that uses the online NCBI eutils function efetch to fetch
@@ -941,8 +934,12 @@ class RemoteNCBIValidator:
             lxml.etree._Element: Output XML stored as an element tree
         """
         # Construct url
-        url = (f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db='
-               f'taxonomy&id={ncbi_id}&api_key={self.api_key}')
+        if self.api_key != None:
+            url = (f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db='
+                   f'taxonomy&id={ncbi_id}&api_key={self.api_key}')
+        else:
+            url = (f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db='
+                   f'taxonomy&id={ncbi_id}')
 
         # Set up while loop to make the request up to 5 times if neccessary
         success = False
@@ -952,8 +949,11 @@ class RemoteNCBIValidator:
             att += 1
             recrd = requests.get(url)
 
-            # Wait a 10th of a second after each request
-            time.sleep(0.1)
+            # Wait a 10th of a second after each request (longer if no api_key)
+            if self.api_key != None:
+                time.sleep(0.1)
+            else:
+                time.sleep(0.3334)
 
             # exit loop if a proper response is recived
             if recrd.status_code == 200:
@@ -987,8 +987,12 @@ class RemoteNCBIValidator:
             lxml.etree._Element: Output XML stored as an element tree
         """
         # Construct url
-        url = (f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db='
-               f'taxonomy&term={t_name}&api_key={self.api_key}')
+        if self.api_key != None:
+            url = (f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db='
+                   f'taxonomy&term={t_name}&api_key={self.api_key}')
+        else:
+            url = (f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db='
+                   f'taxonomy&term={t_name}')
 
         # Set up while loop to make the request up to 5 times if neccessary
         success = False
@@ -998,8 +1002,11 @@ class RemoteNCBIValidator:
             att += 1
             recrd = requests.get(url)
 
-            # Wait a 10th of a second after each request
-            time.sleep(0.1)
+            # Wait a 10th of a second after each request (longer if no api_key)
+            if self.api_key != None:
+                time.sleep(0.1)
+            else:
+                time.sleep(0.3334)
 
             # exit loop if a proper response is recived
             if recrd.status_code == 200:
@@ -1895,7 +1902,7 @@ class NCBITaxa:
         if resources.use_local_ncbi:
             self.validator = LocalNCBIValidator(resources)
         else:
-            self.validator = RemoteNCBIValidator()
+            self.validator = RemoteNCBIValidator(resources)
 
     @loggerinfo_push_pop('Loading NCBITaxa worksheet')
     def load(self, worksheet):

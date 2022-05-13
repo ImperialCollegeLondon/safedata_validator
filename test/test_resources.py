@@ -61,7 +61,6 @@ def nested_set(dic, keys, value):
         dic = dic.setdefault(key, {})
     dic[keys[-1]] = value
 
-# NEED TO PUT NCBI REMOTE/LOCAL ERRORS IN HERE TO MATCH GBIF ONES
 @pytest.mark.parametrize(
     'config',
      ['config_file_dict','config_file_list'],

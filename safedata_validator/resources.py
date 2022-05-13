@@ -43,6 +43,7 @@ CONFIGSPEC = {
     'locations':  'string()',
     'gbif_database':  'string(default=None)',
     'ncbi_database':  'string(default=None)',
+    'ncbi_api_key':  'string(default=None)',
     'extents': {
         'temporal_soft_extent':  'date_list(min=2, max=2, default=None)',
         'temporal_hard_extent':  'date_list(min=2, max=2, default=None)',
@@ -136,6 +137,7 @@ class Resources:
             locations: The path to the locations file
             gbif_database: The path to the GBIF database file or None
             ncbi_database: The path to the NCBI database file or None
+            ncbi_api_key: A NCBI api key or None
             use_local_gbif: Is a local file used or should the GBIF API be used
             ncbi_database: The path to the NCBI database file or None
             use_local_ncbi: Is a local file used or should the NCBI API be used
@@ -187,6 +189,7 @@ class Resources:
         self.locations = config.locations
         self.gbif_database = config.gbif_database
         self.ncbi_database = config.ncbi_database
+        self.ncbi_api_key = config.ncbi_api_key
         self.config_type = config.config_type
         self.config_source = config.config_source
 
