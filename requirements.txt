@@ -10,5 +10,4 @@ enforce_typing
 configobj
 sympy
 
-pytest
 pyfakefs
