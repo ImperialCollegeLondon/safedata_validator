@@ -9,5 +9,6 @@ dotmap
 enforce_typing
 configobj
 sympy
+lxml
 
 pyfakefs
