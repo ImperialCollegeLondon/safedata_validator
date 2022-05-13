@@ -23,7 +23,7 @@ gbif_id,parent_id,taxon_name,taxon_rank,status
 -1,10025464,Cicada sanguinolenta,species,user
 6122612,1941092,Melittia oedippus,species,misapplied
 1941210,1941092,Melittia oedipus,species,accepted
-8826258,4342,Melaphorus potteri,species,accepted
+1327248,1327214,Melophorus potteri,species,accepted
 8548608,704,Goniopholis tenuidens,species,synonym
 4822253,704,Goniopholididae,family,accepted
 5035012,9107211,Solenopsis abdita,species,accepted
@@ -62,6 +62,7 @@ gbif_id,parent_id,taxon_name,taxon_rank,status
 2470872,5023,Varanus,genus,accepted
 1106852,5602,Zenicomus,genus,accepted
 2470685,2470872,Varanus salvator,species,accepted
+1327214,4342,Melophorus,genus,accepted
 # ------------------------------------------------------------------------
 # Taxa from Test_format_bad.xlsx
 # ------------------------------------------------------------------------
@@ -93,6 +94,8 @@ gbif_id,parent_id,taxon_name,taxon_rank,status
 1324306,4342,Crematogaster,genus,accepted
 1317499,4342,Aenictus,genus,accepted
 2435194,9703,Panthera,genus,accepted
+6640,691,Moraceae,family,accepted
+691,220,Rosales,order,accepted
 # ------------------------------------------------------------------------
 # Additions from test_taxa.py
 # ------------------------------------------------------------------------

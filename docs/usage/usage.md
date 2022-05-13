@@ -22,7 +22,7 @@ researchers.
 The code is open source Python and  is maintained on
 [GitHub](https://github.com/ImperialCollegeLondon/safedata_validator) but  can
 also be installed using  [PyPI](https://pypi.org/project/safedata-validator).
-See the [installation notes](../install/install.md) for setup instructions. 
+See the [installation notes](../install/install.md) for setup instructions.
 
 The package provides a command line program `safedata_validate`. The usage
 instructions are below but you will also need to provide links to some external
@@ -55,9 +55,9 @@ validate DOIs without an internet connection, but this is optional.
 
 The locations of these resources are set by command line arguments shown above
 but  can also be set in a [configuration file](usage.md#configuration-file) for
-repeated use. 
+repeated use.
 
-## Locations 
+## Locations
 
 Locations are validated against a set of known location names and possible
 aliases for those names. The data resource providing this information is set
@@ -66,17 +66,25 @@ shown above or a static local JSON file to provide faster and offline use:
 
     safedata_validate MyData.xlsx -l /path/to/validator_locations.json
 
-## Taxa
+## GBIFTaxa
 
 If you  want to speed up taxon checking and allow offline use then you will need
 to download a copy of the backbone taxonomy and build a SQLite3 database from
 it. Using a local database is  much faster than using the GBIF API online. This
 isn't particularly hard and is described in detail [here](build_local_gbif.md),
-but the resulting database is around 1.6GB, so you'll need file space! 
+but the resulting database is around 1.6GB, so you'll need file space!
 
 Once you have this file, you can use it like this:
 
     safedata_validate MyData.xlsx -g /path/to/gbif_backbone.sqlite
+
+## NCBITaxa
+
+Taxon checking against NCBI can be similarly sped up by downloading a copy of the online database and building a SQLite3 database from it. Using a local database is substantially faster than using the online NCBI Entrez tools. Instructions on how to construct the local database are given [here](../install/build_local_ncbi.md), again the resulting database is large so you'll need to ensure you have sufficient file space!
+
+Once you have this file, you can use it like this:
+
+    TODO - INSERT USAGE HERE
 
 ## Fully offline use
 

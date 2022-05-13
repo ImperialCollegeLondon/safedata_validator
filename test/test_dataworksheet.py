@@ -4,7 +4,7 @@ from logging import CRITICAL, ERROR, WARNING, INFO
 
 import openpyxl
 from safedata_validator.field import DataWorksheet
-from safedata_validator.taxa import Taxa
+from safedata_validator.taxa import GBIFTaxa
 from safedata_validator.resources import Resources
 from safedata_validator.locations import Locations
 from safedata_validator.field import Dataset
@@ -28,7 +28,7 @@ def test_DataWorksheet_init(caplog, fixture_field_meta, sheet_meta, expected_log
 
     assert len(expected_log) == len(caplog.records)
 
-    assert all([exp[0] == rec.levelno 
+    assert all([exp[0] == rec.levelno
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
@@ -83,10 +83,10 @@ def test_DataWorksheet_init(caplog, fixture_field_meta, sheet_meta, expected_log
 def test_DataWorksheet_validate_field_meta(caplog, fixture_dataworksheet, field_meta, expected_log):
     """Testing errors created when field metadata is validated"""
     fixture_dataworksheet.validate_field_meta(field_meta)
-    
+
     assert len(expected_log) == len(caplog.records)
 
-    assert all([exp[0] == rec.levelno 
+    assert all([exp[0] == rec.levelno
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
@@ -132,12 +132,12 @@ def test_DataWorksheet_validate_data_rows(caplog, fixture_dataworksheet, fixture
 
     if load_field_meta:
         fixture_dataworksheet.validate_field_meta(fixture_field_meta)
-    
+
     fixture_dataworksheet.validate_data_rows(data_rows)
 
     assert len(expected_log) == len(caplog.records)
 
-    assert all([exp[0] == rec.levelno 
+    assert all([exp[0] == rec.levelno
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
@@ -223,7 +223,7 @@ def test_DataWorksheet_empty_meta(caplog, fixture_dataworksheet,
 
     assert len(expected_log) == len(caplog.records)
 
-    assert all([exp[0] == rec.levelno 
+    assert all([exp[0] == rec.levelno
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
@@ -300,7 +300,7 @@ def test_DataWorksheet_empty_meta(caplog, fixture_dataworksheet,
       ( [[1, 1, 2, 3],
          [2, 1, 2, 3],
          [None, None, None, None],
-         [3, 1, 2, 3], 
+         [3, 1, 2, 3],
          [None, None, None, None]],
          False,
         ( (INFO, "Validating field data"),
@@ -309,16 +309,16 @@ def test_DataWorksheet_empty_meta(caplog, fixture_dataworksheet,
           (INFO, "Checking field c"),
           (ERROR, "Data contains empty rows"),
           (INFO, "Worksheet 'DF' contains 5 descriptors, 3 data rows and 3 fields"),
-          (INFO, "Dataframe contains 1 errors"))),    
+          (INFO, "Dataframe contains 1 errors"))),
           ]
 )
 def test_DataWorksheet_report(caplog, fixture_dataworksheet, fixture_field_meta,
                               data_rows, populate_external, expected_log):
-    """Testing report level errors 
+    """Testing report level errors
       - emission of field errors and
       - dataset level issues
     """
-    
+
     if populate_external:
         fixture_dataworksheet.external = "file_provided.sql"
 
@@ -327,18 +327,18 @@ def test_DataWorksheet_report(caplog, fixture_dataworksheet, fixture_field_meta,
 
     if data_rows:
         fixture_dataworksheet.validate_data_rows(data_rows)
-    
+
     fixture_dataworksheet.report()
 
     assert len(expected_log) == len(caplog.records)
 
-    assert all([exp[0] == rec.levelno 
+    assert all([exp[0] == rec.levelno
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
 
-# TODO - think about the _order_ of different rownumber errors and which 
-#        get reported when: 1,2,3,4,5,6,9,None,None - both non_seq and missing 
+# TODO - think about the _order_ of different rownumber errors and which
+#        get reported when: 1,2,3,4,5,6,9,None,None - both non_seq and missing
 #        useful information for user
 
 @pytest.mark.parametrize(
@@ -383,7 +383,7 @@ def test_DataWorksheet_report(caplog, fixture_dataworksheet, fixture_field_meta,
           (INFO, "Dataframe formatted correctly"))),
       ( [ [[1, 1, 2, 3],
            [2, 1, 2, 3],
-           [3, 1, 2, 3], 
+           [3, 1, 2, 3],
            ],
           [[4, 1, 2, 3],
            [None, None, None, None,], # internal blank row within block
@@ -400,7 +400,7 @@ def test_DataWorksheet_report(caplog, fixture_dataworksheet, fixture_field_meta,
            [2, 1, 2, 3],
            [None, None, None, None], # trailing blank row, but with data then loaded
            ],
-          [[3, 1, 2, 3], 
+          [[3, 1, 2, 3],
            [4, 1, 2, 3],
            [5, 1, 2, 3],
            ]],
@@ -417,18 +417,18 @@ def test_DataWorksheet_report_multi_load(caplog, fixture_dataworksheet, fixture_
                                          data_rows, expected_log):
     """Testing report level errors when more than one set of data loaded
     """
-    
+
     fixture_dataworksheet.validate_field_meta(fixture_field_meta)
     caplog.clear()
 
     for chunk in data_rows:
         fixture_dataworksheet.validate_data_rows(chunk)
-    
+
     fixture_dataworksheet.report()
 
     assert len(expected_log) == len(caplog.records)
 
-    assert all([exp[0] == rec.levelno 
+    assert all([exp[0] == rec.levelno
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
@@ -485,7 +485,7 @@ def test_DataWorksheet_load_from_worksheet(caplog, fixture_dataworksheet, fixtur
     """Testing basics of load_from_worksheet method on programatically created
     worksheet object
     """
-    
+
     # Create a worksheet programatically
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -505,10 +505,10 @@ def test_DataWorksheet_load_from_worksheet(caplog, fixture_dataworksheet, fixtur
 
     # Try loading worksheet
     fixture_dataworksheet.load_from_worksheet(ws)
-    
+
     assert len(expected_log) == len(caplog.records)
 
-    assert all([exp[0] == rec.levelno 
+    assert all([exp[0] == rec.levelno
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
@@ -518,20 +518,20 @@ def test_DataWorksheet_load_from_worksheet(caplog, fixture_dataworksheet, fixtur
 @pytest.mark.parametrize(
     'example_excel_files, wsheet, n_errors',
     [
-      ('good', 'DF', 0), 
-      ('good', 'Incidence', 0), 
+      ('good', 'DF', 0),
+      ('good', 'Incidence', 0),
       ('bad', 'DF', 41),
       ('bad', 'Incidence', 8)
-    ], 
+    ],
     indirect = ['example_excel_files']  # take actual params from fixture
 )
 def test_DataWorksheet_load_from_file(caplog, resources_with_local_gbif, example_excel_files, wsheet, n_errors):
-    """Test loading a dataworksheet from file - this duplicates a lot of 
+    """Test loading a dataworksheet from file - this duplicates a lot of
     Dataset.load_from_workbook"""
-    
+
     # Load the taxa and locations
     ds = Dataset(resources_with_local_gbif)
-    ds.taxa.load(example_excel_files['Taxa'])
+    ds.taxa.gbif_taxa.load(example_excel_files['Taxa'])
     ds.locations.load(example_excel_files['Locations'])
 
     caplog.clear()

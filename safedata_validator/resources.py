@@ -1,7 +1,7 @@
 """Load and check validation resources
 
 The `safedata_validator` package needs access to some local resources and
-configuration to work. The two main resources for file validation are:
+configuration to work. The three main resources for file validation are:
 
 -   locations: A path to a locations data file, providing a gazetteer of known
     locations and their details.
@@ -10,9 +10,13 @@ configuration to work. The two main resources for file validation are:
     backbone database. If this is not provided, then the slower GBIF online API
     will be used instead.
 
+-   ncbi_database: Optionally, a path to a local SQLite copy of the NCBI
+    database files. If this is not provided, then the slower BioEntrez package
+    will be used to access the online APU instead.
+
 The [Resources][safedata_validator.resources.Resources] class is used to locate
 and validate these resources, and then provide those validated resources to
-other components of the package. 
+other components of the package.
 
 A configuration file can be passed as `cfg_path` when creating an instance,
 but if no arguments are provided then an attempt is made to find and load
@@ -38,6 +42,8 @@ from safedata_validator.logger import LOGGER, FORMATTER, log_and_raise, loggerin
 CONFIGSPEC = {
     'locations':  'string()',
     'gbif_database':  'string(default=None)',
+    'ncbi_database':  'string(default=None)',
+    'ncbi_api_key':  'string(default=None)',
     'extents': {
         'temporal_soft_extent':  'date_list(min=2, max=2, default=None)',
         'temporal_hard_extent':  'date_list(min=2, max=2, default=None)',
@@ -60,7 +66,7 @@ CONFIGSPEC = {
         'api': 'string(default=None)',
         'token': 'string(default=None)'}
     }
-"""dict: The safedata_validator package use the `configobj.ConfigObj` 
+"""dict: The safedata_validator package use the `configobj.ConfigObj`
 package to handle resource configuration. This dict defines the basic expected
 specification for the configuration and allows the ConfigObj.validate() method
 to do basic validation and type conversions.
@@ -72,7 +78,7 @@ def date_list(value, min, max):
     values.
 
     Args:
-        value: A string containing comma-separated ISO date strings 
+        value: A string containing comma-separated ISO date strings
         min: The minimum allowed number of entries
         max: The maximum allowed number of entries
     """
@@ -85,16 +91,16 @@ def date_list(value, min, max):
         max = int(max)
     except ValueError:
         raise VdtParamError('max', max)
-    
+
     # Check the supplied value is a list, triggering any issues
-    # with list formatting 
+    # with list formatting
     value = is_list(value, min=min, max=max)
-    
+
     # Next, check every member in the list is an ISO date string
     # noting that this strips out time information
     out = []
     for entry in value:
-        
+
         try:
             parsed_entry = isoparse(entry).date()
         except ValueError:
@@ -120,18 +126,22 @@ class Resources:
         Args:
             config: A path to a configuration file, or a dict or list
                 providing package configuration details. The list format
-                should provide a list of strings, each representing a 
-                line in the configuration file. The dict format is a 
+                should provide a list of strings, each representing a
+                line in the configuration file. The dict format is a
                 dictionary with the required nested dictionary structure
                 and values
 
         Attributes:
             config_type: The method used to specify the resources. One of
                 'init_dict', 'init_list', 'init_file', 'user_config' or 'site_config'.
-            locations: The path to the locations file 
-            gbif_database: The path to the GBIF database file or None 
-            use_local_gbif: Is a local file used or should the GBIF API be used 
-            valid_locations: The locations defined in the locations file 
+            locations: The path to the locations file
+            gbif_database: The path to the GBIF database file or None
+            ncbi_database: The path to the NCBI database file or None
+            ncbi_api_key: A NCBI api key or None
+            use_local_gbif: Is a local file used or should the GBIF API be used
+            ncbi_database: The path to the NCBI database file or None
+            use_local_ncbi: Is a local file used or should the NCBI API be used
+            valid_locations: The locations defined in the locations file
             location_aliases: Location aliases defined in the locations file
             extents: A DotMap of extent data
             zenodo: A DotMap of Zenodo information
@@ -171,13 +181,15 @@ class Resources:
         # Try and load the found configuration
         config = self._load_config(config, config_type)
 
-        # Set attributes - 
+        # Set attributes -
         # HACK - this now seems clumsy - the ConfigObj instance is already a
         #        class containing the config attributes. Having a _function_
         #        that returns a modified ConfigObj instance seems more direct
         #        than having to patch this list of attributes.
         self.locations = config.locations
         self.gbif_database = config.gbif_database
+        self.ncbi_database = config.ncbi_database
+        self.ncbi_api_key = config.ncbi_api_key
         self.config_type = config.config_type
         self.config_source = config.config_source
 
@@ -186,12 +198,14 @@ class Resources:
         self.metadata = config.metadata
 
         self.use_local_gbif = None
+        self.use_local_ncbi = None
         self.valid_locations = None
         self.location_aliases = None
 
         # Validate the resources
         self._validate_locations()
         self._validate_gbif()
+        self._validate_ncbi()
 
     @staticmethod
     def _load_config(config: Union[str, list, dict], cfg_type: str):
@@ -203,7 +217,7 @@ class Resources:
         Args:
             config: Passed from Resources.__init__()
             cfg_type: Identifies the route used to provide the configuration details
-        
+
         Returns:
              If the file does not exist, the function returns None. Otherwise,
              it returns a DotMap of config parameters.
@@ -224,15 +238,15 @@ class Resources:
             print(config)
             print(config_obj)
             # print(open(config))
-            LOGGER.critical("Configuration issues: ") 
-            FORMATTER.push() 
-            for sec, key, err in flatten_errors(config_obj, valid): 
+            LOGGER.critical("Configuration issues: ")
+            FORMATTER.push()
+            for sec, key, err in flatten_errors(config_obj, valid):
                 sec.append(key)
-                LOGGER.critical(f"In config '{'.'.join(sec)}': {err}") 
+                LOGGER.critical(f"In config '{'.'.join(sec)}': {err}")
             FORMATTER.pop()
             raise RuntimeError('Configuration failure')
 
-        # convert to a DotMap for ease 
+        # convert to a DotMap for ease
         config_obj = DotMap(config_obj)
 
         return config_obj
@@ -307,5 +321,45 @@ class Resources:
                               OSError)
             else:
                 self.use_local_gbif = True
+            finally:
+                conn.close()
+
+    def _validate_ncbi(self):
+        """Validate the NCBI settings
+
+        This private function checks whether to use the online API or a local
+        backbone database and then validates the provided sqlite3 database files.
+
+        Returns:
+            None - updates instance.
+        """
+        if self.ncbi_database is None or self.ncbi_database == '':
+            LOGGER.info('Using NCBI online API to validate taxonomy')
+            self.use_local_ncbi = False
+        else:
+            LOGGER.info(f'Validating local NCBI database: {self.ncbi_database}')
+
+            # Does the provided path exist and is it a functional SQLite database
+            # with a backbone table? Because sqlite3 can 'connect' to any path,
+            # use a query attempt to reveal exceptions
+
+            if not os.path.exists(self.ncbi_database):
+                log_and_raise('Local NCBI database not found',
+                              OSError)
+
+            try:
+                conn = sqlite3.connect(self.ncbi_database)
+                _ = conn.execute('select count(*) from nodes;')
+                _ = conn.execute('select count(*) from names;')
+                _ = conn.execute('select count(*) from merge;')
+            except sqlite3.OperationalError:
+                log_and_raise('Local NCBI database is missing either the nodes, '
+                              'names or merge table',
+                              RuntimeError)
+            except sqlite3.DatabaseError:
+                log_and_raise('Local SQLite database not valid',
+                              OSError)
+            else:
+                self.use_local_ncbi = True
             finally:
                 conn.close()

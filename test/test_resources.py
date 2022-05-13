@@ -16,6 +16,7 @@ def config_file_list():
 
     return [f'locations = {FIXTURE_FILES.rf.loc_file}',
             f'gbif_database = {FIXTURE_FILES.rf.gbif_file}',
+            f'ncbi_database = {FIXTURE_FILES.rf.ncbi_file}',
             '[extents]',
             'temporal_soft_extent = 2002-02-01, 2030-02-01',
             'temporal_hard_extent = 2002-02-01, 2030-02-01',
@@ -37,6 +38,7 @@ def config_file_dict():
 
     return {'locations': FIXTURE_FILES.rf.loc_file,
             'gbif_database': FIXTURE_FILES.rf.gbif_file,
+            'ncbi_database': FIXTURE_FILES.rf.ncbi_file,
             'extents': {
                'temporal_soft_extent':  ['2002-02-01', '2030-02-01'],
                'temporal_hard_extent':  ['2002-02-01', '2030-02-01'],
@@ -59,7 +61,6 @@ def nested_set(dic, keys, value):
         dic = dic.setdefault(key, {})
     dic[keys[-1]] = value
 
-
 @pytest.mark.parametrize(
     'config',
      ['config_file_dict','config_file_list'],
@@ -72,10 +73,11 @@ def nested_set(dic, keys, value):
         ( (INFO, 'Configuring Resources'),
           (INFO, 'Configuring resources from init '),
           (INFO, 'Validating locations: '),
-          (INFO, 'Validating local GBIF database: '))),
+          (INFO, 'Validating local GBIF database: '),
+          (INFO, 'Validating local NCBI database: '))),
       # Locations is mandatory
       ( ( (['locations'], ''),),
-        ( (0, 'locations = '),),  
+        ( (0, 'locations = '),),
         RuntimeError,
         ( (INFO, 'Configuring Resources'),
           (INFO, 'Configuring resources from init '),
@@ -111,7 +113,17 @@ def nested_set(dic, keys, value):
         ( (INFO, 'Configuring Resources'),
           (INFO, 'Configuring resources from init '),
           (INFO, 'Validating locations: '),
-          (INFO, 'Using GBIF online API to validate taxonomy'))),
+          (INFO, 'Using GBIF online API to validate taxonomy'),
+          (INFO, 'Validating local NCBI database: '))),
+      # NCBI defaults to online
+      ( ( (['ncbi_database'], ''),),
+        ( (2, 'ncbi_database = '),),
+        None,
+        ( (INFO, 'Configuring Resources'),
+          (INFO, 'Configuring resources from init '),
+          (INFO, 'Validating locations: '),
+          (INFO, 'Validating local GBIF database: '),
+          (INFO, 'Using NCBI online API to validate taxonomy'))),
       # GBIF is missing
       ( ( (['gbif_database'], FIXTURE_FILES.mf),),
         ( (1, f'gbif_database = {FIXTURE_FILES.mf}'),),
@@ -121,6 +133,16 @@ def nested_set(dic, keys, value):
           (INFO, 'Validating locations: '),
           (INFO, 'Validating local GBIF database: '),
           (CRITICAL, 'Local GBIF database not found'))),
+      # NCBI is missing
+      ( ( (['ncbi_database'], FIXTURE_FILES.mf),),
+        ( (2, f'ncbi_database = {FIXTURE_FILES.mf}'),),
+        OSError,
+        ( (INFO, 'Configuring Resources'),
+          (INFO, 'Configuring resources from init '),
+          (INFO, 'Validating locations: '),
+          (INFO, 'Validating local GBIF database: '),
+          (INFO, 'Validating local NCBI database: '),
+          (CRITICAL, 'Local NCBI database not found'))),
       # GBIF database is not sqlite
       ( ( (['gbif_database'], FIXTURE_FILES.rf.loc_file),),
         ( (1, f'gbif_database = {FIXTURE_FILES.rf.loc_file}'),),
@@ -129,6 +151,16 @@ def nested_set(dic, keys, value):
           (INFO, 'Configuring resources from init '),
           (INFO, 'Validating locations: '),
           (INFO, 'Validating local GBIF database: '),
+          (CRITICAL, 'Local SQLite database not valid'))),
+      # NCBI database is not sqlite
+      ( ( (['ncbi_database'], FIXTURE_FILES.rf.loc_file),),
+        ( (2, f'ncbi_database = {FIXTURE_FILES.rf.loc_file}'),),
+        OSError,
+        ( (INFO, 'Configuring Resources'),
+          (INFO, 'Configuring resources from init '),
+          (INFO, 'Validating locations: '),
+          (INFO, 'Validating local GBIF database: '),
+          (INFO, 'Validating local NCBI database: '),
           (CRITICAL, 'Local SQLite database not valid'))),
       # GBIF database is sqlite but not GBIF
       ( ( (['gbif_database'], FIXTURE_FILES.rf.sqlite_not_gbif),),
@@ -139,16 +171,26 @@ def nested_set(dic, keys, value):
           (INFO, 'Validating locations: '),
           (INFO, 'Validating local GBIF database: '),
           (CRITICAL, 'Local GBIF database does not contain the backbone table'))),
+      # GBIF database is sqlite but not NCBI
+      ( ( (['ncbi_database'], FIXTURE_FILES.rf.sqlite_not_gbif),),
+        ( (2, f'ncbi_database = {FIXTURE_FILES.rf.sqlite_not_gbif}'),),
+        RuntimeError,
+        ( (INFO, 'Configuring Resources'),
+          (INFO, 'Configuring resources from init '),
+          (INFO, 'Validating locations: '),
+          (INFO, 'Validating local GBIF database: '),
+          (INFO, 'Validating local NCBI database: '),
+          (CRITICAL, 'Local NCBI database is missing either the nodes, names or merge table'))),
       # Test another misconfig
       ( ( (['extents', 'latitudinal_hard_extent'], ['-90deg', '90deg']),),
-        ( (5, 'latitudinal_hard_extent = -90deg, 90deg'),),
+        ( (6, 'latitudinal_hard_extent = -90deg, 90deg'),),
         RuntimeError,
         ( (INFO, 'Configuring Resources'),
           (INFO, 'Configuring resources from init '),
           (CRITICAL, 'Configuration issues'),
           (CRITICAL, "In config 'extents.latitudinal_hard_extent':"))),
     ])
-def test_load_resources_by_arg(config_filesystem, request, caplog, config, 
+def test_load_resources_by_arg(config_filesystem, request, caplog, config,
                                dict_mod, list_mod, expected_exception, expected_log):
     """This test uses the ability to load a config from a list or a dict to
     validate the behaviour of the config with bad inputs. Arguably overkill to
@@ -156,7 +198,7 @@ def test_load_resources_by_arg(config_filesystem, request, caplog, config,
     """
 
     config = request.getfixturevalue(config)
-    
+
     if expected_exception is None:
       ctxt_manager = does_not_raise()
     else:
@@ -176,7 +218,7 @@ def test_load_resources_by_arg(config_filesystem, request, caplog, config,
 
         assert len(expected_log) == len(caplog.records)
 
-        assert all([exp[0] == rec.levelno 
+        assert all([exp[0] == rec.levelno
                     for exp, rec in zip(expected_log, caplog.records)])
         assert all([exp[1] in rec.message
                     for exp, rec in zip(expected_log, caplog.records)])
@@ -188,13 +230,22 @@ def test_load_resources_by_arg(config_filesystem, request, caplog, config,
         ( (INFO, 'Configuring Resources'),
           (INFO, 'Configuring resources from init '),
           (INFO, 'Validating locations: '),
-          (INFO, 'Validating local GBIF database: '))),
+          (INFO, 'Validating local GBIF database: '),
+          (INFO, 'Using NCBI online API to validate taxonomy'))),
       # GBIF defaults to online
       ( FIXTURE_FILES.vf.fix_cfg_remote,
         ( (INFO, 'Configuring Resources'),
           (INFO, 'Configuring resources from init '),
           (INFO, 'Validating locations: '),
-          (INFO, 'Using GBIF online API to validate taxonomy'))),
+          (INFO, 'Using GBIF online API to validate taxonomy'),
+          (INFO, 'Using NCBI online API to validate taxonomy'))),
+      # NCBI online unless set otherwise
+      ( FIXTURE_FILES.vf.fix_cfg_local_ncbi,
+        ( (INFO, 'Configuring Resources'),
+          (INFO, 'Configuring resources from init '),
+          (INFO, 'Validating locations: '),
+          (INFO, 'Validating local GBIF database: '),
+          (INFO, 'Validating local NCBI database: '))),
     ])
 def test_load_resources_by_file(config_filesystem, caplog, filepath, expected_log):
     """This test uses the ability to load a config from a file to
@@ -205,7 +256,7 @@ def test_load_resources_by_file(config_filesystem, caplog, filepath, expected_lo
 
     assert len(expected_log) == len(caplog.records)
 
-    assert all([exp[0] == rec.levelno 
+    assert all([exp[0] == rec.levelno
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
@@ -229,10 +280,10 @@ def test_load_resources_from_missing_config(config_filesystem, caplog, expected_
     with pytest.raises(RuntimeError):
 
       res = Resources()
-      
+
       assert len(expected_log) == len(caplog.records)
 
-      assert all([exp[0] == rec.levelno 
+      assert all([exp[0] == rec.levelno
                   for exp, rec in zip(expected_log, caplog.records)])
       assert all([exp[1] in rec.message
                   for exp, rec in zip(expected_log, caplog.records)])
@@ -243,7 +294,8 @@ def test_load_resources_from_missing_config(config_filesystem, caplog, expected_
     [ ( (INFO, 'Configuring Resources'),
         (INFO, 'Configuring resources from user '),
         (INFO, 'Validating locations: '),
-        (INFO, 'Validating local GBIF database: ')),
+        (INFO, 'Validating local GBIF database: '),
+        (INFO, 'Validating local NCBI database: ')),
     ])
 def test_load_resources_from_user_config(user_config_file, caplog, expected_log):
     """This test uses the ability to find a user config file
@@ -253,7 +305,7 @@ def test_load_resources_from_user_config(user_config_file, caplog, expected_log)
 
     assert len(expected_log) == len(caplog.records)
 
-    assert all([exp[0] == rec.levelno 
+    assert all([exp[0] == rec.levelno
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
@@ -264,7 +316,8 @@ def test_load_resources_from_user_config(user_config_file, caplog, expected_log)
     [ ( (INFO, 'Configuring Resources'),
         (INFO, 'Configuring resources from site '),
         (INFO, 'Validating locations: '),
-        (INFO, 'Validating local GBIF database: ')),
+        (INFO, 'Validating local GBIF database: '),
+        (INFO, 'Validating local NCBI database: ')),
     ])
 def test_load_resources_from_site_config(site_config_file, caplog, expected_log):
     """This test uses the ability to find a site config file
@@ -274,9 +327,7 @@ def test_load_resources_from_site_config(site_config_file, caplog, expected_log)
 
     assert len(expected_log) == len(caplog.records)
 
-    assert all([exp[0] == rec.levelno 
+    assert all([exp[0] == rec.levelno
                 for exp, rec in zip(expected_log, caplog.records)])
     assert all([exp[1] in rec.message
                 for exp, rec in zip(expected_log, caplog.records)])
-
-

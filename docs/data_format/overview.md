@@ -5,7 +5,7 @@ spreadsheets**. This accounts for the vast majority of the data files used by re
 support other data files but those files will need to be documented using the same Excel format.
 
 !!! Warning
-    
+
     The formatting details described in this documentation will be used to automatically publish your
     data to Zenodo. You should choose titles, descriptions and keywords that you would be happy to be
     **permanently** associated with your dataset!
@@ -13,10 +13,11 @@ support other data files but those files will need to be documented using the sa
 
 # Excel format overview
 
-The basic format for a SAFE dataset submission is an Excel Workbook, which will typically contain at least four worksheets. The first  three worksheets must use the standard names listed below. 
+The basic format for a SAFE dataset submission is an Excel Workbook, which will typically contain at least four worksheets. The first four worksheets must use the standard names listed below. While both Taxa and NCBITaxa can be included, it is only required to include one of them.
 
-* [**Summary**](summary.md): This contains some simple information about the authors of the dataset, access rights and the individual data tables in the dataset. 
-* [**Taxa**](taxa.md): This describes all the taxa used in the dataset. 
+* [**Summary**](summary.md): This contains some simple information about the authors of the dataset, access rights and the individual data tables in the dataset.
+* [**GBIFTaxa**](gbif_taxa.md): This describes taxa used in the Data worksheets, using the GBIF taxonomy backbone as a reference. This is best for observational data.
+* [**NCBITaxa**](ncbi_taxa.md): This describes taxa used in the Data worksheets, using the NCBI taxonomy database as a reference. This is best for sequencing data.
 * [**Locations**](locations.md): This describes all the sampling locations used in the dataset.
 * [**Data worksheets**](data.md): After these worksheets come your data tables. You should label these sheets with a sensible name (not 'Sheet1'!) and each data table must be described in the Summary worksheet. You can include as many data tables as you like in a single dataset: we don't want you to spend time rearranging your data and are happy just to take the data in the natural tables you already use.
 
@@ -36,5 +37,3 @@ You can also look at existing published datasets to see how the format is used:
 
 * [https://safeproject.net/datasets/view_datasets](https://safeproject.net/datasets/view_datasets)
 * [https://zenodo.org/communities/safe/](https://zenodo.org/communities/safe/)
-
-

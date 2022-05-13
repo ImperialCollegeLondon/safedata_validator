@@ -12,7 +12,7 @@ from openpyxl import worksheet, load_workbook
 from openpyxl.utils import get_column_letter
 
 from safedata_validator.validators import (IsInSet, IsNotBlank, IsNotExcelError, IsNotPadded,
-                                           HasDuplicates, IsNotNA, IsNumber, 
+                                           HasDuplicates, IsNotNA, IsNumber,
                                            IsNotNumericString, IsString, IsLocName,
                                            blank_value, valid_r_name, RE_DMS)
 
@@ -20,7 +20,7 @@ from safedata_validator.logger import (CONSOLE_HANDLER, LOG, LOGGER, FORMATTER,
                                        COUNTER_HANDLER, loggerinfo_push_pop)
 from safedata_validator.resources import Resources
 from safedata_validator.locations import Locations
-from safedata_validator.taxa import Taxa
+from safedata_validator.taxa import GBIFTaxa, NCBITaxa, Taxa
 from safedata_validator.summary import Summary
 from safedata_validator.extent import Extent
 
@@ -50,7 +50,7 @@ class Dataset:
         # Try and load the default resources if None provided
         if resources is None:
             resources = Resources()
-        
+
         self.filename = None
         self.resources = resources
         self.summary = Summary(resources)
@@ -72,21 +72,21 @@ class Dataset:
         self.longitudinal_extent = Extent('longitudinal extent', (float, int),
                                           hard_bounds=resources.extents.longitudinal_hard_extent,
                                           soft_bounds=resources.extents.longitudinal_soft_extent)
-        
+
         # Create Locations and pass in dataset extents
         self.locations = Locations(resources,
-                                   latitudinal_extent=self.latitudinal_extent, 
+                                   latitudinal_extent=self.latitudinal_extent,
                                    longitudinal_extent=self.longitudinal_extent)
 
-    def load_from_workbook(self, 
-                           filename: str, 
+    def load_from_workbook(self,
+                           filename: str,
                            validate_doi: bool = False,
                            valid_pid: List[int] = None,
                            chunk_size: int = 1000,
                            console_log: bool = True) -> None:
-        """This method populates a Dataset using the safedata_validator format 
+        """This method populates a Dataset using the safedata_validator format
         for Excel workbooks in .xlsx format.
-        
+
         By default, `safedata_validator` emits log messages to the console and
         to an internal record. In command line scripts, the console log _is_ the
         the validation report but if the function is being used programatically,
@@ -102,7 +102,7 @@ class Dataset:
                 argument sets the size of that chunk.
             console_log: Use the console logging or not
         """
-        
+
         # Handle logging details - flush and reset from previous runs.
         LOG.seek(0)
         LOG.truncate(0)
@@ -112,7 +112,7 @@ class Dataset:
             CONSOLE_HANDLER.setLevel('DEBUG')
         else:
             CONSOLE_HANDLER.setLevel('CRITICAL')
-        
+
         # Open the workbook with:
         #  - read_only to use the memory optimised read_only implementation.
         #    This is a bit restricted as it only exposes row by row iteration
@@ -123,7 +123,7 @@ class Dataset:
 
         # Populate summary
         if 'Summary' in wb.sheetnames:
-            self.summary.load(wb['Summary'], wb.sheetnames, 
+            self.summary.load(wb['Summary'], wb.sheetnames,
                               validate_doi=validate_doi, valid_pid=valid_pid)
         else:
             # No summary is impossible - so an error and no dataworksheets
@@ -137,12 +137,31 @@ class Dataset:
             # No locations is pretty implausible - lab experiments?
             LOGGER.warning("No locations worksheet found - moving on")
 
-        # Populate taxa
-        if 'Taxa' in wb.sheetnames:
-            self.taxa.load(wb['Taxa'])
-        else:
+        # Setup check for existence of either Taxa sheet
+        taxa_sheet = False
+
+        # Throw a critical error if both Taxa and GBIFTaxa have been given as worksheet names
+        if 'GBIFTaxa' in wb.sheetnames and 'Taxa' in wb.sheetnames:
+            LOGGER.error("Both Taxa and GBIFTaxa provided as sheet names, this "
+                            "is not allowed! Only checking GBIFTaxa sheet")
+            self.taxa.gbif_taxa.load(wb['GBIFTaxa'])
+            taxa_sheet = True
+        # Otherwise populate gbif_taxa from the one that has been provided
+        elif 'GBIFTaxa' in wb.sheetnames:
+            self.taxa.gbif_taxa.load(wb['GBIFTaxa'])
+            taxa_sheet = True
+        elif 'Taxa' in wb.sheetnames:
+            self.taxa.gbif_taxa.load(wb['Taxa'])
+            taxa_sheet = True
+
+        # Populate ncbi taxa
+        if 'NCBITaxa' in wb.sheetnames:
+            self.taxa.ncbi_taxa.load(wb['NCBITaxa'])
+            taxa_sheet = True
+
+        if taxa_sheet == False:
             # Leave the default empty Taxa object
-            LOGGER.warning("No Taxa worksheet found - moving on")
+            LOGGER.warning("Neither Taxa worksheet found - moving on")
 
         # Load data worksheets
         for sheet_meta in self.summary.data_worksheets:
@@ -161,8 +180,9 @@ class Dataset:
         """
         A method to run final checks:
         i) The locations and taxa provided have been used in the data worksheets scanned.
-        ii) Extents in the data are congruent with the summary extents
-        iii) Report the total number of errors and warnings
+        ii) That no taxa names are defined twice (i.e. in GBIFTaxa and NCBITaxa)
+        iii) Extents in the data are congruent with the summary extents
+        iv) Report the total number of errors and warnings
         """
 
         LOGGER.info('Checking provided locations and taxa all used in data worksheets')
@@ -185,14 +205,19 @@ class Dataset:
         if not self.taxa.is_empty:
             if self.summary.external_files:
                 LOGGER.warning('Taxon list cannot be validated when external data files are used')
-            elif self.taxa.taxon_names_used == self.taxa.taxon_names:
-                LOGGER.info('Provided taxa all used in datasets')
-            elif self.taxa.taxon_names_used == (self.taxa.taxon_names & self.taxa.taxon_names_used):
-                LOGGER.error('Provided taxa not used: ',
-                             extra={'join': self.taxa.taxon_names - self.taxa.taxon_names_used})
+            else:
+                if self.taxa.taxon_names_used == self.taxa.taxon_names:
+                    LOGGER.info('Provided taxa all used in datasets')
+                elif self.taxa.taxon_names_used != self.taxa.taxon_names.union(self.taxa.taxon_names_used):
+                    LOGGER.error('Provided taxa not used: ',
+                                 extra={'join': self.taxa.taxon_names - self.taxa.taxon_names_used})
+
+                if self.taxa.repeat_names != set():
+                    LOGGER.error('The following taxa are defined in both GBIFTaxa and NCBITaxa: ',
+                                 extra={'join': self.taxa.repeat_names})
 
         # Check the extents - there are both summary and dataset extents so
-        # check at least one is populated for each extent and that they are 
+        # check at least one is populated for each extent and that they are
         # compatible
         FORMATTER.pop()
         LOGGER.info('Checking temporal and geographic extents')
@@ -201,7 +226,7 @@ class Dataset:
         extents_to_check = (("Temporal", 'temporal_extent'),
                             ("Latitudinal", 'latitudinal_extent'),
                             ("Longitudinal", 'longitudinal_extent'))
-        
+
         for label, this_extent in extents_to_check:
 
             dataset_extent = getattr(self, this_extent)
@@ -211,7 +236,7 @@ class Dataset:
             if not (dataset_extent.populated or summary_extent.populated):
                 LOGGER.error(f'{label} extent not set from data or provided in summary: '
                              'add extents to dataset Summary')
-            elif ((dataset_extent.populated and summary_extent.populated) and 
+            elif ((dataset_extent.populated and summary_extent.populated) and
                   ((dataset_extent.extent[0] < summary_extent.extent[0]) or
                    (dataset_extent.extent[1] > summary_extent.extent[1]))):
 
@@ -221,7 +246,7 @@ class Dataset:
 
                 LOGGER.warning(f'The {label} extent is set in Summary but also '
                                f'is populated from the data - this may be deliberate!')
-            
+
 
         # Dedent for final result
         FORMATTER.pop()
@@ -246,7 +271,7 @@ class Dataset:
         """
         This method exports key data about the dataset in JSON format. This
         method is used to export a description of a dataset that can be used
-        to populate a dataset database and publish datasets to Zenodo. 
+        to populate a dataset database and publish datasets to Zenodo.
         """
 
         # TODO - continue with class.to_dict() methods?
@@ -270,13 +295,13 @@ class Dataset:
             # TODO: remember that DB API should populate:
             #   * dataset_id to link from taxon searches to datasets
             #  * id (what's this? Erroneous row ID in query?)
-            taxa = [dict(zip(("worksheet_name", "gbif_id", "gbif_parent_id", 
-                              "taxon_name", "taxon_rank", "gbif_status"), tx)) 
+            taxa = [dict(zip(("worksheet_name", "gbif_id", "gbif_parent_id",
+                              "taxon_name", "taxon_rank", "gbif_status"), tx))
                          for tx in self.taxa.taxon_index],
-            # Locations 
-            locations = [dict(zip(('name', 'new_location', 'wkt_wgs84'), lc)) 
+            # Locations
+            locations = [dict(zip(('name', 'new_location', 'wkt_wgs84'), lc))
                          for lc in self.locations.location_index],
-            # Publication details - these are populated by the 
+            # Publication details - these are populated by the
             # Zenodo publication mechanism.
             zenodo_concept_id = None,
             zenodo_record_id = None,
@@ -303,11 +328,11 @@ class DataWorksheet:
     """
 
     @loggerinfo_push_pop('Checking data worksheet')
-    def __init__(self, 
+    def __init__(self,
                  sheet_meta: dict,
                  dataset: Dataset = None,
                  ) -> None:
-        
+
         """
         This class is used to load and validate the formatting and content of a
         data worksheet. Checking a DataWorksheet has the following workflow:
@@ -315,25 +340,25 @@ class DataWorksheet:
         1) Create a DataWorksheet instance using the field metadata.
         2) Use calls to the validate_data_rows method to pass in field
            contents - this can be done repeatedly to handle chunked inputs.
-        3) Call the report method to obtain all of the logging associated 
+        3) Call the report method to obtain all of the logging associated
            with data validation and any final checks.
 
         Args:
             sheet_meta: The metadata dictionary for this worksheet from
-                the summary worksheet, containing the worksheet name, 
-                title and description and the names of any external files 
+                the summary worksheet, containing the worksheet name,
+                title and description and the names of any external files
                 to be associated with this worksheet.
             field_meta: The field metadata as an OrderedDict - ordered from
                 top to bottom as they appear in the source file - keyed by
                 field descriptor with values as a list of field values for
                 that descriptor.
-            dataset: A safedata_validator Dataset object, providing Taxa, 
+            dataset: A safedata_validator Dataset object, providing Taxa,
                 Locations and Summary information.
         """
 
         # Set initial values
-        
-        # TODO - checks on sheetmeta 
+
+        # TODO - checks on sheetmeta
         self.name = sheet_meta['name']
         self.description = sheet_meta['description']
         self.title = sheet_meta['title']
@@ -384,11 +409,11 @@ class DataWorksheet:
         clean_descriptors = IsNotPadded(field_meta.keys())
         if not clean_descriptors:
             # Report whitespace padding and clean up tuples
-            LOGGER.error('Whitespace padding in descriptor names: ', 
+            LOGGER.error('Whitespace padding in descriptor names: ',
                          extra={'join': clean_descriptors.failed})
-            
+
             # Order preserved in dict and validator
-            cleaned_entries = [(ky, val) for ky, val 
+            cleaned_entries = [(ky, val) for ky, val
                                in zip(clean_descriptors, field_meta.values())]
             field_meta = OrderedDict(cleaned_entries)
 
@@ -400,28 +425,28 @@ class DataWorksheet:
         unknown_descriptors = set(field_meta.keys()).difference(
                                 set(MANDATORY_DESCRIPTORS).union(OPTIONAL_DESCRIPTORS))
         if unknown_descriptors:
-            LOGGER.warning('Unknown field descriptors:', 
+            LOGGER.warning('Unknown field descriptors:',
                            extra={'join': unknown_descriptors})
 
         # * Check for field name as _last_ descriptor. This is primarily to
         #   make it easy to read the dataframe - just skip the other descriptors
         if list(field_meta.keys())[-1] != 'field_name':
                 LOGGER.error('Field_name row is not the last descriptor')
-        
+
         # Repackage field metadata into a list of per field descriptor
         # dictionaries, _importantly_ preserving the column order.
-        field_meta = [dict(zip(field_meta.keys(), val)) 
+        field_meta = [dict(zip(field_meta.keys(), val))
                         for val in zip(*field_meta.values())]
 
         # Check provided field names are unique. This doesn't cause as many
         # problems as duplications in Taxa and Locations, which expect certain
         # fields, so warn and continue. Ignore empty mandatory values - these
         # are handled in field checking.
-        field_names = [fld['field_name'] for fld in field_meta 
+        field_names = [fld['field_name'] for fld in field_meta
                        if fld['field_name'] is not None]
         dupes = HasDuplicates(field_names)
         if dupes:
-            LOGGER.error('Field names duplicated: ', 
+            LOGGER.error('Field names duplicated: ',
                          extra={'join': dupes.duplicated})
 
         # Lowercase the field types
@@ -435,13 +460,13 @@ class DataWorksheet:
         self.n_descriptors = len(field_meta[0].keys())
 
         # get taxa field names for cross checking observation and trait data
-        self.taxa_fields = [fld['field_name'] for fld in self.field_meta 
+        self.taxa_fields = [fld['field_name'] for fld in self.field_meta
                             if fld['field_type'] == 'taxa']
 
         # Now initialise the Field objects using the mapping of field types
         # to the BaseField subclasses. This needs to handle trailing fields
         # containing _no_ metadata (e.g. from inaccurate Excel sheet bounds or
-        # CSV comments) but also fields with missing field_type (but other 
+        # CSV comments) but also fields with missing field_type (but other
         # metadata).
         #
         # - trailing empty fields are assumed to be blank columns
@@ -449,9 +474,9 @@ class DataWorksheet:
         # - otherwise, these are assumed to be fields and should
         #   trigger warnings about descriptors
 
-        # Get logical flags for empty and trailing empty metadata 
+        # Get logical flags for empty and trailing empty metadata
         field_meta_empty = [set(vl.values()) == set([None]) for vl in self.field_meta]
-        trailing_empty  = [all(field_meta_empty[- (n + 1):]) 
+        trailing_empty  = [all(field_meta_empty[- (n + 1):])
                            for n in range(0, len(field_meta_empty))]
         trailing_empty.reverse()
 
@@ -462,7 +487,7 @@ class DataWorksheet:
 
         for col_idx, (tr_empty, fd_empty, fmeta) in \
             enumerate(zip(trailing_empty, field_meta_empty, self.field_meta)):
-            
+
             fmeta['col_idx'] = col_idx + 1
 
             # Consider cases
@@ -486,7 +511,7 @@ class DataWorksheet:
 
         if unknown_field_types:
             LOGGER.error('Unknown field types: ', extra={'join': unknown_field_types})
-        
+
     def validate_data_rows(self, data_rows):
         """Method to pass rows of data into the field checkers for a
         dataworksheet. The data is expected to be as an list of rows
@@ -512,23 +537,23 @@ class DataWorksheet:
         elif row_lengths.pop() != (self.n_fields + 1):
             LOGGER.critical('Data rows not of same length as field metadata - cannot validate')
             return
-        
+
         # Handle empty rows.
         blank_set = set([None])
         blank_row = [set(vals) == blank_set for vals in data_rows]
 
-        trailing_blank_row  = [all(blank_row[- (n + 1):]) 
+        trailing_blank_row  = [all(blank_row[- (n + 1):])
                                 for n in range(0, len(blank_row))]
         trailing_blank_row.reverse()
 
-        internal_blank_row = [blnk & (trail == False) 
+        internal_blank_row = [blnk & (trail == False)
                               for blnk, trail in zip(blank_row, trailing_blank_row)]
 
         # Internals within a set of row are automatically bad, but trailing blank
         # rows are only bad if more data is loaded below them.
         if any(internal_blank_row):
             self.blank_rows = True
-        
+
         if not self.trailing_blank_rows and any(trailing_blank_row):
             self.trailing_blank_rows = True
         elif self.trailing_blank_rows and not all(trailing_blank_row):
@@ -544,7 +569,7 @@ class DataWorksheet:
             return
         else:
             self.n_row += n_row
-        
+
         data_cols = list(zip(*data_rows))
         row_numbers = data_cols.pop(0)
 
@@ -553,16 +578,16 @@ class DataWorksheet:
 
         if not row_numbers:
             self.row_numbers_missing = True
-        
+
         row_numbers = row_numbers.values
-        
+
         if any([not isinstance(vl, int) for vl in row_numbers]):
             self.row_numbers_noninteger = True
-        
+
         # Check the row numbering - skip if this has already failed or
         # the row numbers have already included None or non-integers
         if self.row_numbers_sequential and not (self.row_numbers_noninteger or self.row_numbers_missing):
-            expected_numbers = list(range(self.current_row, 
+            expected_numbers = list(range(self.current_row,
                                            self.current_row + len(row_numbers)))
             self.current_row += len(row_numbers)
 
@@ -578,11 +603,11 @@ class DataWorksheet:
     @loggerinfo_push_pop('Validating field data')
     def report(self):
         """ The validate_data_rows method accumulates logging messages
-        individual fields. This method causes these field logs to be 
+        individual fields. This method causes these field logs to be
         emitted and then carries out final checks and reporting across
         all of the field data.
         """
-        
+
         if not self.n_row:
             if self.external is None:
                 LOGGER.error('No data passed for validation.')
@@ -596,13 +621,13 @@ class DataWorksheet:
         # Report on row numbering
         if self.row_numbers_missing:
             LOGGER.error("Missing row numbers in data")
-        
+
         if self.row_numbers_noninteger:
             LOGGER.error("Row numbers contain non-integer values")
 
         if not (self.row_numbers_noninteger or self.row_numbers_missing) and not self.row_numbers_sequential:
             LOGGER.error("Row numbers not consecutive or do not start with 1")
-        
+
         # Internal blank rows?
         if self.blank_rows:
             LOGGER.error("Data contains empty rows")
@@ -621,7 +646,7 @@ class DataWorksheet:
     @loggerinfo_push_pop('Loading from worksheet')
     def load_from_worksheet(self, worksheet: worksheet, row_chunk_size=1000):
         """Populate a Dataworksheet instance from an openpyxl worksheet
-        
+
         This method takes a fresh Dataworksheet instance and populates the
         details using the contents of a SAFE formatted Excel spreadsheet.
 
@@ -632,7 +657,7 @@ class DataWorksheet:
         on standard Worksheets.
 
         Args:
-            worksheet: 
+            worksheet:
             row_chunk_size:
         """
 
@@ -654,7 +679,7 @@ class DataWorksheet:
             LOGGER.error('Worksheet is empty')
             return
 
-        # Read the field metadata first: 
+        # Read the field metadata first:
         # - There should be rows starting with a string and then rows starting with
         #   a number, or a StopIteration at the end of the row iterator.
         ws_rows = worksheet.iter_rows(values_only=True)
@@ -680,13 +705,13 @@ class DataWorksheet:
         # Load and validate chunks of data
         n_chunks = ((max_row -  self.n_descriptors) // row_chunk_size) + 1
         for chunk in range(n_chunks):
-            
+
             # itertools.islice handles generators and StopIteration, and also
             # trap empty slices
             data = list(islice(data_rows, row_chunk_size))
             if data:
                 self.validate_data_rows(data)
-        
+
         # Finish up
         self.report()
 
@@ -695,19 +720,19 @@ class DataWorksheet:
 
         # TODO CHECK THIS!
         row_sample = len(MANDATORY_DESCRIPTORS) + len(OPTIONAL_DESCRIPTORS) + 10
-        
+
         field_meta = [r for r in ws_rows]
-        
+
         # Get the sequence of column types
         first_column_types = [type(v[0]) for v in field_meta]
         first_column_rle = [(v, len(list(g))) for v, g in groupby(first_column_types, None)]
         first_column_type_seq = [v[0] for v in first_column_rle]
 
-        # Forbid anything except a narrow set of type sequences: 
-        # * descriptor only, 
-        # * descriptors + row numbers, 
+        # Forbid anything except a narrow set of type sequences:
+        # * descriptor only,
+        # * descriptors + row numbers,
         # * descriptors + blanks, and
-        # * descriptors + row numbers + blanks. 
+        # * descriptors + row numbers + blanks.
         #
         # Basically strings, then maybe integers. However, terminal blanks
         # probably indicate unnumbered data rows, so those are allowed through
@@ -763,7 +788,7 @@ class DataWorksheet:
     def to_dict(self):
         """Method to return a dictionary representation of a DataWorksheet
         instance"""
-        
+
         output = dict(taxa_fields = self.taxa_fields,
                       max_row = self.n_row + self.n_descriptors ,
                       max_col = self.n_fields,
@@ -775,14 +800,14 @@ class DataWorksheet:
                       fields = [field_to_dict(fld, idx + 1) for idx, fld in enumerate(self.fields)],
                       field_name_row = self.n_descriptors,
                       n_data_row = self.n_row)
-        
+
         return output
 
 
 class BaseField:
 
     # Class instances describe the field_types handled by the class
-    # and sets the required descriptors for those field_types. The 
+    # and sets the required descriptors for those field_types. The
     # no_validation variable is used to suppress data validation for
     # use on e.g. comments fields.
 
@@ -792,10 +817,10 @@ class BaseField:
     check_taxon_meta = False
     check_interaction_meta = False
 
-    def __init__(self, meta: dict, 
+    def __init__(self, meta: dict,
                  dwsh: DataWorksheet = None,
                  dataset: Dataset = None) -> None:
-        
+
         """
         Base class to check field metadata and then test whether the data
         contents of a field are compatible with the metadata for the field.
@@ -820,7 +845,7 @@ class BaseField:
         and kwargs, the BaseField class makes all information available to all
         subclasses.
 
-        Args: 
+        Args:
             meta: A dictionary of field metadata
             dwsh: A DataWorksheet instance, used to pass worksheet level
                 information, which at the moment is just taxa fields.
@@ -831,7 +856,7 @@ class BaseField:
 
         self.meta = meta
         self.dwsh = dwsh
-        
+
         self.taxa = None
         self.locations = None
         self.summary = None
@@ -839,6 +864,7 @@ class BaseField:
         # Shortcuts to main components
         self.dataset = dataset
         if self.dataset:
+            # HOW DO I OVER WRITE THIS????
             self.taxa = getattr(self.dataset, 'taxa')
             self.locations = getattr(self.dataset, 'locations')
             self.summary = getattr(self.dataset, 'summary')
@@ -863,13 +889,13 @@ class BaseField:
             else:
                 self.field_name = f"Column_{get_column_letter(idx)}"
 
-        # Now check required descriptors - values are present, non-blank and 
+        # Now check required descriptors - values are present, non-blank and
         # are unpadded strings (currently all descriptors are strings).
         for dsc in self.required_descriptors:
             self._check_meta(dsc)
-        
+
         # Specific check that field name is valid - the column letter codes are
-        # always valid, so missing names won't trigger this. 
+        # always valid, so missing names won't trigger this.
         # _check_meta has already tested and logged non-string errors, so
         # only test here for strings that fail.
         if isinstance(self.field_name, str) and not valid_r_name(self.field_name):
@@ -877,11 +903,11 @@ class BaseField:
                       "Common errors are spaces and non-alphanumeric "
                       "characters other than underscore and full stop")
 
-        # TODO - rethink implementation? Quite specific behaviour unique to 
+        # TODO - rethink implementation? Quite specific behaviour unique to
         #        some fields, so could implement as overloaded extra stub.
         if self.check_taxon_meta:
             self._check_taxon_meta()
-        
+
         if self.check_interaction_meta:
             self._check_interaction_meta()
 
@@ -892,13 +918,13 @@ class BaseField:
     def _check_meta(self, descriptor):
         """
         A standardised checker to see if a required descriptor is present for
-        a field and that it isn't simply empty or whitespace. Messages are 
+        a field and that it isn't simply empty or whitespace. Messages are
         added to the log_stack if required.
 
         Args:
             meta: A dictionary of field metadata descriptors
             descriptor: The name of the descriptor to check.
-        
+
         Returns:
             A boolean, with True showing no problems and False showing
             that warnings occurred.
@@ -909,7 +935,7 @@ class BaseField:
             return False
 
         val = self.meta[descriptor]
-        
+
         if blank_value(val):
             self._log(f'{descriptor} descriptor is blank')
             self.meta[descriptor] = None  # standardise whitestring to None
@@ -930,7 +956,7 @@ class BaseField:
         Checks the taxonomic metadata of abundance and trait fields. This is
         more involved that the simple _check_meta(), because of the option to
         provide taxon_name or taxon_field descriptors.
-        
+
         Returns:
             A boolean, with True showing no problems and False showing that
             warnings occurred.
@@ -983,7 +1009,7 @@ class BaseField:
         Args:
             meta: A dictionary of metadata descriptors for the field
             taxa_fields: A list of Taxa fields in this worksheet.
-        
+
         Returns:
             A boolean, with True showing no problems and False showing that
             warnings occurred.
@@ -1030,7 +1056,7 @@ class BaseField:
             else:
 
                 nm_check = True
-            
+
             iact_nm_lab = iact_nm_lab.values
         else:
             iact_nm_lab = []
@@ -1048,7 +1074,7 @@ class BaseField:
                 fd_check = False
             else:
                 fd_check = True
-            
+
             iact_fd_lab = iact_fd_lab.values
         else:
             iact_fd_lab = []
@@ -1063,7 +1089,7 @@ class BaseField:
 
         all_desc = iact_nm_desc + iact_fd_desc
         if None in all_desc:
-            self._log('Label descriptions for interacting taxa incomplete or missing', 
+            self._log('Label descriptions for interacting taxa incomplete or missing',
                       WARNING)
 
         if nm_check and fd_check and num_check:
@@ -1080,11 +1106,11 @@ class BaseField:
         Returns:
             A list of two tuples of label and descriptions.
         """
-        
+
         # remove terminal semi-colon, if used.
         if txt.endswith(';'):
             txt = txt[:-1]
-        
+
         # - split the text up by semi-colon
         parts = txt.split(';')
 
@@ -1132,7 +1158,7 @@ class BaseField:
         field_type_map = {}
 
         # Create a stack starting with the calling class
-        classes = cls.__subclasses__() 
+        classes = cls.__subclasses__()
 
         # Pop subclasses while the stack is not empty
         while classes:
@@ -1141,7 +1167,7 @@ class BaseField:
 
             # Add any subclasses from that class
             classes.extend(current_field_class.__subclasses__())
-            
+
             # Extend the field map
             for ftype in current_field_class.field_types:
                 field_type_map.update({ftype: current_field_class})
@@ -1150,7 +1176,7 @@ class BaseField:
 
 
     def validate_data(self, data: list):
-        """Validates a list of data provided for a field. 
+        """Validates a list of data provided for a field.
 
         This method runs the common shared validation and returns the cleaned
         values, excluding blanks, NA and any Excel errors.
@@ -1161,11 +1187,11 @@ class BaseField:
 
             data = super().validate_data(data)
         """
-        
+
         if self.no_validation:
             return
 
-        # Unless any input is ok (comments fields, basically) filter out 
+        # Unless any input is ok (comments fields, basically) filter out
         # missing and blank data. Also check for Excel formula errors.
         self.n_rows += len(data)
 
@@ -1179,10 +1205,10 @@ class BaseField:
         if not data:
             self.n_blank += len(data.failed)
 
-        # Look for formula errors: 
+        # Look for formula errors:
 
         # With openpyxl, using data_only=False loads function cells with
-        # data_type = 'f', but using data_only=True returns cells with a 
+        # data_type = 'f', but using data_only=True returns cells with a
         # data_type for the resulting value _or_ an 'e' code for a function
         # error. Using value_only=True in iter_row for speed loses that cue,
         # so the values simply come back as a strings that have to be matched
@@ -1212,8 +1238,8 @@ class BaseField:
         # Emit the accumulated messages
         for log_level, msg, extra in self.log_stack:
             LOGGER.log(log_level, msg, extra=extra)
-        
-        # Run any final logging 
+
+        # Run any final logging
         # - warn about NAs
         if self.n_na:
             LOGGER.warning(f'{self.n_na} / {self.n_rows} values missing')
@@ -1229,14 +1255,14 @@ class BaseField:
         FORMATTER.pop()
 
 def field_to_dict(fld: Type[BaseField], col_idx: int) -> dict:
-    """Function to return a dictionary representation of a field object. This 
-    would more naturally be a method of BaseField, but needs to include the 
+    """Function to return a dictionary representation of a field object. This
+    would more naturally be a method of BaseField, but needs to include the
     extended attributes of subclasses of BaseField
-    
+
     Args:
         fld: An instance inheriting from BaseField
         col_idx: The column index of the field
-    
+
     Returns:
         A dictionary representation of the field attributes.
     """
@@ -1253,14 +1279,14 @@ def field_to_dict(fld: Type[BaseField], col_idx: int) -> dict:
                   interaction_name = None,
                   range = None,
                   col_idx = col_idx)
-    
+
     if hasattr(fld, 'units'):
                   output['units'] = getattr(fld, 'units')
                   output['method'] = getattr(fld, 'method')
 
     if hasattr(fld, 'levels'):
                   output['levels'] = getattr(fld, 'levels')
-    
+
     if hasattr(fld, 'taxon_field'):
                   output['levels'] = getattr(fld, 'taxon_field')
 
@@ -1269,7 +1295,7 @@ def field_to_dict(fld: Type[BaseField], col_idx: int) -> dict:
 
     if hasattr(fld, 'interaction_field'):
                   output['interaction_field'] = getattr(fld, 'interaction_field')
-    
+
     if hasattr(fld, 'range'):
                   output['range'] = getattr(fld, 'range')
 
@@ -1295,9 +1321,9 @@ class NumericField(BaseField):
     required_descriptors = MANDATORY_DESCRIPTORS + ['method', 'units']
 
     def validate_data(self, data: list):
-        
+
         data = super().validate_data(data)
-        
+
         numeric = IsNumber(data)
 
         if not numeric:
@@ -1312,7 +1338,7 @@ class CategoricalField(BaseField):
     field_types = ('categorical', 'ordered categorical')
     required_descriptors = MANDATORY_DESCRIPTORS + ['levels']
 
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None,
                  dataset: Dataset = None) -> None:
 
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
@@ -1322,7 +1348,7 @@ class CategoricalField(BaseField):
         self.level_labels = set()
         self.reported_levels = set()
         levels = meta.get('levels')
-        
+
         if levels is not None and isinstance(levels, str) and not levels.isspace():
             level_labels, level_desc = self._parse_levels(levels)
             self.level_labels = set(level_labels)
@@ -1364,16 +1390,16 @@ class TaxaField(BaseField):
 
     field_types = ('taxa',)
 
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None,
                  dataset: Dataset = None) -> None:
 
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.taxa is None:
             self._log('No taxon details provided for dataset')
-        
+
         self.taxa_found = set()
-    
+
     def validate_data(self, data: list):
 
         data = super().validate_data(data)
@@ -1386,7 +1412,7 @@ class TaxaField(BaseField):
         if self.taxa is not None:
             self.taxa_found.update(data)
             self.taxa.taxon_names_used.update(data)
-    
+
     def report(self):
 
         super().report()
@@ -1395,7 +1421,7 @@ class TaxaField(BaseField):
         if self.taxa_found == set():
             LOGGER.error('No taxa loaded')
             return
-        
+
         if self.taxa is not None:
             extra_taxa = self.taxa_found.difference(self.taxa.taxon_names)
 
@@ -1415,16 +1441,16 @@ class LocationsField(BaseField):
 
     field_types = ('locations', 'location')
 
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None,
                  dataset: Dataset = None) -> None:
 
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.locations is None:
             self._log('No location details provided for dataset')
-        
+
         self.locations_found = set()
-    
+
     def validate_data(self, data: list):
 
         data = super().validate_data(data)
@@ -1441,7 +1467,7 @@ class LocationsField(BaseField):
         if self.locations is not None:
             self.locations_found.update(data)
             self.locations.locations_used.update(data)
-    
+
     def report(self):
 
         super().report()
@@ -1450,7 +1476,7 @@ class LocationsField(BaseField):
         if self.locations_found == set():
             LOGGER.error('No locations loaded')
             return
-        
+
         if self.locations is not None:
             extra_locs = self.locations_found.difference(self.locations.locations)
 
@@ -1468,7 +1494,7 @@ class GeoField(BaseField):
 
     def __init__(self, meta: dict, dwsh: DataWorksheet = None,
                  dataset: Dataset = None) -> None:
-        
+
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.dataset is None:
@@ -1476,7 +1502,7 @@ class GeoField(BaseField):
 
         self.min = None
         self.max = None
-        
+
     def validate_data(self, data: list):
         """Testing of the data range is deferred to report() to avoid
         triggering logging from the Extent objects until data loading is
@@ -1490,9 +1516,9 @@ class GeoField(BaseField):
             self._log('Field contains non-numeric data')
 
             if any([RE_DMS.search(str(dt)) for dt in data.failed]):
-                self._log('Possible degrees minutes and seconds formatting? Use decimal degrees', 
+                self._log('Possible degrees minutes and seconds formatting? Use decimal degrees',
                           WARNING)
-        
+
         if data.values:
             self.min = min(data.values + [self.min]) if self.min else min(data.values)
             self.max = max(data.values + [self.max]) if self.max else max(data.values)
@@ -1503,7 +1529,7 @@ class GeoField(BaseField):
 
         if self.min is None or self.max is None:
             return()
-        
+
         if self.dataset is not None:
             if self.meta['field_type'] == 'latitude':
                 self.dataset.latitudinal_extent.update([self.min, self.max])
@@ -1568,9 +1594,9 @@ class TimeField(BaseField):
 
     field_types = ('time', )
 
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None,
                  dataset: Dataset = None) -> None:
-        
+
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         # Defaults
@@ -1579,11 +1605,11 @@ class TimeField(BaseField):
         self.expected_class = True
 
         self.bad_strings = []
-        self.min = None 
+        self.min = None
         self.max = None
 
     def validate_data(self, data: list):
-        
+
         data = super().validate_data(data)
 
         # TODO: report row number of issues - problem of mismatch between
@@ -1600,7 +1626,7 @@ class TimeField(BaseField):
             if not {datetime.time, str}.issuperset(cell_type_set):
                 self.expected_class = False
                 return
-            
+
             # Are the values internally consistent and consistent with
             # previously loaded data
             if len(cell_type_set) > 1:
@@ -1618,16 +1644,16 @@ class TimeField(BaseField):
         # There is no need to check time objects passed in, just time formatted
         # strings
         if self.first_data_class_set == {str}:
-            
+
             for val in data:
                 try:
                     _ = parser.isoparser().parse_isotime(val)
                 except ValueError:
                     self.bad_strings.append(val)
-            
-    
+
+
     def report(self):
-        
+
         super().report()
 
         if not self.expected_class:
@@ -1660,9 +1686,9 @@ class DatetimeField(BaseField):
 
     field_types = ('datetime', 'date')
 
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None,
                  dataset: Dataset = None) -> None:
-        
+
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.dataset is None:
@@ -1675,11 +1701,11 @@ class DatetimeField(BaseField):
         self.all_midnight = True
 
         self.bad_strings = []
-        self.min = None 
+        self.min = None
         self.max = None
 
     def validate_data(self, data: list):
-        
+
         data = super().validate_data(data)
 
         # TODO: report row number of issues - problem of mismatch between
@@ -1696,7 +1722,7 @@ class DatetimeField(BaseField):
             if not {datetime.datetime, str}.issuperset(cell_type_set):
                 self.expected_class = False
                 return
-            
+
             # Are the values internally consistent and consistent with
             # previously loaded data
             if len(cell_type_set) > 1:
@@ -1725,7 +1751,7 @@ class DatetimeField(BaseField):
                     parsed_strings.append(val_parse)
                 except ValueError:
                     self.bad_strings.append(val)
-            
+
             # standardised to datetime objects
             data = parsed_strings
 
@@ -1740,14 +1766,14 @@ class DatetimeField(BaseField):
             self.min = min(data)
         else:
             self.min = min([self.min] + data)
-        
+
         if self.max is None:
             self.max = min(data)
         else:
             self.max = max([self.max] + data)
-        
+
     def report(self):
-        
+
         super().report()
 
         # INconsistent and bad data classes
@@ -1788,22 +1814,22 @@ class FileField(BaseField):
 
     field_types = ('file',)
 
-    def __init__(self, meta: dict, dwsh: DataWorksheet = None, 
+    def __init__(self, meta: dict, dwsh: DataWorksheet = None,
                  dataset: Dataset = None) -> None:
-        
+
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         self.unknown_file_names = set()
 
         # Check whether filename testing is possible
         if self.summary is None:
-            self._log('No Summary instance provided - cannot check file fields', 
+            self._log('No Summary instance provided - cannot check file fields',
                       level=CRITICAL)
             return
         if self.summary.external_files is None:
             self._log('No external files listed in Summary')
             return
-        
+
         self.external_names = {ex['file'] for ex in self.summary.external_files}
 
         # Look for a file container metadata value, pointing to a single file
@@ -1820,14 +1846,14 @@ class FileField(BaseField):
         data = super().validate_data(data)
 
         # If the files are listed in external and not provided in a file
-        # container then check they are all present 
+        # container then check they are all present
         if not self.file_container:
             unknown_files = set(data) - self.external_names
             if unknown_files:
                 self.unknown_file_names.update(unknown_files)
 
     def report(self):
-        
+
         super().report()
 
         if self.unknown_file_names:
@@ -1841,7 +1867,7 @@ class EmptyField():
     from BaseField, so is never included in the BaseField.field_type_map."""
 
     def __init__(self, meta: dict) -> None:
-        
+
         self.meta = meta
         self.empty = True
 
@@ -1851,7 +1877,7 @@ class EmptyField():
 
         if not all(blank):
             self.empty = False
-    
+
     def report(self):
 
         # Get a field name - either a column letter from col_idx if set or 'Unknown'
@@ -1860,12 +1886,9 @@ class EmptyField():
             self.field_name = 'Unknown'
         else:
             self.field_name = f"Column_{get_column_letter(idx)}"
-        
+
         if not self.empty:
             LOGGER.info(f'Checking field {self.field_name}')
             FORMATTER.push()
             LOGGER.error('Trailing field with no descriptors contains data.')
             FORMATTER.pop()
-
-
-
