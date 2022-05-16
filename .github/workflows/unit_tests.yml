@@ -2,7 +2,6 @@ name: Python unit tests
 
 on: [push, pull_request]
 
-
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -23,6 +22,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 pytest
           pip install -r requirements.txt
+      - name: Check branch
+        run: |
+          echo "SDV_NO_REMOTE=False" >> $GITHUB_ENV
+        if: startsWith(github.ref, 'refs/heads/release-')
       - name: Test with pytest
         run: |
-          pytest
+          pytest test/test_ncbi_taxa.py::test_id_lookup

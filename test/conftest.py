@@ -68,6 +68,13 @@ parameterisation as well as within tests, and using fixture values in
 parameterisation is clumsy and complex.
 """
 
+def _skip_remote(validator):
+    # For remote validators check if SDV_NO_REMOTE has been set
+    if (type(validator) == RemoteNCBIValidator or
+        type(validator) == RemoteGBIFValidator):
+        if os.getenv('SDV_NO_REMOTE') is None:
+            pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
+
 
 def log_check(caplog, expected_log):
     """

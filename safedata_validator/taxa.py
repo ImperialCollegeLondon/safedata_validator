@@ -944,7 +944,7 @@ class RemoteNCBIValidator:
         # Set up while loop to make the request up to 5 times if neccessary
         success = False
         att = 0
-        while success == False and att < 5:
+        while success == False and att < 10:
             # Increment counter and make the request
             att += 1
             recrd = requests.get(url)
@@ -997,7 +997,7 @@ class RemoteNCBIValidator:
         # Set up while loop to make the request up to 5 times if neccessary
         success = False
         att = 0
-        while success == False and att < 5:
+        while success == False and att < 10:
             # Increment counter and make the request
             att += 1
             recrd = requests.get(url)

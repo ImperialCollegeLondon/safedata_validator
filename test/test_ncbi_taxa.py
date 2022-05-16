@@ -3,7 +3,7 @@ import copy
 from safedata_validator import taxa
 from safedata_validator.resources import Resources
 from logging import ERROR, WARNING, INFO
-from .conftest import log_check
+from .conftest import log_check, _skip_remote
 
 # ------------------------------------------
 # Testing NCBITaxon
@@ -222,6 +222,9 @@ def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     """This test checks the expected results of looking up a specific NCBI
     taxonomy ID against the actual returned taxonomy details.
     """
+
+    # check if remote test should be skipped
+    _skip_remote(fixture_ncbi_validators)
 
     fnd_tx = fixture_ncbi_validators.id_lookup(**test_input)
 
