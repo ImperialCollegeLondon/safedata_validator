@@ -28,4 +28,4 @@ jobs:
         if: startsWith(github.ref, 'refs/heads/release-')
       - name: Test with pytest
         run: |
-          pytest test/test_ncbi_taxa.py::test_id_lookup
+          pytest

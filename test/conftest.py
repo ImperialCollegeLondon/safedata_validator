@@ -68,14 +68,6 @@ parameterisation as well as within tests, and using fixture values in
 parameterisation is clumsy and complex.
 """
 
-def _skip_remote(validator):
-    # For remote validators check if SDV_NO_REMOTE has been set
-    if (type(validator) == RemoteNCBIValidator or
-        type(validator) == RemoteGBIFValidator):
-        if os.getenv('SDV_NO_REMOTE') is None:
-            pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
-
-
 def log_check(caplog, expected_log):
     """
     This helper function checks that the captured log during a test
@@ -228,7 +220,10 @@ def resources_local_and_remote(request, resources_with_local_gbif, resources_wit
     """
 
     if request.param == 'remote':
-        return resources_with_remote_gbif
+        if os.getenv('SDV_NO_REMOTE') is None:
+            pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
+        else:
+            return resources_with_remote_gbif
     elif request.param == 'local':
         return resources_with_local_gbif
 
@@ -259,7 +254,10 @@ def ncbi_resources_local_and_remote(request, resources_with_local_ncbi, resource
     """
 
     if request.param == 'remote':
-        return resources_with_remote_ncbi
+        if os.getenv('SDV_NO_REMOTE') is None:
+            pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
+        else:
+            return resources_with_remote_ncbi
     elif request.param == 'local':
         return resources_with_local_ncbi
 
@@ -306,19 +304,24 @@ def fixture_taxon_validators(resources_with_local_gbif, request):
     """Parameterised fixture to return local and remote taxon validators
     """
     if request.param == 'remote':
-        return RemoteGBIFValidator()
+        if os.getenv('SDV_NO_REMOTE') is None:
+            pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
+        else:
+            return RemoteGBIFValidator()
 
     elif request.param == 'local':
         return LocalGBIFValidator(resources_with_local_gbif)
 
 
-# Only returns a NCBI validator at the moment
 @pytest.fixture(params=['remote', 'local'])
 def fixture_ncbi_validators(resources_with_local_ncbi, resources_with_remote_ncbi, request):
     """Parameterised fixture to return local and remote NCBI validator
     """
     if request.param == 'remote':
-        return RemoteNCBIValidator(resources_with_remote_ncbi)
+        if os.getenv('SDV_NO_REMOTE') is None:
+            pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
+        else:
+            return RemoteNCBIValidator(resources_with_remote_ncbi)
 
     elif request.param == 'local':
         return LocalNCBIValidator(resources_with_local_ncbi)
