@@ -9,8 +9,9 @@ containing data using SAFE data formatting  and report on any problems. The code
 validates:
 
   1. The data submission formatting of the file.
-  1. All taxonomic names against the [GBIF taxonomy
-     database](../install/gbif_validation.md).
+  1. All taxonomic names against either the [GBIF taxonomy
+     database](../install/gbif_validation.md) or the [NCBI taxonomy
+     database](../install/ncbi_validation.md).
   1. All location names against the SAFE Gazetteer.
 
 This package is used to validate datasets submitted online to a SAFE data
@@ -71,7 +72,7 @@ shown above or a static local JSON file to provide faster and offline use:
 If you  want to speed up taxon checking and allow offline use then you will need
 to download a copy of the backbone taxonomy and build a SQLite3 database from
 it. Using a local database is  much faster than using the GBIF API online. This
-isn't particularly hard and is described in detail [here](build_local_gbif.md),
+isn't particularly hard and is described in detail [here](../install/build_local_gbif.md),
 but the resulting database is around 1.6GB, so you'll need file space!
 
 Once you have this file, you can use it like this:
