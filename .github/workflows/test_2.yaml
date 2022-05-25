@@ -14,4 +14,4 @@ jobs:
     steps:
       - name: Echo value
         run: |
-          echo ${{ jobs.build.strategy.max-parallel}}
+          echo ${{ job.build.strategy.max-parallel}}
