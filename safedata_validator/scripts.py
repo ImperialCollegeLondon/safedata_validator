@@ -83,6 +83,7 @@ def _safedata_zenodo_cli():
     desc = textwrap.dedent(_safedata_zenodo_cli.__doc__)
     fmt = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
+    
     parser.add_argument('-d', '--debug', action='store_true', 
                         help="Show debugging for resource loading")
     parser.add_argument('-r', '--resources', type=str, default=None,
@@ -126,7 +127,7 @@ def _safedata_zenodo_cli():
     parser_upload.add_argument('--zenodo_filename', type=str, default=None, 
                                 help='An optional alternative file name to be used on Zenodo')
 
-   # Delete_file subcommand
+    # Delete_file subcommand
     delete_desc="""Delete an uploaded file from an unpublished deposit. The
     deposit metadata will be re-downloaded to ensure an up to date list of files
     in the deposit.

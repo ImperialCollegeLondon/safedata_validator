@@ -242,7 +242,7 @@ def upload_metadata(metadata: dict,
         {ky: auth[ky] for ky in auth if auth[ky] is not None and ky != 'email'}
         for auth in metadata['authors']]
 
-    zen_md['metadata']['description'] = dataset_description(metadata, zenodo, render=True)
+    zen_md['metadata']['description'] = dataset_description(metadata, zenodo, render=True, resources=resources)
 
     simplejson.dump(zen_md, open('tmpzenmd.json', 'w'), indent="   ")
 
@@ -522,11 +522,12 @@ def post_metadata(metadata: dict,
     payload = {'metadata': metadata, 'zenodo': zenodo}
 
     # post the metadata to the server
-    mtd = requests.post(zres['mdapi'], 
+    mtd = requests.post(f"{zres['mdapi']}/post_metadata", 
                         params={'token': zres['mdtoken']}, 
                         json=payload)
 
     # trap errors in uploading metadata and tidy up
+    print(mtd.content)
     if mtd.status_code != 200:
         return None, mtd.content
     else:
@@ -700,7 +701,7 @@ def dataset_description(metadata: dict,
                               for pmt in metadata['permits']]))
 
     # XML link
-    xml_url = f"{metadata_api}/api/xml/{zenodo['record_id']}"
+    xml_url = f"{metadata_api}/xml/{zenodo['record_id']}"
 
     desc += tags.p(
                 tags.b('XML metadata: '),
