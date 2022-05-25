@@ -6,7 +6,7 @@ jobs:
   test_the_setup:
     runs-on: ${{ matrix.os }}
     env:
-      SDV_NO_REMOTE: ${{ ! [(contains(github.ref, 'master') || contains(github.ref, 'release')) ] }}
+      SDV_NO_REMOTE: ${{ ! ((contains(github.ref, 'master') || contains(github.ref, 'release'))  }}
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON('[12, 1]')[ env.SDV_NO_REMOTE ] }}
