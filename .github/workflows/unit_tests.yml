@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   branch_check:
-    runs-on: ubuntu-latest
+    runs-on: [ubuntu-latest, windows-latest]
     outputs:
       release: ${{ steps.check.outputs.release }}
     steps:
@@ -16,7 +16,6 @@ jobs:
     needs: branch_check
     concurrency:
       group: ${{ needs.branch_check.outputs.release || github.run_id }}
-      cancel-in-progress: true
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
