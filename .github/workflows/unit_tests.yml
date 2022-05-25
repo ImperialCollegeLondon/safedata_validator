@@ -4,17 +4,14 @@ on: [push, pull_request]
 
 jobs:
   branch_check:
-    runs-on: ${{ matrix.os }}
-    strategy:
-       matrix:
-         os: [ubuntu-latest, windows-latest]
+    runs-on: ubuntu-latest
     outputs:
       release: ${{ steps.check.outputs.release }}
     steps:
       - uses: actions/checkout@v3
       - id: check
         run: echo "::set-output name=release::False"
-        if: startsWith(github.ref, 'refs/heads/refactor')
+        if: startsWith(github.ref, 'refs/heads/release')
   build:
     needs: branch_check
     concurrency:
@@ -38,9 +35,10 @@ jobs:
           pip install flake8 pytest
           pip install -r requirements.txt
       - name: Set remote testing flag
+        shell: bash
         run: |
           echo "SDV_NO_REMOTE=${{needs.branch_check.outputs.release}}" >> $GITHUB_ENV
-        if: startsWith(github.ref, 'refs/heads/refactor')
+        if: startsWith(github.ref, 'refs/heads/release')
       - name: Test with pytest
         run: |
           pytest
