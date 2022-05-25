@@ -1,6 +1,6 @@
 name: David test
 
-on: [pull_request]
+on: [push, pull_request]
 
 jobs:
   test_the_setup:
