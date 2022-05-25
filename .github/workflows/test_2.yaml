@@ -9,7 +9,7 @@ jobs:
       SDV_NO_REMOTE: ${{ ! (contains(github.ref, 'master') || contains(github.ref, 'release'))  }}
     strategy:
       fail-fast: false
-      # max-parallel: ${{ fromJSON('[12, 1]')[ jobs.test_the_setup.env.SDV_NO_REMOTE ] }}
+      max-parallel: ${{ fromJSON('[12, 1]')[ env.SDV_NO_REMOTE ] }}
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         os: [ubuntu-latest, macos-latest, windows-latest]
