@@ -1,0 +1,17 @@
+name: David test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ ${{ fromJSON('[12, 1]')[(contains(github.ref, 'master') || contains(github.ref, 'release')) ] }} }}
+      matrix:
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Echo value
+        run: |
+          echo ${{ jobs.build.strategy.max-parallel}}
