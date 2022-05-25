@@ -1,6 +1,6 @@
 name: David test
 
-on: [push, pull_request]
+on: [pull_request]
 
 jobs:
   build:
@@ -14,4 +14,3 @@ jobs:
     steps:
       - name: Dump strategy context
         run: echo '${{ toJSON(strategy) }}'
-
