@@ -1,7 +1,5 @@
 name: Python unit tests
 
-on: [push, pull_request]
-
 jobs:
   branch_check:
     runs-on: ubuntu-latest

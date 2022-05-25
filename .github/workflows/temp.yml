@@ -1,4 +1,4 @@
-name: Python unit tests
+name: Parallel trial
 
 on: [push, pull_request]
 
@@ -7,7 +7,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      max-parallel: ${{ (contains(github.ref, 'master') || contains(github.ref, 'release')) || 12 }}
+      max-parallel: ${{ (contains(github.ref, 'refactor') || contains(github.ref, 'release')) || 12 }}
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         os: [ubuntu-latest, macos-latest, windows-latest]
