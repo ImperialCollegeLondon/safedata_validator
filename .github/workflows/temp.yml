@@ -4,7 +4,6 @@ on: [push, pull_request]
 
 jobs:
   build:
-    needs: branch_check
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
