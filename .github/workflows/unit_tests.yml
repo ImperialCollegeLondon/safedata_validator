@@ -4,7 +4,10 @@ on: [push, pull_request]
 
 jobs:
   branch_check:
-    runs-on: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    strategy:
+       matrix:
+         os: [ubuntu-latest, windows-latest]
     outputs:
       release: ${{ steps.check.outputs.release }}
     steps:
