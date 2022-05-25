@@ -3,7 +3,20 @@ name: Python unit tests
 on: [push, pull_request]
 
 jobs:
+  branch_check:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.check.outputs.release }}
+    steps:
+      - uses: actions/checkout@v3
+      - id: check
+        run: echo "::set-output name=release::False"
+        if: startsWith(github.ref, 'refs/heads/refactor')
   build:
+    needs: branch_check
+    concurrency:
+      group: ${{ needs.branch_check.outputs.release || github.run_id }}
+      cancel-in-progress: true
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -22,10 +35,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 pytest
           pip install -r requirements.txt
-      - name: Check branch
+      - name: Set remote testing flag
         run: |
-          echo "SDV_NO_REMOTE=False" >> $GITHUB_ENV
-        if: startsWith(github.ref, 'refs/heads/release-')
+          echo "SDV_NO_REMOTE=${{needs.branch_check.outputs.release}}" >> $GITHUB_ENV
+        if: startsWith(github.ref, 'refs/heads/refactor')
       - name: Test with pytest
         run: |
           pytest
