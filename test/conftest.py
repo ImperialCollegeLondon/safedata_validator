@@ -220,7 +220,7 @@ def resources_local_and_remote(request, resources_with_local_gbif, resources_wit
     """
 
     if request.param == 'remote':
-        if os.getenv('SDV_NO_REMOTE') is None:
+        if os.getenv('SDV_NO_REMOTE') is None || "true":
             pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
         else:
             return resources_with_remote_gbif
@@ -254,7 +254,7 @@ def ncbi_resources_local_and_remote(request, resources_with_local_ncbi, resource
     """
 
     if request.param == 'remote':
-        if os.getenv('SDV_NO_REMOTE') is None:
+        if os.getenv('SDV_NO_REMOTE') is None || "true":
             pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
         else:
             return resources_with_remote_ncbi
