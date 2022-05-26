@@ -1,9 +1,14 @@
 import pytest
 import copy
+import os
 from safedata_validator import taxa
 from safedata_validator.resources import Resources
 from logging import ERROR, WARNING, INFO
 from .conftest import log_check
+
+# Check that SDV_NO_REMOTE has not been set to an invalid parameter
+def test_sdv_no_remote_set_correctly():
+    assert os.getenv('SDV_NO_REMOTE') in [None, "0", "1", "false", "true", "False", "True"]
 
 # ------------------------------------------
 # Testing NCBITaxon
