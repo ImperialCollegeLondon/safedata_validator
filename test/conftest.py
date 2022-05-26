@@ -220,7 +220,7 @@ def resources_local_and_remote(request, resources_with_local_gbif, resources_wit
     """
 
     if request.param == 'remote':
-        if os.getenv('SDV_NO_REMOTE')  in [None, "true"]:
+        if os.getenv('SDV_NO_REMOTE') is "true":
             pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
         else:
             return resources_with_remote_gbif
@@ -254,7 +254,7 @@ def ncbi_resources_local_and_remote(request, resources_with_local_ncbi, resource
     """
 
     if request.param == 'remote':
-        if os.getenv('SDV_NO_REMOTE') in [None, "true"]:
+        if os.getenv('SDV_NO_REMOTE') is "true":
             pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
         else:
             return resources_with_remote_ncbi
@@ -304,7 +304,7 @@ def fixture_taxon_validators(resources_with_local_gbif, request):
     """Parameterised fixture to return local and remote taxon validators
     """
     if request.param == 'remote':
-        if os.getenv('SDV_NO_REMOTE') in [None, "true"]:
+        if os.getenv('SDV_NO_REMOTE') is "true":
             pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
         else:
             return RemoteGBIFValidator()
@@ -318,7 +318,7 @@ def fixture_ncbi_validators(resources_with_local_ncbi, resources_with_remote_ncb
     """Parameterised fixture to return local and remote NCBI validator
     """
     if request.param == 'remote':
-        if os.getenv('SDV_NO_REMOTE') in [None, "true"]:
+        if os.getenv('SDV_NO_REMOTE') is "true":
             pytest.skip('Remote testing turned off via SDV_NO_REMOTE')
         else:
             return RemoteNCBIValidator(resources_with_remote_ncbi)
