@@ -1,4 +1,4 @@
-# Build notes 
+# Build notes
 
 TODO Incomplete
 
@@ -81,4 +81,11 @@ In order to build and deploy the documentation.
   changes to the repository will automatically trigger a rebuild of the package
   documentation.
 
+## Disabling remote testing
 
+Due to request rate limiting by the online taxonomy databases (particularly NCBI)
+the tests that use remote validation run very slowly. Remote validation can therefore
+be disabled to speed up testing. This is done using the environmental parameter
+`SDV_NO_REMOTE`. This parameter can either be left undefined, set as "0", "false",
+or "False" to keep remote tests on. Or alternatively, it can be set to "1", "true"
+or "True" to turn remote testing off.
