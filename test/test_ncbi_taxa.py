@@ -441,41 +441,44 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
     # Basic case to begin with
     [(['E coli', {'genus': 'Escherichia', 'species': 'Escherichia coli'}, 562],
       (1, 1, 7, 'E coli', ['E coli'], [562], [561], ['Escherichia coli'], ['species'],
-       [False])),
+       ['accepted'])),
      # Incorrect genus but should be found fine
      (['E coli', {'genus': 'Escheria', 'species': 'Escherichia coli'}, 562],
       (1, 1, 7, 'E coli', ['E coli'], [562], [561], ['Escherichia coli'], ['species'],
-       [False])),
+       ['accepted'])),
      # Superseeded species name
      (['C vulpes', {'genus': 'Canis', 'species': 'Canis vulpes'}, None],
       (2, 1, 8, 'C vulpes', ['C vulpes', 'C vulpes'], [9627, 9627], [9625, 9625],
-       ['Canis vulpes', 'Vulpes vulpes'], ['species', 'species'], [True, False])),
+       ['Canis vulpes', 'Vulpes vulpes'], ['species', 'species'], ['merged', 'accepted'])),
      # Superseeded species name + ID
      (['C marina', {'species': 'Cytophaga marina'}, 1000],
       (2, 1, 7, 'C marina', ['C marina', 'C marina'], [1000, 107401], [104267, 104267],
-       ['Cytophaga marina', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False])),
+       ['Cytophaga marina', 'Tenacibaculum maritimum'], ['species', 'species'],
+       ['merged', 'accepted'])),
      # Superseeded ID
      (['T maritimum', {'species': 'Tenacibaculum maritimum'}, 1000],
       (2, 1, 7, 'T maritimum', ['T maritimum', 'T maritimum'], [1000, 107401], [104267, 104267],
-       ['Tenacibaculum maritimum', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False])),
+       ['Tenacibaculum maritimum', 'Tenacibaculum maritimum'], ['species', 'species'],
+       ['merged', 'accepted'])),
      # Superseeded name + correct ID
      (['C marina', {'species': 'Cytophaga marina'}, 107401],
       (2, 1, 7, 'C marina', ['C marina', 'C marina'], [107401, 107401], [104267, 104267],
-       ['Cytophaga marina', 'Tenacibaculum maritimum'], ['species', 'species'], [True, False])),
+       ['Cytophaga marina', 'Tenacibaculum maritimum'], ['species', 'species'],
+       ['merged', 'accepted'])),
      # Bacteria
      (['Bacteria', {'kingdom': 'Bacteria'}, 2],
-      (1, 1, 1, 'Bacteria', ['Bacteria'], [2], [None], ['Bacteria'], ['superkingdom'], [False])),
+      (1, 1, 1, 'Bacteria', ['Bacteria'], [2], [None], ['Bacteria'], ['superkingdom'], ['accepted'])),
      # Eukaryota
      (['Eukaryotes', {'superkingdom': 'Eukaryota'}, 2759],
       (1, 1, 1, 'Eukaryotes', ['Eukaryotes'], [2759], [None], ['Eukaryota'], ['superkingdom'],
-       [False])),
+       ['accepted'])),
      # Fungi
      (['Fungi', {'superkingdom': 'Eukaryota', 'kingdom': 'Fungi'}, 4751],
-      (1, 1, 2, 'Fungi', ['Fungi'], [4751], [2759], ['Fungi'], ['kingdom'], [False])),
+      (1, 1, 2, 'Fungi', ['Fungi'], [4751], [2759], ['Fungi'], ['kingdom'], ['accepted'])),
      # Unknown strain
      (['Unknown strain', {'species': 'Escherichia coli', 'strain': 'NBAvgdft'}, None],
       (1, 1, 7, 'Unknown strain', ['Unknown strain'], [-1], [562], ['NBAvgdft'],
-       ['strain'], [False])),
+       ['strain'], ['user'])),
     ])
 def test_validate_and_add_taxon(ncbi_resources_local_and_remote, test_input, expected):
     """This test checks the function to validate a taxon against the NCBI
@@ -741,26 +744,26 @@ def test_validate_and_add_taxon_errors(ncbi_resources_local_and_remote, test_inp
        543, 561], [561, None, 2, 1224, 1236, 91347, 543], ['Escherichia coli', 'Bacteria',
        'Proteobacteria', 'Gammaproteobacteria', 'Enterobacterales', 'Enterobacteriaceae',
        'Escherichia'], ['species', 'superkingdom', 'phylum', 'class', 'order', 'family', 'genus'],
-       [False, False, False, False, False, False, False])),
+       ['accepted', 'accepted', 'accepted', 'accepted', 'accepted', 'accepted', 'accepted'])),
      # Superseeded ID
      (['T maritimum', {'species': 'Tenacibaculum maritimum'}, 1000],
       (8, 1, 7, 'T maritimum', ['T maritimum', 'T maritimum', None, None, None, None, None, None],
        [1000, 107401, 2, 976, 117743, 200644, 49546, 104267], [104267, 104267, None, 2, 976, 117743,
         200644, 49546], ['Tenacibaculum maritimum', 'Tenacibaculum maritimum', 'Bacteria',
         'Bacteroidetes', 'Flavobacteriia', 'Flavobacteriales', 'Flavobacteriaceae', 'Tenacibaculum'],
-        ['species', 'species', 'superkingdom', 'phylum', 'class', 'order', 'family', 'genus'], [True,
-        False, False, False, False, False, False, False])),
+        ['species', 'species', 'superkingdom', 'phylum', 'class', 'order', 'family', 'genus'], ['merged',
+        'accepted', 'accepted', 'accepted', 'accepted', 'accepted', 'accepted', 'accepted'])),
      # Bacteria
      (['Bacteria', {'kingdom': 'Bacteria'}, 2],
-      (1, 1, 1, 'Bacteria', ['Bacteria'], [2], [None], ['Bacteria'], ['superkingdom'], [False])),
+      (1, 1, 1, 'Bacteria', ['Bacteria'], [2], [None], ['Bacteria'], ['superkingdom'], ['accepted'])),
      # Eukaryota
      (['Eukaryotes', {'superkingdom': 'Eukaryota'}, 2759],
       (1, 1, 1, 'Eukaryotes', ['Eukaryotes'], [2759], [None], ['Eukaryota'], ['superkingdom'],
-       [False])),
+       ['accepted'])),
      # Fungi
      (['Fungi', {'superkingdom': 'Eukaryota', 'kingdom': 'Fungi'}, 4751],
       (2, 1, 2, 'Fungi', ['Fungi', None], [4751, 2759], [2759, None], ['Fungi', 'Eukaryota'],
-       ['kingdom', 'superkingdom'], [False, False])),
+       ['kingdom', 'superkingdom'], ['accepted', 'accepted'])),
     ])
 def test_index_higher_taxa(ncbi_resources_local_and_remote, test_input, expected):
     """This test checks the function to store higher taxonomic ranks for a taxon

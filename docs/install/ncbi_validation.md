@@ -19,3 +19,18 @@ We want three things from validation:
   rank immediately above. However, this isn't too much of a problem in the NCBI
   case as parent IDs are always supplied so a full taxon hierarchy can always be
   constructed, which can then be pruned to form a backbone hierarchy.
+
+Unlike NCBI does not provide status codes to taxa. As describes above it just
+merges outdated taxa names and taxa IDs with up to date names and IDs. Our
+validation proceed makes a note of where this happens. However, we do record
+status codes so that GBIF and NCBI taxonomic information can be stored in the
+same format. The three status codes we define are as follows:
+
+    accepted, merged, user
+
+The first of these (accepted) is for taxa found using a currently valid name or
+ID, the second of these (merged) is for valid taxa found using either a previously
+valid name or ID that has been merged with another name ID. Finally, 'user' is used
+for taxa that are not found in the NCBI database but have valid parent information.
+This is particularly useful for potentially novel taxa, i.e. ones defined by the
+user.

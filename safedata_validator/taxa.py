@@ -1869,7 +1869,7 @@ class NCBITaxa:
                  ncbi_parent_id (int),
                  canonical_name (str),
                  taxonomic_rank (str),
-                 taxon_superseeded (bool)]
+                 status (str)]
 
         We only populate orginal_taxon_rank when the initially supplied taxon is
         not found in NCBI, but a parent (or grandparent etc) is found. In this case
@@ -2206,7 +2206,7 @@ class NCBITaxa:
         if hr_taxon.orig != None:
             self.taxon_index.append([m_name, -1, hr_taxon.ncbi_id,
                                      list(taxon_hier.values())[-1], hr_taxon.orig,
-                                     False])
+                                     'user'])
         else:
             # Then check if taxon is superseeded
             if hr_taxon.superseed == True or (ncbi_id != None and id_taxon.superseed == True):
@@ -2228,12 +2228,12 @@ class NCBITaxa:
                 # Add superseeded taxon to the index
                 self.taxon_index.append([m_name, superseed_id, parent_id,
                                             superseed_name, hr_taxon.rank,
-                                            True])
+                                            'merged'])
 
             # Then (also) add non-superseeded taxon info to the index
             self.taxon_index.append([m_name, hr_taxon.ncbi_id, parent_id,
                                         hr_taxon.name, hr_taxon.rank,
-                                        False])
+                                        'accepted'])
 
         self.hierarchy.update(list(hr_taxon.taxa_hier.items()))
 
@@ -2267,7 +2267,7 @@ class NCBITaxa:
         for tx_lev, (tx_nme, tx_id, p_id) in to_add:
             # Add all this to the taxonomy
             self.taxon_index.append([None, tx_id, p_id, tx_nme, tx_lev,
-                                     False])
+                                     'accepted'])
             LOGGER.info(f'Added {tx_lev} {tx_nme}')
 
     def compare_hier(self, m_name: str, mtaxon: NCBITaxon, taxon_hier: dict):
