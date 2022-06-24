@@ -20,6 +20,7 @@ local_notes
 # build and dist
 build
 dist
+safedata_validator.egg-info
 
 # mkdocs local site build
 site

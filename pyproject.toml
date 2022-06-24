@@ -30,6 +30,10 @@ dotmap = "^1.3.30"
 configobj = "^5.0.6"
 sympy = "^1.10.1"
 lxml = "^4.9.0"
+enforce-typing = "^1.0.0"
+rispy = "^0.7.1"
+dominate = "^2.6.0"
+tqdm = "^4.64.0"
 
 [tool.poetry.dev-dependencies]
 pyfakefs = "^4.5.6"
