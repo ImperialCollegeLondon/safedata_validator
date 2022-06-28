@@ -6,7 +6,7 @@ NCBI taxonomy database.
 The two parallel Taxon dataclasses (GBIFTaxon and NCBITaxon) are used to store
 data about a taxon entry in a dataset. They are initialised with user data and
 then the relevant taxon Validator classes (GBIF or NCBI) can be used to update a
-Taxon object with the result of validaton against a particular database. Online
+Taxon object with the result of validation against a particular database. Online
 GBIF validation can be performed using the online API (`RemoteGBIFValidator`),
 whereas online NCBI validation makes use of the Entrez Eutils (`RemoteNCBIValidator`).
 Faster validation may be performed using local copies of the databases
@@ -2331,6 +2331,25 @@ class Taxa:
     def repeat_names(self):
         return self.gbif_taxa.taxon_names.intersection(self.ncbi_taxa.taxon_names)
 
+    @property
+    def combined_index(self):
+        # Preallocate the two indexes
+        gbif_index = []
+        ncbi_index = []
+
+        # Check whether each sheet has an index and extract if so
+        if not self.gbif_taxa.is_empty:
+            temp_index = self.gbif_taxa.taxon_index
+            for item in temp_index:
+                gbif_index.append(['GBIF'] + item)
+
+        if not self.ncbi_taxa.is_empty:
+            temp_index = self.ncbi_taxa.taxon_index
+            for item in temp_index:
+                ncbi_index.append(['NCBI'] + item)
+
+        return gbif_index + ncbi_index
+
 def taxon_index_to_text(taxon_index, html=False, indent_width=4):
     """
     Turns the taxon index from a GBIFTaxa instance into a text representation
@@ -2456,6 +2475,7 @@ def species_binomial(genus: str, species: str):
         LOGGER.error(f'Genus name ({genus}) appears to be too long')
         return None
 
+
 # Equivalent function to generate subspecies trinominal
 def subspecies_trinomial(species: str, subspecies: str):
     """A function to construct a subspecies trinomal from a species name and a
@@ -2469,7 +2489,7 @@ def subspecies_trinomial(species: str, subspecies: str):
         if "candidatus" in subspecies.lower():
             # Construct trinominal with first word of subspecies name removed
             tri = species.strip()
-            for i in range(1,len(subspecies.split())):
+            for i in range(1, len(subspecies.split())):
                 tri = tri + " " + subspecies.split()[i]
             return tri
         else:
