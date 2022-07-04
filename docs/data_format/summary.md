@@ -55,7 +55,7 @@ a single value for each field.
   to a project of which you are a member.
 * **Title**: This should be a short informative title for the dataset: it will
   be used as the public title for the dataset so make sure it is clear and
-  grammatical! 
+  grammatical!
 * **Description**: This will be the public description of the dataset. Note that you can
   have paragraphs of text within a single cell in Excel, so please do provide a
   reasonable summary. You will need to use Alt + Enter (or Alt + Shift + Enter on a Mac)
@@ -71,7 +71,7 @@ a single value for each field.
 
 !!! Warning "Mandatory block"
 
-    **Embargo date** is only required if the **Access status** value is 'Embargo'. 
+    **Embargo date** is only required if the **Access status** value is 'Embargo'.
     **Access conditions** is only required if the **Access status** value is 'Restricted'.
 
 This block provides the access details for the dataset. You can only provide a
