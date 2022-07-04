@@ -9,7 +9,7 @@ resources for data validation. This is done using a configuration file in the
 The file structure for the configuration file is a simple text file containing
 the details below:
 
-```
+```ini
 locations = /path/to/locations.json
 gbif_database = /path/to/local/backbone.sqlite3
 ncbi_database = /path/to/local/ncbi_database.sqlite3
@@ -35,14 +35,18 @@ downloaded from:
 
 [https://www.safeproject.net/api/validator_locations]("https://www.safeproject.net/api/validator_locations")
 
-The `gbif_database` value can be left empty (`gbif_database = `), in which case
+The `gbif_database` value can be left empty (`gbif_database =`), in which case
 the package will use the online GBIF API for taxon validation. Alternatively,
 the `gbif_database` entry can be used to point to a local copy of the GBIF
 backbone database, which is _very_ much faster but requires the database to be
 built (see [here](build_local_gbif))
 
-The `ncbi_database` value can also be left empty (`ncbi_database = `), in which case
-the package will access the online NCBI taxonomy database using the [Entrez system](https://www.ncbi.nlm.nih.gov/Web/Search/entrezfs.html). Alternatively, the `ncbi_database` entry can be used to point to a local copy of the NCBI database, which is _very_ much faster but requires the database to be built (see [here](build_local_ncbi)).
+The `ncbi_database` value can also be left empty (`ncbi_database =`), in which case the
+package will access the online NCBI taxonomy database using the [Entrez
+system](https://www.ncbi.nlm.nih.gov/Web/Search/entrezfs.html). Alternatively, the
+`ncbi_database` entry can be used to point to a local copy of the NCBI database, which
+is _very_ much faster but requires the database to be built (see
+[here](build_local_ncbi)).
 
 ### Extents
 
@@ -58,13 +62,11 @@ on geographic coordinates:
 * `latitudinal_hard_extent`: (-90, 90)
 * `longitudinal_hard_extent`: (-180, 180)
 
-
 ### Zenodo
 
 !!! Warning "In development"
 
-    These features are in development and are not yet functional.
-
+  These features are in development and are not yet functional.
 
 The `safedata_validator` package provides functionality for publishing validated
 datasets to the Zenodo data repository. In order to do this, the Zenodo

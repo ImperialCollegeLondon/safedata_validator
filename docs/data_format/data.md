@@ -2,7 +2,7 @@
 
 Finally, we get to the worksheets containing your actual data!
 
-# Field metadata
+## Field metadata
 
 The top rows of the worksheet are used to provide metadata descriptors for each
 of the columns ('fields') in your data worksheet. Each descriptor row has a
@@ -48,7 +48,7 @@ some data types (see the descriptions of the data types below). The options are:
 These descriptors only have to be completed for the appropriate data types:
 **leave them blank** for any fields that don't require them.
 
-# Missing data
+## Missing data
 
 If your data worksheets contain missing data, **you must enter 'NA' in those
 cells**, not just leave them blank. This is to make it absolutely unambiguous
@@ -58,13 +58,13 @@ that the species wasn't seen (so the cell should be zero) or that the trap for
 that species fell over and you don't know if it was recorded (so it should be
 NA).
 
-# Formula
+## Formula
 
 You must not submit datasets with formula calculations - obviously, feel free to
 use calculations when working with the data but please copy and paste 'As
 Values' before submitting the dataset.
 
-# Row numbers
+## Row numbers
 
 You **must** number the rows in your data worksheet. The row numbers must start
 at 1 in the cell directly under the `field_name` descriptor, increase by 1 as
@@ -73,40 +73,37 @@ containing data. The row numbers must not extend below the data: the template
 numbers rows down to 1000, so delete the numbers for any unused rows in your
 data!
 
-# Field types
+## Field types
 
 This section shows the options that can appear in the `field_type` descriptor,
 along with any further descriptors that might be needed. See the sections below
 for details on formatting, but the available types are:
 
- * **Date**, **Datetime** and **Time**: when were the data collected?
- * **Location**: where was the data collected?
- * **Latitude**, **Longitude**: GPS data for the exact location.
- * **Replicate**: a record of replication, usually just a repeating set of
-   numbers.
- * **ID**: a column showing any kind of identification code.
- * **Categorical**: otherwise known as a factor: a variable that puts data into
-   a fixed set of groups.
- * **Ordered Categorical**: a factor where there is a logical order to the
-   levels.
- * **Numeric**: all kinds of numeric data.
- * **Taxa**: what taxa was the data collected from?
- * **Abundance**: for abundance/density/presence data collected about a taxon.
- * **Categorical Trait**: for categorical data collected on a taxon.
- * **Numeric Trait**: for numeric data collected on a taxon.
- * **Categorical Interaction**: for categorical data on interactions between
-   taxa.
- * **Numeric Interaction**: for numeric data on interactions between taxa.
- * **File**: for references to external files in data tables.
- * **Comments**: for general comments about data.
+* **Date**, **Datetime** and **Time**: when were the data collected?
+* **Location**: where was the data collected?
+* **Latitude**, **Longitude**: GPS data for the exact location.
+* **Replicate**: a record of replication, usually just a repeating set of numbers.
+* **ID**: a column showing any kind of identification code.
+* **Categorical**: otherwise known as a factor: a variable that puts data into
+  a fixed set of groups.
+* **Ordered Categorical**: a factor where there is a logical order to the levels.
+* **Numeric**: all kinds of numeric data.
+* **Taxa**: what taxa was the data collected from?
+* **Abundance**: for abundance/density/presence data collected about a taxon.
+* **Categorical Trait**: for categorical data collected on a taxon.
+* **Numeric Trait**: for numeric data collected on a taxon.
+* **Categorical Interaction**: for categorical data on interactions between taxa.
+* **Numeric Interaction**: for numeric data on interactions between taxa.
+* **File**: for references to external files in data tables.
+* **Comments**: for general comments about data.
 
-## Date, Datetime and Time
+### Date, Datetime and Time
 
 We have three kinds of date and time fields!
 
- * **Datetime**: The data in the field includes **both a time and a date** (e.g.
-   21/05/2016 15:32), which could be a visit time and day to a site or when a
-   camera trap was deployed or similar data.
+* **Datetime**: The data in the field includes **both a time and a date** (e.g.
+  21/05/2016 15:32), which could be a visit time and day to a site or when a
+  camera trap was deployed or similar data.
 * **Date**: The data in the field **only specifies a date** (e.g. 21/05/2016).
 * **Time**: The data in the field **only specifies a time** (e.g. 15:32).
 
@@ -117,48 +114,48 @@ like) or as Excel date/time formats but again you can only use one of these
 formats within a field.
 
 1. **Text**. If the field contains text values then the checker will try to
-	interpret these as date/time values. We only support [ISO8601
-	format](https://en.wikipedia.org/wiki/ISO_8601), so the following are valid
-	examples:
+  interpret these as date/time values. We only support [ISO8601
+  format](https://en.wikipedia.org/wiki/ISO_8601), so the following are valid
+  examples:
 
-	* `2019-04-24 07:00:12`: a datetime value
-	* `2019-04-24`: a date value
-	* `07:00:12`: a time value
+    * `2019-04-24 07:00:12`: a datetime value
+    * `2019-04-24`: a date value
+    * `07:00:12`: a time value
 
 2. **Excel date and time format**. If the field contains Excel date/time cells
    then we will validate the contents of those cells.
 
 !!! Warning
 
-	Excel stores both date and time data as a single number and flags the cell
+    Excel stores both date and time data as a single number and flags the cell
     as containing a date/time value. Both date and time are stored in Excel as a
     single number (N: days since the beginning of January 1900). If N < 1 it
     represents a time, if N > 1 it is a date and if N > 1 and has a fractional
     part then it is a datetime.
 
-	However, the cell level formatting of dates and times can mislead you as to
+    However, the cell level formatting of dates and times can mislead you as to
     what is actually stored in a cell and this is a common cause of errors.
 
-	* 0.75 is the time `18:00`, but it could also display in Excel as
-	 `00/01/1900` or `00/01/1900 18:00` if formatted as a date. This is
-	 reasonably easy to spot because of the 0th of January!
+    * 0.75 is the time `18:00`, but it could also display in Excel as
+      `00/01/1900` or `00/01/1900 18:00` if formatted as a date. This is reasonably
+      easy to spot because of the 0th of January!
 
-	* 12.75 is the datetime `12/01/1900 18:00` but could display as the time `18:00` or as
-	 `12/01/1900`.
+    * 12.75 is the datetime `12/01/1900 18:00` but could display as the time `18:00` or
+      as `12/01/1900`.
 
-	* Unfortunately, integer values like 12 are ambiguous, because Excel doesn't
-	 differentiate between integer and float numbers: it could just refer to the
-	 day (the integer 12) or mean exactly midnight on the day (the float 12.0).
-	 So it could display perfectly sensibly as `12/01/1900 00:00` or
-	 `12/01/1900` but could also display more misleadingly as the time `00:00`.
+    * Unfortunately, integer values like 12 are ambiguous, because Excel doesn't
+      differentiate between integer and float numbers: it could just refer to the day
+      (the integer 12) or mean exactly midnight on the day (the float 12.0). So it 
+      could display perfectly sensibly as `12/01/1900 00:00` or `12/01/1900` but could 
+      also display more misleadingly as the time `00:00`.
 
-## Locations
+### Locations
 
 Columns of this type contain location labels showing where the data in the row
 was recorded. All of the labels must have been included in the Locations
 worksheet.
 
-## Taxa
+### Taxa
 
 Columns of this type contain taxon names showing the taxon from which other data
 in the row was recorded. All of the values in the row must appear in the Taxon
@@ -169,7 +166,7 @@ need to provide a list of accepted values: the entries are validated against the
 Taxa worksheet. This is different from Categorical variables, where a list of
 category levels is required (see below)
 
-## Replicate and ID
+### Replicate and ID
 
 Both Replicate and ID fields could contain almost any values. Replicates are
 typically just shown with repeating numbers, but researchers could use other
@@ -180,11 +177,11 @@ and again could have almost any format.
 So, both ID and Replicate fields are checked for missing data (NAs are
 permitted) but no other validation occurs.
 
-## Categorical data
+### Categorical data
 
 !!! Note
 
-	Field descriptor `levels` required
+  Field descriptor `levels` required
 
 Both categorical and ordered categorical data (also known as a factors) are made
 up of a set of **levels** showing the different groups or treatment. The data in
@@ -220,7 +217,7 @@ disturbance gradient could be:
 
     Primary:primary rainforest;Once:once logged rainforest;Twice:twice logged;Salvage:salvage logged;Oil palm:plantation
 
-## Numeric data
+### Numeric data
 
 !!! Note
 
@@ -236,7 +233,7 @@ for example. If this is the case, enter None rather than leaving the descriptors
 blank. (If you prefer to use Dimensionless as the unit for dimensionless
 quantities then that is also fine!)
 
-## Abundance and trait data
+### Abundance and trait data
 
 Both traits and abundance data tie a value (category or number) to a single
 taxon. You need to format your data so that it is clear which taxon each value
@@ -246,43 +243,42 @@ comes from. There are two possible formats:
    can put a valid taxon name (see Taxa worksheet) in the `taxon_name`
    descriptor for this column.
 
-Example: Observation counts in separate columns for each taxon
+   Example: Observation counts in separate columns for each taxon
 
-|  |  |  |
-|---|---|--|
-| field_type | Abundance | Abundance |
-| taxon_name | Tiger leech | Brown leech |
-| method | Exhaustive search of 50cm quadrat | Exhaustive search of 50cm quadrat |
-| description | quadrat count | quadrat count |
-| units | individuals | individuals |
-| field_name | tiger_count | brown_count |
-| 1 | 24 | 12 |
-| 2 | 62 | 3 |
+   |  |  |  |
+   |---|---|--|
+   | field_type | Abundance | Abundance |
+   | taxon_name | Tiger leech | Brown leech |
+   | method | Exhaustive search of 50cm quadrat | Exhaustive search of 50cm quadrat |
+   | description | quadrat count | quadrat count |
+   | units | individuals | individuals |
+   | field_name | tiger_count | brown_count |
+   | 1 | 24 | 12 |
+   | 2 | 62 | 3 |
 
 2. Different rows in the column refer to **different taxa**: in this case, you
    must also have a Taxa column and the `taxon_field` descriptor needs to
    contain the field name of the appropriate Taxa column.
 
-Example: Observation counts with different taxa in rows
+   Example: Observation counts with different taxa in rows
 
-|  |  |  |
-|---|---|--|
-| field_type | taxa | Abundance |
-| taxon_field | | common_name |
-| method | | Exhaustive search of 50cm quadrat |
-| description | Species found | Number found |
-| units |  | individuals |
-| field_name | common_name | leech_count |
-| 1 | Tiger leech | 24 |
-| 2 | Brown leech | 12 |
-| 3 | Tiger leech | 62 |
-| 4 | Brown leech | 3 |
-
+   |  |  |  |
+   |---|---|--|
+   | field_type | taxa | Abundance |
+   | taxon_field | | common_name |
+   | method | | Exhaustive search of 50cm quadrat |
+   | description | Species found | Number found |
+   | units |  | individuals |
+   | field_name | common_name | leech_count |
+   | 1 | Tiger leech | 24 |
+   | 2 | Brown leech | 12 |
+   | 3 | Tiger leech | 62 |
+   | 4 | Brown leech | 3 |
 
 It is an error to provide both `taxon_name` and `taxon_field` descriptors for an
 Abundance or Trait field.
 
-## Abundance
+### Abundance
 
 !!! Note
 
@@ -299,7 +295,7 @@ number of samplers and any equipment. This should be detailed enough to allow
 the sampling protocol to be replicated. If other columns provide sampling
 information, such as survey time or area, then make this clear.
 
-## Categorical trait
+### Categorical trait
 
 !!! Note
 
@@ -309,17 +305,17 @@ This is just a categorical variable where the groups apply to a taxa. So, we
 need information on the levels used, as for a standard categorical variable, and
 a link to taxonomic information as described in the examples above.
 
-## Numeric trait
+### Numeric trait
 
 !!! Note
 
-	Field descriptors `units`, `method` and one of `taxon_name` or `taxon_field` required
+  Field descriptors `units`, `method` and one of `taxon_name` or `taxon_field` required
 
 This is just a numeric variable where the groups apply to a taxa. So, we need
 the method and units for the values, as for a standard numeric variable, and a
 link to taxonomic information as described in the examples above.
 
-## Interaction data
+### Interaction data
 
 Interaction data is essentially just a column of categorical or numeric data
 that you want to associate with (at least) two taxon identities, but there are
@@ -340,73 +336,73 @@ possibilities exist.
 1. Both interacting taxa vary from row to row, so taxon names are provided in
    two fields
 
-Example: Interacting taxa identified in separate columns
+   Example: Interacting taxa identified in separate columns
 
-|  |  |  |  |
-|---|---|---|---|
- | field_type | Taxon | Taxon | Categorical Interaction |
- | interaction_field | | | predator;prey |
- | levels | | | success;failure |
- | method | Visual observation | Visual observation | Visual observation |
- | description | Predator observed | Prey observed | Outcome of predation event |
- | field_name | predator | prey | outcome |
- | 1 | Clouded leopard | Brown rat | success |
- | 2 | Flat headed cat | Moon rat | failure |
+   |  |  |  |  |
+   |---|---|---|---|
+   | field_type | Taxon | Taxon | Categorical Interaction |
+   | interaction_field | | | predator;prey |
+   | levels | | | success;failure |
+   | method | Visual observation | Visual observation | Visual observation |
+   | description | Predator observed | Prey observed | Outcome of predation event |
+   | field_name | predator | prey | outcome |
+   | 1 | Clouded leopard | Brown rat | success |
+   | 2 | Flat headed cat | Moon rat | failure |
 
 2. Alternatively, all of the data might refer to the same two taxa, so the taxon
    names can be provided directly.
 
-Example: Interacting taxa constant
+   Example: Interacting taxa constant
 
-|  |  |
-|---|---|
- | field_type | Categorical Interaction |
- | interaction_name | Clouded leopard:predator;Brown rat:prey |
- | levels | success;failure |
- | method | Visual observation |
- | description | Outcome of predation event |
-| field_name | outcome |
- | 1 | success |
- | 2 | failure |
+   |  |  |
+   |---|---|
+   | field_type | Categorical Interaction |
+   | interaction_name | Clouded leopard:predator;Brown rat:prey |
+   | levels | success;failure |
+   | method | Visual observation |
+   | description | Outcome of predation event |
+   | field_name | outcome |
+   | 1 | success |
+   | 2 | failure |
 
 3. Finally, one side of the interaction might vary from row to row but the other
    side is constant for all rows.
 
-Example: Interacting taxa identified by name and by column
+   Example: Interacting taxa identified by name and by column
 
-|  |  |  |
-|---|---|---|
-| field_type | Taxon | Categorical Interaction |
-| interaction_name | | Clouded leopard:predator; |
-| interaction_field | | prey:prey species; |
-| levels | | success;failure |
-| method | Visual observation | Visual observation |
-| description | Prey observed | Outcome of predation event |
-| field_name | prey | outcome |
-| 1 | Brown rat | success |
-| 2 | Moon rat | failure |
+   |  |  |  |
+   |---|---|---|
+   | field_type | Taxon | Categorical Interaction |
+   | interaction_name | | Clouded leopard:predator; |
+   | interaction_field | | prey:prey species; |
+   | levels | | success;failure |
+   | method | Visual observation | Visual observation |
+   | description | Prey observed | Outcome of predation event |
+   | field_name | prey | outcome |
+   | 1 | Brown rat | success |
+   | 2 | Moon rat | failure |
 
 You must provide at least two taxon names or fields, but you can provide more if
 you have tritrophic interactions! Again, you can use any combination of
 interaction names and fields to provide your taxon identities.
 
-## Categorical interactions
+### Categorical interactions
 
 !!! Note
 
-	Field descriptors `levels` and `interaction_name` and/or `interaction_field` required
+  Field descriptors `levels` and `interaction_name` and/or `interaction_field` required
 
-## Numeric interactions
-
-!!! Note
-
-	Field descriptors `units`, `method` and `interaction_name` and/or `interaction_field` required
-
-## File
+### Numeric interactions
 
 !!! Note
 
-	Field descriptor `file_container` may be required
+  Field descriptors `units`, `method` and `interaction_name` and/or `interaction_field` required
+
+### File
+
+!!! Note
+
+  Field descriptor `file_container` may be required
 
 This type is used to provide references to information stored in external files.
 It can be used in two ways:
@@ -417,48 +413,46 @@ It can be used in two ways:
    Summary worksheet includes an external file row with `My_raster_1.tiff` and
    `My_raster_2,tiff`:
 
-|  |  |  |
-|---|---|---|
-| field_type | Numeric | File |
-| description | Altitude in metres | DEM  file used for altitude |
-| method | Extracted from DEM tiffs |  |
-| taxon_name |  |  |
-| units | metres |  |
-| field_name | Altitude | DEM |
-| 1 | 100 | My_raster_1.tiff |
-| 2 | 200 | My_raster_1.tiff |
-| 3 | 300 | My_raster_1.tiff |
-| 4 | 400 | My_raster_1.tiff |
-| 5 | 500 | My_raster_2.tiff |
-| 6 | 600 | My_raster_2.tiff |
-| 7 | 700 | My_raster_2.tiff |
-| 8 | 800 | My_raster_2.tiff |
+   |  |  |  |
+   |---|---|---|
+   | field_type | Numeric | File |
+   | description | Altitude in metres | DEM  file used for altitude |
+   | method | Extracted from DEM tiffs |  |
+   | taxon_name |  |  |
+   | units | metres |  |
+   | field_name | Altitude | DEM |
+   | 1 | 100 | My_raster_1.tiff |
+   | 2 | 200 | My_raster_1.tiff |
+   | 3 | 300 | My_raster_1.tiff |
+   | 4 | 400 | My_raster_1.tiff |
+   | 5 | 500 | My_raster_2.tiff |
+   | 6 | 600 | My_raster_2.tiff |
+   | 7 | 700 | My_raster_2.tiff |
+   | 8 | 800 | My_raster_2.tiff |
 
 2. The values in the data are files contained within an external file. In this
    case, the descriptor `file_container` is used to check the external file is
    present, but the values in the field are not checked. For example:
 
-|  |  |  |
-|---|---|---|
-| field_type | Numeric | File |
-| description | Altitude in metres | Image of Quadrat |
-| method | Extracted from DEM tiffs |  |
-| taxon_name |  |  |
-| units | metres |  |
-| file_container |  | My_archive.zip |
-| field_name | Altitude | Quadrat_image |
-| 1 | 100 | Site_quadrat_1.jpg |
-| 2 | 200 | Site_quadrat_2.jpg |
-| 3 | 300 | Site_quadrat_3.jpg |
-| 4 | 400 | Site_quadrat_4.jpg |
-| 5 | 500 | Site_quadrat_5.jpg |
-| 6 | 600 | Site_quadrat_6.jpg |
-| 7 | 700 | Site_quadrat_7.jpg |
-| 8 | 800 | Site_quadrat_8.jpg |
+   |  |  |  |
+   |---|---|---|
+   | field_type | Numeric | File |
+   | description | Altitude in metres | Image of Quadrat |
+   | method | Extracted from DEM tiffs |  |
+   | taxon_name |  |  |
+   | units | metres |  |
+   | file_container |  | My_archive.zip |
+   | field_name | Altitude | Quadrat_image |
+   | 1 | 100 | Site_quadrat_1.jpg |
+   | 2 | 200 | Site_quadrat_2.jpg |
+   | 3 | 300 | Site_quadrat_3.jpg |
+   | 4 | 400 | Site_quadrat_4.jpg |
+   | 5 | 500 | Site_quadrat_5.jpg |
+   | 6 | 600 | Site_quadrat_6.jpg |
+   | 7 | 700 | Site_quadrat_7.jpg |
+   | 8 | 800 | Site_quadrat_8.jpg |
 
-
-
-## Comments
+### Comments
 
 If you have a free text field with notes or comments, then this is the field
 type to use. We don't really check anything in comments fields: they're not

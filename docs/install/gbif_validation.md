@@ -4,8 +4,8 @@ The basic idea is to search GBIF with a taxon name and rank to find if there is
 a match and then the taxonomic status of the match. GBIF has the following
 status codes:
 
-    doubtful, accepted, homotypic synonym, synonym,
-    heterotypic synonym, proparte synonym, misapplied
+  doubtful, accepted, homotypic synonym, synonym,
+  heterotypic synonym, proparte synonym, misapplied
 
 Misapplications and synonyms always have a suggested **accepted** usage,
 doubtful taxa never do. However, doubtful taxa typically still have a taxonomic
@@ -32,10 +32,10 @@ pallidiflora pallidiflora_.
 
 The `parent_taxon_level_analysis.R` file in this repository contains some code
 to check this:
-  
-  * All **accepted taxa** map to a more nested parent but 5% map to a more
-    nested parent more than one step up the hierarchy. The table below shows
-    child taxon level as rows and parent taxon level as columns.
+
+* All **accepted taxa** map to a more nested parent but 5% map to a more nested parent
+  more than one step up the hierarchy. The table below shows child taxon level as rows
+  and parent taxon level as columns.
 
   |           | kingdom| phylum| class| order| family|   genus| species| subspecies| variety| form|
   |:----------|-------:|------:|-----:|-----:|------:|-------:|-------:|----------:|-------:|----:|
@@ -50,9 +50,9 @@ to check this:
   |variety    |      53|     10|     0|    26|   2661|      50|   82914|         32|       0|    0|
   |form       |      12|      4|     0|     4|    815|      18|   19272|          0|      56|    0|
 
-  * Only 77% of **unaccepted taxa** map to a parent at the next most nested
-    taxonomic level and 4.5% map to a parent at the same or a less nested level,
-    as in the example above.
+* Only 77% of **unaccepted taxa** map to a parent at the next most nested
+  taxonomic level and 4.5% map to a parent at the same or a less nested level,
+  as in the example above.
 
   |           | kingdom| phylum| class| order| family|   genus| species| subspecies| variety| form|
   |:----------|-------:|------:|-----:|-----:|------:|-------:|-------:|----------:|-------:|----:|
@@ -78,10 +78,10 @@ developer site](https://www.gbif.org/developer/species), but the endpoint is
 handy as it accepts variables to turn off fuzzy matching (`strict=true`) and to
 check the name is at the stated rank (e.g. `rank=species`). For example:
 
-
 [http://api.gbif.org/v1/species/match?name=Panthera%20leo&strict=true&rank=species](http://api.gbif.org/v1/species/match?name=Panthera%20leo&strict=true&rank=species)
 
 The JSON data returned looks like this:
+
 ```{json}
 {"usageKey":5219404,
  "scientificName":"Panthera leo (Linnaeus, 1758)",
@@ -141,7 +141,7 @@ When GBIF returns a synonym, there is more to be done. The JSON data from the
 `species/match` endpoint contains the `usageKey` for the search name. That
 _probably_ means that the highest taxon key provided is the accepted taxon and
 the next highest is the parent. However, the program currently checks this using
-the `species/{usageKey}` endpoint, which explictly contains an `acceptedKey` and
+the `species/{usageKey}` endpoint, which explicitly contains an `acceptedKey` and
 a `parentKey` which ought to match the previous information. For example:
 
 [http://api.gbif.org/v1/species/8548608](http://api.gbif.org/v1/species/8548608)
@@ -178,4 +178,3 @@ example, the genus _Morus_ is an accepted usage for both mulberries and gannets.
 This kind of problem is described in the JSON `"note"` field and provided to the
 user. In these rare cases, an accepted usage would require a GBIF taxon ID to be
 provided to discriminate between them.
-

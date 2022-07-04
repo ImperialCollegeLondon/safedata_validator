@@ -13,8 +13,6 @@
     rendering:
         show_root_heading: True
 
-
-
 ## Global logging instances
 
 ::: safedata_validator.logger.COUNTER_HANDLER
@@ -29,7 +27,6 @@
 ::: safedata_validator.logger.FORMATTER
     rendering:
         show_root_heading: True
-
 
 ## Convenience functions
 

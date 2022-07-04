@@ -13,7 +13,6 @@ tagged version. This only needs to be set once.
 set git config --global push.followTags true
 ```
 
-
 Using git-flow and travis (although no tests at present so travis does very
 little except for testing the thing builds)
 
@@ -22,7 +21,7 @@ Use git flow to create a release and then bump the version number in
 
 Check the package builds and installs locally:
 
-```
+```sh
 python setup.py sdist bdist_wheel
 ```
 
@@ -36,24 +35,23 @@ Once that is done, switch back to `develop` and bump the version number to add
 
 To upload the new version to testpypi, checkout master and run
 
-```
+```sh
 python setup.py sdist bdist_wheel
 ```
 
 Remembering to change the version number, you can then create an account at pypi
 and testpypi and use `twine` to test:
 
-```
+```sh
 twine upload -r testpypi dist/*1.2.8*
 ```
 
 and then - once that seems to have gone ok - release the distribution for use
 via `pip`
 
-```
+```sh
 twine upload dist/*1.2.7*
 ```
-
 
 ## Documentation
 
@@ -62,10 +60,9 @@ and deployed to
 [https://safedata-validator.readthedocs.io/](https://safedata-validator.readthedocs.io/).
 MkDocs can be installed using:
 
-```
+```sh
 pip install mkdocs
 ```
-
 
 In order to build and deploy the documentation.
 
@@ -77,7 +74,7 @@ In order to build and deploy the documentation.
   commands are updated, these inputs need to be recreated.
 * From the package root, run `mkdocs build`. This will create the docs site in
   the `site` folder - note that this folder is not included in the git repo.
-* Once you have checked the local copy of the documentation, then commiting the
+* Once you have checked the local copy of the documentation, then committing the
   changes to the repository will automatically trigger a rebuild of the package
   documentation.
 

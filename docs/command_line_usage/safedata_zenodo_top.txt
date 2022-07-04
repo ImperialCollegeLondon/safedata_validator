@@ -30,4 +30,4 @@ optional arguments:
   -r RESOURCES, --resources RESOURCES
                         Path to a safedata_validator resource configuration
                         file
-  -q, --quiet           Surpress normal information messages.
+  -q, --quiet           Suppress normal information messages.

@@ -15,7 +15,7 @@ resources or to have installed a configuration file in a standard location
 (see the package website API for details.)
 
 If validation is successful, then a JSON format file containing key metadata
-will be saved to the same location as the valdiated file. The JSON metadata
+will be saved to the same location as the validated file. The JSON metadata
 is used in the dataset publication process.
 
 positional arguments:

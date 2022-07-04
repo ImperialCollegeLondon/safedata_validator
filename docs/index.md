@@ -17,7 +17,7 @@ If you are planning to submit data, the  process in overview is:
 * Prepare your data following the formatting information on this site.
 * Go to the SAFE Project website and [Submit your
   dataset](https://www.safeproject.net/datasets/submit_dataset).
-* We will automatically validate the data formatting. 
+* We will automatically validate the data formatting.
 * If the validation succeeds then we will publish it on Zenodo.
 * If the validation fails then you will get an error report so you can fix the
   problems and resubmit.
@@ -28,7 +28,7 @@ community](https://zenodo.org/communities/safe/).
 !!! Warning
 
     You **must not** publish your dataset directly to Zenodo. This skips the validation
-    step and means that the datasets are not linked together under our 
+    step and means that the datasets are not linked together under our
     [curation account](availability.md#data-curation).
 
 There is a separate document containing [build notes](build_notes.md) on the

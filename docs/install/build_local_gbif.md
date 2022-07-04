@@ -33,19 +33,16 @@ names and structures change, but the basic process should work.
   include a lot of quotes and add to the file size, but are not used by the
   package. This field is therefore dropped.
 
-*  The file contains a lot of `\N` values, which is a PostgreSQL symbol for a
-   null field. SQLite3 will treat these as values and so they need to be 
+* The file contains a lot of `\N` values, which is a PostgreSQL symbol for a
+   null field. SQLite3 will treat these as values and so they need to be
    converted to a `null` value.
 
-*  The speed of the package is much improved by building covering indices to
-   speed up the two kinds of searches used by `safedata_validator`: 
-   
+* The speed of the package is much improved by building covering indices to
+   speed up the two kinds of searches used by `safedata_validator`:
+
       1.  searches on the canonical name  and rank of a taxon and 
       2.  searches on the taxon id.
 
 Once you have an SQLite3 backbone database, you will then need to edit the
 `gbif_database` entry in your [configuration file](configuration.md) to provide
 the path to your new SQLite file or provide the path as an argument.
-
-
-

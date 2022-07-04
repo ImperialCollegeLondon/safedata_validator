@@ -6,7 +6,7 @@ uploaded to a Zenodo community. It can update an existing RIS format file
 to add new records or it can create the file from scratch.
 
 The program uses both the Zenodo API (to find the records in the community)
-and the Datacite API to access machine readable biblioigraphic records.
+and the Datacite API to access machine readable bibliographic records.
 
 positional arguments:
   ris_file    The file path to populate with RIS records. If this file already

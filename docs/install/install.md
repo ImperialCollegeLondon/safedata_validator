@@ -14,7 +14,7 @@ The following steps should allow you to install `safedata_validator`:
    than is covered here.
 
     If you've got Python 2.7 then type `quit()` and skip to step 4.
-    
+
     If you get a line that says the command is not found then you need to
     install Python. Download a copy from here:
 
@@ -52,6 +52,6 @@ The following steps should allow you to install `safedata_validator`:
 
     You should now see the [usage instructions](../usage/usage.md).
 
- 6. In addition to the command line option, you should now be able to `import
-    safedata_validator` within Python, which will allow you to use the  Dataset
-    class and methods defined  in the package within your own code. 
+6. In addition to the command line option, you should now be able to `import
+   safedata_validator` within Python, which will allow you to use the  Dataset
+   class and methods defined  in the package within your own code. 

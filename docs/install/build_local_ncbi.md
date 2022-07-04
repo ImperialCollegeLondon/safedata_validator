@@ -14,17 +14,27 @@ Next, go to this page:
 
 [https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/)
 
-The DMP files are provided in three different zip formats (`taxdmp.zip`, `taxdump.tar.Z`,
-`taxdump.tar.gz`), you can download whichever of these is most convient to unzip.
-This zip file contains the DMP files for a [number of tables](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_readme.txt). The ones that we require are `nodes.dmp`, `names.dmp`, and `merged.dmp`, which
-describe the taxonomic nodes, the names assigned to specific nodes, and superseeded nodes that have
-now been merged into other nodes, respectively.
+The DMP files are provided in three different zip formats (`taxdmp.zip`,
+`taxdump.tar.Z`, `taxdump.tar.gz`), you can download whichever of these is most
+convenient to unzip. This zip file contains the DMP files for a [number of
+tables](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_readme.txt). The ones that we
+require are `nodes.dmp`, `names.dmp`, and `merged.dmp`, which describe the taxonomic
+nodes, the names assigned to specific nodes, and superseded nodes that have now been
+merged into other nodes, respectively.
 
-There are a number of steps needed to convert this data into a SQLite3 database. For convenience, this conversion has been automated into a Python script (`additional_scripts/create_ncbi_database_sqlite.py`). This may need updating if file names and structures change, but the basic process should work.
+There are a number of steps needed to convert this data into a SQLite3 database. For
+convenience, this conversion has been automated into a Python script
+(`additional_scripts/create_ncbi_database_sqlite.py`). This may need updating if file
+names and structures change, but the basic process should work.
 
-* The nodes table contains a lot of fields unrelated to anything we are interested in (i.e. `division_id`). We therefore drop all fields other than `tax_id`, `parent_tax_id`, `rank`, and `comments`.
+* The nodes table contains a lot of fields unrelated to anything we are interested in
+  (i.e. `division_id`). We therefore drop all fields other than `tax_id`,
+  `parent_tax_id`, `rank`, and `comments`.
 
-* The names table includes a field (`unique_name`) that gives a unique version of every name. Given that `safedata_validator` has built in handling of ambigious names and that these unique names are extremely specific (e.g. `Bacteria <bacteria>`), we do not believe this is a useful field for our purpose. It is therefore dropped.
+* The names table includes a field (`unique_name`) that gives a unique version of every
+  name. Given that `safedata_validator` has built in handling of ambiguous names and
+  that these unique names are extremely specific (e.g. `Bacteria <bacteria>`), we do not
+  believe this is a useful field for our purpose. It is therefore dropped.
 
 * A single database is then generated with three tables: `nodes`, `names`, `merged`.
 

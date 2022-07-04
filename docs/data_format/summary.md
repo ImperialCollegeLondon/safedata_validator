@@ -56,10 +56,10 @@ a single value for each field.
 * **Title**: This should be a short informative title for the dataset: it will
   be used as the public title for the dataset so make sure it is clear and
   grammatical! 
-* **Description**: This will be the public description of the dataset. Note that
-  you can have paragraphs of text within a single cell in Excel, so please do
-  provide a reasonable summary. You will need to use Alt + Enter (or Alt + Shift
-  + Enter on a Mac) to insert a carriage return.
+* **Description**: This will be the public description of the dataset. Note that you can
+  have paragraphs of text within a single cell in Excel, so please do provide a
+  reasonable summary. You will need to use Alt + Enter (or Alt + Shift + Enter on a Mac)
+  to insert a carriage return.
 
 |                 |                                   |  |  |
 |-----------------|-----------------------------------|--|--|
@@ -99,8 +99,7 @@ single value for each field.
 
 !!! Warning "Mandatory block"
 
-	**Author ORCID** is optional and the remaining fields are mandatory.
-
+  **Author ORCID** is optional and the remaining fields are mandatory.
 
 These rows provide contact details for the authors of the data. If the datasets
 should be credited to more than author, then provide sets of details in adjacent
@@ -124,34 +123,32 @@ shown below, not the full URL (http://orcid.org/0000-0002-7005-1394).
 | Author affiliation | Imperial College London |  |  |
 | Author ORCID       | 0000-0002-7005-1394     |  |  |
 
-
 !!! Important
 
-	The authors provided here will form part of the permanent citation for the
-	published dataset. Authorship on published datasets should be treated in the
-	same way as you would consider authorship on papers: you should include not
-	only the people responsible for physically collecting the data but also other
-	researchers who facilitated the work, such as project supervisors and local
-	collaborators.
+  The authors provided here will form part of the permanent citation for the
+  published dataset. Authorship on published datasets should be treated in the
+  same way as you would consider authorship on papers: you should include not
+  only the people responsible for physically collecting the data but also other
+  researchers who facilitated the work, such as project supervisors and local
+  collaborators.
 
 ## The data worksheet block
 
 !!! Warning "Mandatory block"
 
-	The **Worksheet external file** field is only required if a worksheet entry
-	describes data held in another file. All other fields are mandatory,
-
+  The **Worksheet external file** field is only required if a worksheet entry
+  describes data held in another file. All other fields are mandatory,
 
 Each **data worksheet** must be described here - do not include the Taxa and
 Locations worksheet in this block. As with the authors, you can describe
 multiple sheets in adjacent columns.
 
- * The **Worksheet name** row must contain the label of a worksheet in the
+* The **Worksheet name** row must contain the label of a worksheet in the
    workbook: that is, the **exact text** shown on the worksheet tab at the
-   bottom. 
+   bottom.
 * The **Worksheet title** and **Worksheet description** rows are free text to
   provide a longer title and a summary description of the contents of a given
-  sheet. 
+  sheet.
 * You only need to use the **Worksheet external file** row if a data worksheet
   describes tabular data held in an external file. The value must then be a
   filename which appears in the [**External file**](#external-files-block)
@@ -181,8 +178,8 @@ worksheet.
 
 !!! Note "Optional block"
 
-	You only need to provide this information if you are also providing data in
-	other file formats, If you do provide this block, all rows are mandatory,
+  You only need to provide this information if you are also providing data in
+  other file formats, If you do provide this block, all rows are mandatory,
 
 You can include files in other file formats in your data submission as described
 [here](other_formats.md). If you do so, then these files must be listed in this
@@ -217,16 +214,16 @@ the root of the URL.
 
 !!! Note "Optional block"
 
-	Although the funders block is optional, you should provide it in most cases as
-	you must provide details of any funding that lead to the collection of the
-	data. 
-	
-	This is particularly important for RCUK funded research, who have agreed to
-	let us host all of the SAFE data under a common portal on the condition that
-	Research Council funding is clearly acknowledged. 
-	
-	**Funding body** and **Funding type** are mandatory, but please do provide a
-	reference number and a link if possible.
+  Although the funders block is optional, you should provide it in most cases as
+  you must provide details of any funding that lead to the collection of the
+  data.
+
+  This is particularly important for RCUK funded research, who have agreed to
+  let us host all of the SAFE data under a common portal on the condition that
+  Research Council funding is clearly acknowledged.
+
+  **Funding body** and **Funding type** are mandatory, but please do provide a
+  reference number and a link if possible.
 
 Funding details are provided by completing a block as follows and,  as with
 Authors and Worksheets, you can use multiple columns to acknowledge more than
@@ -243,12 +240,12 @@ one funder.
 
 !!! Note "Optional block"
 
-	If you provide permit details, all the fields are required.
+  If you provide permit details, all the fields are required.
 
 Permits are required for nearly all research conducted at SAFE. Use this block
 to record the permits used to collect this data. The permit type value must be
 one of `research`, `export` or `ethics`. Again, you can use multiple columns to
-record mutiple permits.
+record multiple permits.
 
 |                  |                           |  |  |
 |------------------|---------------------------|--|--|
@@ -283,8 +280,8 @@ in your Summary worksheet that provide extent metadata as described below.
 
 !!! Warning "Possibly mandatory block"
 
-	If you do need to provide this block (see [above](#gemini-metadata)) then all
-	rows are required.
+  If you do need to provide this block (see [above](#gemini-metadata)) then all
+  rows are required.
 
 The start and end date values must be provided as an Excel date formatted cell.
 
@@ -297,8 +294,8 @@ The start and end date values must be provided as an Excel date formatted cell.
 
 !!! Warning "Possibly mandatory block"
 
-	If you do need to provide this block (see [above](#gemini-metadata)) then all
-	rows are required.
+  If you do need to provide this block (see [above](#gemini-metadata)) then all
+  rows are required.
 
 The geographic extents must be provided as decimal degrees (16.75) not degrees,
 minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).

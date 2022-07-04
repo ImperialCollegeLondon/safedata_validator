@@ -3,7 +3,6 @@
 !!! Warning
     TODO - Outdated
 
-
 The  `safedata_validator` package contains Python code to validate files
 containing data using SAFE data formatting  and report on any problems. The code
 validates:
@@ -29,12 +28,11 @@ The package provides a command line program `safedata_validate`. The usage
 instructions are below but you will also need to provide links to some external
 data resources used in location and taxon validation.
 
-
 ```sh
 {!docs/command_line_usage/safedata_validate.txt!}
 ```
 
-# Data resources
+## Data resources
 
 The `safedata_validator` package requires external data resources to validate
 both dataset locations and taxa. The package supports online resources for both
@@ -46,7 +44,9 @@ For example, the SAFE Project  website provides an API endpoint returning
 location data. Using this API and the default online GBIF validation, the
 following command will validate `MyData.xlsx`:  
 
-    safedata_validate MyData.xlsx -l https://www.safeproject.net/api/validator_locations
+```sh
+safedata_validate MyData.xlsx -l https://www.safeproject.net/api/validator_locations
+```
 
 This is considerably easier for most users but it can be rather slow and
 requires an internet connection. If you are want to improve the speed of
@@ -58,16 +58,18 @@ The locations of these resources are set by command line arguments shown above
 but  can also be set in a [configuration file](usage.md#configuration-file) for
 repeated use.
 
-## Locations
+### Locations
 
 Locations are validated against a set of known location names and possible
 aliases for those names. The data resource providing this information is set
 with the `location` argument. This can either be a link to a web service as
 shown above or a static local JSON file to provide faster and offline use:
 
-    safedata_validate MyData.xlsx -l /path/to/validator_locations.json
+```sh
+safedata_validate MyData.xlsx -l /path/to/validator_locations.json
+```
 
-## GBIFTaxa
+### GBIFTaxa
 
 If you  want to speed up taxon checking and allow offline use then you will need
 to download a copy of the backbone taxonomy and build a SQLite3 database from
@@ -77,9 +79,11 @@ but the resulting database is around 1.6GB, so you'll need file space!
 
 Once you have this file, you can use it like this:
 
-    safedata_validate MyData.xlsx -g /path/to/gbif_backbone.sqlite
+```sh
+safedata_validate MyData.xlsx -g /path/to/gbif_backbone.sqlite
+```
 
-## NCBITaxa
+### NCBITaxa
 
 Taxon checking against NCBI can be similarly sped up by downloading a copy of the online database and building a SQLite3 database from it. Using a local database is substantially faster than using the online NCBI Entrez tools. Instructions on how to construct the local database are given [here](../install/build_local_ncbi.md), again the resulting database is large so you'll need to ensure you have sufficient file space!
 
@@ -87,17 +91,21 @@ Once you have this file, you can use it like this:
 
     TODO - INSERT USAGE HERE
 
-## Fully offline use
+### Fully offline use
 
 If you've done both the above steps then the following example would validate a
 file using both local data resources, and won't need the internet at all.
 
-    safedata_validate MyData.xlsx -g /path/to/gbif_backbone.sqlite \
-        -l /path/to/validator_locations.json
+```sh
+safedata_validate MyData.xlsx -g /path/to/gbif_backbone.sqlite \
+    -l /path/to/validator_locations.json
+```
 
 In both cases, validation can now simply use:
 
-    safedata_validate MyData.xlsx
+```sh
+safedata_validate MyData.xlsx
+```
 
 If you do provide command line arguments, they will override anything set in the
 configuration.
