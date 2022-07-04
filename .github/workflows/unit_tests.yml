@@ -18,7 +18,7 @@ jobs:
       # is only available within job steps, and not here. 
       max-parallel: ${{ fromJSON('[12, 1]')[ (contains(github.ref, 'master') || contains(github.ref, 'release')) ] }}
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.9", "3.10"]
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v3

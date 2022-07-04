@@ -36,3 +36,6 @@ local_example_inputs/*
 
 # Ignore local pyenv settings
 .python-version
+
+# Ignore code coverage map
+.coverage

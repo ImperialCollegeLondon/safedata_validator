@@ -19,7 +19,7 @@ safedata_validate = "safedata_validator.scripts:_safedata_validator_cli"
 safedata_zenodo = "safedata_validator.scripts:_safedata_zenodo_cli"
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.9"
 openpyxl = "^3.0.10"
 requests = "^2.28.0"
 simplejson = "^3.17.6"
