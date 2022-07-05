@@ -30,11 +30,11 @@ used to provide file details.
 
 ## The `safedata_zenodo` tool
 
-!!! Info
-
-    The subcommands of the `safedata_zenodo` tools require that the
-    `zenodo`  and `metadata` sections of the [resources
-    configuration](../install/configuration.md#zenodo) be completed.
+:::{info}
+The subcommands of the `safedata_zenodo` tools require that the `zenodo`  and `metadata`
+sections of the [resources configuration](../install/configuration.md#zenodo) be
+completed.
+:::
 
 The `safedata_zenodo` command line tool provides the following subcommands which
 are used to publish data, post metadata and help maintain and document published
@@ -60,7 +60,7 @@ safedata_validate Test_format_good.xlsx
 # as - for example - zenodo_1059375.json
 safedata_zenodo create
 
-# Upload the file 
+# Upload the file
 safedata_zenodo upload_file zenodo_1059375.json Test_format_good.xlsx
 
 # Populate the Zenodo deposit metadata from the dataset metadata
