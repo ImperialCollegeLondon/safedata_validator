@@ -1,8 +1,11 @@
-import pytest
 import os
 import string
+
 import openpyxl
-from safedata_validator.validators import *
+import pytest
+
+from safedata_validator.validators import GetDataFrame, HasDuplicates, IsLower
+
 
 @pytest.fixture()
 def dummy_ws_with_extra():
@@ -33,21 +36,52 @@ def test_naive_dims(dummy_ws_with_extra):
 
 
 @pytest.mark.parametrize(
-    'hd_vals,nonstr,padded,duped,blank',
-    [(None, [], [], [], []),
-     (['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'],
-      [], [], [], []),  # replacement works!
-     (['A', 'B', 'C', 'D', 'E', '  \n', 'G', 'H', None, 'J', 'J'],
-      [], [], [], ['  \n', None]),  # blanks
-     (['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'J'],
-      [], [], ['J'], []),  # dupe
-     (['A', 'B', 3, 'D', 'E', 'F', False, 'H', 'I', 'J', 'K'],
-      [3, False], [], [], []),  # nonstring
-     (['A', ' B', 'C', 'D ', 'E', 'F', 'G', 'H', 'I', 'J', 'K'],
-      [], [' B', 'D '], [], []),  # padded
-     (['A', ' B', 3, 'D ', 'E', '  \n', False, 'H', None, 'J', 'J'],
-      [3, False, None], [' B', 'D '], ['J'], ['  \n', None]),  # all - None caught twice
-     ]
+    "hd_vals,nonstr,padded,duped,blank",
+    [
+        (None, [], [], [], []),
+        (
+            ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"],
+            [],
+            [],
+            [],
+            [],
+        ),  # replacement works!
+        (
+            ["A", "B", "C", "D", "E", "  \n", "G", "H", None, "J", "J"],
+            [],
+            [],
+            [],
+            ["  \n", None],
+        ),  # blanks
+        (
+            ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "J"],
+            [],
+            [],
+            ["J"],
+            [],
+        ),  # dupe
+        (
+            ["A", "B", 3, "D", "E", "F", False, "H", "I", "J", "K"],
+            [3, False],
+            [],
+            [],
+            [],
+        ),  # nonstring
+        (
+            ["A", " B", "C", "D ", "E", "F", "G", "H", "I", "J", "K"],
+            [],
+            [" B", "D "],
+            [],
+            [],
+        ),  # padded
+        (
+            ["A", " B", 3, "D ", "E", "  \n", False, "H", None, "J", "J"],
+            [3, False, None],
+            [" B", "D "],
+            ["J"],
+            ["  \n", None],
+        ),  # all - None caught twice
+    ],
 )
 def test_getdataframe(dummy_ws_with_extra, hd_vals, nonstr, padded, duped, blank):
     """
@@ -70,48 +104,60 @@ def test_getdataframe(dummy_ws_with_extra, hd_vals, nonstr, padded, duped, blank
 
         return [v * (r + 1) for r in range(to)]
 
-    assert all([sum(v) == sum(_times_table(idx + 1, 38))
-                for idx, v in enumerate(dataframe.data_columns)])
+    assert all(
+        [
+            sum(v) == sum(_times_table(idx + 1, 38))
+            for idx, v in enumerate(dataframe.data_columns)
+        ]
+    )
 
     # Header checking
     if nonstr:
-        assert (('non_string' in dataframe.bad_headers)and
-                (dataframe.bad_headers['non_string'] == nonstr))
+        assert ("non_string" in dataframe.bad_headers) and (
+            dataframe.bad_headers["non_string"] == nonstr
+        )
 
     if padded:
-        assert (('padded' in dataframe.bad_headers)and
-                (dataframe.bad_headers['padded'] == padded))
+        assert ("padded" in dataframe.bad_headers) and (
+            dataframe.bad_headers["padded"] == padded
+        )
 
     if duped:
-        assert (('duplicated' in dataframe.bad_headers)and
-                (dataframe.bad_headers['duplicated'] == duped))
+        assert ("duplicated" in dataframe.bad_headers) and (
+            dataframe.bad_headers["duplicated"] == duped
+        )
 
     if blank:
-        assert (('blank' in dataframe.bad_headers)and
-                (dataframe.bad_headers['blank'] == blank))
+        assert ("blank" in dataframe.bad_headers) and (
+            dataframe.bad_headers["blank"] == blank
+        )
 
 
 @pytest.mark.parametrize(
-    'input_vals,duplicated,bool_val',
-    [(['a', 'b', 'c', 'd'], [], False),
-     (['a', 'b', 'c', 'd', 'a'], ['a'], True),
-     ]
+    "input_vals,duplicated,bool_val",
+    [
+        (["a", "b", "c", "d"], [], False),
+        (["a", "b", "c", "d", "a"], ["a"], True),
+    ],
 )
 def test_hasduplicates(input_vals, duplicated, bool_val):
 
     out = HasDuplicates(input_vals)
 
     assert out.duplicated == duplicated
-    assert out.__bool__() is bool_val # Can't use out directly because class Filter != bool
+    assert (
+        out.__bool__() is bool_val
+    )  # Can't use out directly because class Filter != bool
 
 
 @pytest.mark.parametrize(
-    'input_vals,output_vals',
-    [(['a', 'b', 'c', 'd'], ['a', 'b', 'c', 'd']),
-     (['A', 'b', 'C', 'd'], ['a', 'b', 'c', 'd']),
-     (['A', 2, 'C', 'd'], ['a', 2, 'c', 'd']),
-     (['A', 'b', 'C', None], ['a', 'b', 'c', None]),
-     ]
+    "input_vals,output_vals",
+    [
+        (["a", "b", "c", "d"], ["a", "b", "c", "d"]),
+        (["A", "b", "C", "d"], ["a", "b", "c", "d"]),
+        (["A", 2, "C", "d"], ["a", 2, "c", "d"]),
+        (["A", "b", "C", None], ["a", "b", "c", None]),
+    ],
 )
 def test_islower(input_vals, output_vals):
 

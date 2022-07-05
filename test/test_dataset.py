@@ -1,14 +1,17 @@
 import pytest
+
 from safedata_validator.field import Dataset
+
 from .conftest import FIXTURE_FILES
 
+
 @pytest.mark.parametrize(
-    'file_key, n_errors',
+    "file_key, n_errors",
     [
-      ('good_excel_file' , 0),
-      ('bad_excel_file', 94),
-      ('good_ncbi_file', 0),
-      ('bad_ncbi_file', 107)
+        ("good_excel_file", 0),
+        ("bad_excel_file", 94),
+        ("good_ncbi_file", 0),
+        ("bad_ncbi_file", 107),
     ],
 )
 def test_DataSet_load_from_file(ncbi_resources_local_and_remote, file_key, n_errors):
