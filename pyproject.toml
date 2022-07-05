@@ -34,6 +34,7 @@ enforce-typing = "^1.0.0"
 rispy = "^0.7.1"
 dominate = "^2.6.0"
 tqdm = "^4.64.0"
+flake8-docstrings = "^1.6.0"
 
 [tool.poetry.dev-dependencies]
 pyfakefs = "^4.5.6"
