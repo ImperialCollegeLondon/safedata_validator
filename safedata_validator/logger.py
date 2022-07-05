@@ -19,26 +19,26 @@ process.
 Note that the handlers are created when the module is loaded, so when running
 behind a web server, the content of the handlers persist between runs of the
 code. To avoid constant concatenation of outputs, the logger should be cleared
-when a new Dataset is being validated. 
+when a new Dataset is being validated.
 """
 
-from functools import wraps
 import logging
+from functools import wraps
 from io import StringIO
 
-class CounterHandler(logging.StreamHandler):
 
+class CounterHandler(logging.StreamHandler):
     def __init__(self, *args, **kwargs):
         """This is an subclass of `logging.StreamHandler` that maintains a count of
         calls at each log level.
         """
         logging.StreamHandler.__init__(self, *args, **kwargs)
-        self.counters = {'DEBUG': 0, 'INFO': 0, 'WARNING': 0, 'ERROR': 0, 'CRITICAL': 0}
+        self.counters = {"DEBUG": 0, "INFO": 0, "WARNING": 0, "ERROR": 0, "CRITICAL": 0}
 
     def emit(self, record: logging.LogRecord):
         """The emit method for CounterHandler emits the message but also increments the
         counter for the message level.
-        
+
         Args:
             record: A `logging.LogRecord` instance.
         """
@@ -47,25 +47,28 @@ class CounterHandler(logging.StreamHandler):
         msg = self.format(record=record)
         self.stream.write(msg)
         self.flush()
-    
+
     def reset(self):
         """This method is used to reset the counters to zero"""
-        self.counters = {'DEBUG': 0, 'INFO': 0, 'WARNING': 0, 'ERROR': 0, 'CRITICAL': 0}
+        self.counters = {"DEBUG": 0, "INFO": 0, "WARNING": 0, "ERROR": 0, "CRITICAL": 0}
 
 
 class IndentFormatter(logging.Formatter):
-
-    def __init__(self, fmt: str = "%(indent)s%(levelcode)s %(message)s",
-                 datefmt: str = None, indent: str = '    ') -> None:
+    def __init__(
+        self,
+        fmt: str = "%(indent)s%(levelcode)s %(message)s",
+        datefmt: str = None,
+        indent: str = "    ",
+    ) -> None:
         """A logging record formatter with indenting
 
         This record formatter tracks an indent depth that is used to nest
         messages, making it easier to track the different sections of validation
         in printed outputs. It also encodes logging levels as single character
-        strings to make logging messages align vertically at different depths  
-        
-        The depth of indenting can be set directly using: 
-            
+        strings to make logging messages align vertically at different depths
+
+        The depth of indenting can be set directly using:
+
             FORMATTER.depth = 1
 
         but it is more convenient to use the
@@ -79,7 +82,7 @@ class IndentFormatter(logging.Formatter):
 
         Args:
             fmt: The formatting used for emitted LogRecord instances
-            datefmt: A date format string 
+            datefmt: A date format string
             indent: This string is used for each depth of the indent.
         """
         logging.Formatter.__init__(self, fmt, datefmt)
@@ -88,7 +91,7 @@ class IndentFormatter(logging.Formatter):
 
     def pop(self, n: int = 1) -> None:
         """A convenience method to increase the indentation of the formatter.
-        
+
         Args:
             n: Increase the indentation depth by n.
         """
@@ -97,7 +100,7 @@ class IndentFormatter(logging.Formatter):
 
     def push(self, n: int = 1) -> None:
         """A convenience method to decrease the indentation of the formatter.
-        
+
         Args:
             n: Decrease the indentation depth by n.
         """
@@ -110,15 +113,21 @@ class IndentFormatter(logging.Formatter):
         rec.indent = self.indent * self.depth
 
         # encode level
-        codes = {'DEBUG': '>', 'INFO': '-', 'WARNING': '?', 'ERROR': '!', 'CRITICAL': 'X'}
+        codes = {
+            "DEBUG": ">",
+            "INFO": "-",
+            "WARNING": "?",
+            "ERROR": "!",
+            "CRITICAL": "X",
+        }
         rec.levelcode = codes[rec.levelname]
 
         # format message
         msg = logging.Formatter.format(self, rec)
 
         # add any joined values as repr
-        if hasattr(rec, 'join'):
-            msg += ', '.join([repr(o) for o in rec.join])
+        if hasattr(rec, "join"):
+            msg += ", ".join([repr(o) for o in rec.join])
 
         return msg
 
@@ -136,7 +145,7 @@ LOG = StringIO()
 """io.StringIO: The safedata_validator message log
 
 This StringIO object is attached to a stream handler for LOGGER and is used
-to keep a programatically accessible log of the messages emitted during validation.
+to keep a programmatically accessible log of the messages emitted during validation.
 It should be truncated between validation runs to remove messages from previous
 runs.
 """
@@ -147,7 +156,7 @@ COUNTER_HANDLER = CounterHandler(LOG)
 This handler is used to track the number of messages emitted by the logger in
 different logging levels and emits log messages to the LOG StringIO instance to
 keep a record of the messages. It is exposed globally to make it easy to access
-counts and the validation log programatically.
+counts and the validation log programmatically.
 """
 
 CONSOLE_HANDLER = logging.StreamHandler()
@@ -166,8 +175,8 @@ the custom pop and push methods.
 """
 
 # Combine those instances into the full LOGGER setup with 2 handlers:
-# - COUNTER_HANDLER - logs records into LOG to keep a history of the validation and maintains
-#        counts of message levels handler
+# - COUNTER_HANDLER - logs records into LOG to keep a history of the validation and
+#        maintains counts of message levels handler
 # - CONSOLE_HANDLER - logs records to the console for command line use and can be
 #     muted
 
@@ -182,6 +191,7 @@ LOGGER.addHandler(CONSOLE_HANDLER)
 # CONVENIENCE FUNCTIONS
 #
 
+
 def log_and_raise(msg: str, exception: Exception) -> None:
     """
     This convenience function adds a critical level message to the logger and
@@ -190,7 +200,7 @@ def log_and_raise(msg: str, exception: Exception) -> None:
     resources but errors with the data checking should log and carry on.
 
     Args:
-        msg: A message to add to the log  
+        msg: A message to add to the log
         exception: An exception type to be raised
 
     Returns:
@@ -201,7 +211,9 @@ def log_and_raise(msg: str, exception: Exception) -> None:
     raise exception(msg)
 
 
-# See https://stackoverflow.com/questions/10176226/how-do-i-pass-extra-arguments-to-a-python-decorator
+# See
+# https://stackoverflow.com/questions/10176226/how-do-i-pass-extra-arguments-to-a-python-decorator
+
 
 def loggerinfo_push_pop(wrapper_message):
     """
@@ -218,14 +230,14 @@ def loggerinfo_push_pop(wrapper_message):
             LOGGER.info(wrapper_message)
             FORMATTER.push()
 
-            # Invoke the wrapped function 
+            # Invoke the wrapped function
             retval = function(*args, **kwargs)
 
             # Step back out
             FORMATTER.pop()
 
             return retval
-        
+
         return wrapped_func
-    
+
     return decorator_func
