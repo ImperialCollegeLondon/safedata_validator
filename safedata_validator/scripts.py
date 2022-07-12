@@ -120,15 +120,19 @@ def _safedata_zenodo_cli():
     parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
 
     parser.add_argument(
-        "--debug", action="store_true", help="Show debugging for resource loading"
-    )
-    parser.add_argument(
         "-r",
         "--resources",
         type=str,
         default=None,
         help="Path to a safedata_validator resource configuration file",
     )
+
+    parser.add_argument(
+        "--show-config",
+        action="store_true",
+        help="Report the config being used and exit",
+    )
+
     parser.add_argument(
         "-q",
         "--quiet",
@@ -386,14 +390,13 @@ def _safedata_zenodo_cli():
     # Parse the arguments and set the verbosity
     args = parser.parse_args()
 
-    if args.debug and args.quiet:
-        args.quiet = False
-
-    # Load the package config
-    if not args.debug:
-        CONSOLE_HANDLER.setLevel("CRITICAL")
-    else:
-        CONSOLE_HANDLER.setLevel("DEBUG")
+    # Show the package config and exit if requested
+    if args.show_config:
+        resources = Resources(args.resources)
+        print("\nZenodo configuration:")
+        for key, val in resources.zenodo.items():
+            print(f" - {key}: {val}")
+        return
 
     resources = Resources(args.resources)
 
