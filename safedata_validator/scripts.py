@@ -120,7 +120,7 @@ def _safedata_zenodo_cli():
     parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
 
     parser.add_argument(
-        "-d", "--debug", action="store_true", help="Show debugging for resource loading"
+        "--debug", action="store_true", help="Show debugging for resource loading"
     )
     parser.add_argument(
         "-r",
@@ -403,6 +403,10 @@ def _safedata_zenodo_cli():
     else:
         CONSOLE_HANDLER.setLevel("DEBUG")
 
+    if args.subcommand is None:
+        parser.print_usage()
+        return
+
     # Handle the different subcommands
     if args.subcommand == "create":
 
@@ -600,4 +604,5 @@ def _safedata_zenodo_cli():
             LOGGER.error(f"Failed to publish deposit: {error}")
         else:
             LOGGER.info(f"Published to: {response['links']['record']}")
+
     return
