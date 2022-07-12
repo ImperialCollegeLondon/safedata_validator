@@ -54,4 +54,4 @@ The following steps should allow you to install `safedata_validator`:
 
 6. In addition to the command line option, you should now be able to `import
    safedata_validator` within Python, which will allow you to use the  Dataset
-   class and methods defined  in the package within your own code. 
+   class and methods defined  in the package within your own code.

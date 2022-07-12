@@ -26,35 +26,36 @@ usage!) but the GBIF backbone has very good taxonomic coverage and is well curat
 
 The table format looks like this:
 
-| Name | Taxon name | Taxon type | Taxon ID | Ignore ID | Parent name | Parent type | Parent ID | Comments |
-|---|---|---|---|---|---|---|---|---|
-| crbo | Crematogaster borneensis | Species |   |   |   |   |   |   |
-| dolic_sp | Dolichoderus | Genus |   |   |   |   |   |   |
-| gannets  | Morus | Genus | 2480962 |   |   |   |   |   |
-| lost_orang | Pongo tapanuliensis | Species |   |   | Pongo | Genus  |   |  New species |
-| morpho1 | NA | Morphospecies |   |   | Formicidae | Family |   |   |
-| bombines | Bombini | Tribe |   |   | Apidae | Family |   |   |
-| micr_hid | Microcopris hidakai | Species |   | 1090433 | Microcopris | Genus |   |   |
+<!-- markdownlint-disable MD013 -->
+| Name       | Taxon name               | Taxon type    | Taxon ID | Ignore ID | Parent name | Parent type | Parent ID | Comments    |
+| ---------- | ------------------------ | ------------- | -------- | --------- | ----------- | ----------- | --------- | ----------- |
+| crbo       | Crematogaster borneensis | Species       |          |           |             |             |           |             |
+| dolic_sp   | Dolichoderus             | Genus         |          |           |             |             |           |             |
+| gannets    | Morus                    | Genus         | 2480962  |           |             |             |           |             |
+| lost_orang | Pongo tapanuliensis      | Species       |          |           | Pongo       | Genus       |           | New species |
+| morpho1    | NA                       | Morphospecies |          |           | Formicidae  | Family      |           |             |
+| bombines   | Bombini                  | Tribe         |          |           | Apidae      | Family      |           |             |
+| micr_hid   | Microcopris hidakai      | Species       |          | 1090433   | Microcopris | Genus       |           |             |
+<!-- markdownlint-enable MD013 -->
 
 The table must contain column headers in the **first row** of the worksheet. The first
 three columns (Name, Taxon name and Taxon type) are mandatory and contain the following:
 
-* **Name**: This column must contain a local name for **all** of the taxa that you are
+- **Name**: This column must contain a local name for **all** of the taxa that you are
   going to use in the rest of the dataset. You cannot have duplicated names! Note that
   these can be abbreviations or codes: if you want to use `Crbe` in your data
   worksheets, rather than typing out `Crematogaster borneensis` every time, then that is
   fine.
 
 !!! Note
-
     These are the names that you are going to use in your data worksheet. The
     other columns are to help us validate the taxonomy of your names.
 
-* **Taxon name**: This column must contain the scientific name of the taxon, which will
+- **Taxon name**: This column must contain the scientific name of the taxon, which will
   be used for taxon validation via GBIF. Note that this should not include any taxon
   authority, so _Panthera tigris_ not _Panthera tigris_ (Linnaeus, 1758).
 
-* **Taxon type**: This column must provide the **taxonomic type** of the named taxon,
+- **Taxon type**: This column must provide the **taxonomic type** of the named taxon,
   which is usually the taxonomic **rank**. For example, the taxon _Pongo pygmaeus_ would
   be of type `Species` and the taxon Formicidae would be of type `Family`. If the taxon
   type is not one of the core GBIF backbone levels ( Kingdom, Phylum, Order, Class,
@@ -62,7 +63,7 @@ three columns (Name, Taxon name and Taxon type) are mandatory and contain the fo
   `Morphospecies` or `Functional group`, then you will need to provide a **parent
   taxon** (see below).
 
-* **Comments**: This is entirely optional - if you have a fairly standard set of taxa
+- **Comments**: This is entirely optional - if you have a fairly standard set of taxa
   with no  serious issues then you can leave it out entirely or it can be empty. If you
   do have particular notes that you want to make - explaining disagreements with GBIF
   taxonomy, new species notes and the  like - then these can be very useful for future
@@ -84,16 +85,17 @@ The example in the table allows us to confirm that you mean this _Morus_:
 
 ### Incorrect GBIF taxonomy
 
- In general, we follow the GBIF 'accepted usage' of a taxon name and this includes
- following when GBIF say a taxon is a synonym. We include your taxon name in our
- taxonomic indices, but under the taxonomic hierarchy suggested by GBIF.
+In general, we follow the GBIF 'accepted usage' of a taxon name and this includes
+following when GBIF say a taxon is a synonym. We include your taxon name in our
+taxonomic indices, but under the taxonomic hierarchy suggested by GBIF.
 
- In the example in the table, GBIF asserts that _Microcopris hidakai_ is a synonym of
- [_Onthophagus hidakai_](https://www.gbif.org/species/1090433) and so our taxonomic
- index will include both those names under the parent genus _Onthophagus_. The taxon
- validation of your dataset does warn about this in the output:
+In the example in the table, GBIF asserts that _Microcopris hidakai_ is a synonym of
+[_Onthophagus hidakai_](https://www.gbif.org/species/1090433) and so our taxonomic
+index will include both those names under the parent genus _Onthophagus_. The taxon
+validation of your dataset does warn about this in the output:
 
-    ? Row 7 (micr_hid): considered a homotypic_synonym of Onthophagus hidakai (1090433) in GBIF backbone
+> ? Row 7 (micr_hid): considered a homotypic_synonym of Onthophagus hidakai (1090433)
+> in GBIF backbone
 
 If you strongly disagree with that accepted usage, then you can use the **Ignore ID**
 field to explicitly ignore the GBIF match. You will need to insert the GBIF ID number of
@@ -124,7 +126,7 @@ provide _Pongo_ as a parent name of type 'genus',
 
 You would then get a message in the file validation report saying:
 
-    - Row 4 (lost_orang): not found in GBIF but has valid parent information
+> \- Row 4 (lost_orang): not found in GBIF but has valid parent information
 
 ### Morphospecies and Functional groups
 
@@ -137,7 +139,7 @@ morphospecies and functional groups is quite variable, but we'd like the finest
 taxonomic level you can provide. As an example, in the table above, 'Morphospecies #1'
 is simply identified as being an ant. The validation report will show:
 
-    - Row 5 (morpho1): Morphospecies with valid parent information
+> \- Row 5 (morpho1): Morphospecies with valid parent information
 
 ### Less common taxonomic levels
 

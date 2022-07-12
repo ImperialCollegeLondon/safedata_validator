@@ -2,7 +2,7 @@
 
 TODO Incomplete
 
-### Configure `git`
+## Configure `git`
 
 It is easier if `git` is configured to push new tags along with commits. This
 essentially just means that new releases can be sent with a single commit, which

@@ -85,11 +85,15 @@ safedata_validate MyData.xlsx -g /path/to/gbif_backbone.sqlite
 
 ### NCBITaxa
 
-Taxon checking against NCBI can be similarly sped up by downloading a copy of the online database and building a SQLite3 database from it. Using a local database is substantially faster than using the online NCBI Entrez tools. Instructions on how to construct the local database are given [here](../install/build_local_ncbi.md), again the resulting database is large so you'll need to ensure you have sufficient file space!
+Taxon checking against NCBI can be similarly sped up by downloading a copy of the online
+database and building a SQLite3 database from it. Using a local database is
+substantially faster than using the online NCBI Entrez tools. Instructions on how to
+construct the local database are given [here](../install/build_local_ncbi.md), again the
+resulting database is large so you'll need to ensure you have sufficient file space!
 
 Once you have this file, you can use it like this:
 
-    TODO - INSERT USAGE HERE
+TODO - INSERT USAGE HERE
 
 ### Fully offline use
 

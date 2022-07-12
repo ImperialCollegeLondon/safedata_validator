@@ -37,35 +37,39 @@ to check this:
   more than one step up the hierarchy. The table below shows child taxon level as rows
   and parent taxon level as columns.
 
-  |           | kingdom| phylum| class| order| family|   genus| species| subspecies| variety| form|
-  |:----------|-------:|------:|-----:|-----:|------:|-------:|-------:|----------:|-------:|----:|
-  |kingdom    |       0|      0|     0|     0|      0|       0|       0|          0|       0|    0|
-  |phylum     |     100|      0|     0|     0|      0|       0|       0|          0|       0|    0|
-  |class      |       5|    316|     0|     0|      0|       0|       0|          0|       0|    0|
-  |order      |       7|     45|  1327|     0|      0|       0|       0|          0|       0|    0|
-  |family     |    2191|   1339|  4267| 14423|      0|       0|       0|          0|       0|    0|
-  |genus      |    3427|   4985|  5584|  6260| 220735|       0|       0|          0|       0|    0|
-  |species    |    1567|    706|  1529|   696|   8944| 2449414|       0|          0|       0|    0|
-  |subspecies |      41|      7|     3|     2|    832|     268|  200902|          0|       0|    0|
-  |variety    |      53|     10|     0|    26|   2661|      50|   82914|         32|       0|    0|
-  |form       |      12|      4|     0|     4|    815|      18|   19272|          0|      56|    0|
+<!-- markdownlint-disable MD013 -->
+|           | kingdom| phylum| class| order| family|   genus| species| subspecies| variety| form|
+|:----------|-------:|------:|-----:|-----:|------:|-------:|-------:|----------:|-------:|----:|
+|kingdom    |       0|      0|     0|     0|      0|       0|       0|          0|       0|    0|
+|phylum     |     100|      0|     0|     0|      0|       0|       0|          0|       0|    0|
+|class      |       5|    316|     0|     0|      0|       0|       0|          0|       0|    0|
+|order      |       7|     45|  1327|     0|      0|       0|       0|          0|       0|    0|
+|family     |    2191|   1339|  4267| 14423|      0|       0|       0|          0|       0|    0|
+|genus      |    3427|   4985|  5584|  6260| 220735|       0|       0|          0|       0|    0|
+|species    |    1567|    706|  1529|   696|   8944| 2449414|       0|          0|       0|    0|
+|subspecies |      41|      7|     3|     2|    832|     268|  200902|          0|       0|    0|
+|variety    |      53|     10|     0|    26|   2661|      50|   82914|         32|       0|    0|
+|form       |      12|      4|     0|     4|    815|      18|   19272|          0|      56|    0|
+<!-- markdownlint-enable MD013 -->
 
 * Only 77% of **unaccepted taxa** map to a parent at the next most nested
   taxonomic level and 4.5% map to a parent at the same or a less nested level,
   as in the example above.
 
-  |           | kingdom| phylum| class| order| family|   genus| species| subspecies| variety| form|
-  |:----------|-------:|------:|-----:|-----:|------:|-------:|-------:|----------:|-------:|----:|
-  |kingdom    |       0|      0|     0|     0|      0|       0|       0|          0|       0|    0|
-  |phylum     |      22|      8|     0|     0|      0|       0|       0|          0|       0|    0|
-  |class      |       0|     14|     1|     0|      0|       0|       0|          0|       0|    0|
-  |order      |       0|      5|    32|     0|      0|       0|       0|          0|       0|    0|
-  |family     |      21|    157|   481|  3599|      0|       0|       0|          0|       0|    0|
-  |genus      |    8555|  24242| 25055| 31010| 185911|       0|       0|          0|       0|    0|
-  |species    |      64|     24|   173|   405|   2142| 1886329|  121225|         84|       5|    0|
-  |subspecies |       3|      0|     1|     0|    151|   77512|   26266|         13|       0|    0|
-  |variety    |       2|      1|     0|     2|    367|  212954|   50062|         47|       4|    0|
-  |form       |       0|      0|     0|     0|    128|   48126|   10449|          3|       2|    0|
+<!-- markdownlint-disable MD013 -->
+|           | kingdom| phylum| class| order| family|   genus| species| subspecies| variety| form|
+|:----------|-------:|------:|-----:|-----:|------:|-------:|-------:|----------:|-------:|----:|
+|kingdom    |       0|      0|     0|     0|      0|       0|       0|          0|       0|    0|
+|phylum     |      22|      8|     0|     0|      0|       0|       0|          0|       0|    0|
+|class      |       0|     14|     1|     0|      0|       0|       0|          0|       0|    0|
+|order      |       0|      5|    32|     0|      0|       0|       0|          0|       0|    0|
+|family     |      21|    157|   481|  3599|      0|       0|       0|          0|       0|    0|
+|genus      |    8555|  24242| 25055| 31010| 185911|       0|       0|          0|       0|    0|
+|species    |      64|     24|   173|   405|   2142| 1886329|  121225|         84|       5|    0|
+|subspecies |       3|      0|     1|     0|    151|   77512|   26266|         13|       0|    0|
+|variety    |       2|      1|     0|     2|    367|  212954|   50062|         47|       4|    0|
+|form       |       0|      0|     0|     0|    128|   48126|   10449|          3|       2|    0|
+<!-- markdownlint-enable MD013 -->
 
 The two different APIs for offline and online usage work to try and get the same
 answer.

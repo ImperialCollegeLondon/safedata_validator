@@ -207,7 +207,9 @@ be easier to read:
 If the levels aren't obvious, we'd also like label descriptions: they come after
 each label, separated by colons (`:`). For example:
 
-    Control:sites in reserve forest;Logged:sites in logged forest;Burned:sites in burned forest
+    Control:sites in reserve forest;
+    Logged:sites in logged forest;
+    Burned:sites in burned forest
 
 **Do not** use colons or semi-colons in your level names or descriptions!
 
@@ -215,7 +217,11 @@ For Ordered Categorical fields, the order of the entries in the `levels`
 descriptor should be the logical order of the factor. For example, an ordered
 disturbance gradient could be:
 
-    Primary:primary rainforest;Once:once logged rainforest;Twice:twice logged;Salvage:salvage logged;Oil palm:plantation
+    Primary:primary rainforest;
+    Once:once logged rainforest;
+    Twice:twice logged;
+    Salvage:salvage logged;
+    Oil palm:plantation
 
 ### Numeric data
 

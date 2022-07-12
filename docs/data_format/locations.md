@@ -9,14 +9,16 @@ relatively simply.
 So, we expect you'll have a set of location names in your data sheets, all of which
 should appear in this worksheet. The worksheet must have the following structure
 
-| Location name | New | Latitude | Longitude | Type | WKT |
-|---|---|---|---|---|---|
-| E_194 | No |  |   |   |  |
-| E_195 | No |  |   |   |  |
-| My_site_1 | Yes | 4.957721 | 117.776023 | POINT | NA |
-| My_site_2 | Yes | NA | NA | POINT | NA |
-| My_site_3 | Yes | NA | NA | POINT | Point(117.7762 4.9576) |
-| My_transect_1 | Yes | NA | NA | Linestring | Linestring(117.7762 4.9576, 117.7862 4.9676) |
+<!-- markdownlint-disable MD013 -->
+| Location name | New | Latitude | Longitude  | Type       | WKT                                          |
+| ------------- | --- | -------- | ---------- | ---------- | -------------------------------------------- |
+| E_194         | No  |          |            |            |                                              |
+| E_195         | No  |          |            |            |                                              |
+| My_site_1     | Yes | 4.957721 | 117.776023 | POINT      | NA                                           |
+| My_site_2     | Yes | NA       | NA         | POINT      | NA                                           |
+| My_site_3     | Yes | NA       | NA         | POINT      | Point(117.7762 4.9576)                       |
+| My_transect_1 | Yes | NA       | NA         | Linestring | Linestring(117.7762 4.9576, 117.7862 4.9676) |
+<!-- markdownlint-enable MD013 -->
 
 ## Known locations
 
@@ -53,26 +55,26 @@ Gazetteer.
 If you include new locations then you will need to include the following columns in your
 Locations worksheet:
 
-* **New**: This should simply contain Yes or No to show which rows contain new
+- **New**: This should simply contain Yes or No to show which rows contain new
   locations. You must enter 'No' for known locations and you cannot create a new
   location with a name that matches an existing location in the Gazetteer.
 
-* **Type**: This is mandatory and is just an indication of the kind of sampling
+- **Type**: This is mandatory and is just an indication of the kind of sampling
   location: 'point', 'transect' or 'area' (or the more GIS names of 'point',
   'linestring' or 'polygon').
 
-* **Latitude** and **Longitude**: these should provide GPS coordinates for the new site.
+- **Latitude** and **Longitude**: these should provide GPS coordinates for the new site.
   These must be provided as decimal degrees (not degrees minutes and seconds) and please
   provide 6 decimal places in your coordinates. This level of precision is around ten
   centimetres and, although the GPS from the field is highly unlikely to be accurate to
   this level, we want to record as much sampling precision as possible.
 
-    Note that you can provide a simple latitude and longitude for any location type: you
-    might not have the coordinates of the whole transect but can give a start point. Any
-    information is better than none but if you don't have any data, then you can enter
-    NA.
+  Note that you can provide a simple latitude and longitude for any location type: you
+  might not have the coordinates of the whole transect but can give a start point. Any
+  information is better than none but if you don't have any data, then you can enter
+  NA.
 
-* **WKT**: This optional field can be used to provide GIS geometry data for the location
+- **WKT**: This optional field can be used to provide GIS geometry data for the location
   in the [well-known text
   format](https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry).
   This is a good way to provide precise GIS data for a location.
@@ -106,8 +108,8 @@ about vector data attribute tables as part of the Excel file.
 You don't **have** to include the Locations worksheet, although it would be very unusual
 to omit it. Possible examples:
 
-* You are working with lab data (and don't need to say where specimens came from in the
+- You are working with lab data (and don't need to say where specimens came from in the
   field)
-* You are collecting data haphazardly from across the landscape, for example tracking
+- You are collecting data haphazardly from across the landscape, for example tracking
   animal movements, and the data isn't tied to particular sampling locations. We would
   then want GPS data for each observation!
