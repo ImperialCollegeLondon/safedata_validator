@@ -266,8 +266,11 @@ def upload_metadata(
         return "success", None
 
 
-# FIXME
-def update_published_metadata(zenodo_record_id, new_values):
+def update_published_metadata(
+    zenodo_md: dict,
+    zenodo_md_update: dict,
+    resources: Resources = None,
+):
     """
     Function to update the metadata on a published deposit. Currently used to
     modify the access status of deposit.
@@ -278,38 +281,32 @@ def update_published_metadata(zenodo_record_id, new_values):
              the existing Zenodo deposition metadata resource.
     """
 
-    # load the correct API and token
-    api, token = get_zenodo_api()
+    # Get resource configuration
+    zres = _resources_to_zenodo_api(resources)
 
-    code, dep = get_deposit(api, token, zenodo_record_id)
-
-    if code != 0:
-        return 1, dep
-
-    links = dep["links"]
-    metadata = dep["metadata"]
+    links = zenodo_md["links"]
 
     # Unlock the published deposit for editing
-    edt = requests.post(links["edit"], params=token)
+    edt = requests.post(links["edit"], params=zres["ztoken"])
 
     if edt.status_code != 201:
         return 1, edt.json()
 
-    # Amend the metadata
-    for key, val in new_values.items():
-        if val is not None:
-            metadata[key] = val
-        elif key in metadata:
-            metadata.pop(key)
+    # # Amend the metadata
+    # for key, val in new_values.items():
+    #     if val is not None:
+    #         metadata[key] = val
+    #     elif key in metadata:
+    #         metadata.pop(key)
 
     # If any API calls from now fail, we need to tidy up the edit
     # status of the record, or it will block subsequent attempts
 
     upd = requests.put(
         links["self"],
-        params=token,
+        params=zres["ztoken"],
         headers={"Content-Type": "application/json"},
-        data=simplejson.dumps({"metadata": metadata}),
+        data=simplejson.dumps({"metadata": zenodo_md_update}),
     )
 
     success_so_far = 0 if upd.status_code != 200 else 1
@@ -317,7 +314,7 @@ def update_published_metadata(zenodo_record_id, new_values):
 
     # Republish to save the changes
     if success_so_far:
-        pub = requests.post(links["publish"], params=token)
+        pub = requests.post(links["publish"], params=zres["ztoken"])
         success_so_far = 0 if pub.status_code != 202 else 1
         ret = pub.json()
 
@@ -328,7 +325,7 @@ def update_published_metadata(zenodo_record_id, new_values):
     if success_so_far:
         return 0, ret
     else:
-        dsc = requests.post(links["discard"], params=token)
+        dsc = requests.post(links["discard"], params=zres["ztoken"])
         success_so_far = 0 if dsc.status_code != 201 else 1
         if not success_so_far:
             ret = dsc.json()
@@ -386,7 +383,7 @@ def upload_file(
                 total=file_size, unit="B", unit_scale=True, unit_divisor=1024
             ) as cm:
                 # Upload the wrapped file
-                wrapped_file = CallbackIOWrapper(cm.update, fp, "read")
+                _ = CallbackIOWrapper(cm.update, fp, "read")
                 fls = requests.put(api, data=fp, params=params)
         else:
             fls = requests.put(api, data=fp, params=params)
@@ -905,7 +902,7 @@ def table_description(tab: Dict) -> tags.div:
 def generate_inspire_xml(
     metadata: Dict,
     zenodo_metadata: dict,
-    ds_url: str = None,
+    resources: Resources,
     lineage_statement: str = None,
 ) -> str:
 
@@ -920,12 +917,16 @@ def generate_inspire_xml(
     Args:
         metadata: A dictionary of the dataset metadata
         zenodo_metadata: A dictionary of the Zenodo record metadata
-        ds_url: An optional alternative URL for the dataset.
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
         lineage_statement: An optional lineage statement about the data.
 
     Returns:
         A string containing GEMINI compliant XML.
     """
+
+    # Get resource configuration
+    zres = _resources_to_zenodo_api(resources)
 
     # parse the XML template and get the namespace map
     template = os.path.join(__file__, "gemini_xml_template.xml")
@@ -957,13 +958,10 @@ def generate_inspire_xml(
     ).text = pub_date.date().isoformat()
 
     # URIs - a dataset URL and the DOI
-    dataset_url = URL(
-        "datasets",
-        "view_dataset",
-        vars={"id": metadata["zenodo_record_id"]},
-        scheme=True,
-        host=True,
+    dataset_url = (
+        f"{zres['mdapi']}/datasets/view_dataset?id={metadata['zenodo_record_id']}"
     )
+
     citation.find(
         "gmd:identifier/gmd:MD_Identifier/gmd:code/gco:CharacterString", nsmap
     ).text = dataset_url
@@ -1004,8 +1002,10 @@ def generate_inspire_xml(
 
     # AUTHORS - find the point of contact with author role from the template and its
     # index using xpath() here to access full xpath predicate search.
-    au_xpath = "./gmd:pointOfContact[gmd:CI_ResponsibleParty/" \
-               "gmd:role/gmd:CI_RoleCode='author']"
+    au_xpath = (
+        "./gmd:pointOfContact[gmd:CI_ResponsibleParty/"
+        "gmd:role/gmd:CI_RoleCode='author']"
+    )
     au_node = data_id.xpath(au_xpath, namespaces=nsmap)[0]
     au_idx = data_id.index(au_node)
 
@@ -1014,8 +1014,10 @@ def generate_inspire_xml(
         data_id.insert(au_idx, copy.deepcopy(au_node))
 
     # now populate the author nodes, there should now be one for each author
-    au_ls_xpath = "./gmd:pointOfContact[gmd:CI_ResponsibleParty/" \
-                  "gmd:role/gmd:CI_RoleCode='author']"
+    au_ls_xpath = (
+        "./gmd:pointOfContact[gmd:CI_ResponsibleParty/"
+        "gmd:role/gmd:CI_RoleCode='author']"
+    )
     au_node_list = data_id.xpath(au_ls_xpath, namespaces=nsmap)
 
     for au_data, au_node in zip(metadata["authors"], au_node_list):
@@ -1043,8 +1045,10 @@ def generate_inspire_xml(
 
     # CONSTRAINTS
     # update the citation information in the second md constraint
-    md_path = "gmd:resourceConstraints/gmd:MD_Constraints/" \
-              "gmd:useLimitation/gco:CharacterString"
+    md_path = (
+        "gmd:resourceConstraints/gmd:MD_Constraints/"
+        "gmd:useLimitation/gco:CharacterString"
+    )
     md_constraint = data_id.find(md_path, nsmap)
     md_constraint.text += cite_string
 
@@ -1099,7 +1103,7 @@ def generate_inspire_xml(
             "gmd:CI_OnlineResource/gmd:linkage/gmd:URL"
         ),
         nsmap,
-    ).text = zenodo_md["files"][0]["links"]["download"]
+    ).text = zenodo_metadata["files"][0]["links"]["download"]
     distrib.find(
         (
             "gmd:transferOptions[2]/gmd:MD_DigitalTransferOptions/gmd:onLine/"
@@ -1109,19 +1113,21 @@ def generate_inspire_xml(
     ).text += str(metadata["zenodo_record_id"])
 
     # LINEAGE STATEMENT
-    lineage = (
-        "This dataset was collected as part of a research project based at The"
-        " SAFE Project. For details of the project and data collection, see the "
-        "methods information contained within the datafile and the project "
-        "website: "
-    ) + URL("projects", "view_project", args=record.project_id, scheme=True, host=True)
+    # lineage = (
+    #     "This dataset was collected as part of a research project based at The"
+    #     " SAFE Project. For details of the project and data collection, see the "
+    #     "methods information contained within the datafile and the project "
+    #     "website: "
+    # ) + URL("projects", "view_project", args=record.project_id, scheme=True,
+    # host=True)
+
     root.find(
         (
             "gmd:dataQualityInfo/gmd:DQ_DataQuality/gmd:lineage/gmd:LI_Lineage/"
             "gmd:statement/gco:CharacterString"
         ),
         nsmap,
-    ).text = lineage
+    ).text = lineage_statement
 
     # return the string contents
     return etree.tostring(tree)

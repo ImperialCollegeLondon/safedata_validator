@@ -15,10 +15,12 @@ from safedata_validator.zenodo import (
     delete_file,
     discard_deposit,
     download_ris_data,
+    generate_inspire_xml,
     get_deposit,
     post_metadata,
     publish_deposit,
     sync_local_dir,
+    update_published_metadata,
     upload_file,
     upload_metadata,
 )
@@ -232,6 +234,24 @@ def _safedata_zenodo_cli():
         "dataset_json", type=str, help="Path to a dataset metadata file"
     )
 
+    # update_metadata subcommand
+    add_metadata_desc = """Updates the Zenodo metadata for an published
+    deposit, using a modified version of the deposit metadata file.
+    """
+
+    parser_add_md = subparsers.add_parser(
+        "update_metadata",
+        description=textwrap.dedent(add_metadata_desc),
+        help="Update published Zenodo metadata",
+    )
+
+    parser_add_md.add_argument(
+        "deposit_json", type=str, help="Path to a Zenodo metadata file"
+    )
+    parser_add_md.add_argument(
+        "deposit_json_update", type=str, help="Path to an updated Zenodo metadata file"
+    )
+
     # Discard subcommand
     discard_desc = """Discard an unpublished deposit. The deposit and all uploaded
     files will be removed from Zenodo."""
@@ -249,7 +269,7 @@ def _safedata_zenodo_cli():
         help="Path to a Zenodo metadata file for the deposit to discard",
     )
 
-    # post_metadata subcommand
+    # publish deposit subcommand
     publish_desc = """Publishes a Zenodo deposit, creating a permanent DOI"""
 
     parser_publish = subparsers.add_parser(
@@ -387,6 +407,31 @@ def _safedata_zenodo_cli():
         "dataset_json", type=str, help="Path to a dataset metadata file"
     )
 
+    # generate_xml subcommand
+    generate_xml_desc = """Creates an INSPIRE compliant XML metadata file for a
+    published dataset, optionally including a user provided lineage statement (such as
+    project details).
+    """
+
+    parser_gen_xml = subparsers.add_parser(
+        "generate_xml",
+        description=textwrap.dedent(generate_xml_desc),
+        help="Create INSPIRE compliant metadata XML",
+    )
+
+    parser_gen_xml.add_argument(
+        "deposit_json", type=str, help="Path to a Zenodo metadata file"
+    )
+    parser_gen_xml.add_argument(
+        "dataset_json", type=str, help="Path to a dataset metadata file"
+    )
+    parser_gen_xml.add_argument(
+        "-l",
+        "--lineage-statement",
+        type=str,
+        help="Path to a text file containing a lineage statement",
+    )
+
     # Parse the arguments and set the verbosity
     args = parser.parse_args()
 
@@ -395,6 +440,9 @@ def _safedata_zenodo_cli():
         resources = Resources(args.resources)
         print("\nZenodo configuration:")
         for key, val in resources.zenodo.items():
+            print(f" - {key}: {val}")
+        print("\nMetadata server configuration:")
+        for key, val in resources.metadata.items():
             print(f" - {key}: {val}")
         return
 
@@ -574,6 +622,28 @@ def _safedata_zenodo_cli():
         else:
             LOGGER.info("Metadata uploaded")
 
+    elif args.subcommand == "update_metadata":
+
+        # Open the two JSON files
+        with open(args.deposit_json) as zn_json:
+            zenodo_json = simplejson.load(zn_json)
+
+        with open(args.deposit_json_update) as zn_json_update:
+            zenodo_json_update = simplejson.load(zn_json_update)
+
+        # Run the function
+        response, error = update_published_metadata(
+            zenodo_md=zenodo_json,
+            zenodo_md_update=zenodo_json_update,
+            resources=resources,
+        )
+
+        # Report on the outcome.
+        if error is not None:
+            LOGGER.error(f"Failed to update published metadata: {error}")
+        else:
+            LOGGER.info("Metadata updated")
+
     elif args.subcommand == "post_metadata":
 
         # Open the two JSON files
@@ -593,6 +663,35 @@ def _safedata_zenodo_cli():
             LOGGER.error(f"Failed to post metadata: {error}")
         else:
             LOGGER.info("Metadata posted")
+
+    elif args.subcommand == "generate_xml":
+
+        # Open the two JSON files
+        with open(args.dataset_json) as ds_json:
+            dataset_json = simplejson.load(ds_json)
+
+        with open(args.deposit_json) as zn_json:
+            zenodo_json = simplejson.load(zn_json)
+
+        if args.lineage_statement is not None:
+            with open(args.lineage_statement) as lin_file:
+                lineage_statement = lin_file.readlines()
+        else:
+            lineage_statement = None
+
+        # Run the function
+        response, error = generate_inspire_xml(
+            metadata=dataset_json,
+            zenodo=zenodo_json,
+            resources=resources,
+            lineage_statement=lineage_statement,
+        )
+
+        # Report on the outcome.
+        if error is not None:
+            LOGGER.error(f"Failed to generate INSPIRE xml: {error}")
+        else:
+            LOGGER.info("Inspire XML generated")
 
     elif args.subcommand == "publish":
 
