@@ -1,3 +1,12 @@
+"""Provide command line scripts.
+
+This module provides command line scripts to expose validation and publishing
+functionality.
+
+* _safedata_validate_cli, exposed as `safedata_validate`
+* _safedata_zenodo_cli, exposed as `safedata_zenodo`
+"""
+
 import argparse
 import os
 import sys
@@ -27,7 +36,8 @@ from safedata_validator.zenodo import (
 
 
 def _safedata_validator_cli():
-    """
+    """Validate a dataset using a command line interface.
+
     This program validates an Excel file formatted as a SAFE dataset. As it
     runs, it outputs a report that highlights any problems with the formatting.
     Much of the validation is to check that the data meets our metadata
@@ -36,8 +46,9 @@ def _safedata_validator_cli():
     However, the package uses external resources to perform validation of taxa
     and sampling locations and to provide other information. For this reason,
     using this program requires you to provide a configuration file for these
-    resources or to have installed a configuration file in a standard location
-    (see the package website API for details.)
+    resources or to have installed a configuration file in a standard location.
+    If you run `safedata_validate` without a configuration file, the output will
+    report the standard locations for your operating system.
 
     If validation is successful, then a JSON format file containing key metadata
     will be saved to the same location as the validated file. The JSON metadata
@@ -59,6 +70,13 @@ def _safedata_validator_cli():
         "matches this integer. Multiple values can be provided "
         "to generate a set of valid IDs.",
         dest="valid_pid",
+    )
+    parser.add_argument(
+        "-r",
+        "--resources",
+        type=str,
+        default=None,
+        help=("A path to a resources configuration file"),
     )
     parser.add_argument(
         "--validate_doi",
@@ -87,7 +105,7 @@ def _safedata_validator_cli():
 
     args = parser.parse_args()
 
-    ds = Dataset()
+    ds = Dataset(resources=args.resources)
     ds.load_from_workbook(
         filename=args.filename,
         valid_pid=args.valid_pid,
@@ -107,7 +125,8 @@ def _safedata_validator_cli():
 
 
 def _safedata_zenodo_cli():
-    """
+    """Publish validate datasets to Zenodo using a command line interface.
+
     This is a the command line interface for publishing safedata validated datasets to
     Zenodo, downloading information and maintaining a local copy of the datasets in the
     file structure required by the R safedata package.
