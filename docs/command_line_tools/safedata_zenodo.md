@@ -14,8 +14,8 @@ use of two _different_ JSON metadata files.
 
 The `safedata_validate` command generates a JSON file containing a standard JSON
 description of the metadata in the dataset and of the data tables it contains.
-This file is used to populate the Zenodo description of the published dataset
-files.
+Some of this metadata is used to populate the Zenodo description of the published
+dataset files.
 
 The dataset metadata is _also_ used to populate the database of a **metadata
 server**. This is a separate website that provides the API for searching
@@ -33,7 +33,8 @@ used to provide file details.
 !!! info
     The subcommands of the `safedata_zenodo` tools require that the `zenodo`  and
     `metadata` sections of the [resources
-    configuration](../install/configuration.md#zenodo) be completed.
+    configuration](../install/configuration.md#zenodo) be completed. These are not
+    required for simply validating datasets.
 
 The `safedata_zenodo` command line tool provides the following subcommands which
 are used to publish data, post metadata and help maintain and document published
@@ -43,7 +44,7 @@ The top level command line help for the tool, showing the available subcommands
 is shown below:
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_top.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_top.txt!}
 ```
 
 ### Simple publication process
@@ -80,65 +81,83 @@ The command line help for each of the various subcommands is shown below:
 #### The `create` subcommand
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_create.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_create.txt!}
 ```
 
 #### The `upload_file` subcommand
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_upload_file.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_upload_file.txt!}
 ```
 
 #### The `delete_file` subcommand
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_delete_file.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_delete_file.txt!}
 ```
 
 #### The `upload_metadata` subcommand
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_upload_metadata.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_upload_metadata.txt!}
+```
+
+#### The `update_metadata` subcommand
+
+```sh
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_update_metadata.txt!}
 ```
 
 #### The `discard` subcommand
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_discard.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_discard.txt!}
 ```
 
 #### The `publish` subcommand
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_publish.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_publish.txt!}
 ```
 
 #### The `info` subcommand
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_info.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_info.txt!}
 ```
 
 #### The `sync_local_dir` subcommand
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_sync_local_dir.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_sync_local_dir.txt!}
 ```
 
 #### The `ris` subcommand
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_ris.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_ris.txt!}
 ```
 
 #### The `html_description` subcommand
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_html_description.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_html_description.txt!}
 ```
 
 #### The `post_metadata` subcommand
 
 ```sh
-{!docs/command_line_usage/safedata_zenodo_post_metadata.txt!}
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_post_metadata.txt!}
+```
+
+#### The `generate_xml` subcommand
+
+```sh
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_generate_xml.txt!}
+```
+
+#### The `show_config` subcommand
+
+```sh
+{!docs/command_line_tools/command_line_usage/safedata_zenodo_show_config.txt!}
 ```

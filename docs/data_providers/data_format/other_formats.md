@@ -5,8 +5,8 @@ We understand that Excel may not be everyone's preferred option but:
 * it is extremely commonly used,
 * it is widely available,
 * the format is well supported in a range of programming languages, and
-* it is well-suited to storing tabular data frames, as long as the data is [well
-  structured and validated](../usage/usage.md).
+* it is well-suited to storing tabular data frames, as long as the data is well
+  structured and validated.
 
 However, you can include files in any format in a dataset published through SAFE. These
 could include zipped archives containing raw data that has been used to construct the

@@ -29,24 +29,31 @@ zenodo_api = https://api.zenodo.org
 zenodo_token = xyz
 ```
 
-Only the `locations` entry is really required, pointing to a local copy of a
-SAFE format gazetteer file in JSON format. An example of this file can be
+### Locations
+
+Locations are validated against a set of known location names and possible
+aliases for those names. The data resource providing this information is set
+with the `location` configuration, providing to local JSON formatted file containing
+known locations and location aliases. An example of this file format can be
 downloaded from:
 
-[https://www.safeproject.net/api/validator_locations]("https://www.safeproject.net/api/validator_locations")
+[https://www.safeproject.net/api/validator_locations](https://www.safeproject.net/api/validator_locations)
+
+### GBIF database
 
 The `gbif_database` value can be left empty (`gbif_database =`), in which case
 the package will use the online GBIF API for taxon validation. Alternatively,
 the `gbif_database` entry can be used to point to a local copy of the GBIF
-backbone database, which is _very_ much faster but requires the database to be
-built (see [here](build_local_gbif))
+backbone database, which is _very_ much faster but [requires the database to be
+built](build_local_gbif).
+
+### NCBI database
 
 The `ncbi_database` value can also be left empty (`ncbi_database =`), in which case the
 package will access the online NCBI taxonomy database using the [Entrez
 system](https://www.ncbi.nlm.nih.gov/Web/Search/entrezfs.html). Alternatively, the
 `ncbi_database` entry can be used to point to a local copy of the NCBI database, which
-is _very_ much faster but requires the database to be built (see
-[here](build_local_ncbi)).
+is _very_ much faster but again [requires the database to be built](build_local_ncbi).
 
 ### Extents
 
