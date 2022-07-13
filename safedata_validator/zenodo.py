@@ -268,17 +268,17 @@ def upload_metadata(
 
 def update_published_metadata(
     zenodo_md: dict,
-    zenodo_md_update: dict,
     resources: Resources = None,
 ):
     """
-    Function to update the metadata on a published deposit. Currently used to
-    modify the access status of deposit.
+    Function to update the metadata on a published deposit, for example to modify the
+    access status of deposit. In general, metadata should be updated by releasing a new
+    version of the dataset,
 
     Args:
-        zenodo_record_id: The record id of the deposit to be updated
-        new_values: A dictionary of new values to be substituted in to
-             the existing Zenodo deposition metadata resource.
+        zenodo_md: A Zenodo metadata dictionary, with an updated metadata section
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
     """
 
     # Get resource configuration
@@ -306,7 +306,7 @@ def update_published_metadata(
         links["self"],
         params=zres["ztoken"],
         headers={"Content-Type": "application/json"},
-        data=simplejson.dumps({"metadata": zenodo_md_update}),
+        data=simplejson.dumps({"metadata": zenodo_md["metadata"]}),
     )
 
     success_so_far = 0 if upd.status_code != 200 else 1

@@ -108,12 +108,23 @@ def _safedata_validator_cli():
 
 def _safedata_zenodo_cli():
     """
-    This is a the command line interface for publishing safedata
-    validated datasets to Zenodo, downloading information and maintaining a
-    local copy of the datasets in the file structure required by the R safedata
-    package.
+    This is a the command line interface for publishing safedata validated datasets to
+    Zenodo, downloading information and maintaining a local copy of the datasets in the
+    file structure required by the R safedata package.
 
-    See the individual help for each of the subcommands
+    The safedata_zenodo command is used by providing a subcommand for the action you
+    want to take. Individual help is available for each of the subcommands:
+        safedata_zenodo subcommand -h
+
+    The subcommands for this tool use two different JSON format metadata files.
+        * A dataset metadata file (`dataset_json`). This is the output from using
+          the `safedata_validate` tool. Some of the information in this file is used
+          to create the Zenodo dataset description, and all of the data is used to
+          describe a dataset on the separate metadata server.
+        * A Zenodo metadata file (`zenodo_json`), that describes the metadata
+          associated with a Zenodo deposit or published record.
+
+    Note that most of these actions are also available via the Zenodo website.
     """
 
     # create the top-level parser and configure to take subparsers
@@ -130,12 +141,6 @@ def _safedata_zenodo_cli():
     )
 
     parser.add_argument(
-        "--show-config",
-        action="store_true",
-        help="Report the config being used and exit",
-    )
-
-    parser.add_argument(
         "-q",
         "--quiet",
         action="store_true",
@@ -145,41 +150,45 @@ def _safedata_zenodo_cli():
     subparsers = parser.add_subparsers(dest="subcommand")
 
     # Setup the parser for the "create" command
-    create_desc = """Create a new deposit draft, possibly as a new version of an
-    existing _published_ record, with a provided zenodo _concept_ ID
+    create_desc = """
+    Create a new deposit draft. The concept_id option uses a provided Zenodo concept ID
+    to creates a draft as a new version of an existing data set.
 
-    When successful, the function also downloads and saves a JSON file
-    containing the Zenodo deposit metadata. This file is used as an input to
-    other subcommands that work with an existing deposit.
+    When successful, the function downloads and saves a JSON file containing the
+    resulting Zenodo deposit metadata. This file is used as an input to other
+    subcommands that work with an existing deposit.
     """
     parser_create = subparsers.add_parser(
-        "create", description=textwrap.dedent(create_desc), help="Create a new deposit"
+        "create",
+        description=textwrap.dedent(create_desc),
+        help="Create a new Zenodo deposit",
+        formatter_class=fmt,
     )
 
     parser_create.add_argument(
-        "-d",
-        "--deposit_id",
+        "-c",
+        "--concept_id",
         type=int,
         default=None,
-        help="The draft created will be a new version of the "
-        "existing published Zenodo record with this concept ID",
+        help="A Zenodo concept ID",
     )
 
     # Setup the parser for the "upload" command
-    upload_desc = """Uploads the contents of a specified file to an
-    _unpublished_ Zenodo deposit, optionally using an alternative filename.
-    If you upload a new file to the same filename, it will replace the existing
-    uploaded file.
+    upload_desc = """
+    Uploads the contents of a specified file to an _unpublished_ Zenodo deposit,
+    optionally using an alternative filename. If you upload a new file to the same
+    filename, it will replace the existing uploaded file.
     """
 
     parser_upload = subparsers.add_parser(
         "upload_file",
         description=textwrap.dedent(upload_desc),
         help="Upload a file to an unpublished deposit",
+        formatter_class=fmt,
     )
 
     parser_upload.add_argument(
-        "deposit_json",
+        "zenodo_json",
         type=str,
         default=None,
         help="Path to a Zenodo metadata JSON for the deposit",
@@ -195,19 +204,20 @@ def _safedata_zenodo_cli():
     )
 
     # Delete_file subcommand
-    delete_desc = """Delete an uploaded file from an unpublished deposit. The
-    deposit metadata will be re-downloaded to ensure an up to date list of files
-    in the deposit.
+    delete_desc = """
+    Delete an uploaded file from an unpublished deposit. The deposit metadata will be
+    re-downloaded to ensure an up to date list of files in the deposit.
     """
 
     parser_delete = subparsers.add_parser(
         "delete_file",
         description=textwrap.dedent(delete_desc),
         help="Delete a file from an unpublished deposit",
+        formatter_class=fmt,
     )
 
     parser_delete.add_argument(
-        "deposit_json",
+        "zenodo_json",
         type=str,
         default=None,
         help="Path to a Zenodo metadata file for the deposit to discard",
@@ -217,74 +227,92 @@ def _safedata_zenodo_cli():
     )
 
     # add_metadata subcommand
-    add_metadata_desc = """Uploads the required Zenodo metadata for an unpublished
-    deposit, using the deposit metadata file.
+    add_metadata_desc = """
+    Uses the dataset metadata created using `safedata_validate` to populate the required
+    Zenodo metadata for an unpublished deposit.
     """
 
     parser_add_md = subparsers.add_parser(
         "upload_metadata",
         description=textwrap.dedent(add_metadata_desc),
         help="Populate the Zenodo metadata",
+        formatter_class=fmt,
     )
 
     parser_add_md.add_argument(
-        "deposit_json", type=str, help="Path to a Zenodo metadata file"
+        "zenodo_json", type=str, help="Path to a Zenodo metadata file"
     )
     parser_add_md.add_argument(
         "dataset_json", type=str, help="Path to a dataset metadata file"
     )
 
     # update_metadata subcommand
-    add_metadata_desc = """Updates the Zenodo metadata for an published
-    deposit, using a modified version of the deposit metadata file.
+    update_metadata_desc = """
+    Updates the Zenodo metadata for an published deposit. To use this, make sure you
+    have the most recent Zenodo metadata for the deposit and then edit the JSON file to
+    the new values. You can only edit the contents of the `metadata` section.
+
+    Caution: this command should only be used to make urgent changes - such as access
+    restrictions. It is also easy to submit invalid metadata!
     """
 
     parser_add_md = subparsers.add_parser(
         "update_metadata",
-        description=textwrap.dedent(add_metadata_desc),
+        description=textwrap.dedent(update_metadata_desc),
         help="Update published Zenodo metadata",
+        formatter_class=fmt,
     )
 
     parser_add_md.add_argument(
-        "deposit_json", type=str, help="Path to a Zenodo metadata file"
-    )
-    parser_add_md.add_argument(
-        "deposit_json_update", type=str, help="Path to an updated Zenodo metadata file"
+        "zenodo_json_update", type=str, help="Path to an updated Zenodo metadata file"
     )
 
     # Discard subcommand
-    discard_desc = """Discard an unpublished deposit. The deposit and all uploaded
-    files will be removed from Zenodo."""
+    discard_desc = """
+    Discard an unpublished deposit. The deposit and all uploaded files will be removed
+    from Zenodo.
+    """
 
     parser_discard = subparsers.add_parser(
         "discard",
         description=textwrap.dedent(discard_desc),
         help="Discard an unpublished deposit",
+        formatter_class=fmt,
     )
 
     parser_discard.add_argument(
-        "deposit_json",
+        "zenodo_json",
         type=str,
         default=None,
         help="Path to a Zenodo metadata file for the deposit to discard",
     )
 
     # publish deposit subcommand
-    publish_desc = """Publishes a Zenodo deposit, creating a permanent DOI"""
+    publish_desc = """
+    Publishes a Zenodo deposit. This is the final step in publishing a dataset and is
+    not reversible. Once a dataset is published, the DOI associated with the record is
+    published to Datacite.
+
+    It may be worth reviewing the deposit webpage (https://zenodo.org/deposit/###)
+    before finally publishing.
+    """
 
     parser_publish = subparsers.add_parser(
         "publish",
         description=textwrap.dedent(publish_desc),
         help="Publish a draft deposit",
+        formatter_class=fmt,
     )
 
     parser_publish.add_argument(
-        "deposit_json", type=str, help="Path to a Zenodo metadata file"
+        "zenodo_json", type=str, help="Path to a Zenodo metadata file"
     )
 
     # INFO subcommand
-    info_desc = """Print out summary information on a deposit and download the
-    Zenodo metadata for that deposit."""
+    info_desc = """
+    Print out summary information on a deposit and download the Zenodo metadata for that
+    deposit.
+    """
 
     parser_info = subparsers.add_parser(
         "info",
@@ -292,7 +320,7 @@ def _safedata_zenodo_cli():
         help="Display and download deposit metadata",
     )
     parser_info.add_argument(
-        "deposit_id",
+        "zenodo_id",
         type=int,
         default=None,
         help="An ID for an existing Zenodo deposit",
@@ -301,23 +329,25 @@ def _safedata_zenodo_cli():
     # sync_local_dir subcommand
 
     sync_local_desc = """
-    The safedata R package defines a directory structure used to store metadata
-    and files downloaded from a safedata community on Zenodo and from a safedata
-    metadata server. This tool allows a safedata developer or community
-    maintainer to create or update such a directory with _all_ of the resources
-    in the Zenodo community, regardless of their public access status. This
-    forms a backup (although Zenodo is heavily backed up) but also provides
-    local copies of the files for testing and development of the code packages.
+    Synchronize a local data directory
 
-    If this is a new data directory, you also need to provide the API url for
-    the a server providing safedata metadata.
+    This subcommand allows a safedata developer or community maintainer to create or
+    update such a directory with _all_ of the resources in the Zenodo community,
+    regardless of their public access status. This forms a backup (although Zenodo is
+    heavily backed up) but also provides local copies of the files for testing and
+    development of the code packages.
+
+    The file structure of the directory follows that used by the safedata R package,
+    used to store metadata and files downloaded from a safedata community on Zenodo and
+    from a safedata metadata server. The `safedata_validator` configuration file will
+    need to include the metadata API.
     """
 
     parser_sync = subparsers.add_parser(
         "sync_local_dir",
         description=textwrap.dedent(sync_local_desc),
-        formatter_class=fmt,
         help="Create or update a local safedata directory",
+        formatter_class=fmt,
     )
 
     parser_sync.add_argument(
@@ -326,15 +356,7 @@ def _safedata_zenodo_cli():
         help="The path to a local directory containing "
         "an existing safedata directory or an empty folder in which to create one",
     )
-    parser_sync.add_argument(
-        "-a",
-        "--api",
-        type=str,
-        default=None,
-        help="An API from which JSON dataset metadata can be downloaded. If "
-        "datadir is an existing safedata directory, then the API will be read "
-        "from `url.json`.",
-    )
+
     parser_sync.add_argument(
         "--xlsx_only",
         type=bool,
@@ -356,8 +378,8 @@ def _safedata_zenodo_cli():
     parser_ris = subparsers.add_parser(
         "ris",
         description=textwrap.dedent(ris_desc),
-        formatter_class=fmt,
         help="Maintain a RIS bibliography file for datasets",
+        formatter_class=fmt,
     )
 
     # positional argument inputs
@@ -370,10 +392,11 @@ def _safedata_zenodo_cli():
     )
 
     # html_description subcommand
-    html_description_desc = """Generates an html file containing a standard
-    description of a dataset from the JSON metadata. Usually this will be
-    generated and uploaded as part of the dataset publication process, but
-    this subcommand can be used for local checking of the resulting HTML.
+    html_description_desc = """
+    Generates an html file containing a standard description of a dataset from the JSON
+    metadata. Usually this will be generated and uploaded as part of the dataset
+    publication process, but this subcommand can be used for local checking of the
+    resulting HTML.
     """
 
     parser_html = subparsers.add_parser(
@@ -383,44 +406,47 @@ def _safedata_zenodo_cli():
     )
 
     parser_html.add_argument(
-        "deposit_json", type=str, help="Path to a Zenodo metadata file"
+        "zenodo_json", type=str, help="Path to a Zenodo metadata file"
     )
     parser_html.add_argument(
         "dataset_json", type=str, help="Path to a dataset metadata file"
     )
 
     # post_metadata subcommand
-    post_metadata_desc = """Posts the dataset and zenodo metadata to the metadata
-    server, which then handles populating the metadata tables.
+    post_metadata_desc = """
+    Posts the dataset and zenodo metadata to the metadata server, which then handles
+    populating the metadata tables.
     """
 
     parser_post_md = subparsers.add_parser(
         "post_metadata",
         description=textwrap.dedent(post_metadata_desc),
         help="Post metadata to the metadata server",
+        formatter_class=fmt,
     )
 
     parser_post_md.add_argument(
-        "deposit_json", type=str, help="Path to a Zenodo metadata file"
+        "zenodo_json", type=str, help="Path to a Zenodo metadata file"
     )
     parser_post_md.add_argument(
         "dataset_json", type=str, help="Path to a dataset metadata file"
     )
 
     # generate_xml subcommand
-    generate_xml_desc = """Creates an INSPIRE compliant XML metadata file for a
-    published dataset, optionally including a user provided lineage statement (such as
-    project details).
+    generate_xml_desc = """
+    Creates an INSPIRE compliant XML metadata file for a published dataset, optionally
+    including a user provided lineage statement (such as project details).
     """
 
     parser_gen_xml = subparsers.add_parser(
         "generate_xml",
         description=textwrap.dedent(generate_xml_desc),
         help="Create INSPIRE compliant metadata XML",
+        formatter_class=fmt,
     )
 
     parser_gen_xml.add_argument(
-        "deposit_json", type=str, help="Path to a Zenodo metadata file"
+        "zenodo_json", type=str, help="Path to a Zenodo metadata file"
     )
     parser_gen_xml.add_argument(
         "dataset_json", type=str, help="Path to a dataset metadata file"
@@ -432,11 +458,29 @@ def _safedata_zenodo_cli():
         help="Path to a text file containing a lineage statement",
     )
 
+    # show_config subcommand
+    show_config_desc = """
+    Loads the safedata_validator configuration file, displays the config setup being
+    used for safedata_zenodo and then exits.
+    """
+
+    # This has no arguments, so subparser object not needed
+    _ = subparsers.add_parser(
+        "show_config",
+        description=textwrap.dedent(show_config_desc),
+        help="Report the config being used and exit",
+        formatter_class=fmt,
+    )
+
     # Parse the arguments and set the verbosity
     args = parser.parse_args()
 
+    if args.subcommand is None:
+        parser.print_usage()
+        return
+
     # Show the package config and exit if requested
-    if args.show_config:
+    if args.subcommand == "show_config":
         resources = Resources(args.resources)
         print("\nZenodo configuration:")
         for key, val in resources.zenodo.items():
@@ -446,19 +490,15 @@ def _safedata_zenodo_cli():
             print(f" - {key}: {val}")
         return
 
-    resources = Resources(args.resources)
-
     if args.quiet:
         # Don't suppress error messages
         CONSOLE_HANDLER.setLevel("ERROR")
     else:
         CONSOLE_HANDLER.setLevel("DEBUG")
 
-    if args.subcommand is None:
-        parser.print_usage()
-        return
+    resources = Resources(args.resources)
 
-    # Handle the different subcommands
+    # Handle the remaining subcommands
     if args.subcommand == "create":
 
         # Run the command
@@ -482,7 +522,7 @@ def _safedata_zenodo_cli():
     elif args.subcommand == "upload_file":
 
         # Load the Zenodo deposit JSON, which contains API links
-        with open(args.deposit_json) as dep_json:
+        with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Report on proposed upload
@@ -548,7 +588,7 @@ def _safedata_zenodo_cli():
     elif args.subcommand == "discard":
 
         # Load the Zenodo deposit JSON, which contains API links
-        with open(args.deposit_json) as dep_json:
+        with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Run the command
@@ -563,7 +603,7 @@ def _safedata_zenodo_cli():
     elif args.subcommand == "delete_file":
 
         # Load the Zenodo deposit JSON, which contains API links
-        with open(args.deposit_json) as dep_json:
+        with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Run the command
@@ -608,7 +648,7 @@ def _safedata_zenodo_cli():
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        with open(args.deposit_json) as zn_json:
+        with open(args.zenodo_json) as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
         # Run the function
@@ -624,17 +664,12 @@ def _safedata_zenodo_cli():
 
     elif args.subcommand == "update_metadata":
 
-        # Open the two JSON files
-        with open(args.deposit_json) as zn_json:
-            zenodo_json = simplejson.load(zn_json)
-
         with open(args.deposit_json_update) as zn_json_update:
             zenodo_json_update = simplejson.load(zn_json_update)
 
         # Run the function
         response, error = update_published_metadata(
-            zenodo_md=zenodo_json,
-            zenodo_md_update=zenodo_json_update,
+            zenodo_md=zenodo_json_update,
             resources=resources,
         )
 
@@ -650,7 +685,7 @@ def _safedata_zenodo_cli():
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        with open(args.deposit_json) as zn_json:
+        with open(args.zenodo_json) as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
         # Run the function
@@ -670,7 +705,7 @@ def _safedata_zenodo_cli():
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        with open(args.deposit_json) as zn_json:
+        with open(args.zenodo_json) as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
         if args.lineage_statement is not None:
@@ -695,7 +730,7 @@ def _safedata_zenodo_cli():
 
     elif args.subcommand == "publish":
 
-        with open(args.deposit_json) as zn_json:
+        with open(args.zenodo_json) as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
         # Run the function
