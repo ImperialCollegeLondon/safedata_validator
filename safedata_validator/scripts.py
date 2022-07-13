@@ -621,7 +621,6 @@ def _safedata_zenodo_cli():
 
         sync_local_dir(
             datadir=args.datadir,
-            api=args.api,
             xlsx_only=args.xlsx_only,
             resources=resources,
         )

@@ -1250,7 +1250,7 @@ def download_ris_data(resources: Resources = None, ris_file: str = None) -> list
 
 
 def sync_local_dir(
-    datadir: str, api: str = None, xlsx_only: bool = True, resources: Resources = None
+    datadir: str, xlsx_only: bool = True, resources: Resources = None
 ) -> None:
 
     """
@@ -1275,9 +1275,6 @@ def sync_local_dir(
             directory or an empty folder in which to create one.
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
-        api: An API from which JSON dataset metadata can be downloaded. If
-            datadir is an existing safedata directory, then the API will be read
-            from `url.json`.
         xlsx_only: Should the download ignore large non-xlsx files, defaulting
             to True.
     """
@@ -1299,26 +1296,23 @@ def sync_local_dir(
     if not (os.path.exists(datadir) and os.path.isdir(datadir)):
         raise IOError(f"{datadir} is not an existing directory")
 
-    # Check for an existing API url file and then see what is provided and resolve
+    # Get the configured metadata api
+    api = zres["mdapi"]
+
+    # Check for an existing API url file and check it is congruent with config
     url_file = os.path.join(datadir, "url.json")
 
     if os.path.exists(url_file):
         with open(url_file, "r") as urlf:
             dir_api = simplejson.load(urlf)["url"][0]
+
+        if api != dir_api:
+            raise RuntimeError(
+                "Configured api does not match existing api in directory"
+            )
     else:
-        dir_api = None
-
-    if api is None and dir_api is None:
-        raise RuntimeError("API not provided or found in directory")
-
-    if api is not None and dir_api is not None and api != dir_api:
-        raise RuntimeError("Provided api does not match existing api in directory")
-
-    if api is not None and dir_api is None:
         with open(url_file, "w") as urlf:
             simplejson.dump({"url": [api]}, urlf)
-    else:
-        api = dir_api
 
     # Download index files - don't bother to check for updates, this isn't
     # a frequent thing to do
