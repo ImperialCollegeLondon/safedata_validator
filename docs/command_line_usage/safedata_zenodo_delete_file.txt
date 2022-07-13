@@ -1,12 +1,12 @@
 cl_prompt $ safedata_zenodo delete_file -h
-usage: safedata_zenodo delete_file [-h] deposit_json filename
+usage: safedata_zenodo delete_file [-h] zenodo_json filename
 
-Delete an uploaded file from an unpublished deposit. The deposit metadata will
-be re-downloaded to ensure an up to date list of files in the deposit.
+Delete an uploaded file from an unpublished deposit. The deposit metadata will be
+re-downloaded to ensure an up to date list of files in the deposit.
 
 positional arguments:
-  deposit_json  Path to a Zenodo metadata file for the deposit to discard
-  filename      The name of the file to delete
+  zenodo_json  Path to a Zenodo metadata file for the deposit to discard
+  filename     The name of the file to delete
 
-optional arguments:
-  -h, --help    show this help message and exit
+options:
+  -h, --help   show this help message and exit

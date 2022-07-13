@@ -1,11 +1,11 @@
 cl_prompt $ safedata_zenodo info -h
-usage: safedata_zenodo info [-h] deposit_id
+usage: safedata_zenodo info [-h] zenodo_id
 
 Print out summary information on a deposit and download the Zenodo metadata
 for that deposit.
 
 positional arguments:
-  deposit_id  An ID for an existing Zenodo deposit
+  zenodo_id   An ID for an existing Zenodo deposit
 
-optional arguments:
+options:
   -h, --help  show this help message and exit

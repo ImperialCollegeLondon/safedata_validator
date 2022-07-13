@@ -1,10 +1,15 @@
 cl_prompt $ safedata_zenodo publish -h
-usage: safedata_zenodo publish [-h] deposit_json
+usage: safedata_zenodo publish [-h] zenodo_json
 
-Publishes a Zenodo deposit, creating a permanent DOI
+Publishes a Zenodo deposit. This is the final step in publishing a dataset and is
+not reversible. Once a dataset is published, the DOI associated with the record is
+published to Datacite.
+
+It may be worth reviewing the deposit webpage (https://zenodo.org/deposit/###)
+before finally publishing.
 
 positional arguments:
-  deposit_json  Path to a Zenodo metadata file
+  zenodo_json  Path to a Zenodo metadata file
 
-optional arguments:
-  -h, --help    show this help message and exit
+options:
+  -h, --help   show this help message and exit

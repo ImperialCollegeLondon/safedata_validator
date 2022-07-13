@@ -17,8 +17,8 @@ echo "cl_prompt $ safedata_zenodo -h" > safedata_zenodo_top.txt
 safedata_zenodo -h >> safedata_zenodo_top.txt
 
 subcommands=(create upload_file delete_file upload_metadata \
-             discard publish info sync_local_dir ris \
-             html_description post_metadata)
+             update_metadata discard publish info sync_local_dir ris \
+             html_description generate_xml post_metadata show_config)
 
 for subc in "${subcommands[@]}";
 do

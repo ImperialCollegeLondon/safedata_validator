@@ -1,14 +1,14 @@
 cl_prompt $ safedata_zenodo create -h
-usage: safedata_zenodo create [-h] [-d DEPOSIT_ID]
+usage: safedata_zenodo create [-h] [-c CONCEPT_ID]
 
-Create a new deposit draft, possibly as a new version of an existing
-_published_ record, with a provided zenodo _concept_ ID When successful, the
-function also downloads and saves a JSON file containing the Zenodo deposit
-metadata. This file is used as an input to other subcommands that work with an
-existing deposit.
+Create a new deposit draft. The concept_id option uses a provided Zenodo concept ID
+to creates a draft as a new version of an existing data set.
 
-optional arguments:
+When successful, the function downloads and saves a JSON file containing the
+resulting Zenodo deposit metadata. This file is used as an input to other
+subcommands that work with an existing deposit.
+
+options:
   -h, --help            show this help message and exit
-  -d DEPOSIT_ID, --deposit_id DEPOSIT_ID
-                        The draft created will be a new version of the
-                        existing published Zenodo record with this concept ID
+  -c CONCEPT_ID, --concept_id CONCEPT_ID
+                        A Zenodo concept ID

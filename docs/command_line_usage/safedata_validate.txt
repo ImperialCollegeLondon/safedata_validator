@@ -6,7 +6,7 @@ usage: safedata_validate [-h] [-p VALID_PID] [--validate_doi]
 This program validates an Excel file formatted as a SAFE dataset. As it
 runs, it outputs a report that highlights any problems with the formatting.
 Much of the validation is to check that the data meets our metadata
-standards and is internally consistent. 
+standards and is internally consistent.
 
 However, the package uses external resources to perform validation of taxa
 and sampling locations and to provide other information. For this reason,
@@ -21,7 +21,7 @@ is used in the dataset publication process.
 positional arguments:
   filename              Path to the Excel file to be validated.
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -p VALID_PID, --project_id VALID_PID
                         If provided, check that the project ID within the file

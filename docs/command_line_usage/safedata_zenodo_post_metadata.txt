@@ -1,12 +1,12 @@
 cl_prompt $ safedata_zenodo post_metadata -h
-usage: safedata_zenodo post_metadata [-h] deposit_json dataset_json
+usage: safedata_zenodo post_metadata [-h] zenodo_json dataset_json
 
-Posts the dataset and zenodo metadata to the metadata server, which then
-handles populating the metadata tables.
+Posts the dataset and zenodo metadata to the metadata server, which then handles
+populating the metadata tables.
 
 positional arguments:
-  deposit_json  Path to a Zenodo metadata file
+  zenodo_json   Path to a Zenodo metadata file
   dataset_json  Path to a dataset metadata file
 
-optional arguments:
+options:
   -h, --help    show this help message and exit

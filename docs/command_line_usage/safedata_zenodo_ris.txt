@@ -13,5 +13,5 @@ positional arguments:
               exists, it is assumed to be RIS file to update with any new
               records not already included in the file.
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
