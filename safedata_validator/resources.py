@@ -48,7 +48,6 @@ CONFIGSPEC = {
     "locations": "string()",
     "gbif_database": "string(default=None)",
     "ncbi_database": "string(default=None)",
-    "ncbi_api_key": "string(default=None)",
     "extents": {
         "temporal_soft_extent": "date_list(min=2, max=2, default=None)",
         "temporal_hard_extent": "date_list(min=2, max=2, default=None)",
@@ -69,6 +68,11 @@ CONFIGSPEC = {
         "contact_orcid": "string(default=None)",
     },
     "metadata": {"api": "string(default=None)", "token": "string(default=None)"},
+    "ncbi": {
+        "api_key": "string(default=None)",
+        "email": "string(default=None)",
+        "tool": "string(default='safedata_validator')",
+    },
 }
 """dict: The safedata_validator package use the `configobj.ConfigObj`
 package to handle resource configuration. This dict defines the basic expected
@@ -142,12 +146,12 @@ class Resources:
         locations: The path to the locations file
         gbif_database: The path to the GBIF database file or None
         ncbi_database: The path to the NCBI database file or None
-        ncbi_api_key: A NCBI api key or None
         use_local_gbif: Is a local file used or should the GBIF API be used
         ncbi_database: The path to the NCBI database file or None
         use_local_ncbi: Is a local file used or should the NCBI API be used
         valid_locations: The locations defined in the locations file
         location_aliases: Location aliases defined in the locations file
+        ncbi: A DotMap of NCBI information
         extents: A DotMap of extent data
         zenodo: A DotMap of Zenodo information
     """
@@ -198,13 +202,13 @@ class Resources:
         self.locations = config.locations
         self.gbif_database = config.gbif_database
         self.ncbi_database = config.ncbi_database
-        self.ncbi_api_key = config.ncbi_api_key
         self.config_type = config.config_type
         self.config_source = config.config_source
 
         self.extents = config.extents
         self.zenodo = config.zenodo
         self.metadata = config.metadata
+        self.ncbi = config.ncbi
 
         self.use_local_gbif = None
         self.use_local_ncbi = None
@@ -217,7 +221,9 @@ class Resources:
         self._validate_ncbi()
 
     @staticmethod
-    def _load_config(config: Union[str, list, dict], cfg_type: str):
+    def _load_config(
+        config: Union[str, list, dict], cfg_type: str
+    ) -> Union[None, DotMap]:
         """Load a configuration file.
 
         This private static method attempts to load a JSON configuration file

@@ -1,4 +1,5 @@
-"""## The taxa submodule
+"""The taxa submodule.
+
 This module describes classes and methods used to compile taxonomic data from
 datasets and to validate taxonomy against the GBIF backbone database and/or the
 NCBI taxonomy database.
@@ -39,8 +40,8 @@ from logging import Formatter
 from typing import Optional, Union
 
 import requests  # type: ignore
-from enforce_typing import enforce_types
 from lxml import etree
+from openpyxl import worksheet
 
 from safedata_validator.logger import (
     COUNTER_HANDLER,
@@ -70,10 +71,9 @@ BACKBONE_RANKS = [
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ["superkingdom"] + BACKBONE_RANKS
 
-# TODO - Modify the resource file to ask the user to provide an email address
-# This should only be done if the user actually wants to use this module as it
-# isn't need elsewhere (as far as I know)
-# Also should ask for api key
+# TODO - Modify the resource file to ask the user to provide NCBI registration email.
+#        This should only be done if the user actually wants to use this module as it
+#        isn't need elsewhere (as far as I know). Also should ask for api key
 
 # TODO - A lot of complexity could be lost here if the two validation
 #        sources had more similar structure. Could have a row return method
@@ -85,7 +85,7 @@ BACKBONE_RANKS_EX = ["superkingdom"] + BACKBONE_RANKS
 
 
 class GBIFError(Exception):
-    """Exception class for remote GBIF errors
+    """Exception class for remote GBIF errors.
 
     Attributes:
         message: explanation of the error
@@ -97,7 +97,7 @@ class GBIFError(Exception):
 
 
 class NCBIError(Exception):
-    """Exception class for remote NCBI errors
+    """Exception class for remote NCBI errors.
 
     Attributes:
         message: explanation of the error
@@ -110,25 +110,28 @@ class NCBIError(Exception):
 
 @dataclasses.dataclass
 class GBIFTaxon:
-    """Holds taxonomic information from a user, which can be populated using GBIF
-    validation.
+    """Represent and validate a GBIF taxon.
 
-    There are 3 class properties that can be used to create an instance:
-        * name
-        * rank
-        * gbif_id
-    The remaining properties are populated by processing functions not when
-    an instance is created.
-        * is_backbone: the taxon is at a taxonomic level included in the GBIF backbone
-        * is_canon: the taxon is considered canon in GBIF
-        * lookup_status: the outcome of the lookup with one of the following values:
-          found, no_match, validation_fail, unknown_id, id_mismatch
-        * taxon_status: the taxonomic status of the taxon with one of the following
-          values: accepted, doubtful, synonym etc. etc.
-        * parent_id: a GBIF id for the accepted parent taxon.
-        * canon_usage: a GBIFTaxon instance holding the canonical usage for the taxon
-        * note: a string of any extra information provided by the search
-        * hierarchy: a list of 2-tuples of rank and GBIF ID for the taxonomic hierarchy
+    Initialised using user taxonomic information for single taxon, which can be then be
+    validated against the GBIF database. Attributes are populated when an instance is
+    passed to one of the validator methods.
+
+    Args:
+        name: A taxonomic name
+        rank: A taxonomic rank
+        gbif_id: A specific GBIF ID
+
+    Attributes:
+        is_backbone: the taxon is at a taxonomic level included in the GBIF backbone
+        is_canon: the taxon is considered canon in GBIF
+        lookup_status: the outcome of the lookup with one of the following values:
+            found, no_match, validation_fail, unknown_id, id_mismatch
+        taxon_status: the taxonomic status of the taxon with one of the following
+            values: accepted, doubtful, synonym etc. etc.
+        parent_id: a GBIF id for the accepted parent taxon.
+        canon_usage: a GBIFTaxon instance holding the canonical usage for the taxon
+        note: a string of any extra information provided by the search
+        hierarchy: a list of 2-tuples of rank and GBIF ID for the taxonomic hierarchy
     """
 
     # Init properties
@@ -144,8 +147,8 @@ class GBIFTaxon:
     lookup_status: str = dataclasses.field(init=False)
     hierarchy: list = dataclasses.field(init=False)
 
-    def __post_init__(self):
-        """Sets the defaults for the post-init properties and checks inputs"""
+    def __post_init__(self) -> None:
+        """Validates inputs and sets defaults for the post-init properties."""
 
         if not isinstance(self.name, str):
             raise TypeError("Provided taxon name not a string")
@@ -169,8 +172,8 @@ class GBIFTaxon:
         self.lookup_status = "unvalidated"
         self.hierarchy = []
 
-    def __repr__(self):
-
+    def __repr__(self) -> str:
+        """Provides a simple representation of the class."""
         if not self.is_backbone:
             return f"{self.name} (not of GBIF backbone rank)"
         elif self.found:
@@ -182,8 +185,10 @@ class GBIFTaxon:
             return f"{self.name} (not found: {self.lookup_status})"
 
     @property
-    def found(self):
-        """Convenience boolean property for processing"""
+    def found(self) -> bool:
+        """Confirms that a taxon is a backbone taxon found in GBIF."""
+
+        # Shorthand property
         return self.is_backbone and self.lookup_status == "found"
 
     # TODO - could make _eq_ method and allow GBIFTaxon to be used directly
@@ -192,17 +197,21 @@ class GBIFTaxon:
 
 @dataclasses.dataclass
 class NCBITaxon:
-    """Holds taxonomic information from a user on a microbial taxa. This can be
-    populated using NCBI validation.
+    """Represent and validate an NCBI taxon.
 
-    There are 3 class properties that can be used to create an instance:
-        * name
-        * taxa_hier: Dictionary of valid taxonomic hierarchy (with ID's)
-        * ncbi_id: NCBI ID for full taxa (i.e. including non-backbone ranks)
-    The remaining properties are populated by processing functions not when an
-    instance is created.
-        * superseed: is supplied taxon name/ID still the accepted usage
-        * orig: Records rank of the original taxa if it was not found
+    Initialised using user taxonomic information for single taxon, which can be then be
+    validated against the NCBI database. Attributes are populated when an instance is
+    passed to one of the validator methods.
+
+    Args:
+        name: A taxonomic name
+        rank: A taxonomic rank
+        taxa_hier: A dictionary of valid taxonomic hierarchy (with ID's)
+        ncbi_id: NCBI ID for full taxa (i.e. including non-backbone ranks)
+
+    Attributes:
+        superseed: is supplied taxon name/ID still the accepted usage
+        orig: Records rank of the original taxa if it was not found
     """
 
     # Init properties
@@ -214,7 +223,7 @@ class NCBITaxon:
     orig: str = dataclasses.field(init=False)
 
     def __post_init__(self):
-        """Sets the defaults for the post-init properties and checks inputs"""
+        """Sets the defaults for the post-init properties and checks inputs."""
 
         if not isinstance(self.name, str):
             raise TypeError("Provided taxon name not a string")
@@ -277,6 +286,7 @@ class NCBITaxon:
         self.orig = None
 
     def __repr__(self):
+        """Provides a simple representation of the class."""
 
         if self.orig is not None:
             return f"{self.name} (resolved as {self.rank} rather than {self.orig})"
@@ -287,27 +297,37 @@ class NCBITaxon:
 
 
 class LocalGBIFValidator:
-    def __init__(self, resources):
+    """Validate taxon data against a local GBIF database.
+
+    This class connects to a local copy of the GBIF database and provides methods to
+    validate GBIFTaxon instances and look up GBIF ID values.
+
+    Args:
+        resources: A Resources instance linking to the local GBIF database
+    """
+
+    def __init__(self, resources: Resources) -> None:
 
         conn = sqlite3.connect(resources.gbif_database)
         conn.row_factory = sqlite3.Row
         self.gbif_conn = conn
 
-    def __del__(self):
+    def __del__(self) -> None:
+        """Delete a LocalGBIFValidator instance.
 
+        This method ensures that the database connection is closed correctly.
+        """
         self.gbif_conn.close()
 
-    def search(self, taxon: GBIFTaxon):
+    def search(self, taxon: GBIFTaxon) -> None:
+        """Validate a GBIFTaxon instance.
 
-        """
-        Looks for a taxon in the GBIF database using name and rank and
-        an optional GBIF ID for disambiguation.
+        The method looks for the taxon in the GBIF database using name and rank and
+        an optional GBIF ID for disambiguation. The input GBIFTaxon is updated in place
+        and so there is no value returned.
 
         Args:
             taxon: A GBIFTaxon instance
-
-        Returns:
-            GBIFTaxon: A GBIFTaxon instance
         """
 
         if not taxon.is_backbone:
@@ -387,15 +407,17 @@ class LocalGBIFValidator:
             # extracted from the database
             return self.id_lookup(selected_row["id"])
 
-    def id_lookup(self, gbif_id: int):
-        """Method to return a GBIFTaxon directly from a GBIF ID. It will raise
+    def id_lookup(self, gbif_id: int) -> GBIFTaxon:
+        """Get a GBIFTaxon by GBIF ID.
+
+        This method returns a GBIFTaxon directly from a GBIF ID. It will raise
         a GBIFError if the provided ID cannot be found.
 
-        Params:
-            gbif_id: An integer
+        Args:
+            gbif_id: A GBIF ID number.
 
         Returns:
-            GBIFTaxon: Complete taxon info
+            A populated GBIFTaxon instance for the ID.
         """
 
         if not isinstance(gbif_id, int):
@@ -446,32 +468,27 @@ class LocalGBIFValidator:
         return taxon
 
 
-@enforce_types
 class RemoteGBIFValidator:
-    """This provides a validate method for a GBIFTaxon using the online GBIF
-    API. Unlike the LocalGBIFValidator, this doesn't need an __init__ method
-    and just contains methods, but duplicates the structure so that
-    the two Validators are interchangeable.
+    """Validate taxon data against the online GBIF API.
+
+    This provides a validate method for a GBIFTaxon using the online GBIF API. Unlike
+    the LocalGBIFValidator, this doesn't need an __init__ method and just contains
+    methods, but duplicates the structure so that the two Validators are
+    interchangeable.
     """
 
-    def search(self, taxon: GBIFTaxon):
+    def search(self, taxon: GBIFTaxon) -> None:
+        """Validate a GBIFTaxon instance.
 
-        """
-        Validates a taxon against the GBIF web API. It uses the API endpoint
-        species/match?name=XXX&rank=YYY&strict=true
-        endpoint to
+        The method looks for the taxon in the GBIF API using name and rank and an
+        optional GBIF ID for disambiguation. It uses the API endpoint:
 
+            species/match?name=XXX&rank=YYY&strict=true
 
-
-        # safe to assume that the next least nested taxonomic level is the parent.
-        # So, populate GBIF ID using species/match and then use species/{id} to
-        # populate the return values
+        The input GBIFTaxon is updated in place and so there is no value returned.
 
         Args:
-            taxon (GBIFTaxon): A GBIFTaxon to be validated
-
-        Returns:
-            GBIFTaxon: An updated GBIFTaxon object.
+            taxon: A GBIFTaxon instance
         """
 
         if not taxon.is_backbone:
@@ -521,16 +538,21 @@ class RemoteGBIFValidator:
             # Return the match
             return self.id_lookup(response["usageKey"])
 
-    def id_lookup(self, gbif_id: int):
-        """Method to return a GBIFTaxon directly from a GBIF ID. It will raise
-        a GBIFError if the provided ID cannot be found, or if there is a
-        connection error.
+    def id_lookup(self, gbif_id: int) -> GBIFTaxon:
+        """Get a GBIFTaxon by GBIF ID.
 
-        Params:
-            gbif_id: An integer
+        This method returns a GBIFTaxon directly from a GBIF ID using the API endpoint:
+
+            species/ID
+
+        It will raise a GBIFError if the provided ID cannot be found or if there is a
+        connection error to the remote GBIF dtabase.
+
+        Args:
+            gbif_id: A GBIF ID number.
 
         Returns:
-            GBIFTaxon: A GBIFTaxon object.
+            A populated GBIFTaxon instance for the ID.
         """
 
         if not isinstance(gbif_id, int):
@@ -587,32 +609,41 @@ class RemoteGBIFValidator:
 
 
 class LocalNCBIValidator:
-    """This provides a validate method for a NCBITaxon using SQLite queries on a
-    locally downloaded copy of the NCBI database.
+    """Validate taxon data against a local NCBI database.
+
+    This class connects to a local copy of the NCBI database and provides methods to
+    validate NCBITaxon instances and look up NCBI ID values.
+
+    Args:
+        resources: A Resources instance linking to the local NCBI database
     """
 
-    def __init__(self, resources):
+    def __init__(self, resources: Resources) -> None:
 
         conn = sqlite3.connect(resources.ncbi_database)
         conn.row_factory = sqlite3.Row
         self.ncbi_conn = conn
 
-    def __del__(self):
+    def __del__(self) -> None:
+        """Delete a LocalNCBIValidator instance.
+
+        This method ensures that the database connection is closed correctly.
+        """
 
         self.ncbi_conn.close()
 
-    # Functionality to find taxa information from Genbank ID
-    def id_lookup(self, nnme: str, ncbi_id: int):
-        """Method to return full taxonomic information from a NCBI ID. It will
-        raise a NCBIError if the provided ID cannot be found, or if there is a
-        connection error.
+    def id_lookup(self, nnme: str, ncbi_id: int) -> NCBITaxon:
+        """Get an NCBITaxon by NCBI ID.
 
-        Params:
+        This method returns a populated NCBITaxon instance, given an NCBI ID and
+        nickname.  It will raise a NCBIError if the provided ID cannot be found.
+
+        Args:
             nnme: A nickname to identify the taxon
             ncbi_id: Unique identifier for the taxon
 
         Returns:
-            NCBITaxon: Complete taxon info
+            A populated NCBITaxon instance
         """
 
         if not isinstance(ncbi_id, int):
@@ -775,19 +806,20 @@ class LocalNCBIValidator:
 
         return mtaxon
 
-    # New function to read in taxa information
-    def taxa_search(self, nnme: str, taxah: dict):
-        """Method that takes in taxonomic information, and finds the corresponding
+    def taxa_search(self, nnme: str, taxah: dict) -> NCBITaxon:
+        """Find an NCBI taxon given a taxon hierarchy.
+
+        Method that takes in taxonomic information, and finds the corresponding
         NCBI ID. This NCBI ID is then used to generate a NCBITaxon object,
         which is returned. This function also makes use of parent taxa information
         to distinguish between ambiguous taxa names.
 
-        Params:
+        Args:
             nnme: A nickname to identify the taxon
             taxah: A dictionary containing taxonomic information
 
         Returns:
-            NCBITaxon: Complete taxon info
+            A populated NCBITaxon instance
         """
 
         if isinstance(taxah, dict) is False:
@@ -1016,29 +1048,38 @@ class LocalNCBIValidator:
 
 
 class RemoteNCBIValidator:
-    """This provides a validate method for a NCBITaxon using the online NCBI Entrez
+    """Validate taxon data using the NCBI Entrez tools.
+
+    This provides a validate method for a NCBITaxon using the online NCBI Entrez
     tools. This validator duplicates the structure of LocalNCBIValidator so that
     the two Validators are interchangeable.
+
+    The online tools are rate-limited to prevent abuse. An Entrez API key can be
+    provided via the resources to increase the permitted rate from 3 queries a second
+    to 10 queries a second.
+
+    Args:
+        resources: A Resources instance providing Entrez API details
     """
 
     def __init__(self, resources: Resources):
 
-        self.api_key = resources.ncbi_api_key
-        # self.email = "WORK HOW TO ADD AN EMAIL SECRETLY"
-        # ALSO NEED PROVIDE TOOL TO THE REQUESTS AT SOME POINT
-        self.tool = "SAFE_data_validator"
+        self.api_key = resources.ncbi.api_key
+        # TODO - also need provide tool to the requests at some point
+        self.email = resources.ncbi.email
+        self.tool = resources.ncbi.tool
 
-    def taxonomy_efetch(self, ncbi_id: int):
-        """A function that uses the online NCBI eutils function efetch to fetch
-        the entry for a specific NCBI ID. This function checks for connection
-        errors, and rate limits to ensure that only 10 requests per second are
-        made. If this is successful the xml output is stored as an element tree.
+    def _taxonomy_efetch(self, ncbi_id: int) -> etree._Element:
+        """Fetch taxonomic data for an NCBI ID.
 
-        Params:
+        This method uses the online NCBI eutils function efetch to fetch the entry for a
+        specific NCBI ID. This function checks for connection errors.
+
+        Args:
             ncbi_id: The NCBI ID to fetch the record for
 
         Returns:
-            lxml.etree._Element: Output XML stored as an element tree
+            NCBI output XML stored as an element tree
         """
         # Construct url
         if self.api_key is not None:
@@ -1084,18 +1125,17 @@ class RemoteNCBIValidator:
 
         return root
 
-    def taxonomy_esearch(self, t_name: str):
-        """A function that uses the online NCBI eutils function esearch to search
-        for a particular taxon name, and to return information on all matching records.
-        This function checks for connection errors, and rate limits to ensure that
-        only 10 requests per second are made. If this is successful the xml output
-        is stored as an element tree.
+    def _taxonomy_esearch(self, t_name: str) -> etree._Element:
+        """Search NCBI for a taxon name.
+
+        This method uses the online NCBI eutils function esearch to search for a
+        particular taxon name, and to return information on all matching records.
 
         Params:
             t_name: taxon name to search for
 
         Returns:
-            lxml.etree._Element: Output XML stored as an element tree
+            NCBI output XML stored as an element tree
         """
         # Construct url
         if self.api_key is not None:
@@ -1137,17 +1177,18 @@ class RemoteNCBIValidator:
         return root
 
     # Functionality to find taxa information from genbank ID
-    def id_lookup(self, nnme: str, ncbi_id: int):
-        """Method to return full taxonomic information from a NCBI ID. It will
-        raise a NCBIError if the provided ID cannot be found, or if there is a
-        connection error.
+    def id_lookup(self, nnme: str, ncbi_id: int) -> NCBITaxon:
+        """Get an NBCITaxon by taxon ID.
 
-        Params:
+        This method returns full taxonomic information from a NCBI ID. It will raise a
+        NCBIError if the provided ID cannot be found, or if there is a connection error.
+
+        Args:
             nnme: A nickname to identify the taxon
             ncbi_id: Unique identifier for the taxon
 
         Returns:
-            NCBITaxon: Complete taxon info
+            A populated NCBITaxon instance
         """
 
         if not isinstance(ncbi_id, int):
@@ -1160,7 +1201,7 @@ class RemoteNCBIValidator:
             raise ValueError("Negative NCBI taxonomy ID")
 
         # Use efetch to find taxonomy details based on the index
-        taxon_row = self.taxonomy_efetch(ncbi_id)
+        taxon_row = self._taxonomy_efetch(ncbi_id)
 
         # Catch case where no entry was found
         if taxon_row is None:
@@ -1303,17 +1344,19 @@ class RemoteNCBIValidator:
 
     # New function to read in taxa information
     def taxa_search(self, nnme: str, taxah: dict):
-        """Method that takes in taxonomic information, and finds the corresponding
+        """Find an NCBI taxon given a taxon hierarchy.
+
+        Method that takes in taxonomic information, and finds the corresponding
         NCBI ID. This NCBI ID is then used to generate a NCBITaxon object,
         which is returned. This function also makes use of parent taxa information
         to distinguish between ambiguous taxa names.
 
-        Params:
+        Args:
             nnme: A nickname to identify the taxon
             taxah: A dictionary containing taxonomic information
 
         Returns:
-            NCBITaxon: Complete taxon info
+            A populated NCBITaxon instance
         """
 
         if isinstance(taxah, dict) is False:
@@ -1334,7 +1377,7 @@ class RemoteNCBIValidator:
         s_term = taxah[f_key]
 
         # Search the online database
-        rcrds = self.taxonomy_esearch(s_term)
+        rcrds = self._taxonomy_esearch(s_term)
 
         # Track down record count
         CNT = rcrds.findall("./Count")
@@ -1368,7 +1411,7 @@ class RemoteNCBIValidator:
                 new_s_term = taxah[f_key]
 
                 # Search the online database
-                rcrds = self.taxonomy_esearch(new_s_term)
+                rcrds = self._taxonomy_esearch(new_s_term)
 
                 # Track down record count
                 CNT = rcrds.findall("./Count")
@@ -1455,7 +1498,7 @@ class RemoteNCBIValidator:
             s_term = taxah[f_key]
 
             # Search the online database for parent record
-            p_rcrds = self.taxonomy_esearch(s_term)
+            p_rcrds = self._taxonomy_esearch(s_term)
 
             # Track down record count
             PCNT = p_rcrds.findall("./Count")
@@ -1544,39 +1587,55 @@ class RemoteNCBIValidator:
 
 
 class GBIFTaxa:
-    def __init__(self, resources: Resources):
-        """A class to hold a list of taxon names and a validated taxonomic
-        index for those taxa and their taxonomic hierarchy. The validate_taxon
-        method checks that taxon details and their optional parent taxon can be
-        matched into the the GBIF backbone and populates two things:
+    """Manage a set of GBIF taxon data and associated GBIFTaxon instances.
 
-        i)  the taxon_names attribute of the dataset, which is just a set of
-            names used as a validation list for taxon names used in data worksheets.
-        ii) the taxon_index attribute of the dataset, which contains a set
-            of lists structured as:
+    A class to hold a list of taxon names and a validated taxonomic
+    index for those taxa and their taxonomic hierarchy. The validate_taxon
+    method checks that taxon details and their optional parent taxon can be
+    matched into the the GBIF backbone and populates two things:
 
-                [worksheet_name (str),
-                gbif_id (int),
-                gbif_parent_id (int),
-                canonical_name (str),
-                taxonomic_rank (str),
-                status (str)]
+    i)  the taxon_names attribute of the dataset, which is just a set of
+        names used as a validation list for taxon names used in data worksheets.
+    ii) the taxon_index attribute of the dataset, which contains a set
+        of lists structured as:
 
-            Where a taxon is not accepted or doubtful on GBIF, two entries are
-            inserted for the taxon, one under the canon name and one under the
-            provided name. They will share the same worksheet name and so can
-            be paired back up for description generation. The worksheet name
-            for parent taxa and deeper taxonomic hierarchy is set to None.
+            [worksheet_name (str),
+            gbif_id (int),
+            gbif_parent_id (int),
+            canonical_name (str),
+            taxonomic_rank (str),
+            status (str)]
 
-        The index_higher_taxa method can be used to extend the taxon_index to
-        include all of the higher taxa linking the validated taxa.
+        Where a taxon is not accepted or doubtful on GBIF, two entries are
+        inserted for the taxon, one under the canon name and one under the
+        provided name. They will share the same worksheet name and so can
+        be paired back up for description generation. The worksheet name
+        for parent taxa and deeper taxonomic hierarchy is set to None.
 
-        The index can then be used:
+    The index_higher_taxa method can be used to extend the taxon_index to
+    include all of the higher taxa linking the validated taxa.
 
-        a) to generate the taxonomic coverage section of the dataset description, and
-        b) as the basis of a SQL dataset_taxa table to index the taxonomic coverage
-        of datasets.
-        """
+    The index can then be used:
+
+    a) to generate the taxonomic coverage section of the dataset description, and
+    b) to populate a database table to index the taxonomic coverage of datasets.
+
+    Args:
+        resources: A Resources instance.
+
+    Attributes:
+        taxon_index: A list containing taxon index lists
+        taxon_names: A set of worksheet names
+        parents: A dictionary linking tuples of taxon parent information to
+            GBIFTaxon instances
+        hierarchy: A set of lists containing the complete taxonomic hierarchy for taxa
+            in the GBIFTaxa instance.
+        n_errors: A count of processing errors when loading and validating taxa
+        taxon_names_used: A set used to track which taxon names have been used in data
+            worksheets
+    """
+
+    def __init__(self, resources: Resources) -> None:
 
         self.taxon_index: list[list] = []
         self.taxon_names: set[str] = set()
@@ -1593,16 +1652,15 @@ class GBIFTaxa:
             self.validator = RemoteGBIFValidator()
 
     @loggerinfo_push_pop("Loading GBIFTaxa worksheet")
-    def load(self, worksheet):
-        """Loads a set of taxa from the rows of a SAFE formatted GBIFTaxa worksheet
-        and then adds the higher taxa for those rows.
+    def load(self, worksheet: worksheet) -> None:
+        """Populate a GBIFTaxa instance from an Excel worksheet.
+
+        This method loads a set of taxa from the rows of a SAFE formatted GBIFTaxa
+        worksheet and populates the taxonomic hierarchy for those rows. The GBIFTaxa
+        instance is updated.
 
         Args:
-            worksheet: An openpyxl worksheet instance following the GBIFTaxa formatting
-
-        Returns:
-            None: Updates the taxon_names and taxon_index attributes of the class
-                  instance using the data in the worksheet.
+            worksheet: An openpyxl worksheet instance using the GBIFTaxa formatting
         """
 
         start_errors = COUNTER_HANDLER.counters["ERROR"]
@@ -1710,30 +1768,30 @@ class GBIFTaxa:
     #        {self._row_description}') but this implementation ties
     #        validate_and_add_taxon() to needing that property populated
 
-    def validate_and_add_taxon(self, taxon_input):
-        """Takes user information on a taxon and optionally a parent taxon,
+    def validate_and_add_taxon(self, taxon_input: list) -> None:
+        """Add a GBIF formatted taxon row to the GBIFTaxa instance.
+
+        This method takes user information on a taxon, and optionally a parent taxon,
         validates it and updates the GBIFTaxa instance to include the new details.
-        This is principally used to process rows found in a GBIFTaxa worksheet,
-        but is deliberately separated out so that a GBIFTaxa instance can be populated
-        independently of an Excel dataset.
+
+        This is typically used to process rows found in a dataset with a GBIFTaxa
+        formatted table, can also be used to populate a GBIFTaxa instance
+        programatically.
 
         The taxon_input has the form:
 
-        ['worksheet_name',
-         ['taxon name', 'taxon type', 'taxon id', 'ignore id'],
-         ['parent name', 'parent type', 'parent id']]
+            ['worksheet_name',
+                ['taxon name', 'taxon type', 'taxon id', 'ignore id'],
+                ['parent name', 'parent type', 'parent id']]
 
         If there is no parent information, the structure is:
-        ['worksheet_name',
-         ['taxon name', 'taxon type', 'taxon id', 'ignore id'],
-          None]
+
+            ['worksheet_name',
+                ['taxon name', 'taxon type', 'taxon id', 'ignore id'],
+                None]
 
         Args:
             taxon_input: GBIFTaxon information in standard form as above
-
-        Returns:
-            None: Updates the taxon_names and taxon_index attributes of the class
-                  instance.
         """
 
         m_name, taxon_info, parent_info = taxon_input
@@ -2101,10 +2159,12 @@ class GBIFTaxa:
                     )
 
     @loggerinfo_push_pop("Indexing taxonomic hierarchy")
-    def index_higher_taxa(self):
+    def index_higher_taxa(self) -> None:
+        """Extend the taxon index to include higher taxa.
 
-        # Use the taxon hierarchy entries to add higher taxa
-        # - drop taxa with a GBIF ID already in the index
+        This method uses the taxon hierarchy entries to add higher taxa to the taxon
+        index for the instance. It does not duplicate taxa already in the index.
+        """
 
         known = [tx[1] for tx in self.taxon_index if tx[1] != -1]
         to_add = [tx for tx in self.hierarchy if tx[1] not in known]
@@ -2126,45 +2186,61 @@ class GBIFTaxa:
             LOGGER.info(f"Added {tx_lev} {higher_taxon}")
 
     @property
-    def is_empty(self):
+    def is_empty(self) -> bool:
+        """Check if a GBIFTaxa instance contains any taxa."""
         return len(self.taxon_names) == 0
 
 
 class NCBITaxa:
-    def __init__(self, resources: Resources):
-        """A class to hold a list of taxon names and a validated taxonomic
-        index for those taxa and their taxonomic hierarchy. The validate_taxon
-        method checks that the provided taxon hierarchy and (optional) NCBI ID can be
-        validated against the NCBI database (and both refer to the same taxon).
-        This then populates two things:
+    """Manage a set of NCBI taxon data and associated NCBITaxon instances.
 
-        i)  the taxon_names attribute of the dataset, which is just a set of
-            names used as a validation list for taxon names used in data worksheets.
-        ii) the taxon_index attribute of the dataset, which contains a set
-            of lists structured as:
+    A class to hold a list of taxon names and a validated taxonomic
+    index for those taxa and their taxonomic hierarchy. The validate_taxon
+    method checks that the provided taxon hierarchy and (optional) NCBI ID can be
+    validated against the NCBI database (and both refer to the same taxon).
 
-                [worksheet_name (str),
-                 ncbi_id (int),
-                 ncbi_parent_id (int),
-                 canonical_name (str),
-                 taxonomic_rank (str),
-                 status (str)]
+    i)  the taxon_names attribute of the dataset, which is just a set of
+        names used as a validation list for taxon names used in data worksheets.
+    ii) the taxon_index attribute of the dataset, which contains a set
+        of lists structured as:
 
-            Where a taxon is superseded in the NCBI database, two entries are
-            inserted for the taxon, one under the canon name and one under the
-            provided name. They will share the same worksheet name and so can
-            be paired back up for description generation. The worksheet name
-            for parent taxa and deeper taxonomic hierarchy is set to None.
+            [worksheet_name (str),
+            gbif_id (int),
+            gbif_parent_id (int),
+            canonical_name (str),
+            taxonomic_rank (str),
+            status (str)]
 
-        The index_higher_taxa method can be used to extend the taxon_index to
-        include all of the higher taxa linking the validated taxa.
+        Where a taxon is not accepted or doubtful on GBIF, two entries are
+        inserted for the taxon, one under the canon name and one under the
+        provided name. They will share the same worksheet name and so can
+        be paired back up for description generation. The worksheet name
+        for parent taxa and deeper taxonomic hierarchy is set to None.
 
-        The index can then be used:
+    The index_higher_taxa method can be used to extend the taxon_index to
+    include all of the higher taxa linking the validated taxa.
 
-        a) to generate the taxonomic coverage section of the dataset description, and
-        b) as the basis of a SQL dataset_taxa table to index the taxonomic coverage
-        of datasets.
-        """
+    The index can then be used:
+
+    a) to generate the taxonomic coverage section of the dataset description, and
+    b) to populate a database table to index the taxonomic coverage of datasets.
+
+    Args:
+        resources: A Resources instance.
+
+    Attributes:
+        taxon_index: A list containing taxon index lists
+        taxon_names: A set of worksheet names
+        parents: A dictionary linking tuples of taxon parent information to
+            GBIFTaxon instances
+        hierarchy: A set of lists containing the complete taxonomic hierarchy for taxa
+            in the GBIFTaxa instance.
+        n_errors: A count of processing errors when loading and validating taxa
+        taxon_names_used: A set used to track which taxon names have been used in data
+            worksheets
+    """
+
+    def __init__(self, resources: Resources) -> None:
 
         self.taxon_index: list[list] = []
         self.taxon_names: set[str] = set()
@@ -2179,16 +2255,15 @@ class NCBITaxa:
             self.validator = RemoteNCBIValidator(resources)
 
     @loggerinfo_push_pop("Loading NCBITaxa worksheet")
-    def load(self, worksheet):
-        """Loads a set of taxa from the rows of a SAFE formatted NCBITaxa worksheet
-        and then adds the higher taxa for those rows.
+    def load(self, worksheet: worksheet) -> None:
+        """Populate an NCBITaxa instance from an Excel worksheet.
+
+        This method loads a set of taxa from the rows of a SAFE formatted NCBITaxa
+        worksheet and populates the taxonomic hierarchy for those rows. The GBIFTaxa
+        instance is updated.
 
         Args:
-            worksheet: An openpyxl worksheet instance following the NCBITaxa formatting
-
-        Returns:
-            None: Updates the taxon_names and taxon_index attributes of the class
-                  instance using the data in the worksheet.
+            worksheet: An openpyxl worksheet instance using the GBIFTaxa formatting
         """
 
         start_errors = COUNTER_HANDLER.counters["ERROR"]
@@ -2333,26 +2408,27 @@ class NCBITaxa:
 
         FORMATTER.pop()
 
-    def validate_and_add_taxon(self, ncbi_taxon_input: list):
-        """User information is provided that names a taxon and (optionally) gives
-        a NCBI taxonomy ID. This information is then validated against the NCBI
-        database. This is principally used to process rows found in a NCBITaxa
-        worksheet, but is deliberately separated out so that a NCBITaxa instance can be
-        populated independently of an Excel dataset.
+    def validate_and_add_taxon(self, ncbi_taxon_input: list) -> None:
+        """Add a GBIF formatted taxon row to the GBIFTaxa instance.
 
-        The ncbi_taxon_input has the form:
+        This method takes user information on a taxon, and optionally an NCBI taxonomy
+        ID, validates it against the NCBI database and updates the NCBITaxa instance to
+        include the new details.
 
-        ['m_name', 'taxon_hier', 'ncbi_id']
+        This is typically used to process rows found in a dataset with an NCBITaxa
+        formatted table, can also be used to populate a NCBITaxa instance
+        programatically.
+
+        The taxon_input has the form:
+
+            ['m_name', 'taxon_hier', 'ncbi_id']
 
         If there is no NCBI ID, the structure is:
-        ['m_name', 'taxon_hier', None]
+
+            ['m_name', 'taxon_hier', None]
 
         Args:
             ncbi_taxon_input: NCBITaxon information in standard form as above
-
-        Returns:
-            None: Updates the taxon_names and taxon_index attributes of the class
-                  instance.
         """
 
         m_name, taxon_hier, ncbi_id = ncbi_taxon_input
@@ -2569,9 +2645,11 @@ class NCBITaxa:
             LOGGER.info(f"Higher taxon for ({m_name}) resolved in NCBI")
 
     @loggerinfo_push_pop("Indexing taxonomic hierarchy")
-    def index_higher_taxa(self):
-        """Function to add higher taxa to the index. The taxa are added are those
-        stored in self.hierarchy that have not already been added to the taxon index.
+    def index_higher_taxa(self) -> None:
+        """Extend the taxon index to include higher taxa.
+
+        This method uses the taxon hierarchy entries to add higher taxa to the taxon
+        index for the instance. It does not duplicate taxa already in the index.
         """
 
         # Use the taxon hierarchy entries to add higher taxa
@@ -2588,10 +2666,13 @@ class NCBITaxa:
             self.taxon_index.append([None, tx_id, p_id, tx_nme, tx_lev, "accepted"])
             LOGGER.info(f"Added {tx_lev} {tx_nme}")
 
-    def compare_hier(self, m_name: str, mtaxon: NCBITaxon, taxon_hier: dict):
-        """Function to compare the hierarchy of a taxon with the hierarchy that was
-        initially supplied. This function only checks that provided information
-        matches, missing levels or entries are not checked for"""
+    def compare_hier(self, m_name: str, mtaxon: NCBITaxon, taxon_hier: dict) -> None:
+        """Validate provided NCBI taxon hierachy.
+
+        This method compares the retrieved hierarchy of a taxon with the hierarchy that
+        was initially supplied. This function only checks that provided information
+        matches, missing levels or entries are not checked for.
+        """
         # Not worth checking hierarchy in superseded case
         if mtaxon.superseed is True:
             return
@@ -2613,68 +2694,92 @@ class NCBITaxa:
                 )
 
     @property
-    def is_empty(self):
+    def is_empty(self) -> bool:
+        """Check if an NCBITaxaWe do instance contains any taxa."""
         return len(self.taxon_names) == 0
 
 
 class Taxa:
+    """Manage combined NCBITaxa and GBIFTaxa instances.
+
+    This class wraps parallel instances of GBIFTaxa and NCBITaxa and provides shared
+    properties across the two instances.
+
+    Args:
+        resources: A Resources instance
+
+
+    We are interested in checking that no worksheet
+    names are reused when both Taxa sheets are provided, that every worksheet
+    name is used somewhere in the Data worksheets, and that every taxon name
+    used across the Data worksheets is defined in a Taxa worksheet.
+
+    This overarching class stores instances of the two lower level classes
+    (GBIFTaxa, NCBITaxa). It can also store (as `taxon_names_used`) the set
+    of all names used across the Data worksheets. The property `is_empty` can
+    be used to check whether both of the lower level classes are empty, and
+    the property `taxon_names` can be used to find the set of all taxon names
+    defined in either GBIFTaxa or NCBITaxa. Finally, the property `repeat_names`
+    can be used to find if any names are used in both GBIFTaxa and NCBITaxa
+    worksheets.
+    """
+
     def __init__(self, resources: Resources):
-        """A class that combines information stored in separate lower level GBIFTaxa
-        and NCBITaxa worksheets. We are interested in checking that no worksheet
-        names are reused when both Taxa sheets are provided, that every worksheet
-        name is used somewhere in the Data worksheets, and that every taxon name
-        used across the Data worksheets is defined in a Taxa worksheet.
-
-        This overarching class stores instances of the two lower level classes
-        (GBIFTaxa, NCBITaxa). It can also store (as `taxon_names_used`) the set
-        of all names used across the Data worksheets. The property `is_empty` can
-        be used to check whether both of the lower level classes are empty, and
-        the property `taxon_names` can be used to find the set of all taxon names
-        defined in either GBIFTaxa or NCBITaxa. Finally, the property `repeat_names`
-        can be used to find if any names are used in both GBIFTaxa and NCBITaxa
-        worksheets.
-        """
-
         self.gbif_taxa = GBIFTaxa(resources)
         self.ncbi_taxa = NCBITaxa(resources)
         self.taxon_names_used: set[str] = set()
 
     @property
-    def is_empty(self):
+    def is_empty(self) -> bool:
+        """Reports if neither GBIF nor NCBI taxa any taxa loaded."""
         return self.gbif_taxa.is_empty and self.ncbi_taxa.is_empty
 
     @property
-    def taxon_names(self):
+    def taxon_names(self) -> set[str]:
+        """Provides loaded taxon names from both NCBI and GBIF taxa."""
         return self.gbif_taxa.taxon_names.union(self.ncbi_taxa.taxon_names)
 
     @property
-    def repeat_names(self):
+    def repeat_names(self) -> set[str]:
+        """Reports taxon names duplicated between NCBI and GBIF taxa."""
         return self.gbif_taxa.taxon_names.intersection(self.ncbi_taxa.taxon_names)
 
     @property
-    def combined_index(self):
-        # Preallocate the two indexes
-        gbif_index = []
-        ncbi_index = []
+    def combined_index(self) -> list[list]:
+        """Provides a combined taxon index across NCBI and GBIF taxa.
 
-        # Check whether each sheet has an index and extract if so
-        if not self.gbif_taxa.is_empty:
-            temp_index = self.gbif_taxa.taxon_index
-            for item in temp_index:
-                gbif_index.append(["GBIF"] + item)
+        The individual entries are lists with the form:
 
-        if not self.ncbi_taxa.is_empty:
-            temp_index = self.ncbi_taxa.taxon_index
-            for item in temp_index:
-                ncbi_index.append(["NCBI"] + item)
+            [database_id: str, worksheet_name: str, id: int, parent_id: int,
+            canonical_name: str, taxonomic_rank: str, status: str]
 
-        return gbif_index + ncbi_index
+        """
+        # Preallocate the combined index
+        combined_index = []
+
+        for db_name, tx_obj in (("GBIF", self.gbif_taxa), ("NCBI", self.ncbi_taxa)):
+
+            # Check whether each sheet has an index and extract if so
+            if not tx_obj.is_empty:
+                for item in tx_obj.taxon_index:
+                    combined_index.append([db_name] + item)
+
+        return combined_index
 
 
-def taxon_index_to_text(taxon_index, html=False, indent_width=4):
-    """
-    Turns the taxon index from a GBIFTaxa instance into a text representation
-    of the taxonomic hierarchy used in the dataset.
+def taxon_index_to_text(
+    taxon_index: list, html: bool = False, indent_width: int = 4
+) -> str:
+    """Render a GBIFTaxa or NCBITaxa instance as text or html.
+
+    This function takes a taxon index from a GBIFTaxa or NCBITaxa instance and renders
+    the contents into a text representation of the taxonomic hierarchy used in the
+    dataset. Taxonomic ranks are indented to render a nested hierarchy.
+
+    Args:
+        taxon_index: The taxon_index property of a GBIFTaxa or NCBITaxa instance.
+        html: Render as html or text
+        indent_width: The indentation width to use for succesive taxonmic ranks.
     """
 
     lbr = "<br>" if html else "\n"
@@ -2751,10 +2856,16 @@ def taxon_index_to_text(taxon_index, html=False, indent_width=4):
     return html.getvalue()
 
 
-# New function to remove k__ notation, and to check that rank and
-def taxa_strip(name: str, rank: str):
-    """A function to remove k__ type notation from taxa names. The function also
-    checks that the provided rank is consistent with the rank implied by its prefix.
+def taxa_strip(name: str, rank: str) -> tuple[str, bool]:
+    """Strip NCBI style rank prefixes from taxon names.
+
+    This function removes NCBI `k__` type notation from taxa names. It returns a tuple
+    containing the stripped name and a boolean indicating if the provided rank is
+    consistent with the rank implied by its prefix.
+
+    Args:
+        name: An NCBI taxon name with `k__` style rank prefix
+        rank: The expected taxonomic rank for the name.
     """
     if name is None:
         return (None, True)
@@ -2769,10 +2880,16 @@ def taxa_strip(name: str, rank: str):
         return (name, True)
 
 
-# New function to generate species binomial
-def species_binomial(genus: str, species: str):
-    """A function to construct a species binomial from a genus name and a species
-    name.
+def species_binomial(genus: str, species: str) -> Union[str, None]:
+    """Generate a species binomial from NCBI genus and species.
+
+    The NCBI database sometimes includes extra tags in binomials, such as 'candidatus'.
+    This function cleans up those names to remove extra tags. It returns the cleaned
+    name or None in the event of a parsing error.
+
+    Args:
+        genus: The NCBI genus name
+        species: The NCBI species name
     """
     # First check if species is a single name
     if len(species.split()) == 1 and len(genus.split()) == 1:
@@ -2802,10 +2919,16 @@ def species_binomial(genus: str, species: str):
         return None
 
 
-# Equivalent function to generate subspecies trinomial
-def subspecies_trinomial(species: str, subspecies: str):
-    """A function to construct a subspecies trinomial from a species name and a
-    subspecies name.
+def subspecies_trinomial(species: str, subspecies: str) -> Union[str, None]:
+    """Generate a species tribinomial from NCBI species and subspecies.
+
+    The NCBI database sometimes includes extra tags in binomials, such as 'candidatus'.
+    This function cleans up those names to remove extra tags. It returns the cleaned
+    name or None in the event of a parsing error.
+
+    Args:
+        species: The NCBI species name
+        subspecies: The NCBI subspecies name
     """
     # First check if subspecies is a single name
     if len(subspecies.split()) == 1 and len(species.split()) == 2:
