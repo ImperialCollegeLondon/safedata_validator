@@ -1,3 +1,4 @@
+"""Test of logging and exception behaviour of DataWorksheet."""
 from collections import OrderedDict
 from logging import CRITICAL, ERROR, INFO, WARNING
 
@@ -25,7 +26,8 @@ from safedata_validator.taxa import GBIFTaxa
     ],
 )
 def test_DataWorksheet_init(caplog, fixture_field_meta, sheet_meta, expected_log):
-    """Testing init errors - field_meta tested elsewhere
+    """Testing init errors - field_meta tested elsewhere.
+
     TODO - currently no errors throw  in init - but might be added
     """
 
@@ -152,7 +154,7 @@ def test_DataWorksheet_init(caplog, fixture_field_meta, sheet_meta, expected_log
 def test_DataWorksheet_validate_field_meta(
     caplog, fixture_dataworksheet, field_meta, expected_log
 ):
-    """Testing errors created when field metadata is validated"""
+    """Testing errors created when field metadata is validated."""
     fixture_dataworksheet.validate_field_meta(field_meta)
 
     assert len(expected_log) == len(caplog.records)
@@ -520,10 +522,7 @@ def test_DataWorksheet_report(
     populate_external,
     expected_log,
 ):
-    """Testing report level errors
-    - emission of field errors and
-    - dataset level issues
-    """
+    """Testing report level errors emission of field errors and dataset level issues."""
 
     if populate_external:
         fixture_dataworksheet.external = "file_provided.sql"
@@ -702,7 +701,7 @@ def test_DataWorksheet_report(
 def test_DataWorksheet_report_multi_load(
     caplog, fixture_dataworksheet, fixture_field_meta, data_rows, expected_log
 ):
-    """Testing report level errors when more than one set of data loaded"""
+    """Testing report level errors when more than one set of data loaded."""
 
     fixture_dataworksheet.validate_field_meta(fixture_field_meta)
     caplog.clear()
@@ -808,9 +807,7 @@ def test_DataWorksheet_load_from_worksheet(
     populate_external,
     expected_log,
 ):
-    """Testing basics of load_from_worksheet method on programmatically created
-    worksheet object
-    """
+    """Testing basics of load_from_worksheet on programmatically created worksheet."""
 
     # Create a worksheet programmatically
     wb = openpyxl.Workbook()
@@ -855,8 +852,10 @@ def test_DataWorksheet_load_from_worksheet(
 def test_DataWorksheet_load_from_file(
     caplog, resources_with_local_gbif, example_excel_files, wsheet, n_errors
 ):
-    """Test loading a dataworksheet from file - this duplicates a lot of
-    Dataset.load_from_workbook"""
+    """Test loading a dataworksheet from file.
+
+    This duplicates a lot of Dataset.load_from_workbook
+    """
 
     # Load the taxa and locations
     ds = Dataset(resources_with_local_gbif)

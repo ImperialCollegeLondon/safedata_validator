@@ -1,3 +1,4 @@
+"""Tests checking that the NCBI specific classes work as intended."""
 import copy
 import os
 from logging import ERROR, INFO, WARNING
@@ -135,7 +136,7 @@ def test_sdv_no_remote_set_correctly():
     ],
 )
 def test_taxon_init_errors(test_input, expected_exception):
-    """This test checks NCBI taxon inputs expected errors"""
+    """This test checks NCBI taxon inputs expected errors."""
     with pytest.raises(expected_exception):
         _ = taxa.NCBITaxon(**test_input)
 
@@ -157,9 +158,10 @@ def test_taxon_init_errors(test_input, expected_exception):
     ],
 )
 def test_taxa_strip(test_input, expected):
-    """This test checks the function that strips taxa strings down to remove k__
-    type notation is functioning properly. This function also checks that the
-    supplied rank matches the rank implied by the notation.
+    """Checks that the function to remove k__ type notation is functioning properly.
+
+    This function also checks that the supplied rank matches the rank implied by the
+    notation.
     """
 
     s_taxa, match = taxa.taxa_strip(**test_input)
@@ -190,9 +192,10 @@ def test_taxa_strip(test_input, expected):
     ],
 )
 def test_species_binomial(test_input, expected):
-    """This test checks the function that constructs species binomials from species
-    and genus names. We test that it can catch when the species name is already
-    a binomial, and that it catches Candidatus names and handles them properly.
+    """Checks the function that constructs species binomials from species and genus names.
+
+    We test that it can catch when the species name is already a binomial, and that it
+    catches Candidatus names and handles them properly.
     """
 
     s_bi = taxa.species_binomial(**test_input)
@@ -222,9 +225,7 @@ def test_species_binomial(test_input, expected):
     ],
 )
 def test_validate_species_binomial(caplog, test_input, expected_log_entries):
-    """This test checks that the function to construct species binomials logs the
-    correct errors and warnings.
-    """
+    """This test checks logging for the function to construct species binomials."""
 
     taxa.species_binomial(**test_input)
 
@@ -262,10 +263,10 @@ def test_validate_species_binomial(caplog, test_input, expected_log_entries):
     ],
 )
 def test_subspecies_trinomial(test_input, expected):
-    """This test checks the function that constructs subspecies trinomials from
-    subspecies and species names. We test that it can catch when the subspecies
-    name is already a trinomial, and that it catches Candidatus names and handles
-    them properly.
+    """Checks the function that constructs subspecies trinomials.
+
+    We test that it can catch when the subspecies name is already a trinomial, and that
+    it catches Candidatus names and handles them properly.
     """
 
     s_bi = taxa.subspecies_trinomial(**test_input)
@@ -305,9 +306,7 @@ def test_subspecies_trinomial(test_input, expected):
     ],
 )
 def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries):
-    """This test checks that the function to construct subspecies trinomials logs
-    the correct errors and warnings.
-    """
+    """This test checks logging for the function to construct subspecies trinomials."""
 
     taxa.subspecies_trinomial(**test_input)
 
@@ -345,9 +344,7 @@ def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries)
     ],
 )
 def test_id_lookup(fixture_ncbi_validators, test_input, expected):
-    """This test checks the expected results of looking up a specific NCBI
-    taxonomy ID against the actual returned taxonomy details.
-    """
+    """This test checks the results of looking up a specific NCBI taxonomy ID."""
 
     fnd_tx = fixture_ncbi_validators.id_lookup(**test_input)
 
@@ -387,9 +384,7 @@ def test_id_lookup(fixture_ncbi_validators, test_input, expected):
 def test_validate_id_lookup(
     caplog, test_input, expected_log_entries, fixture_ncbi_validators
 ):
-    """This test checks that the function to search for a taxon by NCBI ID logs
-    the correct errors and warnings.
-    """
+    """Checks the logging of a NCBI taxon ID search."""
 
     fixture_ncbi_validators.id_lookup(**test_input)
 
@@ -409,7 +404,7 @@ def test_validate_id_lookup(
     ],
 )
 def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exception):
-    """This test checks that validator.id_lookup inputs throw errors as expected"""
+    """This test checks that validator.id_lookup inputs throw errors as expected."""
 
     with pytest.raises(expected_exception):
         _ = fixture_ncbi_validators.id_lookup(**test_input)
@@ -504,9 +499,8 @@ def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exceptio
     ],
 )
 def test_taxa_search(fixture_ncbi_validators, test_input, expected):
-    """This test checks the results of searching for a taxa in the NCBI taxonomy
-    database against what was expected to be found.
-    """
+    """This test checks the results of searching for a specific taxon."""
+
     fnd_tx = fixture_ncbi_validators.taxa_search(**test_input)
 
     assert fnd_tx.name == expected[0]
@@ -660,9 +654,7 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
 def test_validate_taxa_search(
     caplog, test_input, expected_log_entries, fixture_ncbi_validators
 ):
-    """This test checks that the function that searches the NCBI database to find
-    information on particular taxa logs the correct errors and warnings.
-    """
+    """Checks the error logging of a taxon name search."""
 
     fixture_ncbi_validators.taxa_search(**test_input)
 
@@ -694,7 +686,7 @@ def test_validate_taxa_search(
     ],
 )
 def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_exception):
-    """This test checks validator.taxa_search inputs throw errors as expected"""
+    """This test checks validator.taxa_search inputs throw errors as expected."""
 
     with pytest.raises(expected_exception):
         _ = fixture_ncbi_validators.taxa_search(**test_input)
@@ -877,9 +869,7 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
     ],
 )
 def test_validate_and_add_taxon(ncbi_resources_local_and_remote, test_input, expected):
-    """This test checks the function to validate a taxon against the NCBI
-    database actually stores the expected information.
-    """
+    """Checks that NCBI taxon validation stores the expected information."""
 
     ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
     ncbi_instance.validate_and_add_taxon(test_input)
@@ -1250,9 +1240,7 @@ def test_validate_and_add_taxon(ncbi_resources_local_and_remote, test_input, exp
 def test_validate_and_add_taxon_validate(
     caplog, test_input, expected_log_entries, ncbi_resources_local_and_remote
 ):
-    """This test checks the function to validate a taxon against the NCBI
-    database logs the correct information.
-    """
+    """Checks the logging of NCBI taxon validation."""
 
     test_input = copy.deepcopy(test_input)
     ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
@@ -1277,8 +1265,7 @@ def test_validate_and_add_taxon_validate(
 def test_validate_and_add_taxon_errors(
     ncbi_resources_local_and_remote, test_input, expected_exception
 ):
-    """This test checks validator.validate_and_add_taxon inputs throw errors as
-    expected"""
+    """This test checks exception handling of validator.validate_and_add_taxon."""
 
     ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
 
@@ -1426,9 +1413,7 @@ def test_validate_and_add_taxon_errors(
     ],
 )
 def test_index_higher_taxa(ncbi_resources_local_and_remote, test_input, expected):
-    """This test checks the function to store higher taxonomic ranks for a taxon
-    actually stores the correct information.
-    """
+    """Checks that higher taxonomic ranks for a taxon are stored correctly."""
 
     ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
     ncbi_instance.validate_and_add_taxon(test_input)
@@ -1535,9 +1520,7 @@ def test_index_higher_taxa(ncbi_resources_local_and_remote, test_input, expected
 def test_validate_index_higher_taxa(
     caplog, ncbi_resources_local_and_remote, test_input, expected_log_entries
 ):
-    """This test checks the function to store higher taxonomic ranks for a taxon
-    logs the correct information.
-    """
+    """Checks the function to store higher taxonomic ranks of a taxon logs correctly."""
 
     ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
     ncbi_instance.validate_and_add_taxon(test_input)
@@ -1557,9 +1540,10 @@ def test_validate_index_higher_taxa(
 def test_taxa_load(
     ncbi_resources_local_and_remote, example_ncbi_files, n_errors, n_taxa, t_taxa
 ):
-    """This tests the ensemble loading of (ncbi) taxa from a file using
-    indirect parametrisation to access the fixtures containing the
-    sample excel files.
+    """This tests the ensemble loading of (ncbi) taxa from a file.
+
+    It uses indirect parametrisation to access the fixtures containing the sample excel
+    files.
     """
 
     tx = taxa.NCBITaxa(ncbi_resources_local_and_remote)

@@ -1,3 +1,4 @@
+"""Tests to check that the summary sheet functions work as intended."""
 import datetime
 
 import pytest
@@ -1009,8 +1010,9 @@ def test_data_worksheets(
     should_log_error,
     expected_log,
 ):
+    """Test that sheetnames are properly detected and handled.
 
-    """This test suite is more complex as the data worksheets need to match to the
+    This test suite is more complex as the data worksheets need to match to the
     existing sheetnames in the workbook and potentially to a set of external files.
     """
 
@@ -1074,9 +1076,10 @@ def test_data_worksheets(
     indirect=["example_excel_files"],  # take actual params from fixture
 )
 def test_summary_load(fixture_summary, example_excel_files, n_errors):
-    """This tests the ensemble loading of a summary from a file using
-    indirect parameterisation to access the fixtures containing the
-    sample excel files.
+    """This tests the ensemble loading of a summary from a file.
+
+    It uses indirect parameterisation to access the fixtures containing the sample excel
+    files.
     """
 
     fixture_summary.load(

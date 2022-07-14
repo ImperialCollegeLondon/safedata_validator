@@ -1,3 +1,4 @@
+"""Tests checking that the Locations class behaves as intended."""
 from logging import CRITICAL, ERROR, INFO, WARNING
 
 import openpyxl

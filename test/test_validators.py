@@ -1,3 +1,4 @@
+"""Tests to check that validator helper functions are working as intended."""
 import os
 import string
 
@@ -28,9 +29,7 @@ def dummy_ws_with_extra():
 
 
 def test_naive_dims(dummy_ws_with_extra):
-    """
-    Just checks that a naive read does indeed give inflated frame size
-    """
+    """Just checks that a naive read does indeed give inflated frame size."""
     assert dummy_ws_with_extra.max_column == 20
     assert dummy_ws_with_extra.max_row == 50
 
@@ -84,9 +83,7 @@ def test_naive_dims(dummy_ws_with_extra):
     ],
 )
 def test_getdataframe(dummy_ws_with_extra, hd_vals, nonstr, padded, duped, blank):
-    """
-    Does GetDataFrame work?
-    """
+    """Does GetDataFrame work?"""
 
     # Update headers for header checking
     if hd_vals:

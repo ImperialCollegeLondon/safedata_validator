@@ -1,3 +1,4 @@
+"""Collection of fixtures to assist the testing scripts."""
 import os
 from collections import OrderedDict
 
@@ -20,7 +21,9 @@ from safedata_validator.taxa import (
 
 
 def fixture_files():
-    """Whenever testing is run, this conftest file is loaded and the path of the
+    """Function to direct test functions to the fixture files.
+
+    Whenever testing is run, this conftest file is loaded and the path of the
     file can be used to provide paths to the location of all other testing and
     fixture files on a given test system. This helps make sure that absolute
     paths are maintained so that testing is not sensitive to the directory where
@@ -84,9 +87,7 @@ parameterisation is clumsy and complex.
 
 
 def log_check(caplog, expected_log):
-    """
-    This helper function checks that the captured log during a test
-    matches the expected log levels and messages.
+    """Helper function to check that the captured log is as expected.
 
     Arguments:
         caplog: An instance of the caplog fixture
@@ -113,7 +114,7 @@ The other contents are fixtures that will be available to all test suites.
 
 @pytest.fixture()
 def config_filesystem(fs):
-    """Create a config and resources file system for testing
+    """Create a config and resources file system for testing.
 
     Testing requires access to the configuration files for the package resources
     and the paths to these files are going to differ across test system. This
@@ -182,7 +183,7 @@ def config_filesystem(fs):
 
 @pytest.fixture()
 def user_config_file(config_filesystem):
-    """Attempt to extend the fake fs - does not seem to work"""
+    """Attempt to extend the fake fs - does not seem to work."""
     # Local user config as a duplicate of the existing config in the fixture
     # directory
 
@@ -196,7 +197,7 @@ def user_config_file(config_filesystem):
 
 @pytest.fixture()
 def site_config_file(config_filesystem):
-    """Attempt to extend the fake fs - does not seem to work"""
+    """Attempt to extend the fake fs - does not seem to work."""
     # Local user config as a duplicate of the existing config in the fixture
     # directory
 
@@ -217,7 +218,7 @@ def site_config_file(config_filesystem):
 
 @pytest.fixture()
 def resources_with_local_gbif(config_filesystem):
-    """Creates a Resource object configured to use a local GBIF database
+    """Creates a Resource object configured to use a local GBIF database.
 
     Returns:
         A safedata_validator.resources.Resources instance
@@ -228,7 +229,7 @@ def resources_with_local_gbif(config_filesystem):
 
 @pytest.fixture()
 def resources_with_remote_gbif(config_filesystem):
-    """Creates a Resource object configured to use the remote GBIF API
+    """Creates a Resource object configured to use the remote GBIF API.
 
     Returns:
         A safedata_validator.resources.Resources instance
@@ -254,7 +255,7 @@ def resources_local_and_remote(
 
 @pytest.fixture()
 def resources_with_local_ncbi(config_filesystem):
-    """Creates a Resource object configured to use a local NCBI database
+    """Creates a Resource object configured to use a local NCBI database.
 
     Returns:
         A safedata_validator.resources.Resources instance
@@ -265,7 +266,7 @@ def resources_with_local_ncbi(config_filesystem):
 
 @pytest.fixture()
 def resources_with_remote_ncbi(config_filesystem):
-    """Creates a Resource object configured to use the remote NCBI API
+    """Creates a Resource object configured to use the remote NCBI API.
 
     Returns:
         A safedata_validator.resources.Resources instance
@@ -296,9 +297,10 @@ def ncbi_resources_local_and_remote(
 
 @pytest.fixture()
 def example_excel_files(config_filesystem, request):
-    """This uses indirect parameterisation, to allow the shared fixture
-    to be paired with request specific expectations rather than all pair
-    combinations:
+    """Fixture providing example excel files for testing.
+
+    This uses indirect parameterisation, to allow the shared fixture to be paired with
+    request specific expectations rather than all pair combinations:
 
     https://stackoverflow.com/questions/70379640
     """
@@ -312,10 +314,11 @@ def example_excel_files(config_filesystem, request):
 
 @pytest.fixture()
 def example_ncbi_files(config_filesystem, request):
-    """This uses indirect parameterisation, to allow the shared fixture
-    to be paired with request specific expectations rather than all pair
-    combinations. This is an equivalent function to example_excel_files
-    but for the NCBI specific excel files.
+    """Fixture providing additional excel files with NCBI taxa details for testing.
+
+    This uses indirect parameterisation, to allow the shared fixture to be paired with
+    request specific expectations rather than all pair combinations. This is an
+    equivalent function to example_excel_files but for the NCBI specific excel files.
     """
     if request.param == "good":
         wb = openpyxl.load_workbook(FIXTURE_FILES.rf.good_ncbi_file, read_only=True)
@@ -330,7 +333,7 @@ def example_ncbi_files(config_filesystem, request):
 
 @pytest.fixture(params=["remote", "local"])
 def fixture_taxon_validators(resources_with_local_gbif, request):
-    """Parameterised fixture to return local and remote taxon validators"""
+    """Parameterised fixture to return local and remote taxon validators."""
     if request.param == "remote":
         if os.getenv("SDV_NO_REMOTE") in ["1", "true", "True"]:
             pytest.skip("Remote testing turned off via SDV_NO_REMOTE")
@@ -345,7 +348,7 @@ def fixture_taxon_validators(resources_with_local_gbif, request):
 def fixture_ncbi_validators(
     resources_with_local_ncbi, resources_with_remote_ncbi, request
 ):
-    """Parameterised fixture to return local and remote NCBI validator"""
+    """Parameterised fixture to return local and remote NCBI validator."""
     if request.param == "remote":
         if os.getenv("SDV_NO_REMOTE") in ["1", "true", "True"]:
             pytest.skip("Remote testing turned off via SDV_NO_REMOTE")
@@ -362,8 +365,9 @@ def fixture_ncbi_validators(
 
 @pytest.fixture()
 def fixture_taxa(resources_with_local_gbif):
-    """Fixture to provide a taxon object with a couple of names. These examples
-    need to be in the cutdown local GBIF testing database in fixtures.
+    """Fixture to provide a taxon object with a couple of names.
+
+    These examples need to be in the cutdown local GBIF testing database in fixtures.
     """
 
     taxa = GBIFTaxa(resources_with_local_gbif)
@@ -381,8 +385,9 @@ def fixture_taxa(resources_with_local_gbif):
 
 @pytest.fixture()
 def fixture_locations(resources_with_local_gbif):
-    """Fixture to provide a taxon object with a couple of names. These examples
-    need to be in the cutdown local GBIF testing database in fixtures.
+    """Fixture to provide a taxon object with a couple of names.
+
+    These examples need to be in the cutdown local GBIF testing database in fixtures.
     """
 
     locations = Locations(resources_with_local_gbif)
@@ -396,8 +401,10 @@ def fixture_locations(resources_with_local_gbif):
 
 @pytest.fixture()
 def fixture_dataset(resources_with_local_gbif):
-    """Fixture to provide a dataset that has been prepopulated with some taxon
-    and location names for field tests.
+    """Fixture to provide a dataset.
+
+    This dataset has been prepopulated with some taxon and location names for field
+    tests.
     """
 
     dataset = Dataset(resources_with_local_gbif)
@@ -419,7 +426,7 @@ def fixture_dataset(resources_with_local_gbif):
 
 @pytest.fixture(scope="module")
 def fixture_field_meta():
-    """field_meta object for use across tests"""
+    """field_meta object for use across tests."""
 
     return OrderedDict(
         field_type=["numeric", "numeric", "numeric"],
@@ -432,7 +439,7 @@ def fixture_field_meta():
 
 @pytest.fixture()
 def fixture_dataworksheet(fixture_dataset):
-    """field_meta object for use across tests"""
+    """field_meta object for use across tests."""
 
     dws = DataWorksheet(
         {

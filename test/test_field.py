@@ -1,3 +1,4 @@
+"""General tests on the various field types."""
 from collections import OrderedDict
 from datetime import date, datetime, time
 from logging import CRITICAL, ERROR, INFO, WARNING
@@ -87,7 +88,7 @@ from safedata_validator.field import (
     ],
 )
 def test_parse_levels(caplog, data, exp_log, exp_levels, exp_desc):
-    """Testing behaviour of the NumericField class in using _validate_data"""
+    """Testing behaviour of the NumericField class in using _validate_data."""
 
     fld = BaseField(
         {
@@ -187,7 +188,7 @@ def test_parse_levels(caplog, data, exp_log, exp_levels, exp_desc):
 def test_check_taxon_meta(
     caplog, fixture_dataset, tx_meta, has_taxa_object, has_dwsh_object, expected_log
 ):
-    """Testing the use of the BaseField._check_taxon_meta() method"""
+    """Testing the use of the BaseField._check_taxon_meta() method."""
 
     # Set up what information is available for taxon field validation
     ds_obj = fixture_dataset if has_taxa_object else None
@@ -391,7 +392,7 @@ def test_check_taxon_meta(
 def test_check_interaction_meta(
     caplog, fixture_dataset, iact_meta, has_taxa_object, has_dwsh_object, expected_log
 ):
-    """Testing the use of the BaseField._check_interaction_meta() method"""
+    """Testing the use of the BaseField._check_interaction_meta() method."""
 
     # Set up what information is available for taxon field validation
     ds_obj = fixture_dataset if has_taxa_object else None
@@ -544,8 +545,9 @@ def test_check_interaction_meta(
     ],
 )
 def test_BaseField_init(caplog, field_meta, expected_log):
-    """Testing behaviour of the BaseField class in handling bad descriptors
-    via __init__ and testing within the _check_meta() method.
+    """Testing behaviour of the BaseField class in handling bad descriptors.
+
+    This is done via __init__ and testing within the _check_meta() method.
     """
 
     fld = BaseField(field_meta, None)
@@ -589,7 +591,7 @@ def test_BaseField_init(caplog, field_meta, expected_log):
     ],
 )
 def test_BaseField_validate_data(caplog, data, expected_log):
-    """Testing behaviour of the BaseField class in using _validate_data"""
+    """Testing behaviour of the BaseField class in using _validate_data."""
 
     fld = BaseField(
         {
@@ -627,7 +629,7 @@ def test_BaseField_validate_data(caplog, data, expected_log):
     ],
 )
 def test_CommentField_validate_data(caplog, data, expected_log):
-    """Testing behaviour of the CommentsField class in using _validate_data"""
+    """Testing behaviour of the CommentsField class in using _validate_data."""
 
     fld = CommentField(
         {
@@ -687,7 +689,7 @@ def test_CommentField_validate_data(caplog, data, expected_log):
     ],
 )
 def test_ReplicateField_validate_data(caplog, data, expected_log):
-    """Testing behaviour of the CommentsField class in using _validate_data"""
+    """Testing behaviour of the CommentsField class in using _validate_data."""
 
     fld = ReplicateField(
         {
@@ -818,8 +820,7 @@ def test_CatNumTaxonField_init(
     has_dwsh_object,
     expected_log,
 ):
-    """Testing behaviour of the NumericTaxonField and CategoricalTaxonField
-    classes in using __init__"""
+    """Testing __init__ behaviour of NumericTaxonField and CategoricalTaxonField."""
 
     # Set up what information is available for taxon field validation
     ds_obj = fixture_dataset if has_taxa_object else None
@@ -1054,8 +1055,7 @@ def test_CatNumInteractionField_init(
     has_dwsh_object,
     expected_log,
 ):
-    """Testing behaviour of the NumericInteractionField and
-    CategoricalInteractionField classes in using __init__"""
+    """Testing __init__ behaviour of the Numeric and CategoricalInteractionField."""
 
     # Set up what information is available for taxon field validation
     ds_obj = fixture_dataset if has_taxa_object else None
@@ -1174,7 +1174,7 @@ def test_CatNumInteractionField_init(
 def test_NumericField_and_subclasses_validate_data(
     caplog, fixture_dataset, test_class, field_meta, data, expected_log
 ):
-    """Testing behaviour of the NumericField and subclasses in using _validate_data"""
+    """Testing behaviour of the NumericField and subclasses in using _validate_data."""
 
     # Create and instance of the required class
     fld = test_class(field_meta, dataset=fixture_dataset)
@@ -1268,8 +1268,9 @@ def test_NumericField_and_subclasses_validate_data(
     ],
 )
 def test_CategoricalField_init(caplog, field_meta, expected_log):
-    """Testing behaviour of the BaseField class in handling bad descriptors
-    via __init__ and testing within the _check_meta() method.
+    """Testing behaviour of the BaseField class in handling bad descriptors.
+
+    This is done via __init__ and testing within the _check_meta() method.
     """
 
     fld = CategoricalField(field_meta, None)
@@ -1379,7 +1380,7 @@ def test_CategoricalField_init(caplog, field_meta, expected_log):
 def test_CategoricalField_and_subclasses_validate_data(
     caplog, fixture_dataset, test_class, field_meta, data, expected_log
 ):
-    """Testing behaviour of the CategoricalField class in using validate_data"""
+    """Testing behaviour of the CategoricalField class in using validate_data."""
 
     fld = test_class(field_meta, dataset=fixture_dataset)
 
@@ -1459,7 +1460,7 @@ def test_TaxaField_init(caplog, fixture_dataset, provide_taxa_instance, expected
     ],
 )
 def test_TaxaField_validate_data(caplog, fixture_dataset, data, expected_log):
-    """Testing behaviour of the TaxaField class in using validate_data"""
+    """Testing behaviour of the TaxaField class in using validate_data."""
 
     fld = TaxaField(
         {"field_type": "taxa", "description": "My taxa", "field_name": "taxa_field"},
@@ -1553,7 +1554,7 @@ def test_LocationsField_init(
     ],
 )
 def test_LocationsField_validate_data(caplog, fixture_dataset, data, expected_log):
-    """Testing behaviour of the TaxaField class in using validate_data"""
+    """Testing behaviour of the TaxaField class in using validate_data."""
 
     fld = LocationsField(
         {
@@ -1684,7 +1685,7 @@ def test_GeoField_init(caplog, fixture_dataset, provide_ds_instance, expected_lo
     ],
 )
 def test_GeoField_validate_data(caplog, fixture_dataset, which, data, expected_log):
-    """Testing behaviour of the TaxaField class in using validate_data"""
+    """Testing behaviour of the TaxaField class in using validate_data."""
 
     fld = GeoField(
         {"field_name": "geocoords", "field_type": which, "description": "my gcs"},
@@ -1782,7 +1783,7 @@ def test_GeoField_validate_data(caplog, fixture_dataset, which, data, expected_l
     ],
 )
 def test_TimeField_validate_data(caplog, data, expected_log):
-    """Testing behaviour of the TaxaField class in using validate_data"""
+    """Testing behaviour of the TaxaField class in using validate_data."""
 
     fld = TimeField({"field_name": "time", "field_type": "time", "description": "time"})
 
@@ -2080,7 +2081,7 @@ def test_TimeField_validate_data(caplog, data, expected_log):
 def test_DatetimeField_validate_data(
     caplog, fixture_dataset, field_type, data, expected_log
 ):
-    """Testing behaviour of the DatetimeField class in using validate_data"""
+    """Testing behaviour of the DatetimeField class in using validate_data."""
 
     fld = DatetimeField(
         {"field_name": "datetimetest", "field_type": field_type, "description": "time"},
@@ -2235,7 +2236,7 @@ def test_DatetimeField_validate_data(
 def test_DatetimeField_extent(
     caplog, fixture_dataset, provide_dataset, field_type, data, expected_log
 ):
-    """Testing behaviour of the DatetimeField class in setting extents"""
+    """Testing behaviour of the DatetimeField class in setting extents."""
 
     if provide_dataset:
         ds = fixture_dataset
@@ -2324,7 +2325,7 @@ def test_FileField_init(
     external_files,
     expected_log,
 ):
-    """Testing behaviour of the FileField class in using init"""
+    """Testing behaviour of the FileField class in using init."""
 
     if provide_dataset:
         ds = fixture_dataset
@@ -2369,7 +2370,7 @@ def test_FileField_init(
     ],
 )
 def test_FileField_validate_data(caplog, fixture_dataset, data, expected_log):
-    """Testing behaviour of the FileField class in using validate_data"""
+    """Testing behaviour of the FileField class in using validate_data."""
 
     field_meta = {"field_name": "file", "field_type": "file", "description": "file"}
 
@@ -2447,7 +2448,7 @@ def test_FileField_init_v2(
     external_files,
     expected_log,
 ):
-    """Testing behaviour of the FileField class in using init"""
+    """Testing behaviour of the FileField class in using init."""
 
     if provide_dataset:
         ds = fixture_dataset
@@ -2490,7 +2491,7 @@ def test_FileField_init_v2(
     ],
 )
 def test_EmptyField_validate_data(caplog, data, expected_log):
-    """Testing behaviour of the EmptyField class in using validate_data"""
+    """Testing behaviour of the EmptyField class in using validate_data."""
 
     field_meta = {"field_name": None, "field_type": None, "description": None}
 

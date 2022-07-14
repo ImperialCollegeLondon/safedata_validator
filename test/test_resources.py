@@ -1,3 +1,4 @@
+"""General tests to check that config files are handled sensibly."""
 import os
 from contextlib import contextmanager
 from logging import CRITICAL, ERROR, INFO, WARNING
@@ -65,7 +66,7 @@ def config_file_dict():
 
 
 def nested_set(dic, keys, value):
-    """Convenience function for setting dict config values"""
+    """Convenience function for setting dict config values."""
     for key in keys[:-1]:
         dic = dic.setdefault(key, {})
     dic[keys[-1]] = value
@@ -271,7 +272,9 @@ def test_load_resources_by_arg(
     expected_exception,
     expected_log,
 ):
-    """This test uses the ability to load a config from a list or a dict to
+    """Test to check that bad config inputs are logged correctly.
+
+    This test uses the ability to load a config from a list or a dict to
     validate the behaviour of the config with bad inputs. Arguably overkill to
     run this using both list and dict inputs...
     """
@@ -343,9 +346,7 @@ def test_load_resources_by_arg(
     ],
 )
 def test_load_resources_by_file(config_filesystem, caplog, filepath, expected_log):
-    """This test uses the ability to load a config from a file to
-    validate the behaviour of the config.
-    """
+    """Loads a config from a file to validate the behaviour of the config."""
 
     Resources(filepath)
 
@@ -375,7 +376,7 @@ def test_load_resources_by_file(config_filesystem, caplog, filepath, expected_lo
     ],
 )
 def test_load_resources_from_missing_config(config_filesystem, caplog, expected_log):
-    """This test checks failure modes when no config is provided"""
+    """This test checks failure modes when no config is provided."""
 
     with pytest.raises(RuntimeError):
 
@@ -404,7 +405,7 @@ def test_load_resources_from_missing_config(config_filesystem, caplog, expected_
     ],
 )
 def test_load_resources_from_user_config(user_config_file, caplog, expected_log):
-    """This test uses the ability to find a user config file"""
+    """This test uses the ability to find a user config file."""
 
     Resources()
 
@@ -431,7 +432,7 @@ def test_load_resources_from_user_config(user_config_file, caplog, expected_log)
     ],
 )
 def test_load_resources_from_site_config(site_config_file, caplog, expected_log):
-    """This test uses the ability to find a site config file"""
+    """This test uses the ability to find a site config file."""
 
     Resources()
 

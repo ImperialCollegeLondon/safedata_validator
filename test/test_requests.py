@@ -1,9 +1,6 @@
-import requests
+"""This test checks that the fake filesystem correctly handles the requests package."""
 
-"""This test is to double check that the fake filesystem correctly handles
-using the requests package.
-"""
-
+import requests  # type: ignore
 
 URL = (
     "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&"

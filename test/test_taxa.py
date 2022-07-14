@@ -1,3 +1,4 @@
+"""Tests checking that the GBIF specific classes work as intended."""
 from logging import ERROR, INFO, WARNING
 
 import pytest
@@ -32,7 +33,7 @@ from .conftest import log_check
     ],
 )
 def test_taxon_init_errors(test_input, expected_exception):
-    """This test checks taxon inputs throw errors as expected"""
+    """This test checks taxon inputs throw errors as expected."""
     with pytest.raises(expected_exception):
         _ = taxa.GBIFTaxon(**test_input)
 
@@ -60,8 +61,7 @@ def test_taxon_init_errors(test_input, expected_exception):
     ],
 )
 def test_validator_search(fixture_taxon_validators, test_input, expected):
-    """This test checks inputs against expected outputs for both the local
-    and remote validator classes.
+    """This test checks inputs against expected outputs for both validator classes.
 
     TODO - proof of concept, think about systematic structure and failure
            cases
@@ -83,8 +83,8 @@ def test_validator_search(fixture_taxon_validators, test_input, expected):
     [(1324716, ("found", "Crematogaster borneensis")), (2480962, ("found", "Morus"))],
 )
 def test_validator_gbif_lookup_outputs(fixture_taxon_validators, test_input, expected):
-    """This test checks inputs against expected outputs for both the local
-    and remote validator classes.
+    """This test checks inputs against expected outputs for both validator classes.
+
     TODO - proof of concept, think about systematic structure and failure
     cases
     """
@@ -107,7 +107,7 @@ def test_validator_gbif_lookup_outputs(fixture_taxon_validators, test_input, exp
 def test_validator_gbif_lookup_errors(
     fixture_taxon_validators, test_input, expected_exception
 ):
-    """This test checks validator.id_lookup inputs throw errors as expected"""
+    """This test checks validator.id_lookup inputs throw errors as expected."""
 
     with pytest.raises(expected_exception):
         _ = fixture_taxon_validators.id_lookup(test_input)
@@ -680,9 +680,10 @@ def test_validate_taxon_lookup(
     indirect=["example_excel_files"],  # take actual params from fixture
 )
 def test_taxa_load(example_excel_files, resources_local_and_remote, n_errors, n_taxa):
-    """This tests the ensemble loading of taxa from a file using
-    indirect parameterisation to access the fixtures containing the
-    sample excel files.
+    """This tests the ensemble loading of taxa from a file.
+
+    It uses indirect parameterisation to access the fixtures containing the sample excel
+    files.
     """
 
     tx = taxa.GBIFTaxa(resources_local_and_remote)
