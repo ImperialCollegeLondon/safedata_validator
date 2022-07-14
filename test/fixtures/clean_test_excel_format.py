@@ -1,12 +1,13 @@
-import os
+"""Script to tidy up the content of the Excel test files.
 
-import openpyxl
-
-"""
 There were some oddities in the original test files that caused warnings,
 which I think were to do with external data sources. This code simply copies
 the data from one file into another, which should tidy up the contents.
 """
+
+import os
+
+import openpyxl
 
 os.chdir("test/fixtures")
 path = "Test_format_good.xlsx"

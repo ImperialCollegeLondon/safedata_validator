@@ -1,22 +1,24 @@
+"""Script to generate a truncated version of the GBIF taxonomic backbone.
+
+This script uses a list of taxa used in testing to cut down the full (~2GB) GBIF
+backbone to a truncated version for inclusion in the test fixtures directory for testing
+local taxon validation. The list cannot be easily automated, because e.g. ambiguous taxa
+detection needs to have copies of all possible resolutions. Currently easiest to hand
+curate this list but the details for good matches can be extracted from test files and
+then supplemented. For example:
+
+from safedata_validator.taxa import Taxa
+from safedata_validator.resources import Resources
+
+rs = Resources()
+tx = Taxa(rs)
+wb = openpyxl.load_workbook('Test_format_good.xlsx')
+tx.load(wb['Taxa'])
+[t[1:] for t in tx.taxon_index]  # these values are the row entries in the list
+"""
+
 import csv
 import sqlite3
-
-# This script uses a list of taxa used in testing to cut down the full (~2GB)
-# GBIF backbone to a truncated version for inclusion in the test fixtures
-# directory for testing local taxon validation. The list cannot be easily
-# automated, because e.g. ambiguous taxa detection needs to have copies of
-# all possible resolutions. Currently easiest to hand curate this list but
-# the details for good matches can be extracted from test files and then
-# supplemented. For example
-
-# from safedata_validator.taxa import Taxa
-# from safedata_validator.resources import Resources
-#
-# rs = Resources()
-# tx = Taxa(rs)
-# wb = openpyxl.load_workbook('Test_format_good.xlsx')
-# tx.load(wb['Taxa'])
-# [t[1:] for t in tx.taxon_index]  # these values are the row entries in the list
 
 # The details file contains some whole row comments, so these are skipped
 fp = open("details_of_test_taxa.csv")

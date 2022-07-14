@@ -1,13 +1,16 @@
+"""Script to generate a truncated version of the NCBI taxonomy backbone.
+
+This script uses a list of taxa used in testing to cut down the full (~0.5GB) NCBI
+taxonomy database to a truncated version for inclusion in the test fixtures directory
+for testing local taxon validation. The input is a list of valid NCBI taxa IDs,
+associated names, nodes, and merged nodes are then all retained in the appropriate
+tables. Everything else is chucked out. Only IDs for taxa used are needed, higher taxa
+are found automatically and added to the database. This script should be run with
+safedata_validator as the working directory.
+"""
+
 import csv
 import sqlite3
-
-# This script uses a list of taxa used in testing to cut down the full (~0.5GB)
-# NCBI taxonomy database to a truncated version for inclusion in the test fixtures
-# directory for testing local taxon validation. The input is a list of valid NCBI
-# taxa IDs, associated names, nodes, and merged nodes are then all retained in the
-# appropriate tables. Everything else is chucked out. Only IDs for taxa used are
-# needed, higher taxa are found automatically and added to the database. This
-# script should be run with safedata_validator as the working directory.
 
 # The details file contains some whole row comments, so these are skipped
 fp = open("test/fixtures/test_ncbi_taxa_details.csv")
