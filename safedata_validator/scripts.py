@@ -105,7 +105,7 @@ def _safedata_validator_cli():
 
     args = parser.parse_args()
 
-    ds = Dataset(resources=args.resources)
+    ds = Dataset(resources=Resources(args.resources))
     ds.load_from_workbook(
         filename=args.filename,
         valid_pid=args.valid_pid,

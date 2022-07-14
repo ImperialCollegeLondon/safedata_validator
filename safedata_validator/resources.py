@@ -1,4 +1,4 @@
-"""Load and check validation resources
+"""Load and check validation resources.
 
 The `safedata_validator` package needs access to some local resources and
 configuration to work. The three main resources for file validation are:
@@ -78,7 +78,9 @@ to do basic validation and type conversions.
 
 
 def date_list(value, min, max):
-    """A configobj.Validator extension function to check configuration values
+    """Validate config date lists.
+
+    A configobj.Validator extension function to check configuration values
     containing a list of ISO formatted date strings and to return parsed
     values.
 
@@ -119,37 +121,38 @@ def date_list(value, min, max):
 
 @loggerinfo_push_pop("Configuring Resources")
 class Resources:
+    """Load and check validation resources.
+
+    Creating an instance of this class locates and validate resources for
+    using the `safedata_validator` package, either from the provided
+    configuration details or from the user and then site config locations
+    defined by the appdirs package.
+
+    Args:
+        config: A path to a configuration file, or a dict or list
+            providing package configuration details. The list format
+            should provide a list of strings, each representing a
+            line in the configuration file. The dict format is a
+            dictionary with the required nested dictionary structure
+            and values
+
+    Attributes:
+        config_type: The method used to specify the resources. One of
+            'init_dict', 'init_list', 'init_file', 'user_config' or 'site_config'.
+        locations: The path to the locations file
+        gbif_database: The path to the GBIF database file or None
+        ncbi_database: The path to the NCBI database file or None
+        ncbi_api_key: A NCBI api key or None
+        use_local_gbif: Is a local file used or should the GBIF API be used
+        ncbi_database: The path to the NCBI database file or None
+        use_local_ncbi: Is a local file used or should the NCBI API be used
+        valid_locations: The locations defined in the locations file
+        location_aliases: Location aliases defined in the locations file
+        extents: A DotMap of extent data
+        zenodo: A DotMap of Zenodo information
+    """
+
     def __init__(self, config: Union[str, list, dict] = None) -> None:
-        """Load and check validation resources
-
-        Creating an instance of this class locates and validate resources for
-        using the `safedata_validator` package, either from the provided
-        configuration details or from the user and then site config locations
-        defined by the appdirs package.
-
-        Args:
-            config: A path to a configuration file, or a dict or list
-                providing package configuration details. The list format
-                should provide a list of strings, each representing a
-                line in the configuration file. The dict format is a
-                dictionary with the required nested dictionary structure
-                and values
-
-        Attributes:
-            config_type: The method used to specify the resources. One of
-                'init_dict', 'init_list', 'init_file', 'user_config' or 'site_config'.
-            locations: The path to the locations file
-            gbif_database: The path to the GBIF database file or None
-            ncbi_database: The path to the NCBI database file or None
-            ncbi_api_key: A NCBI api key or None
-            use_local_gbif: Is a local file used or should the GBIF API be used
-            ncbi_database: The path to the NCBI database file or None
-            use_local_ncbi: Is a local file used or should the NCBI API be used
-            valid_locations: The locations defined in the locations file
-            location_aliases: Location aliases defined in the locations file
-            extents: A DotMap of extent data
-            zenodo: A DotMap of Zenodo information
-        """
 
         # User and site config paths
         user_cfg_file = os.path.join(
@@ -215,7 +218,7 @@ class Resources:
 
     @staticmethod
     def _load_config(config: Union[str, list, dict], cfg_type: str):
-        """Load a configuration file
+        """Load a configuration file.
 
         This private static method attempts to load a JSON configuration file
         from a path.
@@ -241,9 +244,6 @@ class Resources:
 
         # If there are config file issues, then bail out.
         if isinstance(valid, dict):
-            print(config)
-            print(config_obj)
-            # print(open(config))
             LOGGER.critical("Configuration issues: ")
             FORMATTER.push()
             for sec, key, err in flatten_errors(config_obj, valid):
@@ -258,7 +258,7 @@ class Resources:
         return config_obj
 
     def _validate_locations(self):
-        """Validate and load a locations file
+        """Validate and load a locations file.
 
         This private function checks whether a locations path: exists, is a
         JSON file, and contains location and alias data. It populates the
@@ -290,7 +290,7 @@ class Resources:
         self.location_aliases = loc_payload["aliases"]
 
     def _validate_gbif(self):
-        """Validate the GBIF settings
+        """Validate the GBIF settings.
 
         This private function checks whether to use the online API or a local
         backbone database and then validates the provided sqlite3 database file.
@@ -327,7 +327,7 @@ class Resources:
                 conn.close()
 
     def _validate_ncbi(self):
-        """Validate the NCBI settings
+        """Validate the NCBI settings.
 
         This private function checks whether to use the online API or a local
         backbone database and then validates the provided sqlite3 database files.
