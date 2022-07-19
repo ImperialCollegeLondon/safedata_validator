@@ -1,8 +1,17 @@
-# from enforce_typing import enforce_types
+"""The summary module.
+
+This module handles the parsing and validation of the summary table for a Dataset. The
+table consists of rows of information, with row labels in the first column. The module
+defines the single [Summary object][safedata_validator.summary.Summary] which provides
+methods for loading the summary data from file.
+"""
+
 import datetime
 import re
+from typing import Union
 
 import requests
+from openpyxl.worksheet.worksheet import Worksheet
 
 from safedata_validator.extent import Extent
 from safedata_validator.logger import (
@@ -27,8 +36,44 @@ RE_CONTAINS_WSPACE = re.compile(r"\s")
 
 
 class Summary:
+    """Interface for dataset summary metadata.
 
-    # Class instance to define the metadata that may be present.
+    This class provides an interface to the summary metadata for a dataset. The loading
+    methods check the information provided in the summary worksheet and populates the
+    attributes of the class instance to pass that information to other components.
+
+    The methods are intended to try andget as much information as possible from the
+    Summary table: the instance attributes may therefore be set to None for missing
+    metadata, so classes using Summary should handle None values.
+
+    Args:
+        resources: An instance of Resources providing the safedata_validator
+            configuration.
+
+    Class Attributes:
+        fields: A dictionary setting the expected metadata fields for summary tables.
+
+    Attributes:
+        project_id: An integer project ID code
+        title: A string giving the dataset title.
+        description: A string giving a description of the dataset
+        access: A dictionary giving access metadata.
+        authors: A list of dictionaries of author metadata.
+        permits: A list of dictionaries of research permit metadata.
+        publication_doi: A list of DOIs associated with the dataset.
+        funders: A list of dictionaries of funder metadata.
+        keywords: A list of keyword strings.
+        temporal_extent: Extent instance for the temporal extent of the Dataset.
+        latitudinal_extent: Extent instance for the latitudinal extent of the Dataset.
+        longitudinal_extent: Extent instance for the longitudinal extent of the Dataset.
+        external_files: A list of dictionaries of external file metadata.
+        data_worksheets: A list of dictionaries of data tables in the Dataset.
+        n_errors: A count of the number of errors from loading a summary table.
+        valid_pid: A list of valid project ID values.
+        validate_doi: A boolean flag indicating whether DOI values should be validated.
+    """
+
+    # Class attribute to define the metadata that may be present.
     # These are defined in blocks of related rows described in 4-tuples:
     #  0: a list of tuples giving the rows in the block:
     #     * row header key
@@ -142,16 +187,6 @@ class Summary:
 
     def __init__(self, resources):
 
-        """
-        Checks the information in the summary worksheet and looks for the
-        metadata and dataset worksheets. The methods are intended to try and
-        get as much information as possible from the worksheet: the dictionary
-        of metadata returned will have None for any missing data, which should
-        be handled by downstream code.
-
-
-        """
-
         self.project_id = None
         self.title = None
         self.description = None
@@ -189,22 +224,23 @@ class Summary:
         self.validate_doi = False
 
     @loggerinfo_push_pop("Checking Summary worksheet")
-    def load(self, worksheet, sheetnames, validate_doi=False, valid_pid=None):
-        """
-        Checks the information in a summary worksheet and looks for the
-        metadata and dataset worksheets. The methods are intended to try and
-        get as much information as possible from the worksheet: the dictionary
-        of metadata returned will have None for any missing data, which should
-        be handled by downstream code.
+    def load(
+        self,
+        worksheet: Worksheet,
+        sheetnames: set,
+        validate_doi: bool = False,
+        valid_pid: Union[None, int, list[int]] = None,
+    ):
+        """Populate a Summary instance from an Excel Worksheet.
 
         Args:
             worksheet: An openpyxl worksheet instance.
             sheetnames: A set of sheet names found in the workbook.
-            validate_doi: Check any publication DOIs, requiring a web connection.
+            validate_doi: Should publication DOIs be validated (needs web connection).
             valid_pid: If provided, an integer or list of integer values that are
-                permitted in the Project ID field (usually one for a new dataset
-                but more if a published dataset is associated with multiple projects
-                and any of those ids would be valid).
+                permitted in the Project ID field (usually one for a new dataset but
+                more if a published dataset is associated with multiple projects and any
+                of those ids would be valid).
         """
 
         start_errors = COUNTER_HANDLER.counters["ERROR"]
@@ -285,21 +321,22 @@ class Summary:
         else:
             LOGGER.info("Summary formatted correctly")
 
-    def _read_block(self, field_desc, mandatory, title, only_one):
-        """
-        Internal function that takes a given block definition from
-        SUMMARY_FIELDS and returns a list of dictionary records. This
-        function automatically does some common checking for missing
-        data, bad input types etc, leaving the block specific functions
-        to handle unique tests.
+    def _read_block(
+        self, field_desc: tuple, mandatory: bool, title: str, only_one: bool
+    ) -> Union[None, list]:
+        """Read a block of fields from a summmary table.
+
+        This internal method takes a given block definition from the Summary class
+        [fields][safedata_validator.summary.Summary.fields] attribute and returns a list
+        of dictionary records for that block. This function automatically does some
+        common checking for missing data, bad input types etc, leaving the block
+        specific functions to handle unique tests.
 
         Args:
             field_desc:  A list of tuples describing fields.
             mandatory: Is the block mandatory?
             title: The display title for the block
             only_one: Are multiple records for the field an error?
-        Returns:
-            None or a list of records.
         """
 
         mandatory_fields = [f[0] for f in field_desc if f[1]]
