@@ -1,9 +1,16 @@
+"""The field module.
+
+This module contains the Dataset, Dataworksheet and BaseField classes, along with
+subclasses of BaseField for different data types. These are the core functions of
+safedata_validator, responsible for opening a file containing formatted data,
+and loading and validating the field metadata and data rows in the main data tables.
+"""
+
 import datetime
 import os
-from collections import OrderedDict
 from itertools import groupby, islice
 from logging import CRITICAL, ERROR, INFO, WARNING
-from typing import List, Type
+from typing import List, Type, Union
 
 import simplejson
 from dateutil import parser
@@ -55,18 +62,17 @@ OPTIONAL_DESCRIPTORS = [
 
 
 class Dataset:
-    def __init__(self, resources: Resources = None):
-        """
-        The Dataset class links an input file with a particular configuration of
-        the safedata_validator validation sources, and then loads the components
-        of the dataset.
+    """Process the components of a safedata_validator formatted dataset.
 
-        Args:
-            resources: An instance of class Resources providing a set of
-                validation resources for taxa and locations. If not provided,
-                the default is to attempt to locate these resources from a user
-                or site config file.
-        """
+    The Dataset class links a dataset with a particular configuration of the
+    safedata_validator resources, and then loads the components of the dataset.
+
+    Args:
+        resources: An Resources instance configuring safedata_validator to process a
+            dataset.
+    """
+
+    def __init__(self, resources: Resources = None) -> None:
 
         # Try and load the default resources if None provided
         if resources is None:
@@ -118,14 +124,16 @@ class Dataset:
         chunk_size: int = 1000,
         console_log: bool = True,
     ) -> None:
-        """This method populates a Dataset using the safedata_validator format
-        for Excel workbooks in .xlsx format.
+        """Populate a Dataset instance from a safedata_validator formatted Excel file.
 
-        By default, `safedata_validator` emits log messages to the console and
-        to an internal record. In command line scripts, the console log _is_ the
-        the validation report but if the function is being used programmatically,
-        the internal record is all that is needed. The `console_log` argument
-        can be used to suppress console logging.
+        This method populates a Dataset using the safedata_validator format for Excel
+        workbooks in .xlsx format.
+
+        Logging messages are used to report the progress of the validation process.
+        These are always captured in an internal log (`logging.LOG`) but are also
+        printed by default to the command line. The `console_log` argument can be used
+        to suppress console logging, when this command is being run programatically
+        rather than via the `safedata_validate` command line script.
 
         Args:
             filename: A path to the workbook containing the dataset
@@ -134,7 +142,7 @@ class Dataset:
                 field in the dataset summary.
             chunk_size: Data is read from worksheets in chunks of rows - this
                 argument sets the size of that chunk.
-            console_log: Use the console logging or not
+            console_log: Suppress command line logging.
         """
 
         # Handle logging details - flush and reset from previous runs.
@@ -178,9 +186,10 @@ class Dataset:
         # Setup check for existence of either Taxa sheet
         taxa_sheet = False
 
-        # Throw a critical error if both Taxa and GBIFTaxa have been given as worksheet
-        # names
-        if "GBIFTaxa" in wb.sheetnames and "Taxa" in wb.sheetnames:
+        # Throw an error if both Taxa and GBIFTaxa have been given as worksheet names
+        gbif_sheets = set(["GBIFTaxa", "Taxa"]).intersection(wb.sheetnames)
+
+        if len(gbif_sheets) == 2:
             LOGGER.error(
                 "Both Taxa and GBIFTaxa provided as sheet names, this "
                 "is not allowed! Only checking GBIFTaxa sheet"
@@ -188,11 +197,8 @@ class Dataset:
             self.taxa.gbif_taxa.load(wb["GBIFTaxa"])
             taxa_sheet = True
         # Otherwise populate gbif_taxa from the one that has been provided
-        elif "GBIFTaxa" in wb.sheetnames:
-            self.taxa.gbif_taxa.load(wb["GBIFTaxa"])
-            taxa_sheet = True
-        elif "Taxa" in wb.sheetnames:
-            self.taxa.gbif_taxa.load(wb["Taxa"])
+        elif len(gbif_sheets) == 1:
+            self.taxa.gbif_taxa.load(wb[gbif_sheets.pop()])
             taxa_sheet = True
 
         # Populate ncbi taxa
@@ -217,13 +223,16 @@ class Dataset:
         self.final_checks()
 
     @loggerinfo_push_pop("Running final checking")
-    def final_checks(self):
-        """
-        A method to run final checks:
-        i) The locations and taxa provided have been used in the data worksheets scanned
-        ii) That no taxa names are defined twice (i.e. in GBIFTaxa and NCBITaxa)
-        iii) Extents in the data are congruent with the summary extents
-        iv) Report the total number of errors and warnings
+    def final_checks(self) -> None:
+        """Run final validation checks on a Dataset instance.
+
+        This method checks that:
+        1. all locations and taxa provided have been used in the data worksheets scanned
+        2. no worksheet taxon names are duplicated between GBIFTaxa and NCBITaxa.
+        3. extents in the data are congruent with the summary extents
+
+        Finally, the method reports the total number of errors and warnings from
+        processing the dataset.
         """
 
         LOGGER.info("Checking provided locations and taxa all used in data worksheets")
@@ -343,10 +352,11 @@ class Dataset:
                 LOGGER.info("PASS: file formatted correctly with no warnings")
 
     def to_json(self):
-        """
+        """Export a Dataset to JSON.
+
         This method exports key data about the dataset in JSON format. This
         method is used to export a description of a dataset that can be used
-        to populate a dataset database and publish datasets to Zenodo.
+        to populate a metadata server and publish datasets to Zenodo.
         """
 
         # TODO - continue with class.to_dict() methods?
@@ -369,13 +379,15 @@ class Dataset:
             # TODO: remember that DB API should populate:
             #   * dataset_id to link from taxon searches to datasets
             #  * id (what's this? Erroneous row ID in query?)
+            # TODO - keep NCBI and GBIF separate here?
             taxa=[
                 dict(
                     zip(
                         (
+                            "taxon_db",
                             "worksheet_name",
-                            "gbif_id",
-                            "gbif_parent_id",
+                            "taxon_id",
+                            "taxon_parent_id",
                             "taxon_name",
                             "taxon_rank",
                             "gbif_status",
@@ -383,7 +395,7 @@ class Dataset:
                         tx,
                     )
                 )
-                for tx in self.taxa.taxon_index
+                for tx in self.taxa.combined_index
             ],
             # Locations
             locations=[
@@ -409,12 +421,32 @@ class Dataset:
 
 
 class DataWorksheet:
+    """Process the comtents of safedata_validator formatted data table.
 
-    """
-    This class is used to load and check the formatting and content of a data
-    worksheet. It requires the dictionary of metadata for the data worksheet
-    that was loaded into a Summary object and then access to various Dataset
-    wide resources, such as Locations, Taxa and Extents.
+    This class is used to load and check the formatting and content of a data table
+    using the safedata_validator format. It requires the containing Dataset as an
+    argument to get access to Summary, Locations, Taxa and Extents attributes and the
+    specific data table metadata from the Summary instance.
+
+    The workflow for methods validating a data table is:
+
+    1. Create a DataWorksheet instance using the summary metadata.
+    2. Parse the rows at the top of the file containing field metadata and use
+       `validate_field_meta` to validate the contents.
+    3. Parse the data rows below the field metadata using the `validate_data_rows`
+       method. This can be done repeatedly to handle chunked inputs.
+    4. Use the report method to obtain all of the logging associated with data
+       validation and run any final checks.
+
+    This workflow is currently implemented for Excel format data worksheets in the
+    `load_from_worksheet` method.
+
+    Args:
+        sheet_meta: The metadata dictionary for this worksheet from
+            the Summary instance, containing the worksheet name, title and description
+            and the names of any external files to be associated with this worksheet.
+        dataset: A safedata_validator Dataset object, providing Taxa, Locations and
+            Summary information.
     """
 
     @loggerinfo_push_pop("Checking data worksheet")
@@ -423,29 +455,6 @@ class DataWorksheet:
         sheet_meta: dict,
         dataset: Dataset = None,
     ) -> None:
-
-        """
-        This class is used to load and validate the formatting and content of a
-        data worksheet. Checking a DataWorksheet has the following workflow:
-
-        1) Create a DataWorksheet instance using the field metadata.
-        2) Use calls to the validate_data_rows method to pass in field
-           contents - this can be done repeatedly to handle chunked inputs.
-        3) Call the report method to obtain all of the logging associated
-           with data validation and any final checks.
-
-        Args:
-            sheet_meta: The metadata dictionary for this worksheet from
-                the summary worksheet, containing the worksheet name,
-                title and description and the names of any external files
-                to be associated with this worksheet.
-            field_meta: The field metadata as an OrderedDict - ordered from
-                top to bottom as they appear in the source file - keyed by
-                field descriptor with values as a list of field values for
-                that descriptor.
-            dataset: A safedata_validator Dataset object, providing Taxa,
-                Locations and Summary information.
-        """
 
         # Set initial values
 
@@ -482,15 +491,18 @@ class DataWorksheet:
         self.n_errors = 0
 
     @loggerinfo_push_pop("Validating field metadata")
-    def validate_field_meta(self, field_meta: OrderedDict) -> List[dict]:
-        """This method is used to add and validate field_meta. The requirement
-        of an OrderedDict for field_meta is to check that the field name is the
-        last row in the metadata. A dict should by enough in Python 3.7+ where
-        insertion order is guaranteed, but OrderedDict is currently used to
-        cover 3.6 and to make the requirement explicit.
+    def validate_field_meta(self, field_meta: dict) -> None:
+        """Validate the field metadata for a data table.
 
-        The field meta can include trailing empty fields - these will be checked
-        when data rows are added.
+        This method is used to add and validate field metadata. The field meta can
+        include trailing empty fields - these will be checked when data rows are added.
+        The method also then sets up a list of field validators, matching the order of
+        the fields in the table, which are used for data validation.
+
+        Note:
+            This relies on the maintenance of the dictionary insertion order, which
+            required OrderedDict in the past but is guaranteed for the standard dict in
+            Python >= 3.7.
         """
 
         # Checking field_meta - TODO more checking of structure
@@ -509,7 +521,7 @@ class DataWorksheet:
             cleaned_entries = [
                 (ky, val) for ky, val in zip(clean_descriptors, field_meta.values())
             ]
-            field_meta = OrderedDict(cleaned_entries)
+            field_meta = dict(cleaned_entries)
 
         self.descriptors = list(field_meta.keys())
 
@@ -614,11 +626,15 @@ class DataWorksheet:
         if unknown_field_types:
             LOGGER.error("Unknown field types: ", extra={"join": unknown_field_types})
 
-    def validate_data_rows(self, data_rows):
-        """Method to pass rows of data into the field checkers for a
-        dataworksheet. The data is expected to be as an list of rows
-        from a data file, with the first entry in each row being a row
-        number.
+    def validate_data_rows(self, data_rows: list) -> None:
+        """Validate the contents of data rows from a data table.
+
+        This method is used to pass a list of rows of data from a data table into the
+        appropriate field checkers created by the validate_field_meta method. Each row
+        is represented as a list, with the row number as the first entry in the list.
+
+        Args:
+            data_rows: A list of rows containing data from a data table.
         """
 
         if not self.fields_loaded:
@@ -710,11 +726,15 @@ class DataWorksheet:
             field_inst.validate_data(data)
 
     @loggerinfo_push_pop("Validating field data")
-    def report(self):
-        """The validate_data_rows method accumulates logging messages
-        individual fields. This method causes these field logs to be
-        emitted and then carries out final checks and reporting across
-        all of the field data.
+    def report(self) -> None:
+        """Report data validation for a data table.
+
+        As the validate_data_rows method works on chunks of rows, the DataWorksheet
+        instance accumulates logging messages across individual fields. These are not
+        reported until after all the data rows have been validated, when aggregated
+        reports for each field can be made. This method causes these field logs to be
+        emitted and then carries out final checks and reporting across all of the field
+        data.
         """
 
         if not self.n_row:
@@ -760,28 +780,24 @@ class DataWorksheet:
             LOGGER.info("Dataframe formatted correctly")
 
     @loggerinfo_push_pop("Loading from worksheet")
-    def load_from_worksheet(self, worksheet: worksheet, row_chunk_size=1000):
-        """Populate a Dataworksheet instance from an openpyxl worksheet
+    def load_from_worksheet(
+        self, worksheet: worksheet, row_chunk_size: int = 1000
+    ) -> None:
+        """Populate a Dataworksheet instance from an openpyxl worksheet.
 
-        This method takes a fresh Dataworksheet instance and populates the
-        details using the contents of a SAFE formatted Excel spreadsheet.
+        This method takes a newly initialised DataWorksheet instance and populates the
+        details using the contents of a safedata_validator formatted data table in an
+        Excel spreadsheet.
 
-        To keep memory requirements low, any data in the worksheet is validated
-        by loading sets of rows containing at most `row_chunk_size` rows. Note
-        that this will only actually reduce memory use for openpyxl
-        ReadOnlyWorksheets, as these load data on demand, but will still work
-        on standard Worksheets.
+        To keep memory requirements low, data in the worksheet is validated by loading
+        sets of rows containing at most `row_chunk_size` rows. Note that this will only
+        actually reduce memory use for openpyxl ReadOnlyWorksheets, as these load data
+        on demand, but will still work on standard Worksheets.
 
         Args:
-            worksheet:
-            row_chunk_size:
+            worksheet: An openpyxl worksheet instance
+            row_chunk_size: The number of rows of data to load in each chunk
         """
-
-        # TODO - openpyxl read-only mode provides row by row data access and used lazy
-        # loading to reduce memory usage. Scanning all of a column will need to
-        # load all data (which the old implementation using xlrd did, but which
-        # we might be also improve to reduce memory overhead by chunking large sheets).
-        # Either way, should use row by row ingestion.
 
         if self.fields_loaded:
             LOGGER.critical("Field metadata already loaded - use fresh instance.")
@@ -809,8 +825,8 @@ class DataWorksheet:
             else:
                 break
 
-        # Convert field meta to OrderedDict and validate
-        field_meta = OrderedDict(((rw[0], rw[1:]) for rw in field_meta))
+        # Convert field meta to dict and validate
+        field_meta = dict(((rw[0], rw[1:]) for rw in field_meta))
         self.validate_field_meta(field_meta)
 
         # Get an iterator on the data rows
@@ -829,9 +845,8 @@ class DataWorksheet:
         # Finish up
         self.report()
 
-    def to_dict(self):
-        """Method to return a dictionary representation of a DataWorksheet
-        instance"""
+    def to_dict(self) -> dict:
+        """Return a dictionary representation of a DataWorksheet instance."""
 
         output = dict(
             taxa_fields=self.taxa_fields,
@@ -851,54 +866,83 @@ class DataWorksheet:
 
 
 class BaseField:
+    """Validating metadata and data for a field.
 
-    # Class instances describe the field_types handled by the class
-    # and sets the required descriptors for those field_types. The
-    # no_validation variable is used to suppress data validation for
-    # use on e.g. comments fields.
+    This class provides an implementation for checking field metadata for a field type
+    and then testing whether the data contents are compatible with that metadata. The
+    class is largely used for checking fields in data tables worksheets, but can also
+    be used for checking other tabular data.
+
+    The base class defines the core checking methods and then subclasses are used to
+    extend those methods to implement specific checking for particular data types. The
+    main workflow for the class is:
+
+    * Instantiate a class object using the field metadata to check the metadata.
+    * The base class provides `_check_meta`, `_check_taxon_meta` and
+      `_check_interaction_meta` to provide common shared components of metadata
+      validation in extended `__init__` methods in subclasses.
+    * Data is then validated using the `validate_data` method - it ingests chunks of
+      rows, to avoid having to read all the data in a table from file at once. The data
+      validation process accumulates logging messages in a stack via the `_log` method.
+    * The `report` method is then used to run final checks and emit the message stack,
+      once all of the data has been ingested.
+
+    The base class also has a much more complex signature than the base
+    functionality requires. Various subclasses need access to:
+
+        * Dataset level information - extents, taxa and locations.
+        * Dataworksheet level information - taxon fields
+
+    Rather than having complex inheritance with changing subclass signatures
+    and kwargs, the BaseField class makes all information available to all
+    subclasses.
+
+    Args:
+        meta: A dictionary of field metadata
+        dwsh: A DataWorksheet instance, used to pass worksheet level
+            information, which at the moment is just taxa fields.
+        dataset: An Dataset instance, used to provide dataset level
+            information, such as taxa, locations and summary, and update
+            dataset level attributes such as data extents.
+
+    Class Attributes:
+        field_types: A list of the field types - as entered in data table metadata -
+            that are handled by a class based on BaseField.
+        required_descriptors: A list of field metadata names that are required by a
+            class based on BaseField.
+        check_taxon_meta: A boolean flag indicating whether a class based on BaseField
+            should check taxonomic metadata.
+        check_interaction_meta: A similar boolean flag for interaction metadata.
+
+    Attributes:
+        meta: The metadata dictionary for the field
+        dwsh: The DataWorksheet object in which the field is contained.
+        taxa: The Taxa object for the Dataset or None.
+        locations: The Locations object for the Dataset or None.
+        summary: The Summary objet for the Dataset or None.
+        log_stack: A list of tuples containing logging messages to be emitted.
+        n_rows: The number of rows of data in the field.
+        n_na: The number of NA values in the field data.
+        n_blank: The number of blank cells in the field data.
+        n_excel_error: The number of Excel error codes in the field data.
+        bad_values: A list of invalid value given a class based on BaseField.
+        bad_rows: A list of row numbers containing bad values.
+        field_name: The provided field name.
+
+    """
+
+    # These class attributes describe the field_types handled by the class and sets the
+    # required descriptors for those field_types. The no_validation attributes is used
+    # to suppress data validation for use on e.g. comments fields.
 
     field_types = None
     required_descriptors = MANDATORY_DESCRIPTORS
-    no_validation = False
     check_taxon_meta = False
     check_interaction_meta = False
 
     def __init__(
         self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
     ) -> None:
-
-        """
-        Base class to check field metadata and then test whether the data
-        contents of a field are compatible with the metadata for the field.
-        Largely used for checking data worksheets, but also by other methods.
-        This base class defines the core checking functions as a base class and
-        then subclasses implement data type specific checking.
-
-        In order to work with the row by row data loading from openpyxl, the
-        BaseField class does _not_ emit logging messages as they occur but holds
-        a stack of messages created during initiation and as chunks of data are
-        ingested. These logging messages can then be emitted using the report()
-        method, along with any final checks, once all the data has been
-        ingested.
-
-        The base class also has a much more complex signature than the base
-        functionality requires. Various subclasses need access to:
-
-            * Dataset level information - extents, taxa and locations.
-            * Dataworksheet level information - taxon fields
-
-        Rather than having complex inheritance with changing subclass signatures
-        and kwargs, the BaseField class makes all information available to all
-        subclasses.
-
-        Args:
-            meta: A dictionary of field metadata
-            dwsh: A DataWorksheet instance, used to pass worksheet level
-                information, which at the moment is just taxa fields.
-            dataset: An Dataset instance, used to provide dataset level
-                information, such as taxa, locations and summary, and update
-                dataset level attributes such as data extents.
-        """
 
         self.meta = meta
         self.dwsh = dwsh
@@ -910,7 +954,6 @@ class BaseField:
         # Shortcuts to main components
         self.dataset = dataset
         if self.dataset:
-            # HOW DO I OVER WRITE THIS????
             self.taxa = getattr(self.dataset, "taxa")
             self.locations = getattr(self.dataset, "locations")
             self.summary = getattr(self.dataset, "summary")
@@ -959,23 +1002,30 @@ class BaseField:
         if self.check_interaction_meta:
             self._check_interaction_meta()
 
-    def _log(self, msg, level=ERROR, extra=None):
-        """Helper function for adding to log stack"""
-        self.log_stack.append((level, msg, extra))
+    def _log(self, msg: str, level: int = ERROR, extra: dict = None) -> None:
+        """Adds messages to the field log stack.
 
-    def _check_meta(self, descriptor):
-        """
-        A standardised checker to see if a required descriptor is present for
-        a field and that it isn't simply empty or whitespace. Messages are
-        added to the log_stack if required.
+        Rather than directly emitting a log message, field processing accumulates a
+        stack of messages, which are all emitted when the
+        [safedata_validator.field.BaseField.report][] method is called.
 
         Args:
-            meta: A dictionary of field metadata descriptors
-            descriptor: The name of the descriptor to check.
+            msg: The log message to add
+            level: The logging level to use.
+            extra: A dictionary of extra information to pass to the logging.log method.
+        """
+        self.log_stack.append((level, msg, extra))
 
-        Returns:
-            A boolean, with True showing no problems and False showing
-            that warnings occurred.
+    def _check_meta(self, descriptor: str) -> bool:
+        """Check required field metadata.
+
+        A standardised checker to see if a required descriptor is present for a field
+        and that it isn't simply empty or whitespace. Messages are added to the
+        log_stack if required. It returns a boolean showing whether checks pass or not -
+        the actual causes of failure are added to the field message log.
+
+        Args:
+            descriptor: The name of the descriptor to check.
         """
 
         if descriptor not in self.meta:
@@ -998,16 +1048,14 @@ class BaseField:
         else:
             return True
 
-    def _check_taxon_meta(self):
+    def _check_taxon_meta(self) -> bool:
+        """Check taxon field metadata.
 
-        """
-        Checks the taxonomic metadata of abundance and trait fields. This is
-        more involved that the simple _check_meta(), because of the option to
-        provide taxon_name or taxon_field descriptors.
-
-        Returns:
-            A boolean, with True showing no problems and False showing that
-            warnings occurred.
+        Checks the taxonomic metadata of abundance and trait fields. This is more
+        involved that the simple _check_meta(), because of the option to provide
+        taxon_name or taxon_field descriptors. It returns a boolean showing whether
+        checks pass or not - the actual causes of failure are added to the field message
+        log.
         """
 
         # Are taxon_name and taxon_field provided and not blank: note use of
@@ -1049,21 +1097,14 @@ class BaseField:
         else:
             return True
 
-    def _check_interaction_meta(self):
+    def _check_interaction_meta(self) -> bool:
+        """Check interaction metadata.
 
-        """
-        Checks the taxonomic metadata of interaction fields. This is more
-        involved that the simple _check_meta(), because of the option to provide
-        taxon_name or taxon_field descriptors describing at least two taxonomic
-        identifiers.
-
-        Args:
-            meta: A dictionary of metadata descriptors for the field
-            taxa_fields: A list of Taxa fields in this worksheet.
-
-        Returns:
-            A boolean, with True showing no problems and False showing that
-            warnings occurred.
+        Checks the taxonomic metadata of interaction fields. This is more involved that
+        the simple _check_meta(), because of the option to provide taxon_name or
+        taxon_field descriptors describing at least two taxonomic identifiers. It
+        returns a boolean showing whether checks pass or not - the actual causes of
+        failure are added to the field message log.
         """
 
         # TODO - currently no checking for descriptions being present in
@@ -1162,14 +1203,17 @@ class BaseField:
         else:
             return False
 
-    def _parse_levels(self, txt):
-        """
+    def _parse_levels(self, txt: str) -> list(tuple(str, Union(str, None))):
+        """Parse categorical variable level descriptions.
+
         Splits up category information formatted as label:desc;label:desc, which
         is used in both levels for categorical data and interaction descriptors.
+
         Args:
             txt: The text string to parse
+
         Returns:
-            A list of two tuples of label and descriptions.
+            A list of tuples containing pair of level labels and descriptions.
         """
 
         # remove terminal semi-colon, if used.
@@ -1217,8 +1261,13 @@ class BaseField:
 
     @classmethod
     def field_type_map(cls):
-        """This helper function returns a dictionary that maps field types for the
-        a Field class and all nested subclasses to the class that handles them"""
+        """Returns a map of field types to BaseField subclasses.
+
+        This class method iterates over the existing subclasses of BaseField and returns
+        a returns a dictionary mapping the field types handled by each subclass to the
+        subclass type. This allows the field types listed in field metadata to be
+        quickly matched to the correct BaseField subclass.
+        """
 
         field_type_map = {}
 
@@ -1239,21 +1288,29 @@ class BaseField:
 
         return field_type_map
 
-    def validate_data(self, data: list):
+    def validate_data(self, data: list) -> list:
         """Validates a list of data provided for a field.
 
-        This method runs the common shared validation and returns the cleaned
-        values, excluding blanks, NA and any Excel errors.
+        This base class method runs the common shared validation steps for input data
+        for a given field. It checks for:
 
-        The method is overloaded by subclasses to provide field specific
-        testing. In this case using the following ensures that only the data
-        that passes the common checks is subjected to extra testing:
+        * Explicit missing data, using the NA value.
+        * Empty cells, which is an error.
+        * Excel cell error codes (such as `#VALUE!`)
+
+        The method can be overloaded by subclasses to provide field specific testing. To
+        ensure that only the data that passes the common checks is subjected to extra
+        testing, overloaded subclasses should use:
 
             data = super().validate_data(data)
-        """
 
-        if self.no_validation:
-            return
+        Args:
+            data: a set of values from a data table for the field.
+
+        Returns:
+            A list of the cleaned input values, excluding blanks, NA and any Excel
+            errors.
+        """
 
         # Unless any input is ok (comments fields, basically) filter out
         # missing and blank data. Also check for Excel formula errors.
@@ -1287,10 +1344,10 @@ class BaseField:
         # Return cleaned data for use in further checking.
         return data.values
 
-    def report(self):
+    def report(self) -> None:
         """Report on field creation and data validation.
 
-        This  method emits any logging messages accumulated during the creation
+        This method emits any messages queued in the log stack during the creation
         of a field instance and data validation. The method also contains any final
         checking of data values across all validated data.
         """
@@ -1322,7 +1379,9 @@ class BaseField:
 
 
 def field_to_dict(fld: Type[BaseField], col_idx: int) -> dict:
-    """Function to return a dictionary representation of a field object. This
+    """Convert a object inheriting from BaseField into a dictionary.
+
+    A function to return a dictionary representation of a field object. This
     would more naturally be a method of BaseField, but needs to include the
     extended attributes of subclasses of BaseField
 
@@ -1372,26 +1431,52 @@ def field_to_dict(fld: Type[BaseField], col_idx: int) -> dict:
 
 
 class CommentField(BaseField):
+    """A BaseField subclass for comments fields.
+
+    This subclass overrides the base data validation to allow any content in comments
+    fields. See [safedata_validator.field.BaseField][] for details.
+    """
 
     field_types = ("comments",)
-    no_validation = True
+
+    def validate_data(self, data: list) -> list:
+        """Validate data in comment fields.
+
+        This overrides the BaseField
+        [validate_data][safedata_validator.field.BaseField.validate_data] method to
+        remove any checking on comments fields.
+        """
+
+        return data
 
 
 class ReplicateField(BaseField):
+    """A BaseField subclass for Replicate and ID fields.
+
+    Applies the base data checking needed on Replicate and ID fields. See
+    [safedata_validator.field.BaseField][] for details.
+    """
 
     field_types = ("replicate", "id")
 
 
 class NumericField(BaseField):
-    """
-    Subclass of BaseField to check for numeric data
+    """A BaseField subclass for numeric fields.
+
+    Extends [BaseField][safedata_validator.field.BaseField] to validate numeric data
+    fields.
     """
 
     field_types = ("numeric",)
     required_descriptors = MANDATORY_DESCRIPTORS + ["method", "units"]
 
-    def validate_data(self, data: list):
+    def validate_data(self, data: list) -> None:
+        """Validate numeric field data.
 
+        Extends the BaseField
+        [validate_data][safedata_validator.field.BaseField.validate_data] method to
+        also ensure that data values are numeric.
+        """
         data = super().validate_data(data)
 
         numeric = IsNumber(data)
@@ -1401,8 +1486,11 @@ class NumericField(BaseField):
 
 
 class CategoricalField(BaseField):
-    """
-    Subclass of BaseField to check for categorical data
+    """A BaseField subclass for categorical and ordered categorical fields.
+
+    Extends the [BaseField `__init__` method][safedata_validator.field.BaseField]
+    to store the level labels and track the reported levels during data
+    validation.
     """
 
     field_types = ("categorical", "ordered categorical")
@@ -1424,8 +1512,13 @@ class CategoricalField(BaseField):
             level_labels, level_desc = self._parse_levels(levels)
             self.level_labels = set(level_labels)
 
-    def validate_data(self, data: list):
+    def validate_data(self, data: list) -> None:
+        """Validate categorical field data.
 
+        Extends the BaseField
+        [validate_data][safedata_validator.field.BaseField.validate_data] method to
+        check that string values are provided and populate the set of reported levels.
+        """
         data = super().validate_data(data)
 
         # Now look for consistency: get the unique values reported in the
@@ -1438,8 +1531,12 @@ class CategoricalField(BaseField):
 
         self.reported_levels.update(data)
 
-    def report(self):
+    def report(self) -> None:
+        """Report on field creation and data validation for categorical fields.
 
+        Extends the [BaseField report method][safedata_validator.field.BaseField.report]
+        to handle undeclared or unused level labels.
+        """
         super().report()
 
         extra = self.reported_levels.difference(self.level_labels)
@@ -1458,9 +1555,10 @@ class CategoricalField(BaseField):
 
 
 class TaxaField(BaseField):
-    """
-    Checks if all the values provided in a taxa field are found
-    in the Taxa instance.
+    """A BaseField subclass for taxa fields.
+
+    Extends [BaseField][safedata_validator.field.BaseField] to to track the reported
+    taxa in the field during data validation.
     """
 
     field_types = ("taxa",)
@@ -1476,8 +1574,13 @@ class TaxaField(BaseField):
 
         self.taxa_found = set()
 
-    def validate_data(self, data: list):
+    def validate_data(self, data: list) -> None:
+        """Validate taxa field data.
 
+        Extends the BaseField
+        [validate_data][safedata_validator.field.BaseField.validate_data] method to
+        look for non-string values and track unused or unknown taxon names.
+        """
         data = super().validate_data(data)
 
         data = IsString(data, keep_failed=False)
@@ -1489,8 +1592,12 @@ class TaxaField(BaseField):
             self.taxa_found.update(data)
             self.taxa.taxon_names_used.update(data)
 
-    def report(self):
+    def report(self) -> None:
+        """Report on field creation and data validation for taxa fields.
 
+        Extends the [BaseField report method][safedata_validator.field.BaseField.report]
+        to emit unused or unknown taxon names
+        """
         super().report()
 
         # TODO - not sure about this - no other fields test for emptiness?
@@ -1509,9 +1616,11 @@ class TaxaField(BaseField):
 
 
 class LocationsField(BaseField):
-    """
-    Checks if all the values provided in a locations field are found
-    in the Locations instance.
+    """A BaseField subclass for location fields.
+
+    Extends the [BaseField `__init__` method][safedata_validator.field.BaseField]
+    to check that all the values provided in a locations field are found in the
+    locations data for the dataset.
     """
 
     field_types = ("locations", "location")
@@ -1527,8 +1636,13 @@ class LocationsField(BaseField):
 
         self.locations_found = set()
 
-    def validate_data(self, data: list):
+    def validate_data(self, data: list) -> None:
+        """Validate location field data.
 
+        Extends the BaseField
+        [validate_data][safedata_validator.field.BaseField.validate_data] method to
+        check that location names are all known.
+        """
         data = super().validate_data(data)
 
         data = IsLocName(data, keep_failed=False)
@@ -1544,8 +1658,12 @@ class LocationsField(BaseField):
             self.locations_found.update(data)
             self.locations.locations_used.update(data)
 
-    def report(self):
+    def report(self) -> None:
+        """Report on field creation and data validation for categorical fields.
 
+        Extends the [BaseField report method][safedata_validator.field.BaseField.report]
+        to emit undeclared location names.
+        """
         super().report()
 
         # TODO - not sure about this - no other fields test for emptiness?
@@ -1566,6 +1684,11 @@ class LocationsField(BaseField):
 
 
 class GeoField(BaseField):
+    """A BaseField subclass for latitude and longitude fields.
+
+    Extends the [BaseField `__init__` method][safedata_validator.field.BaseField]
+    to check latitude and longitude data.
+    """
 
     field_types = ("latitude", "longitude")
 
@@ -1581,10 +1704,12 @@ class GeoField(BaseField):
         self.min = None
         self.max = None
 
-    def validate_data(self, data: list):
-        """Testing of the data range is deferred to report() to avoid
-        triggering logging from the Extent objects until data loading is
-        completed
+    def validate_data(self, data: list) -> None:
+        """Validate latitude and longitude data.
+
+        Extends the BaseField
+        [validate_data][safedata_validator.field.BaseField.validate_data] method to
+        check for non-decimal formatting (e.g. 12°24'32"W) and collate the data range.
         """
         data = super().validate_data(data)
 
@@ -1604,8 +1729,12 @@ class GeoField(BaseField):
             self.min = min(data.values + [self.min]) if self.min else min(data.values)
             self.max = max(data.values + [self.max]) if self.max else max(data.values)
 
-    def report(self):
+    def report(self) -> None:
+        """Report on field creation and data validation for latitude and longitude data.
 
+        Extends the [BaseField report method][safedata_validator.field.BaseField.report]
+        to check the coordinate range against the dataset geographic extents.
+        """
         super().report()
 
         if self.min is None or self.max is None:
@@ -1619,9 +1748,12 @@ class GeoField(BaseField):
 
 
 class NumericTaxonField(NumericField):
+    """A NumericField subclass for numeric trait and abundance fields.
 
-    """Checks abundance and numeric trait fields, which are just  NumericFields
-    with taxon reporting requirements turned on."""
+    Further extends the [NumericField][safedata_validator.field.NumericField] subclass
+    to also apply checking of the taxonomic metadata for numeric traits and abundance
+    data.
+    """
 
     # BREAKING CHANGE - abundance did not previously require 'units' as metadata,
     # which is stupid in retrospect. Individuals? Individuals per m2? Individuals
@@ -1632,45 +1764,54 @@ class NumericTaxonField(NumericField):
 
 
 class CategoricalTaxonField(CategoricalField):
+    """A CategoricalField subclass for categorical trait fields.
 
-    """Checks categorical trait fields, which are just CategoricalFields
-    with taxon reporting requirements turned on."""
+    Further extends the [NumericField][safedata_validator.field.NumericField] subclass
+    to also apply checking of the taxonomic metadata for numeric traits and abundance
+    data.
+    """
 
     field_types = ("categorical trait", "ordered categorical trait")
     check_taxon_meta = True
 
 
 class NumericInteractionField(NumericField):
+    """A NumericField subclass for numeric interaction fields.
 
-    """Checks numeric interaction fields, which are just  NumericFields
-    with interaction reporting requirements turned on."""
+    Further extends the [NumericField][safedata_validator.field.NumericField] subclass
+    to also apply checking of the interaction metadata for numeric interaction data.
+    """
 
     field_types = ("numeric interaction",)
     check_interaction_meta = True
 
 
 class CategoricalInteractionField(CategoricalField):
+    """A CategoricalField subclass for categorical trait fields.
 
-    """Checks categorical interaction fields, which are just CategoricalFields
-    with interaction reporting requirements turned on."""
+    Further extends the [NumericField][safedata_validator.field.NumericField] subclass
+    to also apply checking of the interaction metadata for numeric traits and abundance
+    data.
+    """
 
     field_types = ("categorical interaction",)
     check_interaction_meta = True
 
 
 class TimeField(BaseField):
+    """A BaseField subclass for time fields.
 
-    """
-    Time field validation is primarily about checking the consistency of the
-    provided data. The function accepts either as ISO strings in a consistent
-    time format or datetime.time objects. The parsing of timestrings follows
-    ISO8601, which includes quite a range of valid inputs: '11:12:13' and
-    '111213' are both valid.
+    Extends the [BaseField][safedata_validator.field.BaseField] subclass to validate
+    data in time fields.  Time field validation is primarily about checking the
+    consistency of the provided data. The function accepts either as ISO strings in a
+    consistent time format or datetime.time objects. The parsing of timestrings follows
+    ISO8601, which includes quite a range of valid inputs: '11:12:13' and '111213' are
+    both valid.
 
-    One problem here is that - when stored as Excel datetime cells - dates and
-    times in Excel are poorly typed: essentially as a number with a meaning that
-    depends in part on the cell format. The openpyxl package returns
-    datetime.time objects for cells with time formats.
+    One problem here is that - when stored as Excel datetime cells - dates and times in
+    Excel are poorly typed: essentially as a number with a meaning that depends in part
+    on the cell format. The openpyxl package returns datetime.time objects for cells
+    with time formats.
     """
 
     field_types = ("time",)
@@ -1691,7 +1832,12 @@ class TimeField(BaseField):
         self.max = None
 
     def validate_data(self, data: list):
+        """Validate time field data.
 
+        Extends the BaseField
+        [validate_data][safedata_validator.field.BaseField.validate_data] method to
+        check that time data has consistent formatting and are valid time values.
+        """
         data = super().validate_data(data)
 
         # TODO: report row number of issues - problem of mismatch between
@@ -1734,7 +1880,11 @@ class TimeField(BaseField):
                     self.bad_strings.append(val)
 
     def report(self):
+        """Report on field creation and data validation for time fields.
 
+        Extends the [BaseField report method][safedata_validator.field.BaseField.report]
+        to flag inconsistent time formatting and invalid data.
+        """
         super().report()
 
         if not self.expected_class:
@@ -1755,9 +1905,10 @@ class TimeField(BaseField):
 
 
 class DatetimeField(BaseField):
+    """A BaseField subclass for date and datetime fields.
 
-    """
-    Date and datetime field validation is primarily about checking the
+    Extends the [BaseField `__init__` method][safedata_validator.field.BaseField]
+    to validate date and datetime. This is primarily about checking the
     consistency of the provided data. The function accepts either as ISO strings
     in a consistent datetime or date format or datetime.datetime objects. The
     parsing of timestrings follows ISO8601, which includes quite a range of
@@ -1790,7 +1941,14 @@ class DatetimeField(BaseField):
         self.min = None
         self.max = None
 
-    def validate_data(self, data: list):
+    def validate_data(self, data: list) -> None:
+        """Validate date and datetime field data.
+
+        Extends the BaseField
+        [validate_data][safedata_validator.field.BaseField.validate_data] method to
+        check that time data has consistent formatting and are valid date or datetime
+        values.
+        """
 
         data = super().validate_data(data)
 
@@ -1859,7 +2017,11 @@ class DatetimeField(BaseField):
             self.max = max([self.max] + data)
 
     def report(self):
+        """Report on field creation and data validation for date and datetime fields.
 
+        Extends the [BaseField report method][safedata_validator.field.BaseField.report]
+        to flag inconsistent  date and datetime formatting and invalid data.
+        """
         super().report()
 
         # INconsistent and bad data classes
@@ -1898,11 +2060,11 @@ class DatetimeField(BaseField):
 
 
 class FileField(BaseField):
+    """A BaseField subclass for time fields.
 
-    """
-    Checks file fields. The data values need to match to an external file or can
-    be contained within an archive file provided in the 'file_container'
-    descriptor.
+    Extends the [BaseField][safedata_validator.field.BaseField] subclass to check file
+    fields. The data values need to match to an external file or can be contained within
+    an archive file provided in the 'file_container' descriptor.
     """
 
     field_types = ("file",)
@@ -1940,6 +2102,12 @@ class FileField(BaseField):
                 )
 
     def validate_data(self, data: list):
+        """Validate file field data.
+
+        Extends the BaseField
+        [validate_data][safedata_validator.field.BaseField.validate_data] method to
+        track unknown files given in a file field.
+        """
 
         data = super().validate_data(data)
 
@@ -1951,7 +2119,11 @@ class FileField(BaseField):
                 self.unknown_file_names.update(unknown_files)
 
     def report(self):
+        """Report on field creation and data validation for file fields.
 
+        Extends the [BaseField report method][safedata_validator.field.BaseField.report]
+        to flag unknown files.
+        """
         super().report()
 
         if self.unknown_file_names:
@@ -1962,24 +2134,34 @@ class FileField(BaseField):
 
 
 class EmptyField:
-    """This class mocks the interface of BaseField and is only used to keep
-    track of trailing empty fields in loaded field data. It does not inherit
-    from BaseField, so is never included in the BaseField.field_type_map."""
+    """A BaseField-like interface for empty fields.
+
+    This class mocks the interface of BaseField and is only used to check trailing empty
+    fields in loaded field data. These are columns which have no field metadata, but
+    which have are included in the data table. The data rows should be empty.
+
+    This class does not inherit from BaseField, so is never included in the
+    BaseField.field_type_map.
+
+    Args:
+        meta: A dictionary of field metadata. All values should be None with the
+            exception of the column index number (`col_idx`).
+    """
 
     def __init__(self, meta: dict) -> None:
 
         self.meta = meta
         self.empty = True
 
-    def validate_data(self, data):
-
+    def validate_data(self, data) -> None:
+        """Validates that empty fields contain no data."""
         blank = [blank_value(val) for val in data]
 
         if not all(blank):
             self.empty = False
 
     def report(self):
-
+        """Report on an empty field."""
         # Get a field name - either a column letter from col_idx if set or 'Unknown'
         idx = self.meta.get("col_idx")
         if idx is None:
