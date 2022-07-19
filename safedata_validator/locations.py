@@ -1,14 +1,14 @@
-"""Validation of location data
+"""The location module.
 
-The Locations class defined in this submodule is used to validate a set of known
-and or new location information, formatted in the safedata_validator style. An
-instance can then also be used to track which of the validated set of locations
-is used in the rest of the dataset.
+This module provides the Locations class, which used to validate a set of known and or
+new location information, formatted in the safedata_validator style. An instance can
+then also be used to track which of the validated set of locations is used in the rest
+of the dataset.
 """
 
 from typing import List
 
-from openpyxl import worksheet
+from openpyxl.worksheet.worksheet import Worksheet
 from shapely import wkt
 from shapely.errors import WKTReadingError
 
@@ -32,24 +32,37 @@ from safedata_validator.validators import (
 
 
 class Locations:
+    """An interface for Location metadata.
+
+    A Locations instance is initialised using a Resources instance that provides data on
+    known valid locations. The instance validates location names provided in the
+    Locations table of a Dataset and then validates and updates the latitudinal and
+    logitudinal extent of those locations. The instance can then be used to track the
+    use of location names across data tables in the dataset.
+
+    Args:
+        resources: A Resources instance, used to provide information about
+            known locations
+        latitudinal_extent: An Extent instance tracking latititudinal extents.
+        longitudinal_extent: An Extent instance tracking longitudinal extents.
+
+    Attributes:
+        locations: A list of
+        locations_index:
+        locations_used:
+        valid_locations:
+        location_aliases:
+        known_loc_names:
+        latitudinal_extent:
+        longitudinal_extent:
+    """
+
     def __init__(
         self,
         resources: Resources,
         latitudinal_extent: Extent = None,
         longitudinal_extent: Extent = None,
     ) -> None:
-
-        """A Locations instance is initialised using a Resources instance that
-        provides data on known valid locations. The instance validates location
-        names and then records the extent of the provided locations, the loaded
-        location names and which have been used in a Dataset.
-
-        Args:
-            resources: A Resources instance, used to provide information about
-                known locations
-            dataset: A Dataset instance - if provided, the geographic extents
-                of the the dataset instance will be updated.
-        """
 
         self.n_errors = 0
         self.locations = set()
@@ -85,14 +98,15 @@ class Locations:
             self.longitudinal_extent = longitudinal_extent
 
     @loggerinfo_push_pop("Loading Locations worksheet")
-    def load(self, worksheet: worksheet):
-        """
-        Loads and check the contents of a Locations worksheet and compiles the
-        geographic extent of the locations used.
+    def load(self, worksheet: Worksheet):
+        """Populate a Locations instance from an Excel Worksheet.
+
+        Validates the contents of a locations table stored in an Excel Worksheet and
+        then updates the geographic extent of the locations used.
 
         Args:
-            worksheet: An openpyxl worksheet instance containing data describing
-                locations.
+            worksheet: An openpyxl Worksheet instance containing the formatted set of
+                locations used within a Dataset.
         """
 
         start_errors = COUNTER_HANDLER.counters["ERROR"]
@@ -172,15 +186,22 @@ class Locations:
 
     @loggerinfo_push_pop("Checking new locations")
     def add_new_locations(self, locs: List[dict]):
-        """This method takes list of dictionaries giving the details of
-        new locations to be added to the instance. These dictionaries should
-        contain keys `location name` and `type` and then at least one of:
+        """Add new locations to a Locations instance.
+
+        This method takes a list of dictionaries giving the details of new locations to
+        be added to the instance. These are user-defined locations that are not included
+        in the set of known locations loaded from the instance resources. These
+        dictionaries  should contain keys `location name` and `type` and then at least
+        one of:
 
         * `latitude` _and_ `longitude` as float values
         * `wkt` providing a WellKnownText geometry for the location.
 
-        Either of these options _can_ be 'NA' to show that the location
-        coordinates are not known, but they must be provided.
+        Either of these options _can_ be 'NA' to show that the location coordinates are
+        not known, but they must be provided.
+
+        Args:
+            locs: The list of dictionaries of user-defined locations.
         """
 
         # Validation - TODO check locs is a list of dicts
@@ -405,9 +426,15 @@ class Locations:
 
     @loggerinfo_push_pop("Checking known locations")
     def add_known_locations(self, loc_names: list):
-        """This method takes a list of values and tries to validate those
-        values against known locations from the loaded resources. The values
-        are expected to be strings"""
+        """Add known locations to a Locations instance.
+
+        This method takes a list of values and tries to validate those values against
+        known locations from the loaded resources. The values are expected to be
+        strings.
+
+        Args:
+            loc_names: A list of known location names.
+        """
 
         # Check for blanks
         loc_names = IsNotBlank(loc_names, keep_failed=False)
@@ -481,5 +508,6 @@ class Locations:
         self.location_index.append(index_entries)
 
     @property
-    def is_empty(self):
+    def is_empty(self) -> bool:
+        """Reports if any locations have been loaded in a Locations instance."""
         return len(self.locations) == 0

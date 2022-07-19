@@ -1,16 +1,17 @@
+"""The validators module.
+
+The module contains a set of classes providing data validation for use throughout the
+safedata_validator package
+"""
+
+
 import re
 from collections import Counter
 from collections.abc import Iterable
 from numbers import Number
 from typing import Any
 
-from safedata_validator import NA_type
 from safedata_validator.logger import LOGGER
-
-"""
-Some regular expressions used within validators are defined at the module
-level, rather than compiling for each instance
-"""
 
 RE_WSPACE_ONLY = re.compile(r"^\s*$")
 RE_CONTAINS_WSPACE = re.compile(r"\s")
@@ -22,9 +23,8 @@ RE_DMS = re.compile(r'[°\'"dms’”]+')
 RE_R_ELLIPSIS = re.compile(r"^\\.{2}[0-9]+$|^\\.{3}$")
 RE_R_NAME_CHARS = re.compile(r"^[\w\.]+$")
 RE_R_NAME_BAD_START = re.compile(r"^_|^\\.[0-9]")
+"""Constants defining global regular expressions for the module"""
 
-# String values returned by openpyxl for errors when worksheets opened using
-# data_only=True
 EXCEL_ERRORS = set(
     [
         "#DIV/0!",
@@ -38,18 +38,19 @@ EXCEL_ERRORS = set(
         "#CALC!",
     ]
 )
+"""A global set of openpyxl error strings for Worksheets using data_only=True"""
 
-# First some simple single value validators
 
+def blank_value(value) -> bool:
+    """Check if a single value from a data table is empty.
 
-def blank_value(value):
-    """Simple check for 'empty' cell values (None, zero length string or whitespace
-    only)"""
+    Empty values include None, zero length strings and whitespace only strings.
+    """
     return (value is None) or (str(value).isspace()) or not len(str(value))
 
 
-def valid_r_name(string):
-    """Check that a field name is a valid r name"""
+def valid_r_name(string) -> bool:
+    """Check that string is a valid R object name."""
 
     reserved_words = [
         "if",
@@ -96,39 +97,38 @@ def valid_r_name(string):
     return valid
 
 
-# Now a class of validator to handle sets of values and track
-# invalid values
-
-
 class Filter:
+    """A base class to filter an iterable of input values.
+
+    This base class provides the core functionality to check the values in an iterable.
+    The class has two static methods, which can be overloaded in subclasses to yield
+    different checking behaviour. These methods are:
+
+        * `tfunc`, which should perform a boolean test on a value and,
+        * `rfunc`, which should return a value for failing inputs.
+
+    Values which fail `tfunc` are saved in the `failed` attribute. If `keep_failed` is
+    True, the output of `rfunc` for the failed value is added to the list of output
+    values - acting as a cleaner - but if `keep_failed` is False, the value is dropped
+    from the output values - acting as a filter.
+
+    Two magic methods are set for the class:
+
+    * __iter__  is set to iterate over the resulting filtered values
+    * __bool__  reports whether any values failed the checks in `tfunc`
+
+    Args:
+        values: An iterable of values to be filtered
+        keep_failed: A boolean showing whether to keep failed values in the output
+            iterable after passing through tfunc, or reduce the values to only passing
+            values.
+
+    Attributes:
+        failed: A list of failing values
+        values: An iterable of filtered/cleaned values
+    """
+
     def __init__(self, values, keep_failed=True):
-        """Filter an iterable of input values
-
-        This class is a general purpose class to check the values in an iterable.
-        The class has two static methods, which can be overloaded in subclasses
-        to yield different checking behaviour. These methods are:
-
-            * `tfunc`, which should perform a boolean test on a value and,
-            * `rfunc`, which should return a value for failing inputs.
-
-        The __iter__ method is set to iterate over the resulting checked values
-        and the __bool__ method is set to report whether any values failed the
-        checks. The original failing values themselves are saved in the `failed`
-        attribute. If `keep_failed` is True, the output of `rfunc` for the failed
-        value is added to the list of output values - acting as a cleaner - but
-        if `keep_failed` is False, the value is dropped from the output values -
-        acting as a filter.
-
-        Args:
-            values: An iterable of values to be filtered
-            keep_failed: A boolean showing whether to keep failed values in
-                the output iterable after passing through tfunc, or reduce
-                the values to only passing values.
-
-        Attributes:
-            failed: A list of failing values
-            values: An iterable of filtered values
-        """
 
         self.failed = []
         self.keep_failed = keep_failed
@@ -145,46 +145,78 @@ class Filter:
                     yield self.rfunc(val)
 
     @staticmethod
-    def tfunc(val):
+    def tfunc(val) -> bool:
+        """Apply a test to a given value."""
         return True
 
     @staticmethod
-    def rfunc(val):
+    def rfunc(val) -> bool:
+        """Clean a value that has failed testing."""
         return val
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
+        """Filter instances compare True when no values have failed testing."""
         return not self.failed
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Filter instance representation reports the pass or fail status of testing."""
         return str(not self.failed)
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
+        """Iterating over a Filter instance yields the cleaned/filtered values."""
         yield from self.values
 
 
 class IsString(Filter):
+    """A Filter subclass for string values.
+
+    The `tfunc` method overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method to check for string
+    values. Failing values are kept unchanged in the instance values.
+    """
+
     @staticmethod
-    def tfunc(val):
+    def tfunc(val) -> bool:
+        """Test for string values."""
         return isinstance(val, str)
 
     @staticmethod
-    def rfunc(val):
+    def rfunc(val) -> Any:
+        """Return failing values unchanged."""
         return val
 
 
 class IsNumber(Filter):
+    """A Filter subclass for numeric values.
+
+    The `tfunc` method overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method to check if values are a
+    float or int. Failing values are kept unchanged in the instance values.
+    """
+
     @staticmethod
-    def tfunc(val):
+    def tfunc(val) -> bool:
+        """Test for float or int values."""
         return isinstance(val, (float, int))
 
     @staticmethod
-    def rfunc(val):
+    def rfunc(val) -> Any:
+        """Return failing values unchanged."""
         return val
 
 
 class IsNotNumericString(Filter):
+    """A Filter subclass to trap numeric strings.
+
+    The `tfunc` method overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method to return False if the
+    value can be cast to a numeric value. Failing values are kept unchanged in the
+    instance values.
+    """
+
     @staticmethod
     def tfunc(val):
+        """Test that a value does not represent a numeric value."""
         try:
             float(val)
             return False
@@ -193,126 +225,213 @@ class IsNotNumericString(Filter):
 
     @staticmethod
     def rfunc(val):
+        """Return failing values unchanged."""
         return val
 
 
 class IsLocName(Filter):
-    @staticmethod
-    def tfunc(val):
+    """A Filter subclass to check location names.
 
+    Location names are typically strings but can also be numeric codes, which might load
+    as integer or float values. The `tfunc` method therefore overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method to return False if the
+    value is not a string, an integer or a float that is an integer. Failing values are
+    kept unchanged in the instance values.
+    """
+
+    @staticmethod
+    def tfunc(val) -> bool:
+        """Test that a value is a string or integer."""
         if isinstance(val, (str, int)) or (isinstance(val, float) and val.is_integer()):
             return True
 
         return False
 
     @staticmethod
-    def rfunc(val):
+    def rfunc(val) -> str:
+        """Convert failing values to a string."""
         return str(val)
 
 
 class IsNotBlank(Filter):
+    """A Filter subclass to catch blank values.
+
+    Blank values include None, empty strings and whitespace only strings. The `tfunc`
+    method therefore overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method to detect blank values.
+    Failing values are kept unchanged in the instance values.
+    """
+
     @staticmethod
-    def tfunc(val):
+    def tfunc(val) -> bool:
+        """Test if a value is blank."""
         return not ((isinstance(val, str) and val.isspace()) or (val is None))
 
     @staticmethod
-    def rfunc(val):
+    def rfunc(val) -> Any:
+        """Return failing values unchanged."""
         return val
 
 
 class IsNotNone(Filter):
+    """A Filter subclass to catch None values.
+
+    The `tfunc` method overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method simply to test for None
+    values. Failing values are kept unchanged in the instance values.
+    """
+
     @staticmethod
-    def tfunc(val):
+    def tfunc(val) -> bool:
+        """Test for None."""
         return val is not None
 
     @staticmethod
-    def rfunc(val):
+    def rfunc(val) -> Any:
+        """Return failing values unchanged."""
         return val
 
 
 class IsNotSpace(Filter):
+    """A Filter subclass to catch whitespace strings.
 
-    # Only fails strings that contain whitespace. None is OK
+    The `tfunc` method overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method simply to test for values
+    that only contain whitespace. Note that None values or *empty* strings do not fail.
+    Failing values are kept unchanged in the instance values.
+    """
 
     @staticmethod
-    def tfunc(val):
+    def tfunc(val) -> bool:
+        """Test for whitespace strings."""
         return not (isinstance(val, str) and val.isspace())
 
     @staticmethod
-    def rfunc(val):
+    def rfunc(val) -> None:
+        """Replace failing values with None."""
         return None
 
 
 class IsNotPadded(Filter):
+    """A Filter subclass to catch padded strings.
+
+    The `tfunc` method overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method simply to test for values
+    that include whitespace padding. Note that *empty* strings and whitespace only
+    strings are not considered to be padded. Failing values are kept unchanged in the
+    instance values.
+    """
+
     @staticmethod
-    def tfunc(val):
+    def tfunc(val) -> bool:
+        """Test for padded strings."""
         # Deliberately excludes whitespace cells
         return not (isinstance(val, str) and (val != val.strip()) and not val.isspace())
 
     @staticmethod
-    def rfunc(val):
+    def rfunc(val) -> str:
+        """Replace padded strings with padding removed."""
         return val.strip()
 
 
 class IsNotNA(Filter):
+    """A Filter subclass to catch NA values.
+
+    The safedata_validator package uses the string 'NA' to explicitly identify missing
+    data. The `tfunc` method overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method simply to test for 'NA'
+    strings in data values. Failing values are kept unchanged in the instance values.
+    """
+
     @staticmethod
-    def tfunc(val):
+    def tfunc(val) -> bool:
+        """Test for NA strings."""
         return not ((isinstance(val, str) and val == "NA"))
 
     @staticmethod
-    def rfunc(val):
+    def rfunc(val) -> Any:
+        """Return failing values unchanged."""
         return val
 
 
 class IsNotExcelError(Filter):
+    """A Filter subclass to catch Excel error strings.
+
+    The safedata_validator package loads data from Excel spreadsheets using the
+    data_only=True option, which renders Excel errors as strings. The `tfunc` method
+    overrides the base [tfunc][safedata_validator.validators.Filter.tfunc] method to
+    catch those strings in the list of values. Failing values are kept unchanged in the
+    instance values.
+    """
+
     @staticmethod
-    def tfunc(val):
+    def tfunc(val) -> bool:
+        """Test for Excel error strings."""
         return not (isinstance(val, str) and (val in EXCEL_ERRORS))
 
     @staticmethod
-    def rfunc(val):
+    def rfunc(val) -> Any:
+        """Return failing values unchanged."""
         return val
 
 
 class IsLower(Filter):
+    """A Filter subclass to filter values to lowercase strings.
+
+    The `tfunc` method overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method to catch string values
+    and convert them to lowercase.
+    """
+
     @staticmethod
-    def tfunc(val):
+    def tfunc(val) -> bool:
+        """Test for string values."""
         return not isinstance(val, str)
 
     @staticmethod
-    def rfunc(val):
+    def rfunc(val) -> str:
+        """Return lowercase values for strings."""
         return val.lower()
 
 
 class NoPunctuation(Filter):
+    """A Filter subclass to catch values containing punctuation.
+
+    The `tfunc` method overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method to catch strings
+    containing punctuation. Failing values are kept unchanged in the instance values.
+    """
+
     @staticmethod
-    def tfunc(val):
+    def tfunc(val) -> bool:
+        """Test for punctuation in strings."""
         return isinstance(val, str) and (not RE_CONTAINS_PUNC.search(val))
 
     @staticmethod
     def rfunc(val):
+        """Return failing values unchanged."""
         return val
 
 
-# HasDuplicates acts at the level of the set of values, not individual values,
-# so is not a Filter subclass
-
-
 class HasDuplicates:
-    def __init__(self, values):
-        """Find any duplicates in a set of values
+    """Find any duplicates in a set of values.
 
-        Args:
-            values: An iterable of values to be checked
+    The class checks a provided iterable of valies and identifies whether any values are
+    duplicated. The __bool__ magic method returns False if no duplicates are found.
 
-        Attributes:
-            duplicated: A list of duplicated values
-        """
+    Args:
+        values: An iterable of values to be checked
+
+    Attributes:
+        duplicated: A list of duplicated values
+    """
+
+    def __init__(self, values: Iterable):
 
         self.duplicated = list(self._get_duplicates(values))
 
     @staticmethod
-    def _get_duplicates(values):
+    def _get_duplicates(values) -> Any:
         # https://stackoverflow.com/questions/46554866
         c = Counter()
         seen = set()
@@ -322,96 +441,82 @@ class HasDuplicates:
                 seen.add(i)
                 yield i
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
+        """Report if any values are duplicated."""
         return bool(len(self.duplicated))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Class representation shows if values are duplicated."""
         return str(bool(len(self.duplicated)))
 
 
 class IsInSet:
-    def __init__(self, values, test_set):
-        """Test whether all values are found in test_set.
+    """Test values are within a test set.
 
-        Args:
-            values: An iterable of values to be filtered
-            test_set: Another iterable containing accepted values
+    A base class that tests if all values in an iterable against a tuple of test
+    values. The base class simply tests if the iterable values are found in the test
+    values.
 
-        Attributes:
-            failed: A list of failing values
-            values: An iterable of values found in set
-        """
+    The `filter` method can be overridden to alter the test behaviour. The filter method
+    should return passing values and append failing values to the `failed` attribute.
+
+    Args:
+        values: An iterable of values to be filtered
+        test_values: A tuple containing accepted values
+
+    Attributes:
+        failed: A list of failing values not found in the test set.
+        values: An iterable of values found in the test set
+        test_values: The iterable of test values.
+    """
+
+    def __init__(self, values: Iterable, test_values: tuple):
 
         self.failed = []
-        self.test_set = test_set
+        self.test_values = test_values
         self.values = [v for v in self._filter(values)]
 
-    def _filter(self, values):
+    def filter(self, values) -> Any:
+        """Filter the input values.
 
-        for val in values:
-            if val in self.test_set:
-                yield val
-            else:
-                self.failed.append(val)
-
-    def __bool__(self):
-        return not self.failed
-
-    def __repr__(self):
-        return str(not self.failed)
-
-    def __iter__(self):
-        yield from self.values
-
-
-class TypeCheck:
-    def __init__(self, values: Iterable, types: tuple):
-        """Filter an iterable of input values
-
-        This class is used to check whether all the values are members of a
-        given set of types.
-
-        The __iter__ method is set to iterate over the resulting checked values
-        and the __bool__ method is set to report whether any values failed the
-        checks. The failing values themselves are saved in the `failed`
-        attribute.
-
-        Args:
-            values: An iterable of values to be filtered
-            types: A tuple of accepted types
-
-        Attributes:
-            failed: A list of failing values
-            values: An iterable of filtered values
+        This function returns values found in the test set but appends values not found
+        in the set to the self.failed attribute.
         """
-
-        self.failed = []
-        self.values = [v for v in self._filter(values, types)]
-
-    def _filter(self, values, types):
-
         for val in values:
-            if isinstance(val, types):
+            if val in self.test_values:
                 yield val
             else:
                 self.failed.append(val)
 
-    @staticmethod
-    def tfunc(val):
-        return True
-
-    @staticmethod
-    def rfunc(val):
-        return val
-
-    def __bool__(self):
+    def __bool__(self) -> str:
+        """Class compares as False when all values in test set."""
         return not self.failed
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Class represent as 'False' when all values in test set."""
         return str(not self.failed)
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
+        """Class iterates over values found in set."""
         yield from self.values
+
+
+class TypeCheck(IsInSet):
+    """Check the types of a set of values.
+
+    This class is used to check whether all the values are members of a
+    given set of types. It overrides the base
+    [filter][safedata_validator.validators.IsInSet.filter] method to check that the
+    types of `values` are all instances of test_values.
+    """
+
+    def filter(self, values) -> Any:
+        """Test the types of values."""
+        for val in values:
+            if isinstance(val, self.test_values):
+                yield val
+            else:
+                self.failed.append(val)
 
 
 # INFO - pandas has Excel reading including vectorised string operations?
@@ -422,20 +527,23 @@ class TypeCheck:
 
 
 class GetDataFrame:
+    """Get a data frame from an Excel worksheet.
+
+    This class takes a worksheet and extracts a data frame starting at a
+    given header row. It then cleans off any blank terminal rows and columns,
+    which are sometimes loaded from Excel, and returns a dictionary of columns.
+
+    Args:
+        ws: An openpyxl Worksheet instance
+        header_row: The row containing the field headers.
+
+    Attributes:
+        headers: A list of header values
+        data_columns: A list of list containing column data
+        bad_headers: A dictionary of malformed header values
+    """
+
     def __init__(self, ws, header_row=1):
-        """This class takes a worksheet and extracts a data frame starting at a
-        given header row. It then cleans off any blank terminal rows and columns,
-        which are sometimes loaded from Excel, and returns a dictionary of columns.
-
-        Args:
-            ws: An openpyxl Worksheet instance
-            header_row: The row containing the field headers.
-
-        Attributes:
-            headers: A list of header values
-            data_columns: A list of list containing column data
-            bad_headers: A dictionary of malformed header values
-        """
 
         self.headers = []
         self.bad_headers = dict()
