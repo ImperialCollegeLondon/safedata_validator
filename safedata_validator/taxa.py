@@ -1343,7 +1343,7 @@ class RemoteNCBIValidator:
         return mtaxon
 
     # New function to read in taxa information
-    def taxa_search(self, nnme: str, taxah: dict):
+    def taxa_search(self, nnme: str, taxah: dict) -> NCBITaxon:
         """Find an NCBI taxon given a taxon hierarchy.
 
         Method that takes in taxonomic information, and finds the corresponding

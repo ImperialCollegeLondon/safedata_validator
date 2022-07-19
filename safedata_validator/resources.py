@@ -21,7 +21,7 @@ other components of the package.
 A configuration file can be passed as `cfg_path` when creating an instance,
 but if no arguments are provided then an attempt is made to find and load
 configuration files in the user and then site config locations defined by the
-`appdirs` package. See [usage/usage][here] for details.
+`appdirs` package. See [here][usage/usage] for details.
 
 """
 
@@ -81,7 +81,7 @@ to do basic validation and type conversions.
 """
 
 
-def date_list(value, min, max):
+def date_list(value: str, min: str, max: str):
     """Validate config date lists.
 
     A configobj.Validator extension function to check configuration values
