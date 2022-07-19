@@ -474,7 +474,7 @@ class IsInSet:
 
         self.failed = []
         self.test_values = test_values
-        self.values = [v for v in self._filter(values)]
+        self.values = [v for v in self.filter(values)]
 
     def filter(self, values) -> Any:
         """Filter the input values.
