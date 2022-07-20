@@ -68,11 +68,7 @@ CONFIGSPEC = {
         "contact_orcid": "string(default=None)",
     },
     "metadata": {"api": "string(default=None)", "token": "string(default=None)"},
-    "ncbi": {
-        "api_key": "string(default=None)",
-        "email": "string(default=None)",
-        "tool": "string(default='safedata_validator')",
-    },
+    "ncbi": {"api_key": "string(default=None)"},
 }
 """dict: The safedata_validator package use the `configobj.ConfigObj`
 package to handle resource configuration. This dict defines the basic expected

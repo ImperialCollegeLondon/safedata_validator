@@ -71,10 +71,6 @@ BACKBONE_RANKS = [
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ["superkingdom"] + BACKBONE_RANKS
 
-# TODO - Modify the resource file to ask the user to provide NCBI registration email.
-#        This should only be done if the user actually wants to use this module as it
-#        isn't need elsewhere (as far as I know). Also should ask for api key
-
 # TODO - A lot of complexity could be lost here if the two validation
 #        sources had more similar structure. Could have a row return method
 #        that is used within a generic id_lookup and search class.
@@ -1064,10 +1060,10 @@ class RemoteNCBIValidator:
 
     def __init__(self, resources: Resources):
 
+        # Users have to provide an API key, but email and tool are package properties
         self.api_key = resources.ncbi.api_key
-        # TODO - also need provide tool to the requests at some point
-        self.email = resources.ncbi.email
-        self.tool = resources.ncbi.tool
+        self.email = "data@safeproject.net"
+        self.tool = "safedata_validator"
 
     def _taxonomy_efetch(self, ncbi_id: int) -> etree._Element:
         """Fetch taxonomic data for an NCBI ID.
@@ -1082,15 +1078,16 @@ class RemoteNCBIValidator:
             NCBI output XML stored as an element tree
         """
         # Construct url
-        if self.api_key is not None:
+        if self.api_key is not None and self.api_key != "":
             url = (
                 f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db="
-                f"taxonomy&id={ncbi_id}&api_key={self.api_key}"
+                f"taxonomy&id={ncbi_id}&api_key={self.api_key}&email={self.email}"
+                f"&tool={self.tool}"
             )
         else:
             url = (
                 f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db="
-                f"taxonomy&id={ncbi_id}"
+                f"taxonomy&id={ncbi_id}&email={self.email}&tool={self.tool}"
             )
 
         # Set up while loop to make the request up to 5 times if necessary
@@ -1138,15 +1135,16 @@ class RemoteNCBIValidator:
             NCBI output XML stored as an element tree
         """
         # Construct url
-        if self.api_key is not None:
+        if self.api_key is not None and self.api_key != "":
             url = (
                 f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db="
-                f"taxonomy&term={t_name}&api_key={self.api_key}"
+                f"taxonomy&term={t_name}&api_key={self.api_key}&email={self.email}"
+                f"&tool={self.tool}"
             )
         else:
             url = (
                 f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db="
-                f"taxonomy&term={t_name}"
+                f"taxonomy&term={t_name}&email={self.email}&tool={self.tool}"
             )
 
         # Set up while loop to make the request up to 5 times if necessary
