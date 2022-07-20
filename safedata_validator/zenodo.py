@@ -1277,7 +1277,10 @@ def download_ris_data(resources: Resources = None, ris_file: str = None) -> list
 
 
 def sync_local_dir(
-    datadir: str, xlsx_only: bool = True, resources: Resources = None
+    datadir: str,
+    xlsx_only: bool = True,
+    replace_modified: bool = False,
+    resources: Resources = None,
 ) -> None:
     """Syncronise a local data directory with a Zenodo community.
 
@@ -1299,6 +1302,8 @@ def sync_local_dir(
             none is provided, the standard locations are checked.
         xlsx_only: Should the download ignore large non-xlsx files, defaulting
             to True.
+        replace_modified: Should the synchronisation replace locally modified files with
+            the archived version. By default, modified local files are left alone.
     """
 
     # Private helper functions
@@ -1409,7 +1414,10 @@ def sync_local_dir(
                 LOGGER.info("Downloading")
                 _get_file(this_file["links"]["download"], outf, params=params)
             elif local_copy and _compute_md5(outf) != this_file["checksum"]:
-                LOGGER.warning("Local copy modified")
+                if replace_modified:
+                    _get_file(this_file["links"]["download"], outf, params=params)
+                else:
+                    LOGGER.warning("Local copy modified")
             else:
                 LOGGER.info("Already present")
 

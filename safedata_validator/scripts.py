@@ -383,9 +383,15 @@ def _safedata_zenodo_cli():
         "--not-just-xlsx",
         action="store_true",
         default=False,
-        help="Typically large non-xlsx files are also downloaded.",
+        help="Should large non-xlsx files also be downloaded.",
     )
 
+    parser_sync.add_argument(
+        "--replace-modified",
+        action="store_true",
+        default=False,
+        help="Should locally modified files be overwritten with the archive version",
+    )
     # ris subcommand
 
     ris_desc = """
@@ -645,6 +651,7 @@ def _safedata_zenodo_cli():
             datadir=args.datadir,
             xlsx_only=not args.not_just_xlsx,
             resources=resources,
+            replace_modified=args.replace_modified,
         )
 
     elif args.subcommand == "ris":
