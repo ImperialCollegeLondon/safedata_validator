@@ -360,6 +360,9 @@ def _safedata_zenodo_cli():
     used to store metadata and files downloaded from a safedata community on Zenodo and
     from a safedata metadata server. The `safedata_validator` configuration file will
     need to include the metadata API.
+
+    By default, only the XLSX files containing metadata and data tables are downloaded,
+    ignoring any additional files, which are often large.
     """
 
     parser_sync = subparsers.add_parser(
@@ -377,10 +380,10 @@ def _safedata_zenodo_cli():
     )
 
     parser_sync.add_argument(
-        "--xlsx_only",
-        type=bool,
-        default=True,
-        help="Should the download ignore large non-xlsx files, defaulting " "to True.",
+        "--not-just-xlsx",
+        action="store_true",
+        default=False,
+        help="Typically large non-xlsx files are also downloaded.",
     )
 
     # ris subcommand
@@ -640,7 +643,7 @@ def _safedata_zenodo_cli():
 
         sync_local_dir(
             datadir=args.datadir,
-            xlsx_only=args.xlsx_only,
+            xlsx_only=not args.not_just_xlsx,
             resources=resources,
         )
 
