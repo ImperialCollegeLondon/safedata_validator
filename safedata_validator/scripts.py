@@ -522,7 +522,7 @@ def _safedata_zenodo_cli():
 
         # Run the command
         response, error = create_deposit(
-            deposit_id=args.deposit_id, resources=resources
+            concept_id=args.concept_id, resources=resources
         )
         # Trap errors
         if error is not None:

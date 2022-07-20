@@ -40,6 +40,7 @@ nav:
       - 'Locations': 'api/locations.md'
       - 'Fields and dataworksheets': 'api/field.md'
       - 'Taxa': 'api/taxa.md'
+      - 'Zenodo': 'api/zenodo.md'
     - 'Build notes': build_notes.md
   - 'Installation and configuration':
     - 'Installation': 'install/install.md'

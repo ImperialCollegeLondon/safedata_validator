@@ -1,9 +1,41 @@
+"""# The `zenodo` module.
+
+This module provides functions to:
+
+1. handle the publication of datasets after they have been validated
+   using safedata_validate, including the generation of HTML descriptions
+   of datasets.
+2. maintain local copies of datasets in the folder structure expected
+   by the safedata R package.
+3. compile a RIS format bibliographic file for published datasets.
+
+## Function return value
+
+The functions interacting with Zenodo all return a common format of tuple of length 2:
+
+* A dictionary containing the response content or None on error
+* An error message on failure or None on success
+
+So, for example:
+
+```{python}
+({'key': 'value'}, None)
+(None, 'Something went wrong')
+```
+
+The expected use pattern is then:
+
+```{python}
+response, error = zenodo_function(args)
+```
+"""
+
 import copy
 import hashlib
 import os
 import shutil
 from itertools import groupby
-from typing import Dict, List, Tuple, Union
+from typing import Union
 
 import requests
 import rispy
@@ -17,20 +49,16 @@ from tqdm.utils import CallbackIOWrapper
 from safedata_validator.logger import FORMATTER, LOGGER
 from safedata_validator.resources import Resources
 
-"""
-This module provides functions to:
-1. handle the publication of datasets after they have been validated
-   using safedata_validate, including the generation of HTML descriptions
-   of datasets.
-2. maintain local copies of datasets in the folder structure expected
-   by the safedata R package.
-3. compile a RIS format bibliographic file for published datasets.
-"""
+# Constant definition of zenodo action function response type
+ZenodoFunctionResponseType = tuple[Union[dict, None], Union[str, None]]
 
 
-def _resources_to_zenodo_api(resources: Resources = None):
-    """Private function to return the Zenodo API and access token
-    from the configuration.
+def _resources_to_zenodo_api(resources: Resources = None) -> dict:
+    """Get a dictionary of the Zenodo and Metadata config from Resources.
+
+    Args:
+        resources: An instance of Resources or the default None to search for a local
+            Resources configuration file.
     """
 
     # Get resource configuration
@@ -83,7 +111,7 @@ def _resources_to_zenodo_api(resources: Resources = None):
 
 
 def _compute_md5(fname: str) -> str:
-    """Calculate a local file md5 hash"""
+    """Calculate the md5 hash for a local file."""
     hash_md5 = hashlib.md5()
     with open(fname, "rb") as fname_obj:
         for chunk in iter(lambda: fname_obj.read(4096), b""):
@@ -92,20 +120,17 @@ def _compute_md5(fname: str) -> str:
 
 
 def _zenodo_error_message(response) -> str:
-
+    """Format a Zenodo JSON error response as a string."""
     return f"{response.json()['message']} ({response.json()['status']})"
 
 
-"""
-Zenodo action functions
-"""
+# Zenodo action functions
 
 
 def get_deposit(
     deposit_id: int, resources: Resources = None
-) -> Tuple[Union[dict, None], Union[str, None]]:
-    """
-    Download the metadata of a Zenodo deposit.
+) -> ZenodoFunctionResponseType:
+    """Download the metadata of a Zenodo deposit.
 
     Args:
         deposit_id: The Zenodo record id of an existing dataset.
@@ -113,9 +138,7 @@ def get_deposit(
             none is provided, the standard locations are checked.
 
     Returns:
-        A 2 tuple:
-            * A dictionary containing the response content or None on error
-            * An error message on failure or None on success
+        See [here][safedata_validator.zenodo--function-return-value].
     """
 
     zres = _resources_to_zenodo_api(resources)
@@ -135,21 +158,21 @@ def get_deposit(
 
 
 def create_deposit(
-    deposit_id: int = None, resources: Resources = None
-) -> Tuple[Union[dict, None], Union[str, None]]:
-    """
-    Function to create a new deposit draft, possibly as a new version of an
-    existing published record
+    concept_id: int = None, resources: Resources = None
+) -> ZenodoFunctionResponseType:
+    """Create a new deposit.
+
+    Creates a new deposit draft, possibly as a new version of an existing published
+    record.
 
     Args:
-        deposit_id: An optional id of a published record to create a new version
-            of an existing dataset
+        concept_id: An optional concept id of a published record to create a new version
+            of an existing dataset.
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
+
     Returns:
-        A 2 tuple:
-            * A dictionary containing the response content or None on error
-            * An error message on failure or None on success
+        See [here][safedata_validator.zenodo--function-return-value].
     """
 
     # Get resource configuration
@@ -158,10 +181,10 @@ def create_deposit(
     params = zres["ztoken"]
 
     # get the correct draft api
-    if deposit_id is None:
+    if concept_id is None:
         api = f"{zenodo_api}/deposit/depositions"
     else:
-        api = f"{zenodo_api}/deposit/depositions/{deposit_id}/actions/newversion"
+        api = f"{zenodo_api}/deposit/depositions/{concept_id}/actions/newversion"
 
     # Create the draft
     new_draft = requests.post(api, params=params, json={})
@@ -170,7 +193,7 @@ def create_deposit(
     if new_draft.status_code != 201:
         return None, _zenodo_error_message(new_draft)
 
-    if deposit_id is None:
+    if concept_id is None:
         return new_draft.json(), None
 
     # For new versions, the response is an update to the existing copy,
@@ -188,20 +211,20 @@ def create_deposit(
 
 def upload_metadata(
     metadata: dict, zenodo: dict, resources: Resources = None
-) -> Tuple[Union[dict, None], Union[str, None]]:
-    """
-    Function to take dataset metadata, convert to Zenodo metadata JSON and
-    upload it to a deposit.
+) -> ZenodoFunctionResponseType:
+    """Upload dataset metadata.
+
+    Takes a dictionary of dataset metadata, converts it to a JSON payload of Zenodo
+    metadata and uploads it to a deposit.
 
     Args:
         metadata: The dataset metadata dictionary for a dataset
         zenodo: The dataset metadata dictionary for a deposit
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
+
     Returns:
-        A 2 tuple:
-            * A dictionary containing the response content or None on error
-            * An error message on failure or None on success
+        See [here][safedata_validator.zenodo--function-return-value].
     """
 
     # Get resource configuration
@@ -269,16 +292,21 @@ def upload_metadata(
 def update_published_metadata(
     zenodo_md: dict,
     resources: Resources = None,
-):
-    """
-    Function to update the metadata on a published deposit, for example to modify the
-    access status of deposit. In general, metadata should be updated by releasing a new
-    version of the dataset,
+) -> ZenodoFunctionResponseType:
+    """Update published deposit metadata.
+
+    Updates the metadata on a published deposit, for example to modify the access status
+    of deposit. In general, metadata should be updated by releasing a new version of the
+    dataset, and this function should only be used where it is essential that the
+    published version by altered.
 
     Args:
         zenodo_md: A Zenodo metadata dictionary, with an updated metadata section
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
+
+    Returns:
+        See [here][safedata_validator.zenodo--function-return-value].
     """
 
     # Get resource configuration
@@ -339,24 +367,23 @@ def upload_file(
     zenodo_filename: str = None,
     progress_bar: bool = True,
     resources: Resources = None,
-) -> Tuple[Union[dict, None], Union[str, None]]:
-    """
-    Upload the contents of a specified file to an unpublished Zenodo deposit,
-    optionally using an alternative filename. If the file already exists in the
-    deposit, it will be replaced.
+) -> ZenodoFunctionResponseType:
+    """Upload a file to Zenodo.
+
+    Uploads the contents of a specified file to an unpublished Zenodo deposit,
+    optionally using an alternative filename. If the file already exists in the deposit,
+    it will be replaced.
 
     Args:
         metadata: The Zenodo metadata dictionary for a deposit
-        file: The path to the file to be uploaded
+        filepath: The path to the file to be uploaded
         zenodo_filename: An optional alternative file name to be used on Zenodo
         progress_bar: Should the upload progress be displayed
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
     Returns:
-        A 2 tuple:
-            * A dictionary containing the response content or None on error
-            * An error message on failure or None on success
+        See [here][safedata_validator.zenodo--function-return-value].
     """
 
     # Get resource configuration
@@ -404,9 +431,12 @@ def upload_file(
 
 def discard_deposit(
     metadata: dict, resources: Resources = None
-) -> Tuple[Union[dict, None], Union[str, None]]:
-    """
-    Discard an _unpublished_ deposit.
+) -> ZenodoFunctionResponseType:
+    """Discard a deposit.
+
+    Deposits can be discarded - the associated files and metadata will be deleted and
+    the Zenodo ID no longer exists. Once deposits are published to records, they cannot
+    be deleted via the API - contact the Zenodo team for help.
 
     Args:
         metadata: The Zenodo metadata dictionary for a deposit
@@ -414,9 +444,7 @@ def discard_deposit(
             none is provided, the standard locations are checked.
 
     Returns:
-        A 2 tuple:
-            * A dictionary containing the response content or None on error
-            * An error message on failure or None on success
+        See [here][safedata_validator.zenodo--function-return-value].
     """
 
     # Get resource configuration
@@ -433,18 +461,16 @@ def discard_deposit(
 
 def publish_deposit(
     zenodo: dict, resources: Resources = None
-) -> Tuple[Union[dict, None], Union[str, None]]:
-    """
-    Function to publish a created deposit .
+) -> ZenodoFunctionResponseType:
+    """Publish a created deposit.
 
     Args:
         zenodo: The dataset metadata dictionary for a deposit
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
+
     Returns:
-        A 2 tuple:
-            * A dictionary containing the response content or None on error
-            * An error message on failure or None on success
+        See [here][safedata_validator.zenodo--function-return-value].
     """
 
     # Get resource configuration
@@ -463,9 +489,8 @@ def publish_deposit(
 
 def delete_file(
     metadata: dict, filename: str, resources: Resources = None
-) -> Tuple[Union[dict, None], Union[str, None]]:
-    """
-    Delete an uploaded file from an unpublished Zenodo deposit.
+) -> ZenodoFunctionResponseType:
+    """Delete an uploaded file from an unpublished Zenodo deposit.
 
     Args:
         metadata: The Zenodo metadata dictionary for a deposit
@@ -474,9 +499,7 @@ def delete_file(
             none is provided, the standard locations are checked.
 
     Returns:
-        A 2 tuple:
-            * A dictionary containing the response content or None on error
-            * An error message on failure or None on success
+        See [here][safedata_validator.zenodo--function-return-value].
     """
 
     # Get resource configuration
@@ -510,19 +533,17 @@ def delete_file(
 
 def post_metadata(
     metadata: dict, zenodo: dict, resources: Resources = None
-) -> Tuple[Union[dict, None], Union[str, None]]:
-    """
-    Function to post the dataset and zenodo metadata to the metadata server.
+) -> ZenodoFunctionResponseType:
+    """Post the dataset metadata and zenodo metadata to the metadata server.
 
     Args:
         metadata: The dataset metadata dictionary for a dataset
         zenodo: The dataset metadata dictionary for a deposit
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
+
     Returns:
-        A 2 tuple:
-            * A dictionary containing the response content or None on error
-            * An error message on failure or None on success
+        See [here][safedata_validator.zenodo--function-return-value].
     """
 
     # Get resource configuration
@@ -550,8 +571,9 @@ Dataset description generation (HTML and GEMINI XML)
 """
 
 
-def taxon_index_to_div(taxa: List[Dict]) -> tags.div:
-    """
+def taxon_index_to_html(taxa: list[dict]) -> tags.div:
+    """Generate an HTML formatted taxon list.
+
     Takes a taxon index - a list containing taxon dictionaries - and converts into
     an dominate.tags.div() object containing a simple HTML representation of the
     taxonomy. The representation uses indentation to show taxonomic depth.
@@ -653,8 +675,9 @@ def dataset_description(
     extra: str = None,
     resources: Resources = None,
 ) -> Union[tags.div, str]:
-    """
-    Function to turn a dataset metadata JSON into html for inclusion in
+    """Create an HTML dataset description.
+
+    This function turns a dataset metadata JSON into html for inclusion in
     published datasets. This content is used to populate the dataset description
     section in the Zenodo metadata. Zenodo has a limited set of permitted HTML
     tags, so this is quite simple HTML.
@@ -675,6 +698,9 @@ def dataset_description(
         extra: Additional HTML content to include in the description.
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
+
+    Returns:
+        Either a string of rendered HTML or a dominate.tags.div object.
     """
 
     zres = _resources_to_zenodo_api(resources)
@@ -840,7 +866,7 @@ def dataset_description(
             "species and other unknown taxa, morphospecies, functional groups and  "
             "taxonomic levels not used in the GBIF backbone are shown in square "
             "brackets.",
-            taxon_index_to_div(taxon_index),
+            taxon_index_to_html(taxon_index),
         )
 
     if render:
@@ -849,8 +875,9 @@ def dataset_description(
         return desc
 
 
-def table_description(tab: Dict) -> tags.div:
-    """
+def table_description(tab: dict) -> tags.div:
+    """Convert a dict containing table contents into an HTML table.
+
     Function to return a description for an individual source file in a dataset.
     Typically datasets only have a single source file - the Excel workbook that
     also contains the metadata - but they may also report on external files loaded
@@ -860,7 +887,7 @@ def table_description(tab: Dict) -> tags.div:
         tab: A dict describing a data table
 
     Returns:
-        A `dominate.tags.div` instant containing an HTML description of the table
+        A `dominate.tags.div` instance containing an HTML description of the table
     """
 
     # table summary
@@ -900,13 +927,13 @@ def table_description(tab: Dict) -> tags.div:
 
 
 def generate_inspire_xml(
-    metadata: Dict,
+    metadata: dict,
     zenodo_metadata: dict,
     resources: Resources,
     lineage_statement: str = None,
 ) -> str:
+    """Convert dataset and zenodo metadata into GEMINI XML.
 
-    """
     Produces an INSPIRE/GEMINI formatted XML record from dataset metadata,
     and Zenodo record metadata using a template XML file. The dataset URL
     defaults to the Zenodo record but can be replaced if a separate URL (such as
@@ -1134,7 +1161,7 @@ def generate_inspire_xml(
 
 
 def download_ris_data(resources: Resources = None, ris_file: str = None) -> list:
-    """Downloads SAFE records into a RIS format bibliography file
+    """Downloads SAFE records into a RIS format bibliography file.
 
     This function is used to maintain a bibliography file of the records
     uploaded to a safedata community on Zenodo. It accesses the Zenodo community
@@ -1252,23 +1279,18 @@ def download_ris_data(resources: Resources = None, ris_file: str = None) -> list
 def sync_local_dir(
     datadir: str, xlsx_only: bool = True, resources: Resources = None
 ) -> None:
+    """Syncronise a local data directory with a Zenodo community.
 
-    """
-    The safedata R package defines a directory structure used to store metadata
-    and files downloaded from a safedata community on Zenodo and from a safedata
-    metadata server. This tool allows a safedata developer or community
-    maintainer to create or update such a directory with _all_ of the resources
-    in the Zenodo community, regardless of their public access status. This
-    forms a backup (although Zenodo is heavily backed up) but also provides
-    local copies of the files for testing and development of the code packages.
+    The safedata R package defines a directory structure used to store metadata and
+    files downloaded from a safedata community on Zenodo and from a safedata metadata
+    server. This tool allows a safedata developer or community maintainer to create or
+    update such a directory with _all_ of the resources in the Zenodo community,
+    regardless of their public access status. This forms a backup (although Zenodo is
+    heavily backed up) but also provides local copies of the files for testing and
+    development of the code packages.
 
-    You need to provide a Zenodo API token to use this script. That is obtained
-    by logging into the Zenodo account managing the community and going to the
-    Applications tab and creating a personal access token. These allow root
-    level access to the community files so must be treated carefully!
-
-    If this is a new data directory, you also need to provide the API url for
-    the safedata metadata server.
+    This function requires that the resources are configured with access tokens for
+    Zenodo and the details of the metadata server.
 
     Args:
         datadir: The path to a local directory containing an existing safedata
@@ -1281,7 +1303,7 @@ def sync_local_dir(
 
     # Private helper functions
     def _get_file(url: str, outf: str, params: dict = None) -> None:
-        """Download a file from a URL"""
+        """Download a file from a URL."""
         resource = requests.get(url, params=params, stream=True)
 
         with open(outf, "wb") as outf_obj:
