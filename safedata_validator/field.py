@@ -504,10 +504,14 @@ class DataWorksheet:
             Python >= 3.7.
         """
 
-        # Checking field_meta - TODO more checking of structure
+        # Checking field_meta structure - should be an equal length and non-zero tuple
+        # of values for each descriptor. If not, return without setting fields_loaded.
+        descriptor_tuple_lengths = set([len(tp) for tp in field_meta.values()])
+        if len(descriptor_tuple_lengths) > 1 or descriptor_tuple_lengths == set([0]):
+            LOGGER.error("Cannot load unequal length or empty field metadata")
+            return
 
-        # - Descriptors
-        # Clean off whitespace padding?
+        # Clean off descriptor whitespace padding?
         clean_descriptors = IsNotPadded(field_meta.keys())
         if not clean_descriptors:
             # Report whitespace padding and clean up tuples
@@ -836,18 +840,21 @@ class DataWorksheet:
         field_meta = dict(((rw[0], rw[1:]) for rw in field_meta))
         self.validate_field_meta(field_meta)
 
-        # Get an iterator on the data rows
-        data_rows = worksheet.iter_rows(min_row=len(field_meta) + 1, values_only=True)
+        if self.fields_loaded:
+            # Get an iterator on the data rows
+            data_rows = worksheet.iter_rows(
+                min_row=len(field_meta) + 1, values_only=True
+            )
 
-        # Load and validate chunks of data
-        n_chunks = ((max_row - self.n_descriptors) // row_chunk_size) + 1
-        for chunk in range(n_chunks):
+            # Load and validate chunks of data
+            n_chunks = ((max_row - self.n_descriptors) // row_chunk_size) + 1
+            for chunk in range(n_chunks):
 
-            # itertools.islice handles generators and StopIteration, and also
-            # trap empty slices
-            data = list(islice(data_rows, row_chunk_size))
-            if data:
-                self.validate_data_rows(data)
+                # itertools.islice handles generators and StopIteration, and also
+                # trap empty slices
+                data = list(islice(data_rows, row_chunk_size))
+                if data:
+                    self.validate_data_rows(data)
 
         # Finish up
         self.report()
