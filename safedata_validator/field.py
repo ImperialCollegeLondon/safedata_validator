@@ -449,7 +449,6 @@ class DataWorksheet:
             Summary information.
     """
 
-    @loggerinfo_push_pop("Checking data worksheet")
     def __init__(
         self,
         sheet_meta: dict,
@@ -725,7 +724,6 @@ class DataWorksheet:
         for data, field_inst in zip(data_cols, self.fields):
             field_inst.validate_data(data)
 
-    @loggerinfo_push_pop("Validating field data")
     def report(self) -> None:
         """Report data validation for a data table.
 
@@ -746,8 +744,12 @@ class DataWorksheet:
                     f"external file {self.external}"
                 )
         else:
+            LOGGER.info("Validating field data")
+            FORMATTER.push()
+
             for fld in self.fields:
                 fld.report()
+            FORMATTER.pop()
 
         # Report on row numbering
         if self.row_numbers_missing:
@@ -779,7 +781,6 @@ class DataWorksheet:
         else:
             LOGGER.info("Dataframe formatted correctly")
 
-    @loggerinfo_push_pop("Loading from worksheet")
     def load_from_worksheet(
         self, worksheet: worksheet, row_chunk_size: int = 1000
     ) -> None:
@@ -799,8 +800,13 @@ class DataWorksheet:
             row_chunk_size: The number of rows of data to load in each chunk
         """
 
+        # Not using @loggerinfo_push_pop to provide access to WS name
+        LOGGER.info(f"Checking worksheet '{self.name}'")
+        FORMATTER.push()
+
         if self.fields_loaded:
             LOGGER.critical("Field metadata already loaded - use fresh instance.")
+            FORMATTER.pop()
             return
 
         # get the data dimensions
@@ -809,6 +815,7 @@ class DataWorksheet:
         # trap completely empty worksheets
         if max_row == 0:
             LOGGER.error("Worksheet is empty")
+            FORMATTER.pop()
             return
 
         # Read the field metadata first:
@@ -844,6 +851,7 @@ class DataWorksheet:
 
         # Finish up
         self.report()
+        FORMATTER.pop()
 
     def to_dict(self) -> dict:
         """Return a dictionary representation of a DataWorksheet instance."""

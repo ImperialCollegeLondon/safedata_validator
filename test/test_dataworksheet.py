@@ -21,7 +21,7 @@ from safedata_validator.taxa import GBIFTaxa
                 "description": "This is a test data worksheet",
                 "external": None,
             },
-            ((INFO, "Checking data worksheet"),),
+            tuple(),  # No logging emitted
         ),
     ],
 )
@@ -393,7 +393,6 @@ def test_DataWorksheet_empty_meta(
             [],
             False,
             (
-                (INFO, "Validating field data"),
                 (ERROR, "No data passed for validation"),
                 (
                     INFO,
@@ -406,7 +405,6 @@ def test_DataWorksheet_empty_meta(
             [],
             True,
             (
-                (INFO, "Validating field data"),
                 (INFO, "Data table description associated with external file"),
                 (
                     INFO,
@@ -732,7 +730,7 @@ def test_DataWorksheet_report_multi_load(
             ],
             False,
             (
-                (INFO, "Loading from worksheet"),
+                (INFO, "Checking worksheet 'DF'"),
                 (INFO, "Validating field metadata"),
                 (INFO, "Validating field data"),
                 (INFO, "Checking field a"),
@@ -749,9 +747,8 @@ def test_DataWorksheet_report_multi_load(
             [],
             False,
             (
-                (INFO, "Loading from worksheet"),
+                (INFO, "Checking worksheet 'DF'"),
                 (INFO, "Validating field metadata"),
-                (INFO, "Validating field data"),
                 (ERROR, "No data passed for validation"),
                 (
                     INFO,
@@ -764,9 +761,8 @@ def test_DataWorksheet_report_multi_load(
             [],
             True,
             (
-                (INFO, "Loading from worksheet"),
+                (INFO, "Checking worksheet 'DF'"),
                 (INFO, "Validating field metadata"),
-                (INFO, "Validating field data"),
                 (INFO, "Data table description associated with external file"),
                 (
                     INFO,
@@ -783,7 +779,7 @@ def test_DataWorksheet_report_multi_load(
             ],
             False,
             (
-                (INFO, "Loading from worksheet"),
+                (INFO, "Checking worksheet 'DF'"),
                 (INFO, "Validating field metadata"),
                 (INFO, "Validating field data"),
                 (INFO, "Checking field a"),
