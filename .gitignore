@@ -39,3 +39,6 @@ local_example_inputs/*
 
 # Ignore code coverage map
 .coverage
+
+# Ignore config secrets
+test/fixtures/config_secrets.ini
