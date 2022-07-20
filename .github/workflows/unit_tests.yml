@@ -7,6 +7,7 @@ env:
   # testing against remote taxa APIs (slow and throttled) except on
   # master or release branches
   SDV_NO_REMOTE: ${{ ! (contains(github.ref, 'master') || contains(github.ref, 'release'))  }}
+  NCBI_API_KEY: ${{ secrets.NCBI_API_KEY }}
 
 jobs:
   build:
