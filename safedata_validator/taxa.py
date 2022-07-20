@@ -546,7 +546,7 @@ class RemoteGBIFValidator:
             species/ID
 
         It will raise a GBIFError if the provided ID cannot be found or if there is a
-        connection error to the remote GBIF dtabase.
+        connection error to the remote GBIF database.
 
         Args:
             gbif_id: A GBIF ID number.
@@ -1178,7 +1178,7 @@ class RemoteNCBIValidator:
 
     # Functionality to find taxa information from genbank ID
     def id_lookup(self, nnme: str, ncbi_id: int) -> NCBITaxon:
-        """Get an NBCITaxon by taxon ID.
+        """Get an NCBITaxon by taxon ID.
 
         This method returns full taxonomic information from a NCBI ID. It will raise a
         NCBIError if the provided ID cannot be found, or if there is a connection error.
@@ -1776,7 +1776,7 @@ class GBIFTaxa:
 
         This is typically used to process rows found in a dataset with a GBIFTaxa
         formatted table, can also be used to populate a GBIFTaxa instance
-        programatically.
+        programmatically.
 
         The taxon_input has the form:
 
@@ -2417,7 +2417,7 @@ class NCBITaxa:
 
         This is typically used to process rows found in a dataset with an NCBITaxa
         formatted table, can also be used to populate a NCBITaxa instance
-        programatically.
+        programmatically.
 
         The taxon_input has the form:
 
@@ -2667,7 +2667,7 @@ class NCBITaxa:
             LOGGER.info(f"Added {tx_lev} {tx_nme}")
 
     def compare_hier(self, m_name: str, mtaxon: NCBITaxon, taxon_hier: dict) -> None:
-        """Validate provided NCBI taxon hierachy.
+        """Validate provided NCBI taxon hierarchy.
 
         This method compares the retrieved hierarchy of a taxon with the hierarchy that
         was initially supplied. This function only checks that provided information
@@ -2779,7 +2779,7 @@ def taxon_index_to_text(
     Args:
         taxon_index: The taxon_index property of a GBIFTaxa or NCBITaxa instance.
         html: Render as html or text
-        indent_width: The indentation width to use for succesive taxonmic ranks.
+        indent_width: The indentation width to use for successive taxonomic ranks.
     """
 
     lbr = "<br>" if html else "\n"
@@ -2920,7 +2920,7 @@ def species_binomial(genus: str, species: str) -> Union[str, None]:
 
 
 def subspecies_trinomial(species: str, subspecies: str) -> Union[str, None]:
-    """Generate a species tribinomial from NCBI species and subspecies.
+    """Generate a subspecies trinomial from NCBI species and subspecies.
 
     The NCBI database sometimes includes extra tags in binomials, such as 'candidatus'.
     This function cleans up those names to remove extra tags. It returns the cleaned
