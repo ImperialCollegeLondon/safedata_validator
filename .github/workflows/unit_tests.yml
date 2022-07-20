@@ -6,7 +6,7 @@ env:
   # This env variable stops the safedata_validator test suite from
   # testing against remote taxa APIs (slow and throttled) except on
   # master or release branches
-  SDV_NO_REMOTE: ${{ ! (contains(github.ref, 'NCBI_config') || contains(github.ref, 'release'))  }}
+  SDV_NO_REMOTE: ${{ ! (contains(github.ref, 'master') || contains(github.ref, 'release'))  }}
   NCBI_API_KEY: ${{ secrets.NCBI_API_KEY }}
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
       # In order to avoid throttling from remote APIs, only run one job at
       # a time on master and release branches. Note that env.SDV_NO_REMOTE
       # is only available within job steps, and not here. 
-      max-parallel: ${{ fromJSON('[12, 1]')[ (contains(github.ref, 'NCBI_config') || contains(github.ref, 'release')) ] }}
+      max-parallel: ${{ fromJSON('[12, 1]')[ (contains(github.ref, 'master') || contains(github.ref, 'release')) ] }}
       matrix:
         python-version: ["3.9", "3.10"]
         os: [ubuntu-latest, macos-latest, windows-latest]
