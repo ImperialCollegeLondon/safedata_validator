@@ -1,4 +1,5 @@
 """Collection of fixtures to assist the testing scripts."""
+import configparser
 import os
 from collections import OrderedDict
 
@@ -50,7 +51,21 @@ def fixture_files():
         ("good_ncbi_file", "Test_format_good_NCBI.xlsx"),
     ]
 
+    # Check if testing is part of continuos integration
+    on_github_action = os.getenv("CI", False)
+
+    if not on_github_action:
+        real_files.append(("config_secrets", "config_secrets.ini"))
+
     real_files = {ky: os.path.join(fixture_dir, vl) for ky, vl in real_files}
+
+    # Check that a secrets.ini file has actually been provided
+    if not on_github_action:
+        if not os.path.exists(real_files["config_secrets"]):
+            raise OSError(
+                "config_secrets.ini not found. Use fixtures/config_secrets_template.ini"
+                " to create a config_secrets.ini file for configuring local pytests"
+            )
 
     # Need to provide the path to the certifi CA bundle or requests breaks!
     real_files["certifi"] = certifi.where()
@@ -137,6 +152,20 @@ def config_filesystem(fs):
     for _, val in FIXTURE_FILES.rf.items():
         fs.add_real_file(val)
 
+    # Check if tests are being run as part of continuos integration
+    on_github_action = os.getenv("CI", False)
+    ncbi_api_key = None
+
+    if on_github_action:
+        ncbi_api_key = os.getenv("NCBI_API_KEY")
+    else:
+        conf = configparser.ConfigParser()
+        conf.read(FIXTURE_FILES.rf.config_secrets)
+        ncbi_api_key = conf["ncbi"]["api_key"]
+
+    if ncbi_api_key is None:
+        raise RuntimeError("NCBI_API_KEY not found")
+
     # The config files _cannot_ be real files because they need to
     # contain absolute paths to the resources available on the specific
     # test machine, and so need to be created with those paths
@@ -159,6 +188,8 @@ def config_filesystem(fs):
         "zenodo_sandbox_token = xyz",
         "zenodo_api = https://api.zenodo.org",
         "zenodo_token = xyz",
+        "[ncbi]",
+        f"api_key = {ncbi_api_key}",
     ]
 
     # Remote config (no gbif database) in the fixture directory

@@ -71,10 +71,6 @@ BACKBONE_RANKS = [
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ["superkingdom"] + BACKBONE_RANKS
 
-# TODO - Modify the resource file to ask the user to provide NCBI registration email.
-#        This should only be done if the user actually wants to use this module as it
-#        isn't need elsewhere (as far as I know). Also should ask for api key
-
 # TODO - A lot of complexity could be lost here if the two validation
 #        sources had more similar structure. Could have a row return method
 #        that is used within a generic id_lookup and search class.
@@ -546,7 +542,7 @@ class RemoteGBIFValidator:
             species/ID
 
         It will raise a GBIFError if the provided ID cannot be found or if there is a
-        connection error to the remote GBIF dtabase.
+        connection error to the remote GBIF database.
 
         Args:
             gbif_id: A GBIF ID number.
@@ -1064,10 +1060,10 @@ class RemoteNCBIValidator:
 
     def __init__(self, resources: Resources):
 
+        # Users have to provide an API key, but email and tool are package properties
         self.api_key = resources.ncbi.api_key
-        # TODO - also need provide tool to the requests at some point
-        self.email = resources.ncbi.email
-        self.tool = resources.ncbi.tool
+        self.email = "data@safeproject.net"
+        self.tool = "safedata_validator"
 
     def _taxonomy_efetch(self, ncbi_id: int) -> etree._Element:
         """Fetch taxonomic data for an NCBI ID.
@@ -1082,15 +1078,16 @@ class RemoteNCBIValidator:
             NCBI output XML stored as an element tree
         """
         # Construct url
-        if self.api_key is not None:
+        if self.api_key is not None and self.api_key != "":
             url = (
                 f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db="
-                f"taxonomy&id={ncbi_id}&api_key={self.api_key}"
+                f"taxonomy&id={ncbi_id}&api_key={self.api_key}&email={self.email}"
+                f"&tool={self.tool}"
             )
         else:
             url = (
                 f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db="
-                f"taxonomy&id={ncbi_id}"
+                f"taxonomy&id={ncbi_id}&email={self.email}&tool={self.tool}"
             )
 
         # Set up while loop to make the request up to 5 times if necessary
@@ -1138,15 +1135,16 @@ class RemoteNCBIValidator:
             NCBI output XML stored as an element tree
         """
         # Construct url
-        if self.api_key is not None:
+        if self.api_key is not None and self.api_key != "":
             url = (
                 f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db="
-                f"taxonomy&term={t_name}&api_key={self.api_key}"
+                f"taxonomy&term={t_name}&api_key={self.api_key}&email={self.email}"
+                f"&tool={self.tool}"
             )
         else:
             url = (
                 f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db="
-                f"taxonomy&term={t_name}"
+                f"taxonomy&term={t_name}&email={self.email}&tool={self.tool}"
             )
 
         # Set up while loop to make the request up to 5 times if necessary
@@ -1178,7 +1176,7 @@ class RemoteNCBIValidator:
 
     # Functionality to find taxa information from genbank ID
     def id_lookup(self, nnme: str, ncbi_id: int) -> NCBITaxon:
-        """Get an NBCITaxon by taxon ID.
+        """Get an NCBITaxon by taxon ID.
 
         This method returns full taxonomic information from a NCBI ID. It will raise a
         NCBIError if the provided ID cannot be found, or if there is a connection error.
@@ -1776,7 +1774,7 @@ class GBIFTaxa:
 
         This is typically used to process rows found in a dataset with a GBIFTaxa
         formatted table, can also be used to populate a GBIFTaxa instance
-        programatically.
+        programmatically.
 
         The taxon_input has the form:
 
@@ -2417,7 +2415,7 @@ class NCBITaxa:
 
         This is typically used to process rows found in a dataset with an NCBITaxa
         formatted table, can also be used to populate a NCBITaxa instance
-        programatically.
+        programmatically.
 
         The taxon_input has the form:
 
@@ -2667,7 +2665,7 @@ class NCBITaxa:
             LOGGER.info(f"Added {tx_lev} {tx_nme}")
 
     def compare_hier(self, m_name: str, mtaxon: NCBITaxon, taxon_hier: dict) -> None:
-        """Validate provided NCBI taxon hierachy.
+        """Validate provided NCBI taxon hierarchy.
 
         This method compares the retrieved hierarchy of a taxon with the hierarchy that
         was initially supplied. This function only checks that provided information
@@ -2779,7 +2777,7 @@ def taxon_index_to_text(
     Args:
         taxon_index: The taxon_index property of a GBIFTaxa or NCBITaxa instance.
         html: Render as html or text
-        indent_width: The indentation width to use for succesive taxonmic ranks.
+        indent_width: The indentation width to use for successive taxonomic ranks.
     """
 
     lbr = "<br>" if html else "\n"
@@ -2920,7 +2918,7 @@ def species_binomial(genus: str, species: str) -> Union[str, None]:
 
 
 def subspecies_trinomial(species: str, subspecies: str) -> Union[str, None]:
-    """Generate a species tribinomial from NCBI species and subspecies.
+    """Generate a subspecies trinomial from NCBI species and subspecies.
 
     The NCBI database sometimes includes extra tags in binomials, such as 'candidatus'.
     This function cleans up those names to remove extra tags. It returns the cleaned
