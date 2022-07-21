@@ -1415,6 +1415,7 @@ def sync_local_dir(
                 _get_file(this_file["links"]["download"], outf, params=params)
             elif local_copy and _compute_md5(outf) != this_file["checksum"]:
                 if replace_modified:
+                    LOGGER.info("Replacing locally modified file")
                     _get_file(this_file["links"]["download"], outf, params=params)
                 else:
                     LOGGER.warning("Local copy modified")
