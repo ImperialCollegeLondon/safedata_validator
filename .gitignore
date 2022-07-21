@@ -4,8 +4,9 @@ SAFE_import_files*
 # ignore Excel backup files
 ~*
 
-# PyCharm
+# PyCharm and VS code
 .idea/
+.vscode/
 
 # Mac DS files
 .DS_Store
@@ -19,13 +20,25 @@ local_notes
 # build and dist
 build
 dist
+safedata_validator.egg-info
 
 # mkdocs local site build
 site
 
-# Do not include the local copy of the taxon database
+# Do not include the local copy of the taxon databases
 local_db/backbone-current-simple.sqlite
 local_db/taxdump.tar.gz
+local_db/ncbi/*
+local_db/gbif_2021-11-26/*
+
+# ignore the local example inputs folder
+local_example_inputs/*
 
 # Ignore local pyenv settings
 .python-version
+
+# Ignore code coverage map
+.coverage
+
+# Ignore config secrets
+test/fixtures/config_secrets.ini

@@ -1,0 +1,11 @@
+cl_prompt $ safedata_zenodo discard -h
+usage: safedata_zenodo discard [-h] zenodo_json
+
+Discard an unpublished deposit. The deposit and all uploaded files will be removed
+from Zenodo.
+
+positional arguments:
+  zenodo_json  Path to a Zenodo metadata file for the deposit to discard
+
+options:
+  -h, --help   show this help message and exit

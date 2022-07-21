@@ -23,3 +23,16 @@ Fixed:
 2.0.0
 * Shifting to a pure Python 3 implementation. This is a hard shift from 2
   to 3: there will be no support for 2/3 in parallel.
+
+3.0.0
+* Major refactor to split one giant nested class in a single file implementation
+  into a set of modules dealing with different parts of the structure. This
+  separation makes it easier to create unit testing of inputs and also facilitates 
+  code reuse for different file formats and functions.
+* Unit testing for modules.
+* Addition of Zenodo upload and publication tools.
+
+Roadmap:
+
+* Addition of genbank to gbif taxon matching and representation.
+* Validation of zipfiles of CSV files.

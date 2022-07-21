@@ -1,0 +1,104 @@
+# Curated list of taxa to retain in truncated backbone for use in testing
+gbif_id,parent_id,taxon_name,taxon_rank,status
+# ------------------------------------------------------------------------
+# Taxa from Test_format_good.xlsx
+# ------------------------------------------------------------------------
+1324716,1324306,Crematogaster borneensis,species,accepted
+1314182,4342,Dolichoderus,genus,accepted
+4342,1457,Formicidae,family,accepted
+-1,4342,Ponerinae,subfamily,user
+4342,1457,Formicidae,family,accepted
+1470,216,Coleoptera,order,accepted
+-1,1470,NA,morphospecies,user
+359,44,Mammalia,class,accepted
+-1,359,NA,functional group,user
+1324306,4342,Crematogaster,genus,accepted
+-1,1324306,Crematogaster ormei,species,user
+9062878,2470685,Varanus salvator macromaculatus,subspecies,accepted
+5537041,7317605,Alsomitra simplex,species,synonym
+3623287,7317605,Neoalsomitra simplex,species,accepted
+2480962,9351,Morus,genus,accepted
+1106854,1106852,Zenicomus photuroides,species,accepted
+10025464,1,Cicada,genus,accepted
+-1,10025464,Cicada sanguinolenta,species,user
+6122612,1941092,Melittia oedippus,species,misapplied
+1941210,1941092,Melittia oedipus,species,accepted
+1327248,1327214,Melophorus potteri,species,accepted
+8548608,704,Goniopholis tenuidens,species,synonym
+4822253,704,Goniopholididae,family,accepted
+5035012,9107211,Solenopsis abdita,species,accepted
+9107211,4342,Solenopsis,genus,accepted
+-1,9107211,NA,morphospecies,user
+8651762,9372142,Biarmosuchus tagax,species,accepted
+8689344,7490427,Camponotites kraussei,species,accepted
+4673663,4342,Bothroponera,genus,synonym
+1319685,4342,Pachycondyla,genus,accepted
+-1,4673663,Bothroponera novus,species,user
+1,None,Animalia,kingdom,accepted
+6,None,Plantae,kingdom,accepted
+7707728,6,Tracheophyta,phylum,accepted
+44,1,Chordata,phylum,accepted
+54,1,Arthropoda,phylum,accepted
+704,358,Crocodylia,order,accepted
+797,216,Lepidoptera,order,accepted
+1457,216,Hymenoptera,order,accepted
+7224005,220,Cucurbitales,order,accepted
+715,358,Squamata,order,accepted
+7192775,212,Suliformes,order,accepted
+220,7707728,Magnoliopsida,class,accepted
+212,44,Aves,class,accepted
+358,44,Reptilia,class,accepted
+216,54,Insecta,class,accepted
+9394866,358,Alrausuchidae,family,accepted
+6634,7224005,Cucurbitaceae,family,accepted
+5340,797,Sesiidae,family,accepted
+5023,715,Varanidae,family,accepted
+9351,7192775,Sulidae,family,accepted
+5602,1470,Cerambycidae,family,accepted
+1941092,5340,Melittia,genus,accepted
+7490427,4342,Camponotites,genus,doubtful
+7317605,6634,Neoalsomitra,genus,accepted
+9372142,9394866,Alrausuchus,genus,accepted
+2470872,5023,Varanus,genus,accepted
+1106852,5602,Zenicomus,genus,accepted
+2470685,2470872,Varanus salvator,species,accepted
+1327214,4342,Melophorus,genus,accepted
+# ------------------------------------------------------------------------
+# Taxa from Test_format_bad.xlsx
+# ------------------------------------------------------------------------
+1324716,1324306,Crematogaster borneensis,species,accepted
+1470,216,Coleoptera,order,accepted
+2984545,6640,Morus,genus,accepted
+2480962,9351,Morus,genus,accepted
+8665909,2039360,Cicada sanguinolenta,species,synonym
+2018546,2018539,Cicada sanguinolenta,species,homotypic_synonym
+8617822,7431374,Cicada sanguinolenta,species,misapplied
+8607208,2039346,Cicada sanguinolenta,species,misapplied
+-1,1470,NA,morphospecies,user
+9050343,1317499,Aenictus watanasiti,species,doubtful
+5219404,2435194,Panthera leo,species,accepted
+9562548,8801,Solenopsis,genus,doubtful
+3166338,7717,Solenopsis,genus,doubtful
+9107211,4342,Solenopsis,genus,accepted
+9389639,8801,Solenopsis,genus,accepted
+1315403,7235000,Solenopsis,genus,synonym
+1,None,Animalia,kingdom,accepted
+54,1,Arthropoda,phylum,accepted
+44,1,Chordata,phylum,accepted
+732,359,Carnivora,order,accepted
+1457,216,Hymenoptera,order,accepted
+359,44,Mammalia,class,accepted
+216,54,Insecta,class,accepted
+4342,1457,Formicidae,family,accepted
+9703,732,Felidae,family,accepted
+1324306,4342,Crematogaster,genus,accepted
+1317499,4342,Aenictus,genus,accepted
+2435194,9703,Panthera,genus,accepted
+6640,691,Moraceae,family,accepted
+691,220,Rosales,order,accepted
+# ------------------------------------------------------------------------
+# Additions from test_taxa.py
+# ------------------------------------------------------------------------
+2435022,9703,Felis,genus,accepted
+8531298,5219404,Felis imperialis,species,synonym
+2684241,3925,Pinus,genus,accepted

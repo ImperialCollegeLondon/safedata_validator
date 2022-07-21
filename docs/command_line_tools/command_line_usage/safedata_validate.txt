@@ -1,0 +1,35 @@
+cl_prompt $ safedata_safedata_validate -h
+usage: safedata_validate [-h] [-p VALID_PID] [--validate_doi]
+                         [--chunk_size CHUNK_SIZE] [--version]
+                         filename
+
+This program validates an Excel file formatted as a SAFE dataset. As it
+runs, it outputs a report that highlights any problems with the formatting.
+Much of the validation is to check that the data meets our metadata
+standards and is internally consistent.
+
+However, the package uses external resources to perform validation of taxa
+and sampling locations and to provide other information. For this reason,
+using this program requires you to provide a configuration file for these
+resources or to have installed a configuration file in a standard location
+(see the package website API for details.)
+
+If validation is successful, then a JSON format file containing key metadata
+will be saved to the same location as the validated file. The JSON metadata
+is used in the dataset publication process.
+
+positional arguments:
+  filename              Path to the Excel file to be validated.
+
+options:
+  -h, --help            show this help message and exit
+  -p VALID_PID, --project_id VALID_PID
+                        If provided, check that the project ID within the file
+                        matches this integer. Multiple values can be provided
+                        to generate a set of valid IDs.
+  --validate_doi        Check the validity of any publication DOIs, provided
+                        by the user. Requires a web connection.
+  --chunk_size CHUNK_SIZE
+                        Data are loaded from worksheets in chunks: the number
+                        of rows in a chunk is set by this argument
+  --version             show program's version number and exit
