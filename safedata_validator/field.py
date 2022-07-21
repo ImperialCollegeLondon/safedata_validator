@@ -183,9 +183,6 @@ class Dataset:
             # No locations is pretty implausible - lab experiments?
             LOGGER.warning("No locations worksheet found - moving on")
 
-        # Setup check for existence of either Taxa sheet
-        taxa_sheet = False
-
         # Throw an error if both Taxa and GBIFTaxa have been given as worksheet names
         gbif_sheets = set(["GBIFTaxa", "Taxa"]).intersection(wb.sheetnames)
 
@@ -195,18 +192,16 @@ class Dataset:
                 "is not allowed! Only checking GBIFTaxa sheet"
             )
             self.taxa.gbif_taxa.load(wb["GBIFTaxa"])
-            taxa_sheet = True
         # Otherwise populate gbif_taxa from the one that has been provided
         elif len(gbif_sheets) == 1:
             self.taxa.gbif_taxa.load(wb[gbif_sheets.pop()])
-            taxa_sheet = True
 
         # Populate ncbi taxa
-        if "NCBITaxa" in wb.sheetnames:
+        ncbi_sheet = "NCBITaxa" in wb.sheetnames
+        if ncbi_sheet:
             self.taxa.ncbi_taxa.load(wb["NCBITaxa"])
-            taxa_sheet = True
 
-        if not taxa_sheet:
+        if not gbif_sheets and not ncbi_sheet:
             # Leave the default empty Taxa object
             LOGGER.warning("Neither Taxa worksheet found - moving on")
 
@@ -418,6 +413,18 @@ class Dataset:
                 json_dict[ext] = self.extent
 
         return simplejson.dumps(json_dict, default=str, indent=2)
+
+    @property
+    def error_breakdown(self):
+        """Get error counts broken down by dataset component."""
+        return {
+            "total": self.n_errors,
+            "summary": self.summary.n_errors,
+            "locations": self.locations.n_errors,
+            "gbif": self.taxa.gbif_taxa.n_errors or 0,
+            "ncbi": self.taxa.ncbi_taxa.n_errors or 0,
+            "data": [(d.name, d.n_errors) for d in self.dataworksheets],
+        }
 
 
 class DataWorksheet:
