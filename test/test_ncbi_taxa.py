@@ -171,49 +171,90 @@ def test_taxa_strip(test_input, expected):
 
 
 # ------------------------------------------
-# Testing species_binomial
+# Testing construct_bi_or_tri
 # ------------------------------------------
 @pytest.mark.parametrize(
     "test_input,expected",
     [
-        (dict(genus="Escherichia", species="coli"), "Escherichia coli"),
-        (dict(genus="Escherichia", species="Escherichia coli"), "Escherichia coli"),
-        (dict(genus="Gorilla", species="gorilla"), "Gorilla gorilla"),
+        (dict(higher_nm="Escherichia", lower_nm="coli", tri=False), "Escherichia coli"),
         (
-            dict(genus="Candidatus Koribacter", species="Candidatus versatilis"),
+            dict(higher_nm="Escherichia", lower_nm="Escherichia coli", tri=False),
+            "Escherichia coli",
+        ),
+        (dict(higher_nm="Gorilla", lower_nm="gorilla", tri=False), "Gorilla gorilla"),
+        (
+            dict(
+                higher_nm="Candidatus Koribacter",
+                lower_nm="Candidatus versatilis",
+                tri=False,
+            ),
             "Candidatus Koribacter versatilis",
         ),
         (
-            dict(genus="Candidatus Koribacter", species="versatilis"),
+            dict(higher_nm="Candidatus Koribacter", lower_nm="versatilis", tri=False),
             "Candidatus Koribacter versatilis",
         ),
-        (dict(genus="Over long genus name", species="vulpes"), None),
-        (dict(genus="Canis", species="Vulpes vulpes"), None),
+        (dict(higher_nm="Over long genus name", lower_nm="vulpes", tri=False), None),
+        (dict(higher_nm="Canis", lower_nm="Vulpes vulpes", tri=False), None),
+        (
+            dict(higher_nm="Vulpes vulpes", lower_nm="japonica", tri=True),
+            "Vulpes vulpes japonica",
+        ),
+        (
+            dict(
+                higher_nm="Candidatus Koribacter versatilis",
+                lower_nm="Ellin345",
+                tri=True,
+            ),
+            "Candidatus Koribacter versatilis Ellin345",
+        ),
+        (
+            dict(
+                higher_nm="Candidatus Koribacter versatilis",
+                lower_nm="Candidatus Ellin345",
+                tri=True,
+            ),
+            "Candidatus Koribacter versatilis Ellin345",
+        ),
+        (
+            dict(
+                higher_nm="Vulpes vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True
+            ),
+            "Vulpes vulpes schrenckii",
+        ),
+        (
+            dict(
+                higher_nm="Canis vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True
+            ),
+            None,
+        ),
+        (dict(higher_nm="Over long name", lower_nm="schrenckii", tri=True), None),
+        (dict(higher_nm="Vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True), None),
     ],
 )
-def test_species_binomial(test_input, expected):
+def test_construct_bi_or_tri(test_input, expected):
     """Checks the function that constructs species binomials from species and genus names.
 
     We test that it can catch when the species name is already a binomial, and that it
     catches Candidatus names and handles them properly.
     """
 
-    s_bi = taxa.species_binomial(**test_input)
+    s_nm = taxa.construct_bi_or_tri(**test_input)
 
-    assert s_bi == expected
+    assert s_nm == expected
 
 
 # Now test that the function logs errors correctly
 @pytest.mark.parametrize(
     "test_input,expected_log_entries",
-    [
-        (dict(genus="Escherichia", species="coli"), ()),  # Fine so empty
-        (
-            dict(genus="Over long genus name", species="vulpes"),  # Over long name
+    [  # Fine so empty
+        (dict(higher_nm="Escherichia", lower_nm="coli", tri=False), ()),
+        (  # Over long name
+            dict(higher_nm="Over long genus name", lower_nm="vulpes", tri=False),
             ((ERROR, "Genus name (Over long genus name) appears to be too long"),),
         ),
-        (
-            dict(genus="Canis", species="Vulpes vulpes"),  # Genus name not in binomial
+        (  # Genus name not in binomial
+            dict(higher_nm="Canis", lower_nm="Vulpes vulpes", tri=False),
             (
                 (
                     ERROR,
@@ -222,93 +263,39 @@ def test_species_binomial(test_input, expected):
                 ),
             ),
         ),
-    ],
-)
-def test_validate_species_binomial(caplog, test_input, expected_log_entries):
-    """This test checks logging for the function to construct species binomials."""
-
-    taxa.species_binomial(**test_input)
-
-    log_check(caplog, expected_log_entries)
-
-
-# ------------------------------------------
-# Testing subspecies_trinomial
-# ------------------------------------------
-@pytest.mark.parametrize(
-    "test_input,expected",
-    [
-        (
-            dict(species="Vulpes vulpes", subspecies="japonica"),
-            "Vulpes vulpes japonica",
-        ),
-        (
-            dict(species="Candidatus Koribacter versatilis", subspecies="Ellin345"),
-            "Candidatus Koribacter versatilis Ellin345",
-        ),
         (
             dict(
-                species="Candidatus Koribacter versatilis",
-                subspecies="Candidatus Ellin345",
-            ),
-            "Candidatus Koribacter versatilis Ellin345",
-        ),
-        (
-            dict(species="Vulpes vulpes", subspecies="Vulpes vulpes schrenckii"),
-            "Vulpes vulpes schrenckii",
-        ),
-        (dict(species="Canis vulpes", subspecies="Vulpes vulpes schrenckii"), None),
-        (dict(species="Over long name", subspecies="schrenckii"), None),
-        (dict(species="Vulpes", subspecies="Vulpes vulpes schrenckii"), None),
-    ],
-)
-def test_subspecies_trinomial(test_input, expected):
-    """Checks the function that constructs subspecies trinomials.
-
-    We test that it can catch when the subspecies name is already a trinomial, and that
-    it catches Candidatus names and handles them properly.
-    """
-
-    s_bi = taxa.subspecies_trinomial(**test_input)
-
-    assert s_bi == expected
-
-
-# Now test that the function logs errors correctly
-@pytest.mark.parametrize(
-    "test_input,expected_log_entries",
-    [
-        (
-            dict(
-                species="Vulpes vulpes", subspecies="Vulpes vulpes japonica"
+                higher_nm="Vulpes vulpes", lower_nm="Vulpes vulpes japonica", tri=True
             ),  # Fine so empty
             (),
         ),
         # Species name and genus name don't match
         (
-            dict(species="Canis vulpes", subspecies="Vulpes vulpes schrenckii"),
+            dict(
+                higher_nm="Canis vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True
+            ),
             (
                 (
                     ERROR,
                     "Subspecies name (Vulpes vulpes schrenckii) appears to be trinomial"
-                    "but does not contain species name (Canis vulpes)",
+                    " but does not contain species name (Canis vulpes)",
                 ),
             ),
         ),
-        (
-            dict(species="Over long name", subspecies="schrenckii"),  # Over long name
-            ((ERROR, "Species name (Over long name) too long"),),
+        (  # Over long name
+            dict(higher_nm="Over long name", lower_nm="schrenckii", tri=True),
+            ((ERROR, "Species name (Over long name) appears to be too long"),),
         ),
-        (
-            dict(species="Vulpes", subspecies="Vulpes vulpes schrenckii"),  # Too short
+        (  # Too short
+            dict(higher_nm="Vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True),
             ((ERROR, "Species name (Vulpes) too short"),),
         ),
     ],
 )
-def test_validate_subspecies_trinomial(caplog, test_input, expected_log_entries):
-    """This test checks logging for the function to construct subspecies trinomials."""
+def test_validate_construct_bi_or_tri(caplog, test_input, expected_log_entries):
+    """This test checks logging for the function to construct binomials/trinomials."""
 
-    taxa.subspecies_trinomial(**test_input)
+    taxa.construct_bi_or_tri(**test_input)
 
     log_check(caplog, expected_log_entries)
 
