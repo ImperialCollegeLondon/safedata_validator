@@ -2380,10 +2380,12 @@ class NCBITaxa:
             for rnk in non_core:
                 if row[rnk] is not None:
                     if rnk == "species":
-                        taxa_hier[rnk] = species_binomial(row["genus"], row[rnk])
+                        taxa_hier[rnk] = construct_bi_or_tri(
+                            row["genus"], row[rnk], False
+                        )
                     elif rnk == "subspecies":
-                        taxa_hier[rnk] = subspecies_trinomial(
-                            taxa_hier["species"], row[rnk]
+                        taxa_hier[rnk] = construct_bi_or_tri(
+                            taxa_hier["species"], row[rnk], True
                         )
                     else:
                         taxa_hier[rnk] = row[rnk]
@@ -2878,83 +2880,60 @@ def taxa_strip(name: str, rank: str) -> tuple[str, bool]:
         return (name, True)
 
 
-def species_binomial(genus: str, species: str) -> Union[str, None]:
-    """Generate a species binomial from NCBI genus and species.
+def construct_bi_or_tri(higher_nm: str, lower_nm: str, tri: bool) -> Union[str, None]:
+    """Generate a species binomial or a subspecies trinomial.
 
     The NCBI database sometimes includes extra tags in binomials, such as 'candidatus'.
     This function cleans up those names to remove extra tags. It returns the cleaned
     name or None in the event of a parsing error.
 
     Args:
-        genus: The NCBI genus name
-        species: The NCBI species name
+        higher_nm: The NCBI genus/species name
+        lower_nm: The NCBI species/subspecies name
+        tri: Are we looking at a subspecies trinomial
     """
-    # First check if species is a single name
-    if len(species.split()) == 1 and len(genus.split()) == 1:
-        return genus.strip() + " " + species.strip()
-    # Look for Candidatus formats
-    elif "candidatus" in species.lower() or "candidatus" in genus.lower():
-        if "candidatus" in species.lower():
-            # Construct binomial with first word of species name removed
-            bi = genus.strip()
-            for i in range(1, len(species.split())):
-                bi = bi + " " + species.split()[i]
-            return bi
-        else:
-            return genus.strip() + " " + species.strip()
-    # Then check that species name is more words than the genus name
-    elif len(species.split()) > len(genus.split()):
-        if genus in species:
-            return species
-        else:
-            LOGGER.error(
-                f"Species name ({species}) appears to be binomial but "
-                f"does not contain genus name ({genus})"
-            )
-            return None
+
+    # Determine whether a species binomial or a subspecies trinomial is considered
+    if tri:
+        n = 3
+        H = "Species"
+        L = "Subspecies"
+        type = "trinomial"
     else:
-        LOGGER.error(f"Genus name ({genus}) appears to be too long")
-        return None
+        n = 2
+        H = "Genus"
+        L = "Species"
+        type = "binomial"
 
-
-def subspecies_trinomial(species: str, subspecies: str) -> Union[str, None]:
-    """Generate a subspecies trinomial from NCBI species and subspecies.
-
-    The NCBI database sometimes includes extra tags in binomials, such as 'candidatus'.
-    This function cleans up those names to remove extra tags. It returns the cleaned
-    name or None in the event of a parsing error.
-
-    Args:
-        species: The NCBI species name
-        subspecies: The NCBI subspecies name
-    """
-    # First check if subspecies is a single name
-    if len(subspecies.split()) == 1 and len(species.split()) == 2:
-        return species.strip() + " " + subspecies.strip()
+    # First check if lower level name is a single name
+    if len(lower_nm.split()) == 1 and len(higher_nm.split()) == n - 1:
+        return higher_nm.strip() + " " + lower_nm.strip()
     # Look for Candidatus formats
-    elif "candidatus" in subspecies.lower() or "candidatus" in species.lower():
-        if "candidatus" in subspecies.lower():
-            # Construct trinomial with first word of subspecies name removed
-            tri = species.strip()
-            for i in range(1, len(subspecies.split())):
-                tri = tri + " " + subspecies.split()[i]
-            return tri
+    elif lower_nm.lower().startswith("candidatus") or higher_nm.lower().startswith(
+        "candidatus"
+    ):
+        if lower_nm.lower().startswith("candidatus"):
+            # Construct full name with first word of lower name removed
+            nm = higher_nm.strip()
+            for i in range(1, len(lower_nm.split())):
+                nm = nm + " " + lower_nm.split()[i]
+            return nm
         else:
-            return species.strip() + " " + subspecies.strip()
+            return higher_nm.strip() + " " + lower_nm.strip()
     # Catch too short species name case
-    elif len(species.split()) == 1:
-        LOGGER.error(f"Species name ({species}) too short")
+    elif tri and len(higher_nm.split()) == 1:
+        LOGGER.error(f"Species name ({higher_nm}) too short")
         return None
-    # Then check that subspecies name is more words than the species name
-    elif len(subspecies.split()) > len(species.split()):
-        if species in subspecies:
-            return subspecies
+    # Then check that lower name is more words than the higher name
+    elif len(lower_nm.split()) > len(higher_nm.split()):
+        if lower_nm.lower().startswith(higher_nm.lower()):
+            return lower_nm
         else:
             LOGGER.error(
-                f"Subspecies name ({subspecies}) appears to be trinomial"
-                f"but does not contain species name ({species})"
+                f"{L} name ({lower_nm}) appears to be {type} but "
+                f"does not contain {H.lower()} name ({higher_nm})"
             )
             return None
     else:
-        LOGGER.error(f"Species name ({species}) too long")
+        LOGGER.error(f"{H} name ({higher_nm}) appears to be too long")
         return None
