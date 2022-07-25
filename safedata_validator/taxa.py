@@ -376,12 +376,17 @@ class LocalGBIFValidator:
                 tx_status = [tx["status"].lower() for tx in taxon_rows]
                 tx_counts = Counter(tx_status)
 
-                if "accepted" in tx_counts.keys() and tx_counts["accepted"] == 1:
-                    # Single accepted hits are first preference
-                    selected_row = taxon_rows[tx_status.index("accepted")]
-                elif "doubtful" in tx_counts.keys() and tx_counts["doubtful"] == 1:
-                    # Doubtful hits get next preference - not quite sure about this!
-                    selected_row = taxon_rows[tx_status.index("doubtful")]
+                if "accepted" in tx_counts.keys():
+                    if tx_counts["accepted"] == 1:
+                        # Single accepted hits are first preference, and if there are
+                        # multiple accepted hits then parent resolution needed.
+                        selected_row = taxon_rows[tx_status.index("accepted")]
+                elif "doubtful" in tx_counts.keys():
+                    if tx_counts["doubtful"] == 1:
+                        # Single doubtful hits get next preference - not quite sure
+                        # about this! - and if there are multiple accepted hits then
+                        # resolution needed.
+                        selected_row = taxon_rows[tx_status.index("doubtful")]
                 else:
                     # Rows now contain only synonyms (of varying kinds) and
                     # misapplied. Both of these types have accepted usage
