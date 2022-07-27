@@ -482,7 +482,7 @@ class DataWorksheet:
         self.n_fields = None
         self.n_descriptors = None
         self.descriptors = None
-        self.fields = None
+        self.fields = []
         self.taxa_fields = None
 
         # Keep track of row numbering
@@ -511,13 +511,6 @@ class DataWorksheet:
             Python >= 3.7.
         """
 
-        # Checking field_meta structure - should be an equal length and non-zero tuple
-        # of values for each descriptor. If not, return without setting fields_loaded.
-        descriptor_tuple_lengths = set([len(tp) for tp in field_meta.values()])
-        if len(descriptor_tuple_lengths) > 1 or descriptor_tuple_lengths == set([0]):
-            LOGGER.error("Cannot load unequal length or empty field metadata")
-            return
-
         # Clean off descriptor whitespace padding?
         clean_descriptors = IsNotPadded(field_meta.keys())
         if not clean_descriptors:
@@ -534,6 +527,14 @@ class DataWorksheet:
             field_meta = dict(cleaned_entries)
 
         self.descriptors = list(field_meta.keys())
+        self.n_descriptors = len(self.descriptors)
+
+        # Checking field_meta structure - should be an equal length and non-zero tuple
+        # of values for each descriptor. If not, return without setting fields_loaded.
+        descriptor_tuple_lengths = set([len(tp) for tp in field_meta.values()])
+        if len(descriptor_tuple_lengths) > 1 or descriptor_tuple_lengths == set([0]):
+            LOGGER.error("Cannot load unequal length or empty field metadata")
+            return
 
         # * Expected descriptors - do _not_ preclude user defined descriptors
         #   but warn about them to alert to typos. Missing descriptors vary
@@ -578,7 +579,6 @@ class DataWorksheet:
         self.fields_loaded = True
         self.field_meta = field_meta
         self.n_fields = len(field_meta)
-        self.n_descriptors = len(field_meta[0].keys())
 
         # get taxa field names for cross checking observation and trait data
         self.taxa_fields = [
@@ -606,7 +606,6 @@ class DataWorksheet:
         # Get the type map and field list
         field_subclass_map = BaseField.field_type_map()
         unknown_field_types = set()
-        self.fields = []
 
         for col_idx, (tr_empty, fd_empty, fmeta) in enumerate(
             zip(trailing_empty, field_meta_empty, self.field_meta)
@@ -1403,9 +1402,12 @@ class BaseField:
 def field_to_dict(fld: Type[BaseField], col_idx: int) -> dict:
     """Convert a object inheriting from BaseField into a dictionary.
 
-    A function to return a dictionary representation of a field object. This
-    would more naturally be a method of BaseField, but needs to include the
-    extended attributes of subclasses of BaseField
+    A function to return a dictionary representation of a field object. This would more
+    naturally be a method of BaseField, but needs to include the extended attributes of
+    subclasses of BaseField.
+
+    TODO - the BaseField should define all these attributes and then this becomes
+    a method
 
     Args:
         fld: An instance inheriting from BaseField
@@ -2174,6 +2176,12 @@ class EmptyField:
 
         self.meta = meta
         self.empty = True
+        # Get a field name - either a column letter from col_idx if set or 'Unknown'
+        idx = self.meta.get("col_idx")
+        if idx is None:
+            self.field_name = "Unknown"
+        else:
+            self.field_name = f"Column_{get_column_letter(idx)}"
 
     def validate_data(self, data) -> None:
         """Validates that empty fields contain no data."""
@@ -2184,12 +2192,6 @@ class EmptyField:
 
     def report(self):
         """Report on an empty field."""
-        # Get a field name - either a column letter from col_idx if set or 'Unknown'
-        idx = self.meta.get("col_idx")
-        if idx is None:
-            self.field_name = "Unknown"
-        else:
-            self.field_name = f"Column_{get_column_letter(idx)}"
 
         if not self.empty:
             LOGGER.info(f"Checking field {self.field_name}")
