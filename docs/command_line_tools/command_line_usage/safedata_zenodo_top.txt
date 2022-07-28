@@ -1,46 +1,61 @@
 cl_prompt $ safedata_zenodo -h
-usage: safedata_zenodo [-h] [-r RESOURCES] [-q]
-                       {create,upload_file,delete_file,upload_metadata,update_metadata,discard,publish,info,sync_local_dir,ris,html_description,post_metadata,generate_xml,show_config}
-                       ...
+usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ...
 
-This is a the command line interface for publishing safedata validated datasets to
-Zenodo, downloading information and maintaining a local copy of the datasets in the
-file structure required by the R safedata package.
+Publish validated datasets to Zenodo using a command line interface.
 
-The safedata_zenodo command is used by providing a subcommand for the action you
-want to take. Individual help is available for each of the subcommands:
-    safedata_zenodo subcommand -h
+    This is a the command line interface for publishing safedata validated datasets to
+    Zenodo, downloading information and maintaining a local copy of the datasets in the
+    file structure required by the R safedata package.
 
-The subcommands for this tool use two different JSON format metadata files.
+    The safedata_zenodo command is used by providing subcommands for the different
+    actions required to publish a validated dataset. The list of subcommands (with
+    aliases) is shown below and ndividual help is available for each of the subcommands:
+
+        safedata_zenodo subcommand -h
+
+    The subcommands for this tool use two different JSON format metadata files:
+
     * A dataset metadata file (`dataset_json`). This is the output from using
-      the `safedata_validate` tool. Some of the information in this file is used
-      to create the Zenodo dataset description, and all of the data is used to
-      describe a dataset on the separate metadata server.
-    * A Zenodo metadata file (`zenodo_json`), that describes the metadata
-      associated with a Zenodo deposit or published record.
+        the `safedata_validate` tool. Some of the information in this file is used
+        to create the Zenodo dataset description, and all of the data is used to
+        describe a dataset on the separate metadata server.
 
-Note that most of these actions are also available via the Zenodo website.
+    * A Zenodo metadata file (`zenodo_json`), that describes the metadata
+        associated with a Zenodo deposit or published record.
+
+    Note that most of these actions are also available via the Zenodo website.
 
 positional arguments:
-  {create,upload_file,delete_file,upload_metadata,update_metadata,discard,publish,info,sync_local_dir,ris,html_description,post_metadata,generate_xml,show_config}
-    create              Create a new Zenodo deposit
-    upload_file         Upload a file to an unpublished deposit
-    delete_file         Delete a file from an unpublished deposit
-    upload_metadata     Populate the Zenodo metadata
-    update_metadata     Update published Zenodo metadata
-    discard             Discard an unpublished deposit
-    publish             Publish a draft deposit
-    info                Display and download deposit metadata
-    sync_local_dir      Create or update a local safedata directory
-    ris                 Maintain a RIS bibliography file for datasets
-    html_description    Generate an HTML dataset description
-    post_metadata       Post metadata to the metadata server
-    generate_xml        Create INSPIRE compliant metadata XML
-    show_config         Report the config being used and exit
+  {create_deposit,cdep,discard_deposit,ddep,get_deposit,gdep,publish_deposit,pdep,upload_file,ufile,delete_file,dfile,upload_metadata,umeta,amend_metadata,ameta,sync_local_dir,sync,maintain_ris,ris,generate_html,html,generate_xml,xml,show_config,conf}
+    create_deposit (cdep)
+                Create a new Zenodo draft deposit
+    discard_deposit (ddep)
+                Discard an unpublished deposit
+    get_deposit (gdep)
+                Download and display deposit metadata
+    publish_deposit (pdep)
+                Publish a draft deposit
+    upload_file (ufile)
+                Upload a file to an unpublished deposit
+    delete_file (dfile)
+                Delete a file from an unpublished deposit
+    upload_metadata (umeta)
+                Populate the Zenodo metadata
+    amend_metadata (ameta)
+                Update published Zenodo metadata
+    sync_local_dir (sync)
+                Create or update a local safedata directory
+    maintain_ris (ris)
+                Maintain a RIS bibliography file for datasets
+    generate_html (html)
+                Generate an HTML dataset description
+    generate_xml (xml)
+                Create INSPIRE compliant metadata XML
+    show_config (conf)
+                Report the config being used and exit
 
 options:
-  -h, --help            show this help message and exit
+  -h, --help    show this help message and exit
   -r RESOURCES, --resources RESOURCES
-                        Path to a safedata_validator resource configuration
-                        file
-  -q, --quiet           Suppress normal information messages.
+                Path to a safedata_validator resource configuration file
+  -q, --quiet   Suppress normal information messages.
