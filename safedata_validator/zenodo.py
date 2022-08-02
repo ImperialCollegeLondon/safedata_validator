@@ -277,8 +277,6 @@ def upload_metadata(
         metadata, zenodo, render=True, resources=resources
     )
 
-    simplejson.dump(zen_md, open("tmpzenmd.json", "w"), indent="   ")
-
     # attach the metadata to the deposit resource
     mtd = requests.put(zenodo["links"]["self"], params=zres["ztoken"], json=zen_md)
 
@@ -391,6 +389,7 @@ def upload_file(
     params = zres["ztoken"]
 
     # Check the file and get the filename if an alternative is not provided
+    filepath = os.path.abspath(filepath)
     if not (os.path.exists(filepath) and os.path.isfile(filepath)):
         raise IOError(f"The file path is either a directory or not found: {filepath} ")
 
@@ -400,20 +399,21 @@ def upload_file(
         file_name = zenodo_filename
 
     # upload the file
+    # - https://gist.github.com/tyhoff/b757e6af83c1fd2b7b83057adf02c139
     file_size = os.stat(filepath).st_size
     api = f"{metadata['links']['bucket']}/{file_name}"
 
-    with open(filepath, "rb") as fp:
+    with open(filepath, "rb") as file_io:
 
         if progress_bar:
             with tqdm(
                 total=file_size, unit="B", unit_scale=True, unit_divisor=1024
-            ) as cm:
+            ) as upload_monitor:
                 # Upload the wrapped file
-                _ = CallbackIOWrapper(cm.update, fp, "read")
-                fls = requests.put(api, data=fp, params=params)
+                wrapped_file = CallbackIOWrapper(upload_monitor.update, file_io, "read")
+                fls = requests.put(api, data=wrapped_file, params=params)
         else:
-            fls = requests.put(api, data=fp, params=params)
+            fls = requests.put(api, data=file_io, params=params)
 
     # trap errors in uploading file
     # - no success or mismatch in md5 checksums
@@ -421,6 +421,7 @@ def upload_file(
         return None, _zenodo_error_message(fls)
 
     # TODO - could this be inside with above? - both are looping over the file contents
+    # https://medium.com/codex/chunked-uploads-with-binary-files-in-python-f0c48e373a91
     local_hash = _compute_md5(filepath)
 
     if fls.json()["checksum"] != f"md5:{local_hash}":
