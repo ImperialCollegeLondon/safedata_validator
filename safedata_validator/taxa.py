@@ -842,10 +842,10 @@ class LocalNCBIValidator:
 
         # Search for name in the local names database
         sql = "select * from names where name_txt = '%s'" % s_term
-        taxon_row = self.ncbi_conn.execute(sql).fetchall()
+        taxon_rows = self.ncbi_conn.execute(sql).fetchall()
 
         # Store count of the number of rows found
-        c = len(taxon_row)
+        c = len(taxon_rows)
 
         # Check that a singular record has been provided before proceeding
         if c == 1:
@@ -922,7 +922,7 @@ class LocalNCBIValidator:
             # First check if multiple taxa have the same rank
             for i in range(c):
                 # Find taxa ID as single entry in the list
-                tID = taxon_row[i]["tax_id"]
+                tID = taxon_rows[i]["tax_id"]
                 # Use ID lookup function to generate a temporary taxon
                 temp_taxon = self.id_lookup(nnme, tID)
                 # Add rank to list
@@ -942,7 +942,7 @@ class LocalNCBIValidator:
                 # Find relevant index
                 ind = ([i for i, x in enumerate(mtch) if x])[0]
                 # Find taxa ID as single entry in the list
-                tID = taxon_row[ind]["tax_id"]
+                tID = taxon_rows[ind]["tax_id"]
                 # Use ID lookup function to generate as a NCBITaxon object
                 mtaxon = self.id_lookup(nnme, tID)
             # Then check whether multiple taxonomic levels have been provided
@@ -962,10 +962,10 @@ class LocalNCBIValidator:
 
             # Search for name in the local names database
             sql = "select * from names where name_txt = '%s'" % s_term
-            p_taxon_row = self.ncbi_conn.execute(sql).fetchall()
+            p_taxon_rows = self.ncbi_conn.execute(sql).fetchall()
 
             # Store count of the number of records found
-            pc = len(p_taxon_row)
+            pc = len(p_taxon_rows)
 
             # Check that single parent taxa exists in records
             if pc == 0:
@@ -987,7 +987,7 @@ class LocalNCBIValidator:
 
             # Use list comprehension to make list of potential taxa
             potents = [
-                self.id_lookup(f"c{i}", taxon_row[i]["tax_id"]) for i in range(0, c)
+                self.id_lookup(f"c{i}", taxon_rows[i]["tax_id"]) for i in range(0, c)
             ]
 
             # Check if relevant rank exists in the child taxa
@@ -1010,7 +1010,7 @@ class LocalNCBIValidator:
                 return
             else:
                 # Find index corresponding to correct child taxa
-                tID = int(taxon_row[child.index(True)]["tax_id"])
+                tID = int(taxon_rows[child.index(True)]["tax_id"])
                 # Use ID lookup function to find generate as a NCBITaxon object
                 mtaxon = self.id_lookup(nnme, tID)
 
