@@ -153,7 +153,7 @@ class GBIFTaxon:
             raise TypeError("Provided rank not in string form")
 
         if self.gbif_id is not None:
-            if isinstance(self.gbif_id, float) and not self.gbif_id.is_integer():
+            if isinstance(self.gbif_id, float) and not isinstance(self.gbif_id, int):
                 raise ValueError("GBIF ID is a non-integer float")
             elif not isinstance(self.gbif_id, int):  # Catch non int or float case
                 raise TypeError("GBIF ID is neither an int or a float")
@@ -315,7 +315,7 @@ class LocalGBIFValidator:
         """
         self.gbif_conn.close()
 
-    def search(self, taxon: GBIFTaxon) -> None:
+    def search(self, taxon: GBIFTaxon) -> GBIFTaxon:
         """Validate a GBIFTaxon instance.
 
         The method looks for the taxon in the GBIF database using name and rank and
@@ -478,7 +478,7 @@ class RemoteGBIFValidator:
     interchangeable.
     """
 
-    def search(self, taxon: GBIFTaxon) -> None:
+    def search(self, taxon: GBIFTaxon) -> GBIFTaxon:
         """Validate a GBIFTaxon instance.
 
         The method looks for the taxon in the GBIF API using name and rank and an
@@ -746,7 +746,7 @@ class LocalNCBIValidator:
                     LOGGER.error(
                         f"Taxon hierarchy for {nnme} contains no backbone ranks"
                     )
-                    return
+                    return None
                 else:
                     r_ID -= 1
 
@@ -1013,6 +1013,10 @@ class LocalNCBIValidator:
                 tID = int(taxon_row[child.index(True)]["tax_id"])
                 # Use ID lookup function to find generate as a NCBITaxon object
                 mtaxon = self.id_lookup(nnme, tID)
+
+        # Check whether mtaxon has actually been populated by the id_lookup
+        if not mtaxon:
+            return None
 
         # Find last dictionary key
         f_key = list(mtaxon.taxa_hier.keys())[-1]
@@ -1554,6 +1558,10 @@ class RemoteNCBIValidator:
                 tID = int(ID[child.index(True)].text)
                 # Use ID lookup function to find generate as a NCBITaxon object
                 mtaxon = self.id_lookup(nnme, tID)
+
+        # Check whether mtaxon has actually been populated by the id_lookup
+        if not mtaxon:
+            return None
 
         # Find last dictionary key
         f_key = list(mtaxon.taxa_hier.keys())[-1]

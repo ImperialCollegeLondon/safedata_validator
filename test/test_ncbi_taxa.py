@@ -636,6 +636,14 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
                 ),
             ),
         ),
+        # No higher taxonomy provided
+        (
+            dict(nnme="Cellular", taxah={"no rank": "cellular organisms"}),
+            (
+                (WARNING, "No backbone ranks provided in Cellular's taxa hierarchy"),
+                (ERROR, "Taxon hierarchy for Cellular contains no backbone ranks"),
+            ),
+        ),
     ],
 )
 def test_validate_taxa_search(
