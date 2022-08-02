@@ -183,9 +183,6 @@ class Dataset:
             # No locations is pretty implausible - lab experiments?
             LOGGER.warning("No locations worksheet found - moving on")
 
-        # Setup check for existence of either Taxa sheet
-        taxa_sheet = False
-
         # Throw an error if both Taxa and GBIFTaxa have been given as worksheet names
         gbif_sheets = set(["GBIFTaxa", "Taxa"]).intersection(wb.sheetnames)
 
@@ -195,18 +192,16 @@ class Dataset:
                 "is not allowed! Only checking GBIFTaxa sheet"
             )
             self.taxa.gbif_taxa.load(wb["GBIFTaxa"])
-            taxa_sheet = True
         # Otherwise populate gbif_taxa from the one that has been provided
         elif len(gbif_sheets) == 1:
             self.taxa.gbif_taxa.load(wb[gbif_sheets.pop()])
-            taxa_sheet = True
 
         # Populate ncbi taxa
-        if "NCBITaxa" in wb.sheetnames:
+        ncbi_sheet = "NCBITaxa" in wb.sheetnames
+        if ncbi_sheet:
             self.taxa.ncbi_taxa.load(wb["NCBITaxa"])
-            taxa_sheet = True
 
-        if not taxa_sheet:
+        if not gbif_sheets and not ncbi_sheet:
             # Leave the default empty Taxa object
             LOGGER.warning("Neither Taxa worksheet found - moving on")
 
@@ -419,6 +414,18 @@ class Dataset:
 
         return simplejson.dumps(json_dict, default=str, indent=2)
 
+    @property
+    def error_breakdown(self):
+        """Get error counts broken down by dataset component."""
+        return {
+            "total": self.n_errors,
+            "summary": self.summary.n_errors,
+            "locations": self.locations.n_errors,
+            "gbif": self.taxa.gbif_taxa.n_errors or 0,
+            "ncbi": self.taxa.ncbi_taxa.n_errors or 0,
+            "data": [(d.name, d.n_errors) for d in self.dataworksheets],
+        }
+
 
 class DataWorksheet:
     """Process the comtents of safedata_validator formatted data table.
@@ -475,7 +482,7 @@ class DataWorksheet:
         self.n_fields = None
         self.n_descriptors = None
         self.descriptors = None
-        self.fields = None
+        self.fields = []
         self.taxa_fields = None
 
         # Keep track of row numbering
@@ -504,10 +511,7 @@ class DataWorksheet:
             Python >= 3.7.
         """
 
-        # Checking field_meta - TODO more checking of structure
-
-        # - Descriptors
-        # Clean off whitespace padding?
+        # Clean off descriptor whitespace padding?
         clean_descriptors = IsNotPadded(field_meta.keys())
         if not clean_descriptors:
             # Report whitespace padding and clean up tuples
@@ -523,6 +527,14 @@ class DataWorksheet:
             field_meta = dict(cleaned_entries)
 
         self.descriptors = list(field_meta.keys())
+        self.n_descriptors = len(self.descriptors)
+
+        # Checking field_meta structure - should be an equal length and non-zero tuple
+        # of values for each descriptor. If not, return without setting fields_loaded.
+        descriptor_tuple_lengths = set([len(tp) for tp in field_meta.values()])
+        if len(descriptor_tuple_lengths) > 1 or descriptor_tuple_lengths == set([0]):
+            LOGGER.error("Cannot load unequal length or empty field metadata")
+            return
 
         # * Expected descriptors - do _not_ preclude user defined descriptors
         #   but warn about them to alert to typos. Missing descriptors vary
@@ -567,7 +579,6 @@ class DataWorksheet:
         self.fields_loaded = True
         self.field_meta = field_meta
         self.n_fields = len(field_meta)
-        self.n_descriptors = len(field_meta[0].keys())
 
         # get taxa field names for cross checking observation and trait data
         self.taxa_fields = [
@@ -595,7 +606,6 @@ class DataWorksheet:
         # Get the type map and field list
         field_subclass_map = BaseField.field_type_map()
         unknown_field_types = set()
-        self.fields = []
 
         for col_idx, (tr_empty, fd_empty, fmeta) in enumerate(
             zip(trailing_empty, field_meta_empty, self.field_meta)
@@ -836,18 +846,21 @@ class DataWorksheet:
         field_meta = dict(((rw[0], rw[1:]) for rw in field_meta))
         self.validate_field_meta(field_meta)
 
-        # Get an iterator on the data rows
-        data_rows = worksheet.iter_rows(min_row=len(field_meta) + 1, values_only=True)
+        if self.fields_loaded:
+            # Get an iterator on the data rows
+            data_rows = worksheet.iter_rows(
+                min_row=len(field_meta) + 1, values_only=True
+            )
 
-        # Load and validate chunks of data
-        n_chunks = ((max_row - self.n_descriptors) // row_chunk_size) + 1
-        for chunk in range(n_chunks):
+            # Load and validate chunks of data
+            n_chunks = ((max_row - self.n_descriptors) // row_chunk_size) + 1
+            for chunk in range(n_chunks):
 
-            # itertools.islice handles generators and StopIteration, and also
-            # trap empty slices
-            data = list(islice(data_rows, row_chunk_size))
-            if data:
-                self.validate_data_rows(data)
+                # itertools.islice handles generators and StopIteration, and also
+                # trap empty slices
+                data = list(islice(data_rows, row_chunk_size))
+                if data:
+                    self.validate_data_rows(data)
 
         # Finish up
         self.report()
@@ -1389,9 +1402,12 @@ class BaseField:
 def field_to_dict(fld: Type[BaseField], col_idx: int) -> dict:
     """Convert a object inheriting from BaseField into a dictionary.
 
-    A function to return a dictionary representation of a field object. This
-    would more naturally be a method of BaseField, but needs to include the
-    extended attributes of subclasses of BaseField
+    A function to return a dictionary representation of a field object. This would more
+    naturally be a method of BaseField, but needs to include the extended attributes of
+    subclasses of BaseField.
+
+    TODO - the BaseField should define all these attributes and then this becomes
+    a method
 
     Args:
         fld: An instance inheriting from BaseField
@@ -2160,6 +2176,12 @@ class EmptyField:
 
         self.meta = meta
         self.empty = True
+        # Get a field name - either a column letter from col_idx if set or 'Unknown'
+        idx = self.meta.get("col_idx")
+        if idx is None:
+            self.field_name = "Unknown"
+        else:
+            self.field_name = f"Column_{get_column_letter(idx)}"
 
     def validate_data(self, data) -> None:
         """Validates that empty fields contain no data."""
@@ -2170,12 +2192,6 @@ class EmptyField:
 
     def report(self):
         """Report on an empty field."""
-        # Get a field name - either a column letter from col_idx if set or 'Unknown'
-        idx = self.meta.get("col_idx")
-        if idx is None:
-            self.field_name = "Unknown"
-        else:
-            self.field_name = f"Column_{get_column_letter(idx)}"
 
         if not self.empty:
             LOGGER.info(f"Checking field {self.field_name}")

@@ -15,8 +15,9 @@ authors = ["David Orme <d.orme@imperial.ac.uk>",
 license = "MIT"
 
 [tool.poetry.scripts]
-safedata_validate = "safedata_validator.scripts:_safedata_validator_cli"
-safedata_zenodo = "safedata_validator.scripts:_safedata_zenodo_cli"
+safedata_validate = "safedata_validator.entry_points:_safedata_validator_cli"
+safedata_zenodo = "safedata_validator.entry_points:_safedata_zenodo_cli"
+safedata_post_metadata = "safedata_validator.entry_points:_safedata_post_metadata_cli"
 
 [tool.poetry.dependencies]
 python = "^3.9"
