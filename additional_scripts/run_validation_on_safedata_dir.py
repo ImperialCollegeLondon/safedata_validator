@@ -31,6 +31,13 @@ resource_file = (
 test_files = glob("*/*/*.xlsx", recursive=True, root_dir=safe_dir)
 resources = Resources(resource_file)
 
+
+# Timestamp output files by GBIF database
+timestamp = resources.gbif_database.removesuffix(".sqlite")[-10:]
+
+data_outfile = f"file_data_{timestamp}.csv"
+error_outfile = f"errors_{timestamp}.csv"
+
 COUNTER_HANDLER.setLevel("ERROR")
 CONSOLE_HANDLER.setLevel(100)  # Muted
 
@@ -85,12 +92,12 @@ def process_file(idx: int, this_file: str, resources: Resources):
         files.append([this_file, filesize, proc_time, ds.n_errors, ds.error_breakdown])
 
         # output json
-        jsonf = f"{file_parts[0]}_{file_parts[1]}.json"
+        jsonf = os.path.join(timestamp, f"{file_parts[0]}_{file_parts[1]}.json")
         with open(jsonf, "w") as jsonout:
             jsonout.write(ds.to_json())
 
     except Exception as e:
-        print(f"{idx:3} {this_file} failed {str(e)}")
+        print(f"{idx:3} FAIL {this_file} {str(e)}")
 
 
 # Loop over the files
@@ -99,7 +106,7 @@ for idx, this_file in enumerate(test_files):
     process_file(idx, this_file, resources)
 
 # Save a file by file summary of processing time and file size
-with open("testing_gbif20xx.csv", "w") as csvfile:
+with open(data_outfile, "w") as csvfile:
     csvwriter = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
 
     csvwriter.writerow(
@@ -126,7 +133,7 @@ with open("testing_gbif20xx.csv", "w") as csvfile:
         csvwriter.writerow(rw_unpack)
 
 # Save a table of individual errors by file
-with open("errors_gbif20xx.csv", "w") as csvfile:
+with open(error_outfile, "w") as csvfile:
     csvwriter = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
 
     csvwriter.writerow(("filepath", "error_msg"))
