@@ -2255,7 +2255,7 @@ class NCBITaxa:
 
         self.taxon_index: list[list] = []
         self.taxon_names: set[str] = set()
-        self.hierarchy: set[list] = set()
+        self.hierarchy: set[tuple] = set()
         self.n_errors = None
 
         # Get a validator instance
@@ -2643,7 +2643,7 @@ class NCBITaxa:
                 ]
             )
 
-        self.hierarchy.update(list(hr_taxon.taxa_hier.items()))
+        self.hierarchy.update([*hr_taxon.taxa_hier.items()])
 
         # Check if this has succeeded without warnings or errors
         if hr_taxon.superseed is False and hr_taxon.orig is None:
@@ -2794,7 +2794,7 @@ def taxon_index_to_text(
             return tx[3]
 
     # Container to hold the output
-    html = StringIO()
+    html_out = StringIO()
 
     # group by parent taxon id in position 2, substituting 0 for None
     taxon_index.sort(key=lambda x: x[2] or 0)
@@ -2827,7 +2827,7 @@ def taxon_index_to_text(
         else:
             txt = f"{indent(len(stack))} {canon_name}{lbr}"
 
-        html.write(txt)
+        html_out.write(txt)
 
         # Is this taxon a parent for other taxa - if so add that taxon to the top of
         # the stack, otherwise start looking for a next taxon to push onto the stack.
@@ -2844,7 +2844,7 @@ def taxon_index_to_text(
                     stack.append({"current": push["next"][0], "next": push["next"][1:]})
                     break
 
-    return html.getvalue()
+    return html_out.getvalue()
 
 
 def taxa_strip(name: str, rank: str) -> tuple[str, bool]:
