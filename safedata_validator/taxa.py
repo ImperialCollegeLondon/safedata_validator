@@ -633,7 +633,7 @@ class LocalNCBIValidator:
 
         self.ncbi_conn.close()
 
-    def id_lookup(self, nnme: str, ncbi_id: int) -> NCBITaxon:
+    def id_lookup(self, nnme: str, ncbi_id: int) -> Optional[NCBITaxon]:
         """Get an NCBITaxon by NCBI ID.
 
         This method returns a populated NCBITaxon instance, given an NCBI ID and
@@ -807,7 +807,7 @@ class LocalNCBIValidator:
 
         return mtaxon
 
-    def taxa_search(self, nnme: str, taxah: dict) -> NCBITaxon:
+    def taxa_search(self, nnme: str, taxah: dict) -> Optional[NCBITaxon]:
         """Find an NCBI taxon given a taxon hierarchy.
 
         Method that takes in taxonomic information, and finds the corresponding
@@ -1184,7 +1184,7 @@ class RemoteNCBIValidator:
         return root
 
     # Functionality to find taxa information from genbank ID
-    def id_lookup(self, nnme: str, ncbi_id: int) -> NCBITaxon:
+    def id_lookup(self, nnme: str, ncbi_id: int) -> Optional[NCBITaxon]:
         """Get an NCBITaxon by taxon ID.
 
         This method returns full taxonomic information from a NCBI ID. It will raise a
@@ -1350,7 +1350,7 @@ class RemoteNCBIValidator:
         return mtaxon
 
     # New function to read in taxa information
-    def taxa_search(self, nnme: str, taxah: dict) -> NCBITaxon:
+    def taxa_search(self, nnme: str, taxah: dict) -> Optional[NCBITaxon]:
         """Find an NCBI taxon given a taxon hierarchy.
 
         Method that takes in taxonomic information, and finds the corresponding
@@ -2643,7 +2643,7 @@ class NCBITaxa:
                 ]
             )
 
-        self.hierarchy.update([*hr_taxon.taxa_hier.items()])
+        self.hierarchy.update(list(hr_taxon.taxa_hier.items()))
 
         # Check if this has succeeded without warnings or errors
         if hr_taxon.superseed is False and hr_taxon.orig is None:
@@ -2871,7 +2871,7 @@ def taxa_strip(name: str, rank: str) -> tuple[str, bool]:
         return (name, True)
 
 
-def construct_bi_or_tri(higher_nm: str, lower_nm: str, tri: bool) -> Union[str, None]:
+def construct_bi_or_tri(higher_nm: str, lower_nm: str, tri: bool) -> Optional[str]:
     """Generate a species binomial or a subspecies trinomial.
 
     The NCBI database sometimes includes extra tags in binomials, such as 'candidatus'.
