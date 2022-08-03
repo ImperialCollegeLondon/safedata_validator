@@ -863,7 +863,7 @@ class LocalNCBIValidator:
                     f"Taxa {nnme} cannot be found and its higher "
                     f"taxonomic hierarchy is absent"
                 )
-                return
+                return None
 
             # If there is then set up a loop over it
             fnshd = False
@@ -902,7 +902,7 @@ class LocalNCBIValidator:
                         f"Taxa {nnme} cannot be found and its higher "
                         f"taxonomic hierarchy is ambiguous"
                     )
-                    return
+                    return None
                 # Catch when all the provided hierarchy has been exhausted
                 elif cnt == len(taxah.keys()):
                     fnshd = True
@@ -913,7 +913,7 @@ class LocalNCBIValidator:
                         f"Taxa {nnme} cannot be found and neither can "
                         f"its higher taxonomic hierarchy"
                     )
-                    return
+                    return None
 
         # Case where only one rank has been provided
         elif len(taxah) == 1:
@@ -952,7 +952,7 @@ class LocalNCBIValidator:
                     f"Taxa {nnme} cannot be found using only one "
                     f"taxonomic level, more should be provided"
                 )
-                return
+                return None
         # Higher ranks provided
         else:
             # Find second from last dictionary key
@@ -970,10 +970,10 @@ class LocalNCBIValidator:
             # Check that single parent taxa exists in records
             if pc == 0:
                 LOGGER.error(f"Provided parent taxa for {nnme} not found")
-                return
+                return None
             elif pc > 1:
                 LOGGER.error(f"More than one possible parent taxa for {nnme} found")
-                return
+                return None
             else:
                 # Find parent taxa ID as single entry in the list
                 p_taxon_row = self.ncbi_conn.execute(sql).fetchone()
@@ -1002,12 +1002,12 @@ class LocalNCBIValidator:
             # Check for errors relating to finding too many or few child taxa
             if sum(child) == 0:
                 LOGGER.error(f"Parent taxa not actually a valid parent of {nnme}")
-                return
+                return None
             elif sum(child) > 1:
                 LOGGER.error(
                     f"Parent taxa for {nnme} refers to multiple " f"possible child taxa"
                 )
-                return
+                return None
             else:
                 # Find index corresponding to correct child taxa
                 tID = int(taxon_rows[child.index(True)]["tax_id"])
@@ -1032,7 +1032,7 @@ class LocalNCBIValidator:
                 f"{list(taxah.values())[-1]} is a {f_key}"
                 f" not a {list(taxah.keys())[-1]}"
             )
-            return
+            return None
         elif list(taxah.keys())[-1] == "kingdom" and f_key == "superkingdom":
             # If not print a warning
             LOGGER.warning(
@@ -1235,7 +1235,7 @@ class RemoteNCBIValidator:
         # If no lineage raise an error
         else:
             LOGGER.error(f"Taxon hierarchy for {nnme} contains no backbone ranks")
-            return
+            return None
 
         # Find number of taxonomic ranks
         tx_len = len(linx)
@@ -1274,7 +1274,7 @@ class RemoteNCBIValidator:
                     LOGGER.error(
                         f"Taxon hierarchy for {nnme} contains no backbone ranks"
                     )
-                    return
+                    return None
                 else:
                     r_ID -= 1
 
@@ -1405,7 +1405,7 @@ class RemoteNCBIValidator:
                     f"Taxa {nnme} cannot be found and its higher "
                     f"taxonomic hierarchy is absent"
                 )
-                return
+                return None
 
             # If there is then set up a loop over it
             fnshd = False
@@ -1444,7 +1444,7 @@ class RemoteNCBIValidator:
                         f"Taxa {nnme} cannot be found and its higher "
                         f"taxonomic hierarchy is ambiguous"
                     )
-                    return
+                    return None
                 # Catch when all the provided hierarchy has been exhausted
                 elif cnt == len(taxah.keys()):
                     fnshd = True
@@ -1455,7 +1455,7 @@ class RemoteNCBIValidator:
                         f"Taxa {nnme} cannot be found and neither can "
                         f"its higher taxonomic hierarchy"
                     )
-                    return
+                    return None
 
         # Case where only one rank has been provided
         elif len(taxah) == 1:
@@ -1496,7 +1496,7 @@ class RemoteNCBIValidator:
                     f"Taxa {nnme} cannot be found using only one "
                     f"taxonomic level, more should be provided"
                 )
-                return
+                return None
         # Higher ranks provided
         else:
             # Find second from last dictionary key
@@ -1514,10 +1514,10 @@ class RemoteNCBIValidator:
             # Check that single parent taxa exists in records
             if pc == 0:
                 LOGGER.error(f"Provided parent taxa for {nnme} not found")
-                return
+                return None
             elif pc > 1:
                 LOGGER.error(f"More than one possible parent taxa for {nnme} found")
-                return
+                return None
             else:
                 # Find parent taxa ID as single entry in the list
                 PAR = p_rcrds.findall("./IdList/Id")
@@ -1547,12 +1547,12 @@ class RemoteNCBIValidator:
             # Check for errors relating to finding too many or few child taxa
             if sum(child) == 0:
                 LOGGER.error(f"Parent taxa not actually a valid parent of {nnme}")
-                return
+                return None
             elif sum(child) > 1:
                 LOGGER.error(
                     f"Parent taxa for {nnme} refers to multiple " f"possible child taxa"
                 )
-                return
+                return None
             else:
                 # Find index corresponding to correct child taxa
                 tID = int(ID[child.index(True)].text)
@@ -1577,7 +1577,7 @@ class RemoteNCBIValidator:
                 f"{list(taxah.values())[-1]} is a {f_key}"
                 f" not a {list(taxah.keys())[-1]}"
             )
-            return
+            return None
         elif list(taxah.keys())[-1] == "kingdom" and f_key == "superkingdom":
             # If not print a warning
             LOGGER.warning(
@@ -1779,7 +1779,7 @@ class GBIFTaxa:
     #        {self._row_description}') but this implementation ties
     #        validate_and_add_taxon() to needing that property populated
 
-    def validate_and_add_taxon(self, taxon_input: list) -> None:
+    def validate_and_add_taxon(self, taxon_input: tuple) -> None:
         """Add a GBIF formatted taxon row to the GBIFTaxa instance.
 
         This method takes user information on a taxon, and optionally a parent taxon,
@@ -2421,7 +2421,7 @@ class NCBITaxa:
 
         FORMATTER.pop()
 
-    def validate_and_add_taxon(self, ncbi_taxon_input: list) -> None:
+    def validate_and_add_taxon(self, ncbi_taxon_input: tuple) -> None:
         """Add a GBIF formatted taxon row to the GBIFTaxa instance.
 
         This method takes user information on a taxon, and optionally an NCBI taxonomy
@@ -2756,28 +2756,6 @@ class Taxa:
     def repeat_names(self) -> set[str]:
         """Reports taxon names duplicated between NCBI and GBIF taxa."""
         return self.gbif_taxa.taxon_names.intersection(self.ncbi_taxa.taxon_names)
-
-    @property
-    def combined_index(self) -> list[list]:
-        """Provides a combined taxon index across NCBI and GBIF taxa.
-
-        The individual entries are lists with the form:
-
-            [database_id: str, worksheet_name: str, id: int, parent_id: int,
-            canonical_name: str, taxonomic_rank: str, status: str]
-
-        """
-        # Preallocate the combined index
-        combined_index = []
-
-        for db_name, tx_obj in (("GBIF", self.gbif_taxa), ("NCBI", self.ncbi_taxa)):
-
-            # Check whether each sheet has an index and extract if so
-            if not tx_obj.is_empty:
-                for item in tx_obj.taxon_index:
-                    combined_index.append([db_name] + item)
-
-        return combined_index
 
 
 def taxon_index_to_text(
