@@ -28,6 +28,7 @@ configuration files in the user and then site config locations defined by the
 
 import os
 import sqlite3
+from datetime import date
 from typing import Union
 
 import appdirs
@@ -35,6 +36,7 @@ import simplejson
 from configobj import ConfigObj, flatten_errors
 from dateutil.parser import isoparse
 from dotmap import DotMap
+from simplejson.errors import JSONDecodeError
 from validate import Validator, VdtParamError, VdtValueError, is_list
 
 from safedata_validator.logger import (
@@ -77,7 +79,7 @@ to do basic validation and type conversions.
 """
 
 
-def date_list(value: str, min: str, max: str):
+def date_list(value: str, min: str, max: str) -> list[date]:
     """Validate config date lists.
 
     A configobj.Validator extension function to check configuration values
@@ -91,17 +93,17 @@ def date_list(value: str, min: str, max: str):
     """
     # min and max are supplied as a string, test conversion to int
     try:
-        min = int(min)
+        min_int = int(min)
     except ValueError:
         raise VdtParamError("min", min)
     try:
-        max = int(max)
+        max_int = int(max)
     except ValueError:
         raise VdtParamError("max", max)
 
     # Check the supplied value is a list, triggering any issues
     # with list formatting
-    value = is_list(value, min=min, max=max)
+    value = is_list(value, min=min_int, max=max_int)
 
     # Next, check every member in the list is an ISO date string
     # noting that this strips out time information
@@ -188,28 +190,31 @@ class Resources:
         LOGGER.info(msg)
 
         # Try and load the found configuration
-        config = self._load_config(config, config_type)
+        config_loaded = self._load_config(config, config_type)
 
         # Set attributes -
         # HACK - this now seems clumsy - the ConfigObj instance is already a
         #        class containing the config attributes. Having a _function_
         #        that returns a modified ConfigObj instance seems more direct
         #        than having to patch this list of attributes.
-        self.locations = config.locations
-        self.gbif_database = config.gbif_database
-        self.ncbi_database = config.ncbi_database
-        self.config_type = config.config_type
-        self.config_source = config.config_source
+        self.locations = config_loaded.locations
+        self.gbif_database = config_loaded.gbif_database
+        self.ncbi_database = config_loaded.ncbi_database
+        self.config_type = config_loaded.config_type
+        self.config_source = config_loaded.config_source
 
-        self.extents = config.extents
-        self.zenodo = config.zenodo
-        self.metadata = config.metadata
-        self.ncbi = config.ncbi
+        self.extents = config_loaded.extents
+        self.zenodo = config_loaded.zenodo
+        self.metadata = config_loaded.metadata
+        self.ncbi = config_loaded.ncbi
 
-        self.use_local_gbif = None
-        self.use_local_ncbi = None
-        self.valid_locations = None
-        self.location_aliases = None
+        self.use_local_gbif = False
+        self.use_local_ncbi = False
+        # Valid locations is a dictionary keying string location names to tuples of
+        # floats describing the location bounding box
+        self.valid_location: dict[str, list[float]] = dict()
+        # Location aliases is a dictionary keying a string to a key in valid locations
+        self.location_aliases: dict[str, str] = dict()
 
         # Validate the resources
         self._validate_locations()
@@ -217,9 +222,7 @@ class Resources:
         self._validate_ncbi()
 
     @staticmethod
-    def _load_config(
-        config: Union[str, list, dict], cfg_type: str
-    ) -> Union[None, DotMap]:
+    def _load_config(config: Union[str, list, dict], cfg_type: str) -> DotMap:
         """Load a configuration file.
 
         This private static method attempts to load a JSON configuration file
@@ -259,15 +262,11 @@ class Resources:
 
         return config_obj
 
-    def _validate_locations(self):
+    def _validate_locations(self) -> None:
         """Validate and load a locations file.
 
-        This private function checks whether a locations path: exists, is a
-        JSON file, and contains location and alias data. It populates the
-        instance attributes
-
-        Returns:
-            None - updates instance.
+        This private function checks whether a locations path: exists, is a JSON file,
+        and contains location and alias data. It populates the instance attributes
         """
 
         if self.locations is None or self.locations == "":
@@ -281,7 +280,7 @@ class Resources:
 
         try:
             loc_payload = simplejson.load(open(self.locations, mode="r"))
-        except (simplejson.errors.JSONDecodeError, UnicodeDecodeError):
+        except (JSONDecodeError, UnicodeDecodeError):
             log_and_raise("Local locations file not JSON encoded.", OSError)
 
         # process the locations payload
@@ -291,18 +290,16 @@ class Resources:
         self.valid_locations = loc_payload["locations"]
         self.location_aliases = loc_payload["aliases"]
 
-    def _validate_gbif(self):
+    def _validate_gbif(self) -> None:
         """Validate the GBIF settings.
 
-        This private function checks whether to use the online API or a local
-        backbone database and then validates the provided sqlite3 database file.
-
-        Returns:
-            None - updates instance.
+        This private function checks whether to use the online API or a local backbone
+        database and then validates the provided sqlite3 database file. It updates the
+        instance with validated details.
         """
+
         if self.gbif_database is None or self.gbif_database == "":
             LOGGER.info("Using GBIF online API to validate taxonomy")
-            self.use_local_gbif = False
         else:
             LOGGER.info(f"Validating local GBIF database: {self.gbif_database}")
 
@@ -328,18 +325,16 @@ class Resources:
             finally:
                 conn.close()
 
-    def _validate_ncbi(self):
+    def _validate_ncbi(self) -> None:
         """Validate the NCBI settings.
 
-        This private function checks whether to use the online API or a local
-        backbone database and then validates the provided sqlite3 database files.
-
-        Returns:
-            None - updates instance.
+        This private function checks whether to use the online API or a local backbone
+        database and then validates the provided sqlite3 database files. It updates the
+        instance with validated details.
         """
+
         if self.ncbi_database is None or self.ncbi_database == "":
             LOGGER.info("Using NCBI online API to validate taxonomy")
-            self.use_local_ncbi = False
         else:
             LOGGER.info(f"Validating local NCBI database: {self.ncbi_database}")
 

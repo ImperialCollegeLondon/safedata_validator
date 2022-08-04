@@ -1,4 +1,4 @@
-""" ## Logging setup for safedata_validator
+"""Logging setup for safedata_validator.
 
 This submodule extends the standard logging setup to provide extra functionality
 and to expose some global logging objects for use throughout the code.
@@ -26,18 +26,19 @@ import logging
 from functools import wraps
 from io import StringIO
 
+from typing_extensions import Type
+
 
 class CounterHandler(logging.StreamHandler):
-    def __init__(self, *args, **kwargs):
-        """This is an subclass of `logging.StreamHandler` that maintains a count of
-        calls at each log level.
-        """
+    """Subclass of `logging.StreamHandler` counting calls emitted at each log level."""
+
+    def __init__(self, *args, **kwargs) -> None:
+
         logging.StreamHandler.__init__(self, *args, **kwargs)
         self.counters = {"DEBUG": 0, "INFO": 0, "WARNING": 0, "ERROR": 0, "CRITICAL": 0}
 
-    def emit(self, record: logging.LogRecord):
-        """The emit method for CounterHandler emits the message but also increments the
-        counter for the message level.
+    def emit(self, record: logging.LogRecord) -> None:
+        """Emit a message and increment the counter for the message level.
 
         Args:
             record: A `logging.LogRecord` instance.
@@ -48,43 +49,41 @@ class CounterHandler(logging.StreamHandler):
         self.stream.write(msg)
         self.flush()
 
-    def reset(self):
-        """This method is used to reset the counters to zero"""
+    def reset(self) -> None:
+        """Reset the message counters to zero."""
         self.counters = {"DEBUG": 0, "INFO": 0, "WARNING": 0, "ERROR": 0, "CRITICAL": 0}
 
 
 class IndentFormatter(logging.Formatter):
+    """A logging record formatter with indenting.
+
+    This record formatter tracks an indent depth that is used to nest messages, making
+    it easier to track the different sections of validation in printed outputs. It also
+    encodes logging levels as single character strings to make logging messages align
+    vertically at different depths
+
+    The depth of indenting can be set directly using `FORMATTER.depth = 1`  but it is
+    more convenient to use the [push][safedata_validator.logger.IndentFormatter.push]
+    and [pop][safedata_validator.logger.IndentFormatter.pop] methods to increase and
+    decrease indenting depth.
+
+    The `extra` argument to logger messages can be used to provide a dictionary and is
+    used in this subclass to provide the ability to `join` a list of entries as comma
+    separated list on to the end of the message.
+
+    Args:
+        fmt: The formatting used for emitted LogRecord instances
+        datefmt: A date format string
+        indent: This string is used for each depth of the indent.
+    """
+
     def __init__(
         self,
         fmt: str = "%(indent)s%(levelcode)s %(message)s",
         datefmt: str = None,
         indent: str = "    ",
     ) -> None:
-        """A logging record formatter with indenting
 
-        This record formatter tracks an indent depth that is used to nest
-        messages, making it easier to track the different sections of validation
-        in printed outputs. It also encodes logging levels as single character
-        strings to make logging messages align vertically at different depths
-
-        The depth of indenting can be set directly using:
-
-            FORMATTER.depth = 1
-
-        but it is more convenient to use the
-        [push][safedata_validator.logger.IndentFormatter.push] and
-        [pop][safedata_validator.logger.IndentFormatter.pop] methods to increase
-        and decrease indenting depth.
-
-        The `extra` argument to logger messages can be used to provide a
-        dictionary and is used in this subclass to provide the ability to `join`
-        a list of entries as comma separated list on to the end of the message.
-
-        Args:
-            fmt: The formatting used for emitted LogRecord instances
-            datefmt: A date format string
-            indent: This string is used for each depth of the indent.
-        """
         logging.Formatter.__init__(self, fmt, datefmt)
         self.depth = 0
         self.indent = indent
@@ -107,8 +106,10 @@ class IndentFormatter(logging.Formatter):
         self.depth = self.depth + n
 
     def format(self, rec: logging.LogRecord):
-        """A custom format method to output indented messages with encoded
-        logger message levels.
+        """Format indented messages with encoded logger message levels.
+
+        Args:
+            rec: The logging record to be formatted.
         """
         rec.indent = self.indent * self.depth
 
@@ -192,8 +193,9 @@ LOGGER.addHandler(CONSOLE_HANDLER)
 #
 
 
-def log_and_raise(msg: str, exception: Exception) -> None:
-    """
+def log_and_raise(msg: str, exception: Type[Exception]) -> None:
+    """Emit a critical error message and raise an Exception.
+
     This convenience function adds a critical level message to the logger and
     then raises an exception with the same message. This is intended only for
     use in loading resources: the package cannot run properly with misconfigured
@@ -202,9 +204,6 @@ def log_and_raise(msg: str, exception: Exception) -> None:
     Args:
         msg: A message to add to the log
         exception: An exception type to be raised
-
-    Returns:
-        None
     """
 
     LOGGER.critical(msg)
@@ -215,11 +214,15 @@ def log_and_raise(msg: str, exception: Exception) -> None:
 # https://stackoverflow.com/questions/10176226/how-do-i-pass-extra-arguments-to-a-python-decorator
 
 
-def loggerinfo_push_pop(wrapper_message):
-    """
-    This decorator is used to reduce boilerplate logger code within functions.
-    It emits a message and then increases the indentation depth while the
-    wrapped function is running.
+def loggerinfo_push_pop(wrapper_message: str) -> None:
+    """Wrap a callable with an Info logging message and indentation.
+
+    This decorator is used to reduce boilerplate logger code within functions. It emits
+    a message and then increases the indentation depth while the wrapped function is
+    running.
+
+    Args:
+        wrapper_message: The test to use in the info logging message.
     """
 
     def decorator_func(function):
