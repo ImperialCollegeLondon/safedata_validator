@@ -194,7 +194,7 @@ class Dataset:
             self.taxa.gbif_taxa.load(wb["GBIFTaxa"])
         # Otherwise populate gbif_taxa from the one that has been provided
         elif len(gbif_sheets) == 1:
-            self.taxa.gbif_taxa.load(wb[gbif_sheets.pop()])
+            self.taxa.gbif_taxa.load(wb[list(gbif_sheets)[0]])
 
         # Populate ncbi taxa
         ncbi_sheet = "NCBITaxa" in wb.sheetnames
