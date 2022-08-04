@@ -1784,7 +1784,7 @@ class GBIFTaxa:
         # summary of processing
         self.n_errors = COUNTER_HANDLER.counters["ERROR"] - start_errors
         if self.n_errors is None:
-            LOGGER.critical("Taxa error logging has broken!")
+            LOGGER.critical("GBIFTaxa error logging has broken!")
         elif self.n_errors > 0:
             LOGGER.info("GBIFTaxa contains {} errors".format(self.n_errors))
         else:
@@ -1930,7 +1930,12 @@ class GBIFTaxa:
                     ]
                 )
 
-                if p_taxon.is_backbone and p_taxon.found and not p_taxon.is_canon:
+                if (
+                    p_taxon.is_backbone
+                    and p_taxon.found
+                    and not p_taxon.is_canon
+                    and p_taxon.canon_usage
+                ):
                     self.hierarchy.update(
                         [
                             rw
@@ -1960,7 +1965,7 @@ class GBIFTaxa:
             elif not p_taxon.found:
                 LOGGER.error(f"Parent taxon ({p_taxon.name}) {p_taxon.lookup_status}")
 
-            elif not p_taxon.is_canon:
+            elif not p_taxon.is_canon and p_taxon.canon_usage:
                 LOGGER.warning(
                     f"Parent taxon ({p_taxon.name}) considered a {p_taxon.taxon_status}"
                     f" of {p_taxon.canon_usage.name} in GBIF backbone"
@@ -2017,8 +2022,10 @@ class GBIFTaxa:
                         f"Ignore ID does not match the canon GBIF usage ("
                         f"{m_taxon.gbif_id})"
                     )
-                elif not m_taxon.is_canon and (
-                    m_taxon.canon_usage.gbif_id != ignore_gbif
+                elif (
+                    not m_taxon.is_canon
+                    and m_taxon.canon_usage
+                    and (m_taxon.canon_usage.gbif_id != ignore_gbif)
                 ):
                     LOGGER.error(
                         f"Taxon is non-canon and Ignore ID does not match the canon "
@@ -2090,7 +2097,7 @@ class GBIFTaxa:
                     LOGGER.info(
                         f"Taxon found in GBIF backbone ({m_taxon.taxon_status})"
                     )
-                else:
+                elif m_taxon.canon_usage:
                     LOGGER.warning(
                         f"Taxon considered a {m_taxon.taxon_status} "
                         f"of {m_taxon.canon_usage.name} in GBIF backbone"
@@ -2433,7 +2440,9 @@ class NCBITaxa:
 
         # summary of processing
         self.n_errors = COUNTER_HANDLER.counters["ERROR"] - start_errors
-        if self.n_errors > 0:
+        if self.n_errors is None:
+            LOGGER.critical("NCBITaxa error logging has broken!")
+        elif self.n_errors > 0:
             LOGGER.info("NCBITaxa contains {} errors".format(self.n_errors))
         else:
             LOGGER.info("{} taxa loaded correctly".format(len(self.taxon_names)))
