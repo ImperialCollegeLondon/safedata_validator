@@ -292,6 +292,16 @@ class NCBITaxon:
             return f"{self.name}"
 
 
+def gen_invalid_NCBITaxon() -> NCBITaxon:
+    """Generates a standardised invalid NCBITaxon instance.
+
+    This is defined as an independent function so that it can be used by both local and
+    remote NCBI validators.
+    """
+
+    return NCBITaxon("INVALID", "invalid_rank", {"invalid_rank": ("INVALID", -9, None)})
+
+
 class LocalGBIFValidator:
     """Validate taxon data against a local GBIF database.
 
@@ -636,7 +646,7 @@ class LocalNCBIValidator:
 
         self.ncbi_conn.close()
 
-    def id_lookup(self, nnme: str, ncbi_id: int) -> Optional[NCBITaxon]:
+    def id_lookup(self, nnme: str, ncbi_id: int) -> NCBITaxon:
         """Get an NCBITaxon by NCBI ID.
 
         This method returns a populated NCBITaxon instance, given an NCBI ID and
@@ -749,7 +759,7 @@ class LocalNCBIValidator:
                     LOGGER.error(
                         f"Taxon hierarchy for {nnme} contains no backbone ranks"
                     )
-                    return None
+                    return gen_invalid_NCBITaxon()
                 else:
                     r_ID -= 1
 
@@ -810,7 +820,7 @@ class LocalNCBIValidator:
 
         return mtaxon
 
-    def taxa_search(self, nnme: str, taxah: dict) -> Optional[NCBITaxon]:
+    def taxa_search(self, nnme: str, taxah: dict) -> NCBITaxon:
         """Find an NCBI taxon given a taxon hierarchy.
 
         Method that takes in taxonomic information, and finds the corresponding
@@ -866,7 +876,7 @@ class LocalNCBIValidator:
                     f"Taxa {nnme} cannot be found and its higher "
                     f"taxonomic hierarchy is absent"
                 )
-                return None
+                return gen_invalid_NCBITaxon()
 
             # If there is then set up a loop over it
             fnshd = False
@@ -905,7 +915,7 @@ class LocalNCBIValidator:
                         f"Taxa {nnme} cannot be found and its higher "
                         f"taxonomic hierarchy is ambiguous"
                     )
-                    return None
+                    return gen_invalid_NCBITaxon()
                 # Catch when all the provided hierarchy has been exhausted
                 elif cnt == len(taxah.keys()):
                     fnshd = True
@@ -916,7 +926,7 @@ class LocalNCBIValidator:
                         f"Taxa {nnme} cannot be found and neither can "
                         f"its higher taxonomic hierarchy"
                     )
-                    return None
+                    return gen_invalid_NCBITaxon()
 
         # Case where only one rank has been provided
         elif len(taxah) == 1:
@@ -955,7 +965,7 @@ class LocalNCBIValidator:
                     f"Taxa {nnme} cannot be found using only one "
                     f"taxonomic level, more should be provided"
                 )
-                return None
+                return gen_invalid_NCBITaxon()
         # Higher ranks provided
         else:
             # Find second from last dictionary key
@@ -973,10 +983,10 @@ class LocalNCBIValidator:
             # Check that single parent taxa exists in records
             if pc == 0:
                 LOGGER.error(f"Provided parent taxa for {nnme} not found")
-                return None
+                return gen_invalid_NCBITaxon()
             elif pc > 1:
                 LOGGER.error(f"More than one possible parent taxa for {nnme} found")
-                return None
+                return gen_invalid_NCBITaxon()
             else:
                 # Find parent taxa ID as single entry in the list
                 p_taxon_row = self.ncbi_conn.execute(sql).fetchone()
@@ -1005,12 +1015,12 @@ class LocalNCBIValidator:
             # Check for errors relating to finding too many or few child taxa
             if sum(child) == 0:
                 LOGGER.error(f"Parent taxa not actually a valid parent of {nnme}")
-                return None
+                return gen_invalid_NCBITaxon()
             elif sum(child) > 1:
                 LOGGER.error(
                     f"Parent taxa for {nnme} refers to multiple " f"possible child taxa"
                 )
-                return None
+                return gen_invalid_NCBITaxon()
             else:
                 # Find index corresponding to correct child taxa
                 tID = int(taxon_rows[child.index(True)]["tax_id"])
@@ -1018,8 +1028,8 @@ class LocalNCBIValidator:
                 mtaxon = self.id_lookup(nnme, tID)
 
         # Check whether mtaxon has actually been populated by the id_lookup
-        if not mtaxon:
-            return None
+        if mtaxon.name == "INVALID":
+            return mtaxon
 
         # Find last dictionary key
         f_key = list(mtaxon.taxa_hier.keys())[-1]
@@ -1035,7 +1045,7 @@ class LocalNCBIValidator:
                 f"{list(taxah.values())[-1]} is a {f_key}"
                 f" not a {list(taxah.keys())[-1]}"
             )
-            return None
+            return gen_invalid_NCBITaxon()
         elif list(taxah.keys())[-1] == "kingdom" and f_key == "superkingdom":
             # If not print a warning
             LOGGER.warning(
@@ -1187,7 +1197,7 @@ class RemoteNCBIValidator:
         return root
 
     # Functionality to find taxa information from genbank ID
-    def id_lookup(self, nnme: str, ncbi_id: int) -> Optional[NCBITaxon]:
+    def id_lookup(self, nnme: str, ncbi_id: int) -> NCBITaxon:
         """Get an NCBITaxon by taxon ID.
 
         This method returns full taxonomic information from a NCBI ID. It will raise a
@@ -1238,7 +1248,7 @@ class RemoteNCBIValidator:
         # If no lineage raise an error
         else:
             LOGGER.error(f"Taxon hierarchy for {nnme} contains no backbone ranks")
-            return None
+            return gen_invalid_NCBITaxon()
 
         # Find number of taxonomic ranks
         tx_len = len(linx)
@@ -1277,7 +1287,7 @@ class RemoteNCBIValidator:
                     LOGGER.error(
                         f"Taxon hierarchy for {nnme} contains no backbone ranks"
                     )
-                    return None
+                    return gen_invalid_NCBITaxon()
                 else:
                     r_ID -= 1
 
@@ -1353,7 +1363,7 @@ class RemoteNCBIValidator:
         return mtaxon
 
     # New function to read in taxa information
-    def taxa_search(self, nnme: str, taxah: dict) -> Optional[NCBITaxon]:
+    def taxa_search(self, nnme: str, taxah: dict) -> NCBITaxon:
         """Find an NCBI taxon given a taxon hierarchy.
 
         Method that takes in taxonomic information, and finds the corresponding
@@ -1408,7 +1418,7 @@ class RemoteNCBIValidator:
                     f"Taxa {nnme} cannot be found and its higher "
                     f"taxonomic hierarchy is absent"
                 )
-                return None
+                return gen_invalid_NCBITaxon()
 
             # If there is then set up a loop over it
             fnshd = False
@@ -1447,7 +1457,7 @@ class RemoteNCBIValidator:
                         f"Taxa {nnme} cannot be found and its higher "
                         f"taxonomic hierarchy is ambiguous"
                     )
-                    return None
+                    return gen_invalid_NCBITaxon()
                 # Catch when all the provided hierarchy has been exhausted
                 elif cnt == len(taxah.keys()):
                     fnshd = True
@@ -1458,7 +1468,7 @@ class RemoteNCBIValidator:
                         f"Taxa {nnme} cannot be found and neither can "
                         f"its higher taxonomic hierarchy"
                     )
-                    return None
+                    return gen_invalid_NCBITaxon()
 
         # Case where only one rank has been provided
         elif len(taxah) == 1:
@@ -1499,7 +1509,7 @@ class RemoteNCBIValidator:
                     f"Taxa {nnme} cannot be found using only one "
                     f"taxonomic level, more should be provided"
                 )
-                return None
+                return gen_invalid_NCBITaxon()
         # Higher ranks provided
         else:
             # Find second from last dictionary key
@@ -1517,10 +1527,10 @@ class RemoteNCBIValidator:
             # Check that single parent taxa exists in records
             if pc == 0:
                 LOGGER.error(f"Provided parent taxa for {nnme} not found")
-                return None
+                return gen_invalid_NCBITaxon()
             elif pc > 1:
                 LOGGER.error(f"More than one possible parent taxa for {nnme} found")
-                return None
+                return gen_invalid_NCBITaxon()
             else:
                 # Find parent taxa ID as single entry in the list
                 PAR = p_rcrds.findall("./IdList/Id")
@@ -1550,12 +1560,12 @@ class RemoteNCBIValidator:
             # Check for errors relating to finding too many or few child taxa
             if sum(child) == 0:
                 LOGGER.error(f"Parent taxa not actually a valid parent of {nnme}")
-                return None
+                return gen_invalid_NCBITaxon()
             elif sum(child) > 1:
                 LOGGER.error(
                     f"Parent taxa for {nnme} refers to multiple " f"possible child taxa"
                 )
-                return None
+                return gen_invalid_NCBITaxon()
             else:
                 # Find index corresponding to correct child taxa
                 tID = int(ID[child.index(True)].text)
@@ -1563,8 +1573,8 @@ class RemoteNCBIValidator:
                 mtaxon = self.id_lookup(nnme, tID)
 
         # Check whether mtaxon has actually been populated by the id_lookup
-        if not mtaxon:
-            return None
+        if mtaxon.name == "INVALID":
+            return gen_invalid_NCBITaxon()
 
         # Find last dictionary key
         f_key = list(mtaxon.taxa_hier.keys())[-1]
@@ -1580,7 +1590,7 @@ class RemoteNCBIValidator:
                 f"{list(taxah.values())[-1]} is a {f_key}"
                 f" not a {list(taxah.keys())[-1]}"
             )
-            return None
+            return gen_invalid_NCBITaxon()
         elif list(taxah.keys())[-1] == "kingdom" and f_key == "superkingdom":
             # If not print a warning
             LOGGER.warning(
@@ -2546,7 +2556,7 @@ class NCBITaxa:
         # Go straight ahead and search for the taxon
         hr_taxon = self.validator.taxa_search(m_name, taxon_hier)
         # Catch case where errors are returned rather than a taxon
-        if hr_taxon is None:
+        if hr_taxon.name == "INVALID":
             LOGGER.error("Search based on taxon hierarchy failed")
             return
 
