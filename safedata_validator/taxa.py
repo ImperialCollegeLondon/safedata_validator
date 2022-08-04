@@ -137,9 +137,9 @@ class GBIFTaxon:
     is_backbone: bool = dataclasses.field(init=False)
     is_canon: bool = dataclasses.field(init=False)
     # https://stackoverflow.com/questions/33533148
-    canon_usage: "GBIFTaxon" = dataclasses.field(init=False)
-    parent_id: int = dataclasses.field(init=False)
-    taxon_status: str = dataclasses.field(init=False)
+    canon_usage: Optional["GBIFTaxon"] = dataclasses.field(init=False)
+    parent_id: Optional[int] = dataclasses.field(init=False)
+    taxon_status: Optional[str] = dataclasses.field(init=False)
     lookup_status: str = dataclasses.field(init=False)
     hierarchy: list = dataclasses.field(init=False)
 
@@ -461,6 +461,9 @@ class LocalGBIFValidator:
         # to get the canon and parent populated.
         if taxon.taxon_status in ["accepted", "doubtful"]:
             taxon.is_canon = True
+        elif taxon.parent_id is None:
+            LOGGER.warning("Non-canon taxa does not have valid parent id")
+            taxon.is_canon = False
         else:
             taxon.is_canon = False
             taxon.canon_usage = self.id_lookup(taxon.parent_id)
