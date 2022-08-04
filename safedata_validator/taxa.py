@@ -1628,7 +1628,7 @@ class GBIFTaxa:
             gbif_parent_id (int),
             canonical_name (str),
             taxonomic_rank (str),
-            status (str)]
+            gbif_status (str)]
 
         Where a taxon is not accepted or doubtful on GBIF, two entries are
         inserted for the taxon, one under the canon name and one under the
@@ -2242,11 +2242,11 @@ class NCBITaxa:
         of lists structured as:
 
             [worksheet_name (str),
-            gbif_id (int),
-            gbif_parent_id (int),
+            ncbi_id (int),
+            ncbi_parent_id (int),
             canonical_name (str),
             taxonomic_rank (str),
-            status (str)]
+            ncbi_status (str)]
 
         Where a taxon is not accepted or doubtful on GBIF, two entries are
         inserted for the taxon, one under the canon name and one under the
