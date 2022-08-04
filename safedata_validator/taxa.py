@@ -1762,7 +1762,11 @@ class GBIFTaxa:
                 row["taxon id"],
                 row["ignore id"],
             ]
-            parent_info = [row["parent name"], row["parent type"], row["parent id"]]
+            parent_info: Optional[list] = [
+                row["parent name"],
+                row["parent type"],
+                row["parent id"],
+            ]
 
             # If there is no parent information, replace the parent tuple with None
             if parent_info == [None, None, None]:
@@ -1779,7 +1783,9 @@ class GBIFTaxa:
 
         # summary of processing
         self.n_errors = COUNTER_HANDLER.counters["ERROR"] - start_errors
-        if self.n_errors > 0:
+        if self.n_errors is None:
+            LOGGER.critical("Taxa error logging has broken!")
+        elif self.n_errors > 0:
             LOGGER.info("GBIFTaxa contains {} errors".format(self.n_errors))
         else:
             LOGGER.info("{} taxa loaded correctly".format(len(self.taxon_names)))
@@ -2411,7 +2417,7 @@ class NCBITaxa:
                         )
                     elif rnk == "subspecies":
                         taxa_hier[rnk] = construct_bi_or_tri(
-                            taxa_hier["species"], row[rnk], True
+                            row["species"], row[rnk], True
                         )
                     else:
                         taxa_hier[rnk] = row[rnk]
