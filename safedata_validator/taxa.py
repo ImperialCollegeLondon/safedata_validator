@@ -2789,7 +2789,7 @@ class Taxa:
 def taxon_index_to_text(
     taxon_index: list, html: bool = False, indent_width: int = 4
 ) -> str:
-    """Render a GBIFTaxa or NCBITaxa instance as text or html.
+    """Render a GBIFTaxa instance as text or html.
 
     This function takes a taxon index from a GBIFTaxa or NCBITaxa instance and renders
     the contents into a text representation of the taxonomic hierarchy used in the

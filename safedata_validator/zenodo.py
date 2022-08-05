@@ -654,7 +654,7 @@ def taxon_index_to_html(taxa: list[dict]) -> tags.div:
         # Is this taxon a parent for other taxa - if so add that taxon to the top of
         # the stack, otherwise start looking for a next taxon to push onto the stack.
         # If there is none at the top, pop and look down.
-        parent_id = current["gbif_id"]
+        parent_id = current["gbif_taxon_id"]
         if parent_id in grouped:
             stack.append(
                 {"current": grouped[parent_id][0], "next": grouped[parent_id][1:]}
@@ -855,9 +855,11 @@ def dataset_description(
             "{0[0]:.4f} to {0[1]:.4f}".format(metadata["longitudinal_extent"]),
         )
 
-    # Add taxa
-    taxon_index = metadata.get("taxa")
-    if taxon_index:
+    # Add gbif_taxa
+    # TODO - ALTER STARTING TEXT HERE SO THAT EITHER EVENTUALITY IS COVERED
+    # THIS SHOULD IDEALLY GENERATE IDENTICAL OUTPUT WHEN ONLY GBIFTAXA IS PROVIDED
+    gbif_taxon_index = metadata.get("gbif_taxa")
+    if gbif_taxon_index:
         desc += tags.p(
             tags.b("Taxonomic coverage: "),
             tags.br(),
@@ -867,8 +869,10 @@ def dataset_description(
             "species and other unknown taxa, morphospecies, functional groups and  "
             "taxonomic levels not used in the GBIF backbone are shown in square "
             "brackets.",
-            taxon_index_to_html(taxon_index),
+            taxon_index_to_html(gbif_taxon_index),
         )
+
+    # TODO - INSERT COMPARABLE FUNCTION FOR NCBITAXA, IF IT IS INCLUDED
 
     if render:
         return desc.render()
