@@ -282,7 +282,7 @@ def upload_metadata(
 
     # trap errors in uploading metadata and tidy up
     if mtd.status_code != 200:
-        return None, mtd.json()
+        return None, mtd.reason
     else:
         return "success", None
 
