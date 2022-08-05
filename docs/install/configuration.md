@@ -108,7 +108,13 @@ TODO - THINK ABOUT WHAT I SAY HERE
 
 ### NCBI API
 
-TODO - EXPLAIN WHY API KEY IS NEED FOR ONLINE NCBI VALIDATION
+Remote NCBI validation is very slow due to requests being rate limited to a maximum of 3
+requests per second. However, if an API key is provided the rate limit increases to 10
+requests per second. An API key can be obtained by registering for an NCBI account and
+then requesting one, instructions for this can be found
+[here](https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/).
+When this key is included in the configuration file `safedata_validator` will make use
+of it for all remote validation requests.
 
 ## Configuration file location
 
