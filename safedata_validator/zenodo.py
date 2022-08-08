@@ -855,24 +855,61 @@ def dataset_description(
             "{0[0]:.4f} to {0[1]:.4f}".format(metadata["longitudinal_extent"]),
         )
 
-    # Add gbif_taxa
-    # TODO - ALTER STARTING TEXT HERE SO THAT EITHER EVENTUALITY IS COVERED
-    # THIS SHOULD IDEALLY GENERATE IDENTICAL OUTPUT WHEN ONLY GBIFTAXA IS PROVIDED
+    # Find taxa data from each database (if they exist)
     gbif_taxon_index = metadata.get("gbif_taxa")
-    if gbif_taxon_index:
+    ncbi_taxon_index = metadata.get("ncbi_taxa")
+
+    gbif_text = (
+        " If a dataset uses a synonym, the accepted usage is shown followed by the "
+        "dataset usage in brackets. Taxa that cannot be validated, including new "
+        "species and other unknown taxa, morphospecies, functional groups and "
+        "taxonomic levels not used in the GBIF backbone are shown in square brackets."
+        ""
+    )
+
+    # TODO - FILL THIS IN PROPERLY
+    ncbi_text = "INSERT DETAILS OF THE NCBI TREE HERE"
+
+    # When NCBI is absent use the old format for backwards compatibility
+    if gbif_taxon_index and not ncbi_taxon_index:
         desc += tags.p(
             tags.b("Taxonomic coverage: "),
             tags.br(),
-            " All taxon names are validated against the GBIF backbone taxonomy. If a "
-            "dataset uses a synonym, the accepted usage is shown followed by the "
-            "dataset usage in brackets. Taxa that cannot be validated, including new "
-            "species and other unknown taxa, morphospecies, functional groups and  "
-            "taxonomic levels not used in the GBIF backbone are shown in square "
-            "brackets.",
+            f" All taxon names are validated against the GBIF backbone taxonomy."
+            f"{gbif_text}",
+            taxon_index_to_html(gbif_taxon_index),
+        )
+    elif gbif_taxon_index and ncbi_taxon_index:
+        desc += tags.p(
+            tags.b("Taxonomic coverage: "),
+            tags.br(),
+            " For this dataset taxon names are validated against both the GBIF backbone"
+            " taxonomy and the NCBI taxonomy database.",
+            tags.br(),
+            tags.u("GBIF taxa details: "),
+            tags.br(),
+            f"{gbif_text}",
             taxon_index_to_html(gbif_taxon_index),
         )
 
-    # TODO - INSERT COMPARABLE FUNCTION FOR NCBITAXA, IF IT IS INCLUDED
+    # Similar handling used for the NCBI case
+    if ncbi_taxon_index and not gbif_taxon_index:
+        desc += tags.p(
+            tags.b("Taxonomic coverage: "),
+            tags.br(),
+            " All taxon names are validated against the NCBI taxonomy database."
+            f"{ncbi_text}",
+            # TODO - INSERT COMPARABLE FUNCTION FOR NCBITAXA, IF IT IS INCLUDED
+            # ncbi_index_to_html(ncbi_taxon_index),
+        )
+    elif ncbi_taxon_index and gbif_taxon_index:
+        desc += tags.p(
+            tags.u("NCBI taxa details: "),
+            tags.br(),
+            tags.br(),
+            f"{gbif_text}",
+            # ncbi_index_to_html(ncbi_taxon_index)
+        )
 
     if render:
         return desc.render()
