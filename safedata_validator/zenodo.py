@@ -970,13 +970,13 @@ def dataset_description(
         ""
     )
 
-    # TODO - FILL THIS IN PROPERLY
-    # SAY SOMETHING ABOUT NON-BACKBONE RANKS
-    # Database doesn't really provide much detail, just which have merged into which, so
-    # only this info is presented for synonyms
     ncbi_text = (
-        "If a dataset uses a synonym, the accepted usage is shown followed by the "
-        "dataset usage in brackets."
+        " If a dataset uses a synonym, the accepted usage is shown followed by the "
+        "dataset usage in brackets. Taxa that cannot be validated, e.g. new or unknown "
+        "species are shown in square brackets. Non-backbone taxonomic ranks (e.g. "
+        "strains or subphyla) can be validated using the NCBI database. However, they "
+        "will only be shown if the user explicitly provided a non-backbone taxon. When"
+        " they are shown they will be accompanied by an message stating their rank."
     )
 
     # When NCBI is absent use the old format for backwards compatibility
@@ -1015,7 +1015,7 @@ def dataset_description(
             tags.u("NCBI taxa details: "),
             tags.br(),
             tags.br(),
-            f"{gbif_text}",
+            f"{ncbi_text}",
             ncbi_index_to_html(ncbi_taxon_index),
         )
 
