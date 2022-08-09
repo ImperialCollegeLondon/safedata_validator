@@ -711,24 +711,24 @@ def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
     grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x["ncbi_parent_id"])}
 
     # start the stack with the superkingdoms - these taxa will have None as a parent
-    stack = [{"current": grouped[None][0], "next": grouped[None][1:]}]
+    stack = [({"current": grouped[None][0]}, {"next": grouped[None][1:]})]
 
     while stack:
 
         # Handle the current top of the stack: format the canonical name
-        current = stack[-1]["current"]
+        current = stack[-1][0]["current"]
         canon_name = _format_name(current)
 
         # Look for a non-None entry in next that shares the same worksheet name
         next_ws_names = [
             tx["worksheet_name"]
-            for tx in stack[-1]["next"]
+            for tx in stack[-1][1]["next"]
             if tx["worksheet_name"] is not None
         ]
 
         if current["worksheet_name"] in next_ws_names:
             # pop out the matching entry and find which is 'accepted'
-            name_pair = stack[-1]["next"].pop(
+            name_pair = stack[-1][1]["next"].pop(
                 next_ws_names.index(current["worksheet_name"])
             )
             if current["ncbi_status"] == "accepted":
@@ -742,9 +742,9 @@ def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
             txt = [
                 _indent(len(stack)),
                 canon_name,
-                " (as ",
+                " (",
                 as_status,
-                ": ",
+                " from: ",
                 as_name,
                 ")",
                 tags.br(),
@@ -760,7 +760,7 @@ def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
         parent_id = current["ncbi_taxon_id"]
         if parent_id in grouped:
             stack.append(
-                {"current": grouped[parent_id][0], "next": grouped[parent_id][1:]}
+                ({"current": grouped[parent_id][0]}, {"next": grouped[parent_id][1:]})
             )
         else:
             while stack:
@@ -994,8 +994,10 @@ def dataset_description(
             tags.br(),
             " For this dataset taxon names are validated against both the GBIF backbone"
             " taxonomy and the NCBI taxonomy database.",
-            tags.br(),
+        )
+        desc += tags.p(
             tags.u("GBIF taxa details: "),
+            tags.br(),
             tags.br(),
             f"{gbif_text}",
             taxon_index_to_html(gbif_taxon_index),
