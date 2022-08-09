@@ -104,7 +104,14 @@ site.
 
 ### Metadata server
 
-TODO - THINK ABOUT WHAT I SAY HERE
+Zenodo only allows a fairly limited amount of metadata to be stored for each dataset.
+While this is completely adequate to describe the contents of a dataset, more extensive
+metadata must be stored elsewhere if detailed searches within datasets are desired. In
+our case, the SAFE project [website](https://safeproject.net) is used as a metadata
+server, which provides an API allowing searches across all uploaded datasets. A further
+package in the SAFE data ecosystem
+([`safedata`](https://imperialcollegelondon.github.io/safedata/)) has been built, in
+order to simplify the process of querying this API for end users.
 
 ### NCBI API
 

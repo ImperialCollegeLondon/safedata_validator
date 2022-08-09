@@ -2786,6 +2786,7 @@ class Taxa:
         return self.gbif_taxa.taxon_names.intersection(self.ncbi_taxa.taxon_names)
 
 
+# TODO - Decide whether to delete this function
 def taxon_index_to_text(
     taxon_index: list, html: bool = False, indent_width: int = 4
 ) -> str:

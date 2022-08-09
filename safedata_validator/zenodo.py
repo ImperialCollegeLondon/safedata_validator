@@ -672,7 +672,6 @@ def taxon_index_to_html(taxa: list[dict]) -> tags.div:
     return html
 
 
-# TODO - FIX MYPY ERRORS
 def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
     """Generate an HTML formatted taxon list for an NCBI index.
 
