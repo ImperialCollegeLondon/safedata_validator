@@ -37,7 +37,7 @@ import shutil
 from itertools import groupby
 from typing import Union
 
-import requests
+import requests  # type: ignore
 import rispy
 import simplejson
 from dominate import tags
@@ -609,24 +609,24 @@ def taxon_index_to_html(taxa: list[dict]) -> tags.div:
     grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x["gbif_parent_id"])}
 
     # start the stack with the kingdoms - these taxa will have None as a parent
-    stack = [{"current": grouped[None][0], "next": grouped[None][1:]}]
+    stack = [({"current": grouped[None][0]}, {"next": grouped[None][1:]})]
 
     while stack:
 
         # Handle the current top of the stack: format the canonical name
-        current = stack[-1]["current"]
+        current = stack[-1][0]["current"]
         canon_name = _format_name(current)
 
         # Look for a non-None entry in next that shares the same worksheet name
         next_ws_names = [
             tx["worksheet_name"]
-            for tx in stack[-1]["next"]
+            for tx in stack[-1][1]["next"]
             if tx["worksheet_name"] is not None
         ]
 
         if current["worksheet_name"] in next_ws_names:
             # pop out the matching entry and find which is 'accepted'
-            name_pair = stack[-1]["next"].pop(
+            name_pair = stack[-1][1]["next"].pop(
                 next_ws_names.index(current["worksheet_name"])
             )
             if current["gbif_status"] == "accepted":
@@ -658,13 +658,15 @@ def taxon_index_to_html(taxa: list[dict]) -> tags.div:
         parent_id = current["gbif_taxon_id"]
         if parent_id in grouped:
             stack.append(
-                {"current": grouped[parent_id][0], "next": grouped[parent_id][1:]}
+                ({"current": grouped[parent_id][0]}, {"next": grouped[parent_id][1:]})
             )
         else:
             while stack:
                 push = stack.pop()
-                if push["next"]:
-                    stack.append({"current": push["next"][0], "next": push["next"][1:]})
+                if push[1]["next"]:
+                    stack.append(
+                        ({"current": push[1]["next"][0]}, {"next": push[1]["next"][1:]})
+                    )
                     break
 
     return html
@@ -765,8 +767,10 @@ def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
         else:
             while stack:
                 push = stack.pop()
-                if push["next"]:
-                    stack.append({"current": push["next"][0], "next": push["next"][1:]})
+                if push[1]["next"]:
+                    stack.append(
+                        ({"current": push[1]["next"][0]}, {"next": push[1]["next"][1:]})
+                    )
                     break
 
     return html
