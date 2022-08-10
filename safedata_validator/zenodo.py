@@ -573,6 +573,7 @@ Dataset description generation (HTML and GEMINI XML)
 """
 
 
+# TODO - Fix multiple branch error
 def taxon_index_to_html(taxa: list[dict]) -> tags.div:
     """Generate an HTML formatted taxon list.
 
@@ -695,14 +696,18 @@ def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
     def _format_name(tx):
 
         # format the canonical name
-        if tx["taxon_rank"] in ["genus", "species", "subspecies"]:
-            return tags.i(tx["taxon_name"])
-        elif tx["ncbi_status"] == "user":
-            return f"[{tx['taxon_name']}]"
-        elif tx["taxon_rank"] not in BACKBONE_RANKS_EX:
-            return f"{tx['taxon_name']} (non-backbone rank: {tx['taxon_rank']})"
+        if tx["ncbi_status"] == "user":
+            if tx["taxon_rank"] in BACKBONE_RANKS_EX:
+                return f"[{tx['taxon_name']}]"
+            else:
+                return f"[{tx['taxon_name']}]  (non-backbone rank: {tx['taxon_rank']})"
         else:
-            return tx["taxon_name"]
+            if tx["taxon_rank"] in ["genus", "species", "subspecies"]:
+                return tags.i(tx["taxon_name"])
+            elif tx["taxon_rank"] not in BACKBONE_RANKS_EX:
+                return f"{tx['taxon_name']} (non-backbone rank: {tx['taxon_rank']})"
+            else:
+                return tx["taxon_name"]
 
     # Container to hold the output
     html = tags.div()
@@ -1437,7 +1442,7 @@ def sync_local_dir(
     replace_modified: bool = False,
     resources: Resources = None,
 ) -> None:
-    """Syncronise a local data directory with a Zenodo community.
+    """Synchronise a local data directory with a Zenodo community.
 
     The safedata R package defines a directory structure used to store metadata and
     files downloaded from a safedata community on Zenodo and from a safedata metadata
