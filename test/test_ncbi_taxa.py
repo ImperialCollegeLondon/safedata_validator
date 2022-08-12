@@ -45,8 +45,8 @@ def test_efetch_status_errors(
 
     # Call the service, which will send a request to the server.
     with pytest.raises(expected_exception[1], match=expected_exception[0]):
-        _ = v._taxonomy_efetch(0)
-        _ = v._taxonomy_esearch("NAME")
+        v._taxonomy_efetch(2)
+        v._taxonomy_esearch("Bacteria")
 
 
 # ------------------------------------------
