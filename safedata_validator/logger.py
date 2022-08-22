@@ -147,9 +147,8 @@ class IndentFormatter(logging.Formatter):
         msg = logging.Formatter.format(self, rec)
 
         # Add any joined values as repr
-        join = getattr(rec, "join")
-        if join is not None:
-            msg += ", ".join([repr(o) for o in join])
+        if hasattr(rec, "join"):
+            msg += ", ".join([repr(o) for o in getattr(rec, "join")])
 
         return self.indent * self.depth + msg
 
