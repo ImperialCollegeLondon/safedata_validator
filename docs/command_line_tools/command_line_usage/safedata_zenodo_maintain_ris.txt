@@ -1,5 +1,6 @@
-cl_prompt $ safedata_zenodo ris -h
-usage: safedata_zenodo ris [-h] ris_file
+cl_prompt $ safedata_zenodo maintain_ris -h
+usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ... maintain_ris
+       [-h] ris_file
 
 This command maintains a RIS format bibliography file of the datasets
 uploaded to a Zenodo community. It can update an existing RIS format file

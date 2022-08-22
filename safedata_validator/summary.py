@@ -20,6 +20,7 @@ from safedata_validator.logger import (
     LOGGER,
     loggerinfo_push_pop,
 )
+from safedata_validator.resources import Resources
 from safedata_validator.validators import (
     IsNotSpace,
     IsString,
@@ -185,7 +186,7 @@ class Summary:
         ),
     )
 
-    def __init__(self, resources):
+    def __init__(self, resources: Resources):
 
         self.project_id = None
         self.title = None
