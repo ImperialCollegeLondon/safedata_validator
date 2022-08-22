@@ -25,8 +25,39 @@ when a new Dataset is being validated.
 import logging
 from functools import wraps
 from io import StringIO
+from typing import Any, Callable
 
 from typing_extensions import Type
+
+LOGGER_CODES = {
+    "DEBUG": ">",
+    "INFO": "-",
+    "WARNING": "?",
+    "ERROR": "!",
+    "CRITICAL": "X",
+}
+
+
+# Extend the logging record factory to include custom attributes. This could also be
+# achieved by changing all the level names: https://stackoverflow.com/questions/47035760
+old_factory = logging.getLogRecordFactory()
+
+
+def record_factory(*args, **kwargs):
+    """Logging record factory with extended attributes.
+
+    The representation of logging records uses single character codes to show logging
+    levels. This record factory adds custom attributes to records to
+    support that behavour.
+
+    """
+    record = old_factory(*args, **kwargs)
+    record.levelcode = LOGGER_CODES[record.levelname]
+
+    return record
+
+
+logging.setLogRecordFactory(record_factory)
 
 
 class CounterHandler(logging.StreamHandler):
@@ -79,7 +110,7 @@ class IndentFormatter(logging.Formatter):
 
     def __init__(
         self,
-        fmt: str = "%(indent)s%(levelcode)s %(message)s",
+        fmt: str = "%(levelcode)s %(message)s",
         datefmt: str = None,
         indent: str = "    ",
     ) -> None:
@@ -111,26 +142,16 @@ class IndentFormatter(logging.Formatter):
         Args:
             rec: The logging record to be formatted.
         """
-        rec.indent = self.indent * self.depth
 
-        # encode level
-        codes = {
-            "DEBUG": ">",
-            "INFO": "-",
-            "WARNING": "?",
-            "ERROR": "!",
-            "CRITICAL": "X",
-        }
-        rec.levelcode = codes[rec.levelname]
-
-        # format message
+        # Format message
         msg = logging.Formatter.format(self, rec)
 
-        # add any joined values as repr
-        if hasattr(rec, "join"):
-            msg += ", ".join([repr(o) for o in rec.join])
+        # Add any joined values as repr
+        join = getattr(rec, "join")
+        if join is not None:
+            msg += ", ".join([repr(o) for o in join])
 
-        return msg
+        return self.indent * self.depth + msg
 
 
 # Setup the logging instance
@@ -214,7 +235,7 @@ def log_and_raise(msg: str, exception: Type[Exception]) -> None:
 # https://stackoverflow.com/questions/10176226/how-do-i-pass-extra-arguments-to-a-python-decorator
 
 
-def loggerinfo_push_pop(wrapper_message: str) -> None:
+def loggerinfo_push_pop(wrapper_message: str) -> Callable:
     """Wrap a callable with an Info logging message and indentation.
 
     This decorator is used to reduce boilerplate logger code within functions. It emits
@@ -225,9 +246,9 @@ def loggerinfo_push_pop(wrapper_message: str) -> None:
         wrapper_message: The test to use in the info logging message.
     """
 
-    def decorator_func(function):
+    def decorator_func(function: Callable) -> Callable:
         @wraps(function)
-        def wrapped_func(*args, **kwargs):
+        def wrapped_func(*args, **kwargs: Any):
 
             # Emit the logger info and step in a level
             LOGGER.info(wrapper_message)
