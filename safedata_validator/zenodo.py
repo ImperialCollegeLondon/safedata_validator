@@ -37,7 +37,7 @@ import shutil
 from itertools import groupby
 from typing import Union
 
-import requests
+import requests  # type: ignore
 import rispy
 import simplejson
 from dominate import tags
@@ -48,6 +48,7 @@ from tqdm.utils import CallbackIOWrapper
 
 from safedata_validator.logger import FORMATTER, LOGGER
 from safedata_validator.resources import Resources
+from safedata_validator.taxa import BACKBONE_RANKS_EX
 
 # Constant definition of zenodo action function response type
 ZenodoFunctionResponseType = tuple[Union[dict, None], Union[str, None]]
@@ -282,7 +283,7 @@ def upload_metadata(
 
     # trap errors in uploading metadata and tidy up
     if mtd.status_code != 200:
-        return None, mtd.json()
+        return None, mtd.reason
     else:
         return "success", None
 
@@ -572,6 +573,7 @@ Dataset description generation (HTML and GEMINI XML)
 """
 
 
+# TODO - Fix multiple branch error
 def taxon_index_to_html(taxa: list[dict]) -> tags.div:
     """Generate an HTML formatted taxon list.
 
@@ -608,24 +610,24 @@ def taxon_index_to_html(taxa: list[dict]) -> tags.div:
     grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x["gbif_parent_id"])}
 
     # start the stack with the kingdoms - these taxa will have None as a parent
-    stack = [{"current": grouped[None][0], "next": grouped[None][1:]}]
+    stack = [({"current": grouped[None][0]}, {"next": grouped[None][1:]})]
 
     while stack:
 
         # Handle the current top of the stack: format the canonical name
-        current = stack[-1]["current"]
+        current = stack[-1][0]["current"]
         canon_name = _format_name(current)
 
         # Look for a non-None entry in next that shares the same worksheet name
         next_ws_names = [
             tx["worksheet_name"]
-            for tx in stack[-1]["next"]
+            for tx in stack[-1][1]["next"]
             if tx["worksheet_name"] is not None
         ]
 
         if current["worksheet_name"] in next_ws_names:
             # pop out the matching entry and find which is 'accepted'
-            name_pair = stack[-1]["next"].pop(
+            name_pair = stack[-1][1]["next"].pop(
                 next_ws_names.index(current["worksheet_name"])
             )
             if current["gbif_status"] == "accepted":
@@ -654,16 +656,125 @@ def taxon_index_to_html(taxa: list[dict]) -> tags.div:
         # Is this taxon a parent for other taxa - if so add that taxon to the top of
         # the stack, otherwise start looking for a next taxon to push onto the stack.
         # If there is none at the top, pop and look down.
-        parent_id = current["gbif_id"]
+        parent_id = current["gbif_taxon_id"]
         if parent_id in grouped:
             stack.append(
-                {"current": grouped[parent_id][0], "next": grouped[parent_id][1:]}
+                ({"current": grouped[parent_id][0]}, {"next": grouped[parent_id][1:]})
             )
         else:
             while stack:
                 push = stack.pop()
-                if push["next"]:
-                    stack.append({"current": push["next"][0], "next": push["next"][1:]})
+                if push[1]["next"]:
+                    stack.append(
+                        ({"current": push[1]["next"][0]}, {"next": push[1]["next"][1:]})
+                    )
+                    break
+
+    return html
+
+
+def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
+    """Generate an HTML formatted taxon list for an NCBI index.
+
+    Takes a taxon index - a list containing taxon dictionaries - and converts into
+    an dominate.tags.div() object containing a simple HTML representation of the
+    taxonomy. The representation uses indentation to show taxonomic depth. This function
+    differs from `taxon_index_to_html` in that it works for NCBI indices rather than
+    GBIF.
+
+    Arguments:
+        taxa: A list of taxon dictionaries containing the taxa for a dataset.
+
+    Returns:
+        A `dominate.tags.div` object containing an HTML representation of the taxa.
+    """
+
+    def _indent(n):
+
+        return raw("&ensp;-&ensp;" * n)
+
+    def _format_name(tx):
+
+        # format the canonical name
+        if tx["ncbi_status"] == "user":
+            if tx["taxon_rank"] in BACKBONE_RANKS_EX:
+                return f"[{tx['taxon_name']}]"
+            else:
+                return f"[{tx['taxon_name']}]  (non-backbone rank: {tx['taxon_rank']})"
+        else:
+            if tx["taxon_rank"] in ["genus", "species", "subspecies"]:
+                return tags.i(tx["taxon_name"])
+            elif tx["taxon_rank"] not in BACKBONE_RANKS_EX:
+                return f"{tx['taxon_name']} (non-backbone rank: {tx['taxon_rank']})"
+            else:
+                return tx["taxon_name"]
+
+    # Container to hold the output
+    html = tags.div()
+
+    # group by parent taxon, substituting 0 for None
+    taxa.sort(key=lambda x: x["ncbi_parent_id"] or 0)
+    grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x["ncbi_parent_id"])}
+
+    # start the stack with the superkingdoms - these taxa will have None as a parent
+    stack = [({"current": grouped[None][0]}, {"next": grouped[None][1:]})]
+
+    while stack:
+
+        # Handle the current top of the stack: format the canonical name
+        current = stack[-1][0]["current"]
+        canon_name = _format_name(current)
+
+        # Look for a non-None entry in next that shares the same worksheet name
+        next_ws_names = [
+            tx["worksheet_name"]
+            for tx in stack[-1][1]["next"]
+            if tx["worksheet_name"] is not None
+        ]
+
+        if current["worksheet_name"] in next_ws_names:
+            # pop out the matching entry and find which is 'accepted'
+            name_pair = stack[-1][1]["next"].pop(
+                next_ws_names.index(current["worksheet_name"])
+            )
+            if current["ncbi_status"] == "accepted":
+                as_name = _format_name(name_pair)
+                as_status = name_pair["ncbi_status"]
+            else:
+                as_name = canon_name
+                as_status = current["ncbi_status"]
+                canon_name = _format_name(name_pair)
+
+            txt = [
+                _indent(len(stack)),
+                canon_name,
+                " (",
+                as_status,
+                " from: ",
+                as_name,
+                ")",
+                tags.br(),
+            ]
+        else:
+            txt = [_indent(len(stack)), canon_name, tags.br()]
+
+        html += txt
+
+        # Is this taxon a parent for other taxa - if so add that taxon to the top of
+        # the stack, otherwise start looking for a next taxon to push onto the stack.
+        # If there is none at the top, pop and look down.
+        parent_id = current["ncbi_taxon_id"]
+        if parent_id in grouped:
+            stack.append(
+                ({"current": grouped[parent_id][0]}, {"next": grouped[parent_id][1:]})
+            )
+        else:
+            while stack:
+                push = stack.pop()
+                if push[1]["next"]:
+                    stack.append(
+                        ({"current": push[1]["next"][0]}, {"next": push[1]["next"][1:]})
+                    )
                     break
 
     return html
@@ -855,19 +966,67 @@ def dataset_description(
             "{0[0]:.4f} to {0[1]:.4f}".format(metadata["longitudinal_extent"]),
         )
 
-    # Add taxa
-    taxon_index = metadata.get("taxa")
-    if taxon_index:
+    # Find taxa data from each database (if they exist)
+    gbif_taxon_index = metadata.get("gbif_taxa")
+    ncbi_taxon_index = metadata.get("ncbi_taxa")
+
+    gbif_text = (
+        " If a dataset uses a synonym, the accepted usage is shown followed by the "
+        "dataset usage in brackets. Taxa that cannot be validated, including new "
+        "species and other unknown taxa, morphospecies, functional groups and "
+        "taxonomic levels not used in the GBIF backbone are shown in square brackets."
+        ""
+    )
+
+    ncbi_text = (
+        " If a dataset uses a synonym, the accepted usage is shown followed by the "
+        "dataset usage in brackets. Taxa that cannot be validated, e.g. new or unknown "
+        "species are shown in square brackets. Non-backbone taxonomic ranks (e.g. "
+        "strains or subphyla) can be validated using the NCBI database. However, they "
+        "will only be shown if the user explicitly provided a non-backbone taxon. When"
+        " they are shown they will be accompanied by an message stating their rank."
+    )
+
+    # When NCBI is absent use the old format for backwards compatibility
+    if gbif_taxon_index and not ncbi_taxon_index:
         desc += tags.p(
             tags.b("Taxonomic coverage: "),
             tags.br(),
-            " All taxon names are validated against the GBIF backbone taxonomy. If a "
-            "dataset uses a synonym, the accepted usage is shown followed by the "
-            "dataset usage in brackets. Taxa that cannot be validated, including new "
-            "species and other unknown taxa, morphospecies, functional groups and  "
-            "taxonomic levels not used in the GBIF backbone are shown in square "
-            "brackets.",
-            taxon_index_to_html(taxon_index),
+            f" All taxon names are validated against the GBIF backbone taxonomy."
+            f"{gbif_text}",
+            taxon_index_to_html(gbif_taxon_index),
+        )
+    elif gbif_taxon_index and ncbi_taxon_index:
+        desc += tags.p(
+            tags.b("Taxonomic coverage: "),
+            tags.br(),
+            " For this dataset taxon names are validated against both the GBIF backbone"
+            " taxonomy and the NCBI taxonomy database.",
+        )
+        desc += tags.p(
+            tags.u("GBIF taxa details: "),
+            tags.br(),
+            tags.br(),
+            f"{gbif_text}",
+            taxon_index_to_html(gbif_taxon_index),
+        )
+
+    # Similar handling used for the NCBI case
+    if ncbi_taxon_index and not gbif_taxon_index:
+        desc += tags.p(
+            tags.b("Taxonomic coverage: "),
+            tags.br(),
+            " All taxon names are validated against the NCBI taxonomy database."
+            f"{ncbi_text}",
+            ncbi_index_to_html(ncbi_taxon_index),
+        )
+    elif ncbi_taxon_index and gbif_taxon_index:
+        desc += tags.p(
+            tags.u("NCBI taxa details: "),
+            tags.br(),
+            tags.br(),
+            f"{ncbi_text}",
+            ncbi_index_to_html(ncbi_taxon_index),
         )
 
     if render:
@@ -1283,7 +1442,7 @@ def sync_local_dir(
     replace_modified: bool = False,
     resources: Resources = None,
 ) -> None:
-    """Syncronise a local data directory with a Zenodo community.
+    """Synchronise a local data directory with a Zenodo community.
 
     The safedata R package defines a directory structure used to store metadata and
     files downloaded from a safedata community on Zenodo and from a safedata metadata

@@ -14,19 +14,27 @@ locations = /path/to/locations.json
 gbif_database = /path/to/local/backbone.sqlite3
 ncbi_database = /path/to/local/ncbi_database.sqlite3
 [extents]
-temporal_soft_extent = 2002-02-01, 2030-02-01
+temporal_soft_extent = 2002-02-02, 2030-01-31
 temporal_hard_extent = 2002-02-01, 2030-02-01
 latitudinal_hard_extent = -90, 90
-latitudinal_soft_extent = -4, 2
+latitudinal_soft_extent = -4, 6
 longitudinal_hard_extent = -180, 180
 longitudinal_soft_extent = 110, 120
 [zenodo]
 community_name = safe
-use_sandbox = True
+use_sandbox = true
 zenodo_sandbox_api = https://sandbox.zenodo.org
-zenodo_sandbox_token = xyz
 zenodo_api = https://api.zenodo.org
-zenodo_token = xyz
+zenodo_sandbox_token = xyz
+zenodo_token = abc
+contact_name = The SAFE Project
+contact_affiliation = Imperial College London
+contact_orcid = 0000-0003-3378-2814
+[metadata]
+api = https://safeproject.net
+token = xyz
+[ncbi]
+api_key = xyz
 ```
 
 ### Locations
@@ -71,13 +79,49 @@ on geographic coordinates:
 
 ### Zenodo
 
-!!! Warning "In development"
-
-  These features are in development and are not yet functional.
-
 The `safedata_validator` package provides functionality for publishing validated
 datasets to the Zenodo data repository. In order to do this, the Zenodo
 community name and access keys need to be stored in the configuration file.
+
+On Zenodo datasets are generally uploaded to specific communities. The community to
+upload the dataset to is indicated in the configuration file by the `community_name`
+option. In our case it is set to upload datasets to the [SAFE project Zenodo
+community](https://zenodo.org/communities/safe). Uploading to a community requires that
+you hold proper admin credentials for said community. These are provided in the form of
+a `zenodo_token`. It is also important to provide the contact details of the community
+when interacting with the api. These consist of the full community name, affiliation,
+and orchid ID, and are provided by `contact_name`, `contact_affiliation`, and
+`contact_orcid`, respectively.
+
+When testing dataset uploads the normal Zenodo api should **not** be used. Instead the
+sandbox api should be used. Documentation of this can be found
+[here](https://developers.zenodo.org/#testing). The sandbox provides an identical
+environment to the real Zenodo site, so that upload function outputs can be checked,
+without adding unnecessary (or invalid) datasets to the official repository. Sandbox is
+enabled by specifying `use_sandbox = true` in the configuration file. A different token
+(`zenodo_sandbox_token`) has to be provided to upload to a community on the sandbox
+site.
+
+### Metadata server
+
+Zenodo only allows a fairly limited amount of metadata to be stored for each dataset.
+While this is completely adequate to describe the contents of a dataset, more extensive
+metadata must be stored elsewhere if detailed searches within datasets are desired. In
+our case, the SAFE project [website](https://safeproject.net) is used as a metadata
+server, which provides an API allowing searches across all uploaded datasets. A further
+package in the SAFE data ecosystem
+([`safedata`](https://imperialcollegelondon.github.io/safedata/)) has been built, in
+order to simplify the process of querying this API for end users.
+
+### NCBI API
+
+Remote NCBI validation is very slow due to requests being rate limited to a maximum of 3
+requests per second. However, if an API key is provided the rate limit increases to 10
+requests per second. An API key can be obtained by registering for an NCBI account and
+then requesting one, instructions for this can be found
+[here](https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/).
+When this key is included in the configuration file `safedata_validator` will make use
+of it for all remote validation requests.
 
 ## Configuration file location
 

@@ -374,15 +374,14 @@ class Dataset:
             # TODO: remember that DB API should populate:
             #   * dataset_id to link from taxon searches to datasets
             #  * id (what's this? Erroneous row ID in query?)
-            # TODO - keep NCBI and GBIF separate here?
-            taxa=[
+            # Gbif taxa if they exist
+            gbif_taxa=[
                 dict(
                     zip(
                         (
-                            "taxon_db",
                             "worksheet_name",
-                            "taxon_id",
-                            "taxon_parent_id",
+                            "gbif_taxon_id",
+                            "gbif_parent_id",
                             "taxon_name",
                             "taxon_rank",
                             "gbif_status",
@@ -390,7 +389,24 @@ class Dataset:
                         tx,
                     )
                 )
-                for tx in self.taxa.combined_index
+                for tx in self.taxa.gbif_taxa.taxon_index
+            ],
+            # NCBI taxa if they exist
+            ncbi_taxa=[
+                dict(
+                    zip(
+                        (
+                            "worksheet_name",
+                            "ncbi_taxon_id",
+                            "ncbi_parent_id",
+                            "taxon_name",
+                            "taxon_rank",
+                            "ncbi_status",
+                        ),
+                        tx,
+                    )
+                )
+                for tx in self.taxa.ncbi_taxa.taxon_index
             ],
             # Locations
             locations=[

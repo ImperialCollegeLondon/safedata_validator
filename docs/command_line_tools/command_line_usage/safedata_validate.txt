@@ -1,4 +1,4 @@
-cl_prompt $ safedata_safedata_validate -h
+cl_prompt $ safedata_validate -h
 usage: safedata_validate [-h] [-p VALID_PID] [-r RESOURCES] [--validate_doi]
                          [--chunk_size CHUNK_SIZE] [--version]
                          filename

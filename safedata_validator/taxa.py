@@ -1628,7 +1628,7 @@ class GBIFTaxa:
             gbif_parent_id (int),
             canonical_name (str),
             taxonomic_rank (str),
-            status (str)]
+            gbif_status (str)]
 
         Where a taxon is not accepted or doubtful on GBIF, two entries are
         inserted for the taxon, one under the canon name and one under the
@@ -2242,11 +2242,11 @@ class NCBITaxa:
         of lists structured as:
 
             [worksheet_name (str),
-            gbif_id (int),
-            gbif_parent_id (int),
+            ncbi_id (int),
+            ncbi_parent_id (int),
             canonical_name (str),
             taxonomic_rank (str),
-            status (str)]
+            ncbi_status (str)]
 
         Where a taxon is not accepted or doubtful on GBIF, two entries are
         inserted for the taxon, one under the canon name and one under the
@@ -2786,10 +2786,11 @@ class Taxa:
         return self.gbif_taxa.taxon_names.intersection(self.ncbi_taxa.taxon_names)
 
 
+# TODO - Decide whether to delete this function
 def taxon_index_to_text(
     taxon_index: list, html: bool = False, indent_width: int = 4
 ) -> str:
-    """Render a GBIFTaxa or NCBITaxa instance as text or html.
+    """Render a GBIFTaxa instance as text or html.
 
     This function takes a taxon index from a GBIFTaxa or NCBITaxa instance and renders
     the contents into a text representation of the taxonomic hierarchy used in the

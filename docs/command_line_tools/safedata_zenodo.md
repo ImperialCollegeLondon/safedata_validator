@@ -58,7 +58,7 @@ safedata_validate Test_format_good.xlsx
 
 # Create a new deposit, creating a JSON file of metadata for the Zenodo deposit
 # as - for example - zenodo_1059375.json
-safedata_zenodo create
+safedata_zenodo create_deposit
 
 # Upload the file
 safedata_zenodo upload_file zenodo_1059375.json Test_format_good.xlsx
@@ -67,7 +67,7 @@ safedata_zenodo upload_file zenodo_1059375.json Test_format_good.xlsx
 safedata_zenodo upload_metadata zenodo_1059375.json Test_format_good.json
 
 # Publish the deposit
-safedata_zenodo publish zenodo_1059375.json
+safedata_zenodo publish_deposit zenodo_1059375.json
 
 # Post the metadata to the metadata server
 safedata_zenodo post_metadata zenodo_1059375.json Test_format_good.json
