@@ -48,7 +48,11 @@ from tqdm.utils import CallbackIOWrapper
 
 from safedata_validator.logger import FORMATTER, LOGGER
 from safedata_validator.resources import Resources
-from safedata_validator.taxa import BACKBONE_RANKS_EX
+from safedata_validator.taxa import (
+    BACKBONE_RANKS_EX,
+    ncbi_index_to_html,
+    taxon_index_to_text,
+)
 
 # Constant definition of zenodo action function response type
 ZenodoFunctionResponseType = tuple[Union[dict, None], Union[str, None]]
@@ -573,213 +577,6 @@ Dataset description generation (HTML and GEMINI XML)
 """
 
 
-# TODO - Fix multiple branch error
-def taxon_index_to_html(taxa: list[dict]) -> tags.div:
-    """Generate an HTML formatted taxon list.
-
-    Takes a taxon index - a list containing taxon dictionaries - and converts into
-    an dominate.tags.div() object containing a simple HTML representation of the
-    taxonomy. The representation uses indentation to show taxonomic depth.
-
-    Arguments:
-        taxa: A list of taxon dictionaries containing the taxa for a dataset.
-
-    Returns:
-        A `dominate.tags.div` object containing an HTML representation of the taxa.
-    """
-
-    def _indent(n):
-
-        return raw("&ensp;-&ensp;" * n)
-
-    def _format_name(tx):
-
-        # format the canonical name
-        if tx["taxon_rank"] in ["genus", "species", "subspecies"]:
-            return tags.i(tx["taxon_name"])
-        elif tx["taxon_rank"] in ["morphospecies", "functional group"]:
-            return f"[{tx['taxon_name']}]"
-        else:
-            return tx["taxon_name"]
-
-    # Container to hold the output
-    html = tags.div()
-
-    # group by parent taxon, substituting 0 for None
-    taxa.sort(key=lambda x: x["gbif_parent_id"] or 0)
-    grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x["gbif_parent_id"])}
-
-    # start the stack with the kingdoms - these taxa will have None as a parent
-    stack = [({"current": grouped[None][0]}, {"next": grouped[None][1:]})]
-
-    while stack:
-
-        # Handle the current top of the stack: format the canonical name
-        current = stack[-1][0]["current"]
-        canon_name = _format_name(current)
-
-        # Look for a non-None entry in next that shares the same worksheet name
-        next_ws_names = [
-            tx["worksheet_name"]
-            for tx in stack[-1][1]["next"]
-            if tx["worksheet_name"] is not None
-        ]
-
-        if current["worksheet_name"] in next_ws_names:
-            # pop out the matching entry and find which is 'accepted'
-            name_pair = stack[-1][1]["next"].pop(
-                next_ws_names.index(current["worksheet_name"])
-            )
-            if current["gbif_status"] == "accepted":
-                as_name = _format_name(name_pair)
-                as_status = name_pair["gbif_status"]
-            else:
-                as_name = canon_name
-                as_status = current["gbif_status"]
-                canon_name = _format_name(name_pair)
-
-            txt = [
-                _indent(len(stack)),
-                canon_name,
-                " (as ",
-                as_status,
-                ": ",
-                as_name,
-                ")",
-                tags.br(),
-            ]
-        else:
-            txt = [_indent(len(stack)), canon_name, tags.br()]
-
-        html += txt
-
-        # Is this taxon a parent for other taxa - if so add that taxon to the top of
-        # the stack, otherwise start looking for a next taxon to push onto the stack.
-        # If there is none at the top, pop and look down.
-        parent_id = current["gbif_taxon_id"]
-        if parent_id in grouped:
-            stack.append(
-                ({"current": grouped[parent_id][0]}, {"next": grouped[parent_id][1:]})
-            )
-        else:
-            while stack:
-                push = stack.pop()
-                if push[1]["next"]:
-                    stack.append(
-                        ({"current": push[1]["next"][0]}, {"next": push[1]["next"][1:]})
-                    )
-                    break
-
-    return html
-
-
-def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
-    """Generate an HTML formatted taxon list for an NCBI index.
-
-    Takes a taxon index - a list containing taxon dictionaries - and converts into
-    an dominate.tags.div() object containing a simple HTML representation of the
-    taxonomy. The representation uses indentation to show taxonomic depth. This function
-    differs from `taxon_index_to_html` in that it works for NCBI indices rather than
-    GBIF.
-
-    Arguments:
-        taxa: A list of taxon dictionaries containing the taxa for a dataset.
-
-    Returns:
-        A `dominate.tags.div` object containing an HTML representation of the taxa.
-    """
-
-    def _indent(n):
-
-        return raw("&ensp;-&ensp;" * n)
-
-    def _format_name(tx):
-
-        # format the canonical name
-        if tx["ncbi_status"] == "user":
-            if tx["taxon_rank"] in BACKBONE_RANKS_EX:
-                return f"[{tx['taxon_name']}]"
-            else:
-                return f"[{tx['taxon_name']}]  (non-backbone rank: {tx['taxon_rank']})"
-        else:
-            if tx["taxon_rank"] in ["genus", "species", "subspecies"]:
-                return tags.i(tx["taxon_name"])
-            elif tx["taxon_rank"] not in BACKBONE_RANKS_EX:
-                return f"{tx['taxon_name']} (non-backbone rank: {tx['taxon_rank']})"
-            else:
-                return tx["taxon_name"]
-
-    # Container to hold the output
-    html = tags.div()
-
-    # group by parent taxon, substituting 0 for None
-    taxa.sort(key=lambda x: x["ncbi_parent_id"] or 0)
-    grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x["ncbi_parent_id"])}
-
-    # start the stack with the superkingdoms - these taxa will have None as a parent
-    stack = [({"current": grouped[None][0]}, {"next": grouped[None][1:]})]
-
-    while stack:
-
-        # Handle the current top of the stack: format the canonical name
-        current = stack[-1][0]["current"]
-        canon_name = _format_name(current)
-
-        # Look for a non-None entry in next that shares the same worksheet name
-        next_ws_names = [
-            tx["worksheet_name"]
-            for tx in stack[-1][1]["next"]
-            if tx["worksheet_name"] is not None
-        ]
-
-        if current["worksheet_name"] in next_ws_names:
-            # pop out the matching entry and find which is 'accepted'
-            name_pair = stack[-1][1]["next"].pop(
-                next_ws_names.index(current["worksheet_name"])
-            )
-            if current["ncbi_status"] == "accepted":
-                as_name = _format_name(name_pair)
-                as_status = name_pair["ncbi_status"]
-            else:
-                as_name = canon_name
-                as_status = current["ncbi_status"]
-                canon_name = _format_name(name_pair)
-
-            txt = [
-                _indent(len(stack)),
-                canon_name,
-                " (",
-                as_status,
-                " from: ",
-                as_name,
-                ")",
-                tags.br(),
-            ]
-        else:
-            txt = [_indent(len(stack)), canon_name, tags.br()]
-
-        html += txt
-
-        # Is this taxon a parent for other taxa - if so add that taxon to the top of
-        # the stack, otherwise start looking for a next taxon to push onto the stack.
-        # If there is none at the top, pop and look down.
-        parent_id = current["ncbi_taxon_id"]
-        if parent_id in grouped:
-            stack.append(
-                ({"current": grouped[parent_id][0]}, {"next": grouped[parent_id][1:]})
-            )
-        else:
-            while stack:
-                push = stack.pop()
-                if push[1]["next"]:
-                    stack.append(
-                        ({"current": push[1]["next"][0]}, {"next": push[1]["next"][1:]})
-                    )
-                    break
-
-    return html
-
-
 def dataset_description(
     metadata: dict,
     zenodo: dict,
@@ -994,7 +791,7 @@ def dataset_description(
             tags.br(),
             f" All taxon names are validated against the GBIF backbone taxonomy."
             f"{gbif_text}",
-            taxon_index_to_html(gbif_taxon_index),
+            taxon_index_to_text(gbif_taxon_index, True),
         )
     elif gbif_taxon_index and ncbi_taxon_index:
         desc += tags.p(
@@ -1008,7 +805,7 @@ def dataset_description(
             tags.br(),
             tags.br(),
             f"{gbif_text}",
-            taxon_index_to_html(gbif_taxon_index),
+            taxon_index_to_text(gbif_taxon_index, True),
         )
 
     # Similar handling used for the NCBI case
