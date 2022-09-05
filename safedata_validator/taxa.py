@@ -1665,7 +1665,7 @@ class GBIFTaxa:
         self.taxon_names: set[str] = set()
         self.parents: dict[tuple, GBIFTaxon] = dict()
         self.hierarchy: set[list] = set()
-        self.n_errors = None
+        self.n_errors: Optional[int] = None
         self.taxon_names_used: set[str] = set()
 
         # Get a validator instance
@@ -2282,7 +2282,7 @@ class NCBITaxa:
         self.taxon_index: list[list] = []
         self.taxon_names: set[str] = set()
         self.hierarchy: set[tuple] = set()
-        self.n_errors = None
+        self.n_errors: Optional[int] = None
 
         # Get a validator instance
         self.validator: Union[LocalNCBIValidator, RemoteNCBIValidator]
