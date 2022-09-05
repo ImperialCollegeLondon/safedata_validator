@@ -8,9 +8,9 @@ methods for loading the summary data from file.
 
 import datetime
 import re
-from typing import Union
+from typing import Optional, Union
 
-import requests
+import requests  # type: ignore
 from openpyxl.worksheet.worksheet import Worksheet
 
 from safedata_validator.extent import Extent
@@ -43,7 +43,7 @@ class Summary:
     methods check the information provided in the summary worksheet and populates the
     attributes of the class instance to pass that information to other components.
 
-    The methods are intended to try andget as much information as possible from the
+    The methods are intended to try and get as much information as possible from the
     Summary table: the instance attributes may therefore be set to None for missing
     metadata, so classes using Summary should handle None values.
 
@@ -216,12 +216,12 @@ class Summary:
             soft_bounds=resources.extents.longitudinal_soft_extent,
         )
         self.external_files = None
-        self.data_worksheets = []
+        self.data_worksheets: list[Worksheet] = []
 
-        self._rows = None
+        self._rows: Optional[dict] = None
         self._ncols = None
-        self.n_errors = None
-        self.valid_pid = None
+        self.n_errors: Optional[int] = None
+        self.valid_pid: Optional[list[int]] = None
         self.validate_doi = False
 
     @loggerinfo_push_pop("Checking Summary worksheet")
@@ -325,7 +325,7 @@ class Summary:
     def _read_block(
         self, field_desc: tuple, mandatory: bool, title: str, only_one: bool
     ) -> Union[None, list]:
-        """Read a block of fields from a summmary table.
+        """Read a block of fields from a summary table.
 
         This internal method takes a given block definition from the Summary class
         [fields][safedata_validator.summary.Summary.fields] attribute and returns a list
