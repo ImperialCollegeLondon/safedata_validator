@@ -2799,12 +2799,12 @@ def taxon_index_to_text(
     dataset. Taxonomic ranks are indented to render a nested hierarchy.
 
     Args:
-        taxon_index: The taxon_index property of a GBIFTaxa or NCBITaxa instance.
-        html: Render as html or text
+        taxa: A list of taxon dictionaries containing the taxa for a dataset.
+        html: Render as html or text.
         indent_width: The indentation width to use for successive taxonomic ranks.
 
     Returns:
-        A `dominate.tags.div` object containing an HTML representation of the taxa.
+        A string containing either a HTML or text representation of the taxa tree.
     """
 
     lbr = "<br>" if html else "\n"
