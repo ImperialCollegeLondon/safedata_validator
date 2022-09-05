@@ -82,7 +82,7 @@ class Dataset:
         self.resources = resources
         self.summary = Summary(resources)
         self.taxa = Taxa(resources)
-        self.dataworksheets = []
+        self.dataworksheets: list[DataWorksheet] = []
         self.n_errors = 0
         self.passed = False
 
