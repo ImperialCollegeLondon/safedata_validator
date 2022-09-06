@@ -1,4 +1,5 @@
-"""
+"""Create a local GBIF backbone database.
+
 This script is used to build an SQLite3 database file containing the contents of
 the GBIF backbone taxonomy. It is not currently provided as a part of the package
 because the details of file names etc. change and so it is provided as a recipe.
@@ -7,10 +8,41 @@ because the details of file names etc. change and so it is provided as a recipe.
 import csv
 import sqlite3
 
-db_file = "local_db/gbif_2021-11-26/gbif_backbone.sqlite3"
+import requests
+from dateutil.parser import isoparse
+
+# These variable set the output location for the SQLITE file, paths for the the required
+# input files downloaded from GBIF and (optionally) the timestamp
+
+output_location = "local_db/gbif_2021-11-26/"
 drop_fields = ["name_published_in", "issues"]
 backbone = "local_db/gbif_2021-11-26/simple.txt"
 deleted = "local_db/gbif_2021-11-26/simple-deleted.txt"
+timestamp = None
+
+# Get the timestamp if none is provided
+if timestamp is None:
+    gbif_backbone = (
+        "https://api.gbif.org/v1/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c"
+    )
+    timestamp = requests.get(gbif_backbone)
+
+    if not timestamp.ok:
+        raise IOError("Could not read current backbone timestamp from GBIF API")
+
+    timestamp = timestamp.json()["pubDate"]
+
+# Validate the timestamp
+try:
+    timestamp = isoparse(timestamp)
+except ValueError:
+    raise ValueError(f"Could not parse timestamp: {timestamp}")
+
+# Render timestamp as ISO date
+timestamp_fmt = timestamp.date().isoformat()
+
+# Get the output filename
+db_file = f"gbif_backbone_{timestamp_fmt}.sqlite"
 
 # Create the schema for the table, using drop fields to remove unwanted fields
 # in the schema and the data tuples. The file_schema list describes the full set
