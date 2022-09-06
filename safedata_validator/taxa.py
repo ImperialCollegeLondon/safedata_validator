@@ -40,8 +40,8 @@ from logging import Formatter
 from typing import Optional, Union
 
 import requests  # type: ignore
-from dominate import tags  # TEMP - DELETE LATER
-from dominate.util import raw  # TEMP - DELETE LATER
+from dominate import tags
+from dominate.util import raw
 from lxml import etree
 from openpyxl import worksheet
 
@@ -2807,28 +2807,32 @@ def taxon_index_to_text(
         A string containing either a HTML or text representation of the taxa tree.
     """
 
-    lbr = "<br>" if html else "\n"
-
     def _indent(n, use_html=html):
 
-        ind = "&ensp;" if use_html else " "
-        return ind * indent_width * (n - 1)
+        if use_html:
+            return raw("&ensp;-&ensp;" * n)
+        else:
+            return " " * indent_width * (n - 1)
 
     def _format_name(tx, use_html=html):
 
         # format the canonical name
-        if tx[4] in ["genus", "species", "subspecies"]:
+        if tx["taxon_rank"] in ["genus", "species", "subspecies"]:
             if use_html:
-                return f"<i>{tx[3]}</i>"
+                return tags.i(tx["taxon_name"])
             else:
-                return f"_{tx[3]}_"
-        elif tx[4] in ["morphospecies", "functional group"]:
-            return f"[{tx[0]}]"
+                return f"_{tx['taxon_name']}_"
+        elif tx["taxon_rank"] in ["morphospecies", "functional group"]:
+            return f"[{tx['taxon_name']}]"
         else:
-            return tx[3]
+            return tx["taxon_name"]
 
-    # Container to hold the output
-    html_out = StringIO()
+    # Container type depends on whether or not
+    if html:
+        # Container to hold the output
+        html_out = tags.div()
+    else:
+        html_out = StringIO()
 
     # group by parent taxon, substituting 0 for None
     taxa.sort(key=lambda x: x["gbif_parent_id"] or 0)
@@ -2863,11 +2867,31 @@ def taxon_index_to_text(
                 as_status = current["gbif_status"]
                 canon_name = _format_name(name_pair)
 
-            txt = f"{_indent(len(stack))} {canon_name} (as {as_status}: {as_name}){lbr}"
+            if html:
+                html_txt = [
+                    _indent(len(stack)),
+                    canon_name,
+                    " (as ",
+                    as_status,
+                    ": ",
+                    as_name,
+                    ")",
+                    tags.br(),
+                ]
+            else:
+                txt = (
+                    f"{_indent(len(stack))} {canon_name} (as {as_status}: {as_name})\n"
+                )
         else:
-            txt = f"{_indent(len(stack))} {canon_name}{lbr}"
+            if html:
+                html_txt = [_indent(len(stack)), canon_name, tags.br()]
+            else:
+                txt = f"{_indent(len(stack))} {canon_name}\n"
 
-        html_out.write(txt)
+        if html:
+            html_out += html_txt
+        else:
+            html_out.write(txt)
 
         # Is this taxon a parent for other taxa - if so add that taxon to the top of
         # the stack, otherwise start looking for a next taxon to push onto the stack.
@@ -2886,7 +2910,10 @@ def taxon_index_to_text(
                     )
                     break
 
-    return html_out.getvalue()
+    if html:
+        return html_out
+    else:
+        return html_out.getvalue()
 
 
 def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
