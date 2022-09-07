@@ -2789,13 +2789,11 @@ class Taxa:
 
 
 # TODO - Fix multiple branch error
-def taxon_index_to_text(
-    taxa: list[dict], html: bool = False, indent_width: int = 4
-) -> str:
+def taxon_index_to_text(taxa: list[dict], html: bool = False, indent_width: int = 4):
     """Render a GBIFTaxa instance as text or html.
 
-    This function takes a taxon index from a GBIFTaxa or NCBITaxa instance and renders
-    the contents into a text representation of the taxonomic hierarchy used in the
+    This function takes a taxon index from a GBIFTaxa instance and renders the contents
+    into either a text or html representation of the taxonomic hierarchy used in the
     dataset. Taxonomic ranks are indented to render a nested hierarchy.
 
     Args:
@@ -2804,7 +2802,7 @@ def taxon_index_to_text(
         indent_width: The indentation width to use for successive taxonomic ranks.
 
     Returns:
-        A string containing either a HTML or text representation of the taxa tree.
+        Either a HTML or text representation of the taxa tree.
     """
 
     def _indent(n, use_html=html):
@@ -2827,7 +2825,7 @@ def taxon_index_to_text(
         else:
             return tx["taxon_name"]
 
-    # Container type depends on whether or not
+    # Container type depends on whether or not html output is required
     if html:
         # Container to hold the output
         html_out = tags.div()
@@ -2916,27 +2914,32 @@ def taxon_index_to_text(
         return html_out.getvalue()
 
 
-def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
-    """Generate an HTML formatted taxon list for an NCBI index.
+def ncbi_index_to_text(taxa: list[dict], html: bool = False, indent_width: int = 4):
+    """Render a NCBITaxa instance as text or html.
 
-    Takes a taxon index - a list containing taxon dictionaries - and converts into
-    an dominate.tags.div() object containing a simple HTML representation of the
-    taxonomy. The representation uses indentation to show taxonomic depth. This function
+    This function takes a taxon index from a NCBITaxa instance and renders the contents
+    into either a text or html representation of the taxonomic hierarchy used in the
+    dataset. Taxonomic ranks are indented to render a nested hierarchy. This function
     differs from `taxon_index_to_html` in that it works for NCBI indices rather than
     GBIF.
 
-    Arguments:
+    Args:
         taxa: A list of taxon dictionaries containing the taxa for a dataset.
+        html: Render as html or text.
+        indent_width: The indentation width to use for successive taxonomic ranks.
 
     Returns:
-        A `dominate.tags.div` object containing an HTML representation of the taxa.
+        Either a HTML or text representation of the taxa tree.
     """
 
-    def _indent(n):
+    def _indent(n, use_html=html):
 
-        return raw("&ensp;-&ensp;" * n)
+        if use_html:
+            return raw("&ensp;-&ensp;" * n)
+        else:
+            return " " * indent_width * (n - 1)
 
-    def _format_name(tx):
+    def _format_name(tx, use_html=html):
 
         # format the canonical name
         if tx["ncbi_status"] == "user":
@@ -2946,14 +2949,21 @@ def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
                 return f"[{tx['taxon_name']}]  (non-backbone rank: {tx['taxon_rank']})"
         else:
             if tx["taxon_rank"] in ["genus", "species", "subspecies"]:
-                return tags.i(tx["taxon_name"])
+                if use_html:
+                    return tags.i(tx["taxon_name"])
+                else:
+                    return f"_{tx['taxon_name']}_"
             elif tx["taxon_rank"] not in BACKBONE_RANKS_EX:
                 return f"{tx['taxon_name']} (non-backbone rank: {tx['taxon_rank']})"
             else:
                 return tx["taxon_name"]
 
-    # Container to hold the output
-    html = tags.div()
+    # Container type depends on whether or not html output is required
+    if html:
+        # Container to hold the output
+        html_out = tags.div()
+    else:
+        html_out = StringIO()
 
     # group by parent taxon, substituting 0 for None
     taxa.sort(key=lambda x: x["ncbi_parent_id"] or 0)
@@ -2988,20 +2998,31 @@ def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
                 as_status = current["ncbi_status"]
                 canon_name = _format_name(name_pair)
 
-            txt = [
-                _indent(len(stack)),
-                canon_name,
-                " (",
-                as_status,
-                " from: ",
-                as_name,
-                ")",
-                tags.br(),
-            ]
+            if html:
+                html_txt = [
+                    _indent(len(stack)),
+                    canon_name,
+                    " (as ",
+                    as_status,
+                    ": ",
+                    as_name,
+                    ")",
+                    tags.br(),
+                ]
+            else:
+                txt = (
+                    f"{_indent(len(stack))} {canon_name} (as {as_status}: {as_name})\n"
+                )
         else:
-            txt = [_indent(len(stack)), canon_name, tags.br()]
+            if html:
+                html_txt = [_indent(len(stack)), canon_name, tags.br()]
+            else:
+                txt = f"{_indent(len(stack))} {canon_name}\n"
 
-        html += txt
+        if html:
+            html_out += html_txt
+        else:
+            html_out.write(txt)
 
         # Is this taxon a parent for other taxa - if so add that taxon to the top of
         # the stack, otherwise start looking for a next taxon to push onto the stack.
@@ -3020,7 +3041,10 @@ def ncbi_index_to_html(taxa: list[dict]) -> tags.div:
                     )
                     break
 
-    return html
+    if html:
+        return html_out
+    else:
+        return html_out.getvalue()
 
 
 def taxa_strip(name: str, rank: str) -> tuple[str, bool]:

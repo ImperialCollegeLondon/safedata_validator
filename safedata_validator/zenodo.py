@@ -50,7 +50,7 @@ from safedata_validator.logger import FORMATTER, LOGGER
 from safedata_validator.resources import Resources
 from safedata_validator.taxa import (
     BACKBONE_RANKS_EX,
-    ncbi_index_to_html,
+    ncbi_index_to_text,
     taxon_index_to_text,
 )
 
@@ -815,7 +815,7 @@ def dataset_description(
             tags.br(),
             " All taxon names are validated against the NCBI taxonomy database."
             f"{ncbi_text}",
-            ncbi_index_to_html(ncbi_taxon_index),
+            ncbi_index_to_text(ncbi_taxon_index, True),
         )
     elif ncbi_taxon_index and gbif_taxon_index:
         desc += tags.p(
@@ -823,7 +823,7 @@ def dataset_description(
             tags.br(),
             tags.br(),
             f"{ncbi_text}",
-            ncbi_index_to_html(ncbi_taxon_index),
+            ncbi_index_to_text(ncbi_taxon_index, True),
         )
 
     if render:
