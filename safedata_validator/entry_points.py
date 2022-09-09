@@ -10,11 +10,19 @@ functionality.
 import argparse
 import os
 import sys
+import tempfile
 import textwrap
+from time import time
 
 import simplejson
 
 from safedata_validator.field import Dataset
+from safedata_validator.local_db import (
+    build_local_gbif,
+    build_local_ncbi,
+    download_gbif_backbone,
+    download_ncbi_taxonomy,
+)
 from safedata_validator.logger import CONSOLE_HANDLER, FORMATTER, LOGGER
 from safedata_validator.resources import Resources
 from safedata_validator.version import __version__
@@ -826,3 +834,84 @@ def _safedata_post_metadata_cli():
         LOGGER.error(f"Failed to post metadata: {error}")
     else:
         LOGGER.info("Metadata posted")
+
+    return
+
+
+# Local Database building
+
+
+def _build_local_gbif_cli():
+    """Build a local GBIF database.
+
+    This tool builds an SQLite database of the GBIF backbone taxonomy to use in local
+    validation by safedata_validate. There are multiple versions of the dataset, and the
+    available versions can be seen here:
+
+        https://hosted-datasets.gbif.org/datasets/backbone/
+
+    The tool will optionally take a timestamp - using the format '2021-11-26' -  to
+    build a particular version, but defaults to the most recent version.
+    """
+
+    desc = textwrap.dedent(_build_local_gbif_cli.__doc__)
+    fmt = argparse.RawDescriptionHelpFormatter
+    parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
+
+    parser.add_argument("outdir", help="Location to create database file.")
+    parser.add_argument(
+        "-t",
+        "--timestamp",
+        default=None,
+        type=str,
+        help="The time stamp of a database archive version to use.",
+    )
+
+    args = parser.parse_args()
+
+    with tempfile.TemporaryDirectory() as download_loc:
+
+        file_data = download_gbif_backbone(
+            outdir=download_loc, timestamp=args.timestamp
+        )
+        build_local_gbif(outdir=args.outdir, **file_data)
+
+    return
+
+
+def _build_local_ncbi_cli():
+    """Build a local NCBI database.
+
+    This tool builds an SQLite database of the NCBI  taxonomy to use in local validation
+    by safedata_validate. There are multiple archived versions of the dataset, and the
+    available versions can be seen here:
+
+        https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/
+
+    The tool will optionally take a timestamp - using the format '2021-11-26' -  to
+    build a particular version, but defaults to the most recent version.
+    """
+
+    desc = textwrap.dedent(_build_local_ncbi_cli.__doc__)
+    fmt = argparse.RawDescriptionHelpFormatter
+    parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
+
+    parser.add_argument("outdir", help="Location to create database file.")
+    parser.add_argument(
+        "-t",
+        "--timestamp",
+        default=None,
+        type=str,
+        help="The time stamp of a database archive version to use.",
+    )
+
+    args = parser.parse_args()
+
+    with tempfile.TemporaryDirectory() as download_loc:
+
+        file_data = download_ncbi_taxonomy(
+            outdir=download_loc, timestamp=args.timestamp
+        )
+        build_local_ncbi(outdir=args.outdir, **file_data)
+
+    return
