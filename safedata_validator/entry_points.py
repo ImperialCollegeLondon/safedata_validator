@@ -17,14 +17,14 @@ from time import time
 import simplejson
 
 from safedata_validator.field import Dataset
-from safedata_validator.local_db import (
+from safedata_validator.logger import CONSOLE_HANDLER, FORMATTER, LOGGER
+from safedata_validator.resources import Resources
+from safedata_validator.taxondb import (
     build_local_gbif,
     build_local_ncbi,
     download_gbif_backbone,
     download_ncbi_taxonomy,
 )
-from safedata_validator.logger import CONSOLE_HANDLER, FORMATTER, LOGGER
-from safedata_validator.resources import Resources
 from safedata_validator.version import __version__
 from safedata_validator.zenodo import (
     create_deposit,

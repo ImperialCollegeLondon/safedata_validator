@@ -1,8 +1,13 @@
-"""Create a local GBIF backbone database.
+"""The taxondb module.
 
-This script is used to build an SQLite3 database file containing the contents of
-the GBIF backbone taxonomy. It is not currently provided as a part of the package
-because the details of file names etc. change and so it is provided as a recipe.
+This module contains functions to:
+
+1. download versions of the GBIF backbone taxonomy and NCBI taxonomy databases, and
+2. build and index SQLite3 databases of those datasets for use in local taxon
+   validation.
+
+The functions also store the timestamp of each database version in the SQLite3 files, so
+that datasets can include a taxonomy timestamp.
 """
 
 import csv
