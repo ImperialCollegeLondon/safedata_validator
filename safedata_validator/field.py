@@ -8,6 +8,8 @@ and loading and validating the field metadata and data rows in the main data tab
 
 import datetime
 import os
+import resource
+from cgitb import reset
 from itertools import groupby, islice
 from logging import CRITICAL, ERROR, INFO, WARNING
 from typing import List, Type, Union
@@ -375,6 +377,8 @@ class Dataset:
             #   * dataset_id to link from taxon searches to datasets
             #  * id (what's this? Erroneous row ID in query?)
             # Gbif taxa if they exist
+            gbif_local=self.resources.use_local_gbif,
+            gbif_timestamp=self.resources.gbif_timestamp,
             gbif_taxa=[
                 dict(
                     zip(
@@ -392,6 +396,8 @@ class Dataset:
                 for tx in self.taxa.gbif_taxa.taxon_index
             ],
             # NCBI taxa if they exist
+            ncbi_local=self.resources.use_local_ncbi,
+            ncbi_timestamp=self.resources.ncbi_timestamp,
             ncbi_taxa=[
                 dict(
                     zip(
