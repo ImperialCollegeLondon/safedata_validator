@@ -3010,6 +3010,41 @@ def ncbi_index_to_text(
 
     # group by parent taxon, substituting 0 for None
     taxa.sort(key=lambda x: x["ncbi_parent_id"] or 0)
+
+    # Preallocate container to store identity of surplus taxa
+    surp_tx_ids = []
+    # Define keys that would match in unwanted repeated entries
+    match_keys = [
+        "ncbi_taxon_id",
+        "ncbi_parent_id",
+        "taxon_name",
+        "taxon_rank",
+        "ncbi_status",
+    ]
+
+    # Loop over taxa to filter for repeated entries
+    for idx, taxon in enumerate(taxa):
+        # Identify elements in taxa where all 5 of the desired keys match
+        matches = list(
+            map(
+                lambda x: x == 5,
+                [sum([taxon[k] == item[k] for k in match_keys]) for item in taxa],
+            )
+        )
+        if sum(matches) > 1:
+            # Generate reduced list of matching taxa
+            taxa_mtch = list(compress(taxa, matches))
+            ws_names = [item["worksheet_name"] for item in taxa_mtch]
+            # Find first non-None worksheet names
+            first_nm = next(name for name in ws_names if name is not None)
+            # If it doesn't match worksheet name of taxon, add index to be deleted
+            if first_nm != taxon["worksheet_name"]:
+                surp_tx_ids.append(idx)
+
+    # Delete taxa that are superfluous by index
+    for index in sorted(surp_tx_ids, reverse=True):
+        del taxa[index]
+
     grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x["ncbi_parent_id"])}
 
     # start the stack with the superkingdoms - these taxa will have None as a parent
