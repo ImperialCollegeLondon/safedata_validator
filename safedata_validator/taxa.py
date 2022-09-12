@@ -37,9 +37,6 @@ from collections import Counter
 from io import StringIO
 from itertools import compress, groupby
 from logging import Formatter
-from tarfile import LENGTH_PREFIX
-from tkinter import INSERT
-from types import NoneType
 from typing import Optional, Union
 
 import requests  # type: ignore
