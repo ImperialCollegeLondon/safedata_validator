@@ -26,12 +26,15 @@ configuration files in the user and then site config locations defined by the
 """
 
 
+import contextlib
 import os
 import sqlite3
 from datetime import date
+from time import time
 from typing import Union
 
 import appdirs
+import requests
 import simplejson
 from configobj import ConfigObj, flatten_errors
 from dateutil.parser import isoparse
@@ -209,7 +212,10 @@ class Resources:
         self.ncbi = config_loaded.ncbi
 
         self.use_local_gbif = False
+        self.gbif_timestamp = None
         self.use_local_ncbi = False
+        self.ncbi_timestamp = None
+
         # Valid locations is a dictionary keying string location names to tuples of
         # floats describing the location bounding box
         self.valid_location: dict[str, list[float]] = dict()
@@ -300,30 +306,26 @@ class Resources:
 
         if self.gbif_database is None or self.gbif_database == "":
             LOGGER.info("Using GBIF online API to validate taxonomy")
+
+            # Retrieve from API URL for the backbone dataset
+            gbif_backbone = (
+                "https://api.gbif.org/v1/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c"
+            )
+            timestamp = requests.get(gbif_backbone)
+
+            if not timestamp.ok:
+                log_and_raise(
+                    "Could not read current backbone timestamp from GBIF API", IOError
+                )
+
+            timestamp = isoparse(timestamp).date().isoformat()
+
         else:
             LOGGER.info(f"Validating local GBIF database: {self.gbif_database}")
-
-            # Does the provided path exist and is it a functional SQLite database
-            # with a backbone table? Because sqlite3 can 'connect' to any path,
-            # use a query attempt to reveal exceptions
-
-            if not os.path.exists(self.gbif_database):
-                log_and_raise("Local GBIF database not found", OSError)
-
-            try:
-                conn = sqlite3.connect(self.gbif_database)
-                _ = conn.execute("select count(*) from backbone;")
-            except sqlite3.OperationalError:
-                log_and_raise(
-                    "Local GBIF database does not contain the backbone table",
-                    RuntimeError,
-                )
-            except sqlite3.DatabaseError:
-                log_and_raise("Local SQLite database not valid", OSError)
-            else:
-                self.use_local_gbif = True
-            finally:
-                conn.close()
+            self.gbif_timestamp = validate_taxon_db(
+                self.gbif_database, "GBIF", ["backbone"]
+            )
+            self.use_local_gbif = True
 
     def _validate_ncbi(self) -> None:
         """Validate the NCBI settings.
@@ -335,30 +337,85 @@ class Resources:
 
         if self.ncbi_database is None or self.ncbi_database == "":
             LOGGER.info("Using NCBI online API to validate taxonomy")
+            self.ncbi_timestamp = date.today().isoformat()
         else:
             LOGGER.info(f"Validating local NCBI database: {self.ncbi_database}")
 
-            # Does the provided path exist and is it a functional SQLite database
-            # with a backbone table? Because sqlite3 can 'connect' to any path,
-            # use a query attempt to reveal exceptions
+            self.ncbi_timestamp = validate_taxon_db(
+                self.ncbi_database, "NCBI", ["nodes", "merge", "names"]
+            )
+            self.use_local_ncbi = True
 
-            if not os.path.exists(self.ncbi_database):
-                log_and_raise("Local NCBI database not found", OSError)
 
-            try:
-                conn = sqlite3.connect(self.ncbi_database)
-                _ = conn.execute("select count(*) from nodes;")
-                _ = conn.execute("select count(*) from names;")
-                _ = conn.execute("select count(*) from merge;")
-            except sqlite3.OperationalError:
-                log_and_raise(
-                    "Local NCBI database is missing either the nodes, "
-                    "names or merge table",
-                    RuntimeError,
-                )
-            except sqlite3.DatabaseError:
-                log_and_raise("Local SQLite database not valid", OSError)
-            else:
-                self.use_local_ncbi = True
-            finally:
-                conn.close()
+def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
+    """Validate a local taxon database file.
+
+    This helper function validates that a given path contains a valid taxonomy database:
+
+    - the required tables are all present, automatically including the timestamp table.
+    - the timestamp table contains a single ISO format date showing the database
+      version.
+
+    Args:
+        db_path: Location of the SQLite3 database.
+        db_name: A label for the taxonomy database - used in logger messages.
+        tables: A list of table names expected to be present in the database.
+
+    Returns:
+        The database timestamp as an ISO formatted date string.
+    """
+
+    LOGGER.info(f"Validating local {db_name} database: {db_path}")
+
+    # Does the provided path exist and is it a functional SQLite database
+    # with a backbone table? Because sqlite3 can 'connect' to any path,
+    # use a query attempt to reveal exceptions
+
+    if not os.path.exists(db_path):
+        log_and_raise(f"Local {db_name} database not found", OSError)
+
+    # Connect to the file (which might or might not be a database containing the
+    # required tables)
+    with contextlib.closing(sqlite3.connect(db_name)) as conn:
+
+        # Check that it is a database by running a query
+        try:
+            db_tables = conn.execute(
+                "SELECT name FROM sqlite_schema WHERE type ='table';"
+            )
+        except sqlite3.DatabaseError:
+            log_and_raise("Local SQLite database not valid", OSError)
+
+        # Check the required tables against found tables
+        db_tables = set([rw[0] for rw in db_tables.fetchall()])
+        required_tables = set(tables + ["timestamp"])
+        missing = required_tables.difference(db_tables)
+
+        if missing:
+            log_and_raise(
+                "Local GBIF database does not contain the backbone table",
+                RuntimeError,
+                extra={"join": missing},
+            )
+
+        # Check the timestamp table contains a single ISO date
+        cursor = conn.execute("select * from timestamp;")
+        timestamp = cursor.fetchall()
+
+    # Is there one unique date in the table
+    if len(timestamp) != 1:
+        log_and_raise(
+            f"Local {db_name} database timestamp table contains more than one entry.",
+            RuntimeError,
+        )
+
+    try:
+        timestamp = timestamp[0]
+        isoparse(timestamp)
+    except ValueError:
+        log_and_raise(
+            f"Local {db_name} database timestamp value is not an ISO date.",
+            RuntimeError,
+        )
+
+    return timestamp
