@@ -2,12 +2,10 @@
 import copy
 import os
 from logging import ERROR, INFO, WARNING
-from unittest.mock import Mock, patch
 
 import pytest
 
 from safedata_validator import taxa
-from safedata_validator.resources import Resources
 
 from .conftest import log_check
 
@@ -32,12 +30,12 @@ def test_sdv_no_remote_set_correctly():
         (503, ["Connection error to remote server", taxa.NCBIError]),
     ],
 )
-@patch("safedata_validator.taxa.requests.get")
 # Test that taxonomy efetch and esearch handles status codes correctly
-def test_efetch_status_errors(
-    mock_get, resources_with_remote_ncbi, status_code, expected_exception
+def test_entrez_status_errors(
+    mocker, resources_with_remote_ncbi, status_code, expected_exception
 ):
     # Configure the mock to return a response with a specific status code.
+    mock_get = mocker.patch("safedata_validator.taxa.requests.get")
     mock_get.return_value.status_code = status_code
 
     # Construct remote validator
