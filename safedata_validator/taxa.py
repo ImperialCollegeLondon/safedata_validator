@@ -35,11 +35,13 @@ import sqlite3
 import time
 from collections import Counter
 from io import StringIO
-from itertools import groupby
+from itertools import compress, groupby
 from logging import Formatter
 from typing import Optional, Union
 
 import requests  # type: ignore
+from dominate import tags
+from dominate.util import raw
 from lxml import etree
 from openpyxl import worksheet
 
@@ -1665,7 +1667,7 @@ class GBIFTaxa:
         self.taxon_names: set[str] = set()
         self.parents: dict[tuple, GBIFTaxon] = dict()
         self.hierarchy: set[list] = set()
-        self.n_errors = None
+        self.n_errors: Optional[int] = None
         self.taxon_names_used: set[str] = set()
 
         # Get a validator instance
@@ -2282,7 +2284,7 @@ class NCBITaxa:
         self.taxon_index: list[list] = []
         self.taxon_names: set[str] = set()
         self.hierarchy: set[tuple] = set()
-        self.n_errors = None
+        self.n_errors: Optional[int] = None
 
         # Get a validator instance
         self.validator: Union[LocalNCBIValidator, RemoteNCBIValidator]
@@ -2786,94 +2788,339 @@ class Taxa:
         return self.gbif_taxa.taxon_names.intersection(self.ncbi_taxa.taxon_names)
 
 
-# TODO - Decide whether to delete this function
 def taxon_index_to_text(
-    taxon_index: list, html: bool = False, indent_width: int = 4
-) -> str:
+    taxa: list[dict], html: bool = False, indent_width: int = 4
+) -> Union[str, tags.div]:
     """Render a GBIFTaxa instance as text or html.
 
-    This function takes a taxon index from a GBIFTaxa or NCBITaxa instance and renders
-    the contents into a text representation of the taxonomic hierarchy used in the
+    This function takes a taxon index from a GBIFTaxa instance and renders the contents
+    into either a text or html representation of the taxonomic hierarchy used in the
     dataset. Taxonomic ranks are indented to render a nested hierarchy.
 
     Args:
-        taxon_index: The taxon_index property of a GBIFTaxa or NCBITaxa instance.
-        html: Render as html or text
+        taxa: A list of taxon dictionaries containing the taxa for a dataset.
+        html: Render as html or text.
         indent_width: The indentation width to use for successive taxonomic ranks.
+
+    Returns:
+        Either a HTML or text representation of the taxa tree.
     """
 
-    lbr = "<br>" if html else "\n"
+    def _indent(n, use_html=html):
 
-    def indent(n, use_html=html):
+        if use_html:
+            return raw("&ensp;-&ensp;" * n)
+        else:
+            return " " * indent_width * (n - 1)
 
-        ind = "&ensp;" if use_html else " "
-        return ind * indent_width * (n - 1)
-
-    def format_name(tx, use_html=html):
+    def _format_name(tx, use_html=html):
 
         # format the canonical name
-        if tx[4] in ["genus", "species", "subspecies"]:
+        if tx["taxon_rank"] in ["genus", "species", "subspecies"]:
             if use_html:
-                return f"<i>{tx[3]}</i>"
+                return tags.i(tx["taxon_name"])
             else:
-                return f"_{tx[3]}_"
-        elif tx[4] in ["morphospecies", "functional group"]:
-            return f"[{tx[0]}]"
+                return f"_{tx['taxon_name']}_"
+        elif tx["taxon_rank"] in ["morphospecies", "functional group"]:
+            return f"[{tx['taxon_name']}]"
         else:
-            return tx[3]
+            return tx["taxon_name"]
 
-    # Container to hold the output
-    html_out = StringIO()
+    # Container type depends on whether or not html output is required
+    if html:
+        # Container to hold the output
+        html_out = tags.div()
+    else:
+        html_out = StringIO()
 
-    # group by parent taxon id in position 2, substituting 0 for None
-    taxon_index.sort(key=lambda x: x[2] or 0)
-    grouped = {k: list(v) for k, v in groupby(taxon_index, lambda x: x[2])}
+    # group by parent taxon, substituting 0 for None
+    # secondary order is then alphabetic based on taxon name
+    taxa.sort(key=lambda x: (x["gbif_parent_id"] or 0, x["taxon_name"]))
+
+    # Preallocate container to store identity of surplus taxa
+    surp_tx_ids = []
+    # Define keys that would match in unwanted repeated entries
+    match_keys = [
+        "gbif_taxon_id",
+        "gbif_parent_id",
+        "taxon_name",
+        "taxon_rank",
+        "gbif_status",
+    ]
+
+    # Loop over taxa to filter for repeated entries
+    for idx, taxon in enumerate(taxa):
+        # Identify elements in taxa where all 5 of the desired keys match
+        matches = list(
+            map(
+                lambda x: x == 5,
+                [sum([taxon[k] == item[k] for k in match_keys]) for item in taxa],
+            )
+        )
+        if sum(matches) > 1:
+            # Generate reduced list of matching taxa
+            taxa_mtch = list(compress(taxa, matches))
+            ws_names = [item["worksheet_name"] for item in taxa_mtch]
+            # Find first non-None worksheet names
+            first_nm = next(name for name in ws_names if name is not None)
+            # If it doesn't match worksheet name of taxon, add index to be deleted
+            if first_nm != taxon["worksheet_name"]:
+                surp_tx_ids.append(idx)
+
+    # Delete taxa that are superfluous by index
+    for index in sorted(surp_tx_ids, reverse=True):
+        del taxa[index]
+
+    # group taxa by their parent id
+    grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x["gbif_parent_id"])}
 
     # start the stack with the kingdoms - these taxa will have None as a parent
-    stack = [{"current": grouped[None][0], "next": grouped[None][1:]}]
+    stack = [({"current": grouped[None][0]}, {"next": grouped[None][1:]})]
 
     while stack:
 
         # Handle the current top of the stack: format the canonical name
-        current = stack[-1]["current"]
-        canon_name = format_name(current)
+        current = stack[-1][0]["current"]
+        canon_name = _format_name(current)
 
         # Look for a non-None entry in next that shares the same worksheet name
-        next_ws_names = [tx[0] for tx in stack[-1]["next"] if tx[0] is not None]
+        next_ws_names = [
+            tx["worksheet_name"]
+            for tx in stack[-1][1]["next"]
+            if tx["worksheet_name"] is not None
+        ]
 
-        if current[0] in next_ws_names:
+        if current["worksheet_name"] in next_ws_names:
             # pop out the matching entry and find which is 'accepted'
-            name_pair = stack[-1]["next"].pop(next_ws_names.index(current[0]))
-            if current[5] == "accepted":
-                as_name = format_name(name_pair)
-                as_status = name_pair[5]
+            name_pair = stack[-1][1]["next"].pop(
+                next_ws_names.index(current["worksheet_name"])
+            )
+            if current["gbif_status"] == "accepted":
+                as_name = _format_name(name_pair)
+                as_status = name_pair["gbif_status"]
             else:
                 as_name = canon_name
-                as_status = current[5]
-                canon_name = format_name(name_pair)
+                as_status = current["gbif_status"]
+                canon_name = _format_name(name_pair)
 
-            txt = f"{indent(len(stack))} {canon_name} (as {as_status}: {as_name}){lbr}"
+            if html:
+                html_txt = [
+                    _indent(len(stack)),
+                    canon_name,
+                    " (as ",
+                    as_status,
+                    ": ",
+                    as_name,
+                    ")",
+                    tags.br(),
+                ]
+            else:
+                txt = (
+                    f"{_indent(len(stack))} {canon_name} (as {as_status}: {as_name})\n"
+                )
         else:
-            txt = f"{indent(len(stack))} {canon_name}{lbr}"
+            if html:
+                html_txt = [_indent(len(stack)), canon_name, tags.br()]
+            else:
+                txt = f"{_indent(len(stack))} {canon_name}\n"
 
-        html_out.write(txt)
+        if html:
+            html_out += html_txt
+        else:
+            html_out.write(txt)
 
         # Is this taxon a parent for other taxa - if so add that taxon to the top of
         # the stack, otherwise start looking for a next taxon to push onto the stack.
         # If there is none at the top, pop and look down.
-        parent_id = current[1]
+        parent_id = current["gbif_taxon_id"]
         if parent_id in grouped:
             stack.append(
-                {"current": grouped[parent_id][0], "next": grouped[parent_id][1:]}
+                ({"current": grouped[parent_id][0]}, {"next": grouped[parent_id][1:]})
             )
         else:
             while stack:
                 push = stack.pop()
-                if push["next"]:
-                    stack.append({"current": push["next"][0], "next": push["next"][1:]})
+                if push[1]["next"]:
+                    stack.append(
+                        ({"current": push[1]["next"][0]}, {"next": push[1]["next"][1:]})
+                    )
                     break
 
-    return html_out.getvalue()
+    if html:
+        return html_out
+    else:
+        return html_out.getvalue()
+
+
+def ncbi_index_to_text(
+    taxa: list[dict], html: bool = False, indent_width: int = 4
+) -> Union[str, tags.div]:
+    """Render a NCBITaxa instance as text or html.
+
+    This function takes a taxon index from a NCBITaxa instance and renders the contents
+    into either a text or html representation of the taxonomic hierarchy used in the
+    dataset. Taxonomic ranks are indented to render a nested hierarchy. This function
+    differs from `taxon_index_to_html` in that it works for NCBI indices rather than
+    GBIF.
+
+    Args:
+        taxa: A list of taxon dictionaries containing the taxa for a dataset.
+        html: Render as html or text.
+        indent_width: The indentation width to use for successive taxonomic ranks.
+
+    Returns:
+        Either a HTML or text representation of the taxa tree.
+    """
+
+    def _indent(n, use_html=html):
+
+        if use_html:
+            return raw("&ensp;-&ensp;" * n)
+        else:
+            return " " * indent_width * (n - 1)
+
+    def _format_name(tx, use_html=html):
+
+        # format the canonical name
+        if tx["ncbi_status"] == "user":
+            if tx["taxon_rank"] in BACKBONE_RANKS_EX:
+                return f"[{tx['taxon_name']}]"
+            else:
+                return f"[{tx['taxon_name']}]  (non-backbone rank: {tx['taxon_rank']})"
+        else:
+            if tx["taxon_rank"] in ["genus", "species", "subspecies"]:
+                if use_html:
+                    return tags.i(tx["taxon_name"])
+                else:
+                    return f"_{tx['taxon_name']}_"
+            elif tx["taxon_rank"] not in BACKBONE_RANKS_EX:
+                return f"{tx['taxon_name']} (non-backbone rank: {tx['taxon_rank']})"
+            else:
+                return tx["taxon_name"]
+
+    # Container type depends on whether or not html output is required
+    if html:
+        # Container to hold the output
+        html_out = tags.div()
+    else:
+        html_out = StringIO()
+
+    # group by parent taxon, substituting 0 for None
+    # secondary order is then alphabetic based on taxon name
+    taxa.sort(key=lambda x: (x["ncbi_parent_id"] or 0, x["taxon_name"]))
+
+    # Preallocate container to store identity of surplus taxa
+    surp_tx_ids = []
+    # Define keys that would match in unwanted repeated entries
+    match_keys = [
+        "ncbi_taxon_id",
+        "ncbi_parent_id",
+        "taxon_name",
+        "taxon_rank",
+        "ncbi_status",
+    ]
+
+    # Loop over taxa to filter for repeated entries
+    for idx, taxon in enumerate(taxa):
+        # Identify elements in taxa where all 5 of the desired keys match
+        matches = list(
+            map(
+                lambda x: x == 5,
+                [sum([taxon[k] == item[k] for k in match_keys]) for item in taxa],
+            )
+        )
+        if sum(matches) > 1:
+            # Generate reduced list of matching taxa
+            taxa_mtch = list(compress(taxa, matches))
+            ws_names = [item["worksheet_name"] for item in taxa_mtch]
+            # Find first non-None worksheet names
+            first_nm = next(name for name in ws_names if name is not None)
+            # If it doesn't match worksheet name of taxon, add index to be deleted
+            if first_nm != taxon["worksheet_name"]:
+                surp_tx_ids.append(idx)
+
+    # Delete taxa that are superfluous by index
+    for index in sorted(surp_tx_ids, reverse=True):
+        del taxa[index]
+
+    grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x["ncbi_parent_id"])}
+
+    # start the stack with the superkingdoms - these taxa will have None as a parent
+    stack = [({"current": grouped[None][0]}, {"next": grouped[None][1:]})]
+
+    while stack:
+
+        # Handle the current top of the stack: format the canonical name
+        current = stack[-1][0]["current"]
+        canon_name = _format_name(current)
+
+        # Look for a non-None entry in next that shares the same worksheet name
+        next_ws_names = [
+            tx["worksheet_name"]
+            for tx in stack[-1][1]["next"]
+            if tx["worksheet_name"] is not None
+        ]
+
+        if current["worksheet_name"] in next_ws_names:
+            # pop out the matching entry and find which is 'accepted'
+            name_pair = stack[-1][1]["next"].pop(
+                next_ws_names.index(current["worksheet_name"])
+            )
+            if current["ncbi_status"] == "accepted":
+                as_name = _format_name(name_pair)
+                as_status = name_pair["ncbi_status"]
+            else:
+                as_name = canon_name
+                as_status = current["ncbi_status"]
+                canon_name = _format_name(name_pair)
+
+            if html:
+                html_txt = [
+                    _indent(len(stack)),
+                    canon_name,
+                    " (as ",
+                    as_status,
+                    ": ",
+                    as_name,
+                    ")",
+                    tags.br(),
+                ]
+            else:
+                txt = (
+                    f"{_indent(len(stack))} {canon_name} (as {as_status}: {as_name})\n"
+                )
+        else:
+            if html:
+                html_txt = [_indent(len(stack)), canon_name, tags.br()]
+            else:
+                txt = f"{_indent(len(stack))} {canon_name}\n"
+
+        if html:
+            html_out += html_txt
+        else:
+            html_out.write(txt)
+
+        # Is this taxon a parent for other taxa - if so add that taxon to the top of
+        # the stack, otherwise start looking for a next taxon to push onto the stack.
+        # If there is none at the top, pop and look down.
+        parent_id = current["ncbi_taxon_id"]
+        if parent_id in grouped:
+            stack.append(
+                ({"current": grouped[parent_id][0]}, {"next": grouped[parent_id][1:]})
+            )
+        else:
+            while stack:
+                push = stack.pop()
+                if push[1]["next"]:
+                    stack.append(
+                        ({"current": push[1]["next"][0]}, {"next": push[1]["next"][1:]})
+                    )
+                    break
+
+    if html:
+        return html_out
+    else:
+        return html_out.getvalue()
 
 
 def taxa_strip(name: str, rank: str) -> tuple[str, bool]:
