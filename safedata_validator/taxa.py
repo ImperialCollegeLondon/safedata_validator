@@ -35,8 +35,11 @@ import sqlite3
 import time
 from collections import Counter
 from io import StringIO
-from itertools import groupby
+from itertools import compress, groupby
 from logging import Formatter
+from tarfile import LENGTH_PREFIX
+from tkinter import INSERT
+from types import NoneType
 from typing import Optional, Union
 
 import requests  # type: ignore
@@ -2789,7 +2792,9 @@ class Taxa:
 
 
 # TODO - Fix multiple branch error
-def taxon_index_to_text(taxa: list[dict], html: bool = False, indent_width: int = 4):
+def taxon_index_to_text(
+    taxa: list[dict], html: bool = False, indent_width: int = 4
+) -> Union[str, tags.div]:
     """Render a GBIFTaxa instance as text or html.
 
     This function takes a taxon index from a GBIFTaxa instance and renders the contents
@@ -2834,6 +2839,42 @@ def taxon_index_to_text(taxa: list[dict], html: bool = False, indent_width: int 
 
     # group by parent taxon, substituting 0 for None
     taxa.sort(key=lambda x: x["gbif_parent_id"] or 0)
+
+    # Preallocate container to store identity of surplus taxa
+    surp_tx_ids = []
+    # Define keys that would match in unwanted repeated entries
+    match_keys = [
+        "gbif_taxon_id",
+        "gbif_parent_id",
+        "taxon_name",
+        "taxon_rank",
+        "gbif_status",
+    ]
+
+    # Loop over taxa to filter for repeated entries
+    for idx, taxon in enumerate(taxa):
+        # Identify elements in taxa where all 5 of the desired keys match
+        matches = list(
+            map(
+                lambda x: x == 5,
+                [sum([taxon[k] == item[k] for k in match_keys]) for item in taxa],
+            )
+        )
+        if sum(matches) > 1:
+            # Generate reduced list of matching taxa
+            taxa_mtch = list(compress(taxa, matches))
+            ws_names = [item["worksheet_name"] for item in taxa_mtch]
+            # Find first non-None worksheet names
+            first_nm = next(name for name in ws_names if name is not None)
+            # If it doesn't match worksheet name of taxon, add index to be deleted
+            if first_nm != taxon["worksheet_name"]:
+                surp_tx_ids.append(idx)
+
+    # Delete taxa that are superfluous by index
+    for index in sorted(surp_tx_ids, reverse=True):
+        del taxa[index]
+
+    # TODO - ALPHABETISE
     grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x["gbif_parent_id"])}
 
     # start the stack with the kingdoms - these taxa will have None as a parent
@@ -2914,7 +2955,9 @@ def taxon_index_to_text(taxa: list[dict], html: bool = False, indent_width: int 
         return html_out.getvalue()
 
 
-def ncbi_index_to_text(taxa: list[dict], html: bool = False, indent_width: int = 4):
+def ncbi_index_to_text(
+    taxa: list[dict], html: bool = False, indent_width: int = 4
+) -> Union[str, tags.div]:
     """Render a NCBITaxa instance as text or html.
 
     This function takes a taxon index from a NCBITaxa instance and renders the contents
