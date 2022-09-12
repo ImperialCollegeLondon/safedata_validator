@@ -321,7 +321,6 @@ class Resources:
             timestamp = isoparse(timestamp).date().isoformat()
 
         else:
-            LOGGER.info(f"Validating local GBIF database: {self.gbif_database}")
             self.gbif_timestamp = validate_taxon_db(
                 self.gbif_database, "GBIF", ["backbone"]
             )
@@ -339,7 +338,6 @@ class Resources:
             LOGGER.info("Using NCBI online API to validate taxonomy")
             self.ncbi_timestamp = date.today().isoformat()
         else:
-            LOGGER.info(f"Validating local NCBI database: {self.ncbi_database}")
 
             self.ncbi_timestamp = validate_taxon_db(
                 self.ncbi_database, "NCBI", ["nodes", "merge", "names"]
@@ -384,7 +382,7 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
                 "SELECT name FROM sqlite_schema WHERE type ='table';"
             )
         except sqlite3.DatabaseError:
-            log_and_raise("Local SQLite database not valid", OSError)
+            log_and_raise(f"Local {db_name} database not an SQLite3 file.", OSError)
 
         # Check the required tables against found tables
         db_tables = set([rw[0] for rw in db_tables.fetchall()])
@@ -393,7 +391,7 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
 
         if missing:
             log_and_raise(
-                "Local GBIF database does not contain the backbone table",
+                f"Local {db_name} database does not contain required tables: ",
                 RuntimeError,
                 extra={"join": missing},
             )
