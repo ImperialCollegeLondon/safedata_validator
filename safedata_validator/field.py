@@ -12,7 +12,7 @@ import resource
 from cgitb import reset
 from itertools import groupby, islice
 from logging import CRITICAL, ERROR, INFO, WARNING
-from typing import List, Type, Union
+from typing import List, Optional, Type, Union
 
 import simplejson
 from dateutil import parser
@@ -84,7 +84,7 @@ class Dataset:
         self.resources = resources
         self.summary = Summary(resources)
         self.taxa = Taxa(resources)
-        self.dataworksheets = []
+        self.dataworksheets: list[DataWorksheet] = []
         self.n_errors = 0
         self.passed = False
 
@@ -134,7 +134,7 @@ class Dataset:
         Logging messages are used to report the progress of the validation process.
         These are always captured in an internal log (`logging.LOG`) but are also
         printed by default to the command line. The `console_log` argument can be used
-        to suppress console logging, when this command is being run programatically
+        to suppress console logging, when this command is being run programmatically
         rather than via the `safedata_validate` command line script.
 
         Args:
@@ -450,7 +450,7 @@ class Dataset:
 
 
 class DataWorksheet:
-    """Process the comtents of safedata_validator formatted data table.
+    """Process the contents of safedata_validator formatted data table.
 
     This class is used to load and check the formatting and content of a data table
     using the safedata_validator format. It requires the containing Dataset as an
@@ -962,7 +962,7 @@ class BaseField:
         dwsh: The DataWorksheet object in which the field is contained.
         taxa: The Taxa object for the Dataset or None.
         locations: The Locations object for the Dataset or None.
-        summary: The Summary objet for the Dataset or None.
+        summary: The Summary object for the Dataset or None.
         log_stack: A list of tuples containing logging messages to be emitted.
         n_rows: The number of rows of data in the field.
         n_na: The number of NA values in the field data.
@@ -990,7 +990,7 @@ class BaseField:
         self.meta = meta
         self.dwsh = dwsh
 
-        self.taxa = None
+        self.taxa: Optional[Taxa] = None
         self.locations = None
         self.summary = None
 

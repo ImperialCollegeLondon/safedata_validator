@@ -185,6 +185,7 @@ class Resources:
             LOGGER.critical(f"No user config in {user_cfg_file}")
             LOGGER.critical(f"No site config in {site_cfg_file}")
             log_and_raise("No config files provided or found", RuntimeError)
+            return
 
         # Report resource config location and type
         msg = f"Configuring resources from {config_type}"
