@@ -53,7 +53,7 @@ The `gbif_database` value can be left empty (`gbif_database =`), in which case
 the package will use the online GBIF API for taxon validation. Alternatively,
 the `gbif_database` entry can be used to point to a local copy of the GBIF
 backbone database, which is _very_ much faster but [requires the database to be
-built](build_local_gbif).
+built](build_local_gbif.md).
 
 ### NCBI database
 
@@ -61,7 +61,7 @@ The `ncbi_database` value can also be left empty (`ncbi_database =`), in which c
 package will access the online NCBI taxonomy database using the [Entrez
 system](https://www.ncbi.nlm.nih.gov/Web/Search/entrezfs.html). Alternatively, the
 `ncbi_database` entry can be used to point to a local copy of the NCBI database, which
-is _very_ much faster but again [requires the database to be built](build_local_ncbi).
+is _very_ much faster but again [requires the database to be built](build_local_ncbi.md).
 
 ### Extents
 
