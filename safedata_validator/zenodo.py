@@ -48,11 +48,7 @@ from tqdm.utils import CallbackIOWrapper
 
 from safedata_validator.logger import FORMATTER, LOGGER
 from safedata_validator.resources import Resources
-from safedata_validator.taxa import (
-    BACKBONE_RANKS_EX,
-    ncbi_index_to_text,
-    taxon_index_to_text,
-)
+from safedata_validator.taxa import ncbi_index_to_text, taxon_index_to_text
 
 # Constant definition of zenodo action function response type
 ZenodoFunctionResponseType = tuple[Union[dict, None], Union[str, None]]
