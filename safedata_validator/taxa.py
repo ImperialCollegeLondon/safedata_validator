@@ -2791,7 +2791,6 @@ class Taxa:
         return self.gbif_taxa.taxon_names.intersection(self.ncbi_taxa.taxon_names)
 
 
-# TODO - Fix multiple branch error
 def taxon_index_to_text(
     taxa: list[dict], html: bool = False, indent_width: int = 4
 ) -> Union[str, tags.div]:
@@ -2838,7 +2837,8 @@ def taxon_index_to_text(
         html_out = StringIO()
 
     # group by parent taxon, substituting 0 for None
-    taxa.sort(key=lambda x: x["gbif_parent_id"] or 0)
+    # secondary order is then alphabetic based on taxon name
+    taxa.sort(key=lambda x: (x["gbif_parent_id"] or 0, x["taxon_name"]))
 
     # Preallocate container to store identity of surplus taxa
     surp_tx_ids = []
@@ -2874,7 +2874,7 @@ def taxon_index_to_text(
     for index in sorted(surp_tx_ids, reverse=True):
         del taxa[index]
 
-    # TODO - ALPHABETISE
+    # group taxa by their parent id
     grouped = {k: list(v) for k, v in groupby(taxa, lambda x: x["gbif_parent_id"])}
 
     # start the stack with the kingdoms - these taxa will have None as a parent
@@ -3009,7 +3009,8 @@ def ncbi_index_to_text(
         html_out = StringIO()
 
     # group by parent taxon, substituting 0 for None
-    taxa.sort(key=lambda x: x["ncbi_parent_id"] or 0)
+    # secondary order is then alphabetic based on taxon name
+    taxa.sort(key=lambda x: (x["ncbi_parent_id"] or 0, x["taxon_name"]))
 
     # Preallocate container to store identity of surplus taxa
     surp_tx_ids = []
