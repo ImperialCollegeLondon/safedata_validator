@@ -6,7 +6,6 @@ from logging import ERROR, INFO, WARNING
 import pytest
 
 from safedata_validator import taxa
-from safedata_validator.resources import Resources
 
 from .conftest import log_check
 
@@ -22,6 +21,30 @@ def test_sdv_no_remote_set_correctly():
         "False",
         "True",
     ]
+
+
+@pytest.mark.parametrize(
+    "status_code,expected_exception",
+    [
+        (404, ["Connection error to remote server", taxa.NCBIError]),
+        (503, ["Connection error to remote server", taxa.NCBIError]),
+    ],
+)
+# Test that taxonomy efetch and esearch handles status codes correctly
+def test_entrez_status_errors(
+    mocker, resources_with_remote_ncbi, status_code, expected_exception
+):
+    # Configure the mock to return a response with a specific status code.
+    mock_get = mocker.patch("safedata_validator.taxa.requests.get")
+    mock_get.return_value.status_code = status_code
+
+    # Construct remote validator
+    v = taxa.RemoteNCBIValidator(resources_with_remote_ncbi)
+
+    # Call the service, which will send a request to the server.
+    with pytest.raises(expected_exception[1], match=expected_exception[0]):
+        v._taxonomy_efetch(2)
+        v._taxonomy_esearch("Bacteria")
 
 
 # ------------------------------------------
