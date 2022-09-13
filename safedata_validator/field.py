@@ -8,8 +8,6 @@ and loading and validating the field metadata and data rows in the main data tab
 
 import datetime
 import os
-import resource
-from cgitb import reset
 from itertools import groupby, islice
 from logging import CRITICAL, ERROR, INFO, WARNING
 from typing import List, Optional, Type, Union
