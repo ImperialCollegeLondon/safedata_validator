@@ -119,7 +119,7 @@ def download_gbif_backbone(outdir: str, timestamp: str = None) -> dict:
 
 
 def build_local_gbif(
-    outdir: str, timestamp: str, simple: str, deleted: str = None, keep=False
+    outdir: str, timestamp: str, simple: str, deleted: str = None, keep: bool = False
 ) -> None:
     """Create a local GBIF backbone database.
 
@@ -299,7 +299,7 @@ def download_ncbi_taxonomy(outdir: str, timestamp: str = None) -> dict:
 
     This function downloads the data for the NCBI taxonomy to a given location. By
     default, the most recent version is downloaded. A timestamp (e.g. '2021-11-26') can
-    be provided to select a particular version from the list at:
+    be provided to select a particular version from the following link.
 
         https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/
 
@@ -379,7 +379,9 @@ def download_ncbi_taxonomy(outdir: str, timestamp: str = None) -> dict:
     return return_dict
 
 
-def build_local_ncbi(outdir: str, timestamp: str, taxdmp: str, keep=False) -> None:
+def build_local_ncbi(
+    outdir: str, timestamp: str, taxdmp: str, keep: bool = False
+) -> None:
     """Create a local NCBI taxonomy database.
 
     This function takes the path to a downloaded data file from the NCBI Taxonomy
@@ -406,6 +408,16 @@ def build_local_ncbi(outdir: str, timestamp: str, taxdmp: str, keep=False) -> No
     db_file = os.path.join(outdir, f"ncbi_taxonomy_{timestamp}.sqlite")
     LOGGER.info(f"Building GBIF backbone database in: {db_file}")
     FORMATTER.push()
+
+    # Create the output file and turn off safety features for speed
+    con = sqlite3.connect(db_file)
+    con.execute("PRAGMA synchronous = OFF")
+
+    # Write the timestamp into a table
+    con.execute("CREATE TABLE timestamp (timestamp date);")
+    con.execute(f"INSERT INTO timestamp VALUES ('{timestamp}');")
+    con.commit()
+    LOGGER.info("Timestamp table created")
 
     # Define the retained fields and schema for each required table
     tables = {
@@ -454,10 +466,6 @@ def build_local_ncbi(outdir: str, timestamp: str, taxdmp: str, keep=False) -> No
             "schema": [("old_tax_id", "int"), ("new_tax_id", "int")],
         },
     }
-
-    # Create the output file and turn off safety features for speed
-    con = sqlite3.connect(db_file)
-    con.execute("PRAGMA synchronous = OFF")
 
     archive = zipfile.ZipFile(taxdmp)
 
