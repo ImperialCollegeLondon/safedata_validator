@@ -312,14 +312,15 @@ class Resources:
             gbif_backbone = (
                 "https://api.gbif.org/v1/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c"
             )
-            timestamp = requests.get(gbif_backbone)
+            data = requests.get(gbif_backbone)
 
-            if not timestamp.ok:
+            if not data.ok:
                 log_and_raise(
                     "Could not read current backbone timestamp from GBIF API", IOError
                 )
 
-            timestamp = isoparse(timestamp).date().isoformat()
+            time_data = data.json()["pubDate"]
+            self.gbif_timestamp = isoparse(time_data).date().isoformat()
 
         else:
             self.gbif_timestamp = validate_taxon_db(
