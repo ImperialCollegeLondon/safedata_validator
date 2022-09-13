@@ -375,7 +375,7 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
 
     # Connect to the file (which might or might not be a database containing the
     # required tables)
-    with contextlib.closing(sqlite3.connect(db_name)) as conn:
+    with contextlib.closing(sqlite3.connect(db_path)) as conn:
 
         # Check that it is a database by running a query
         try:
@@ -409,7 +409,8 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
         )
 
     try:
-        timestamp = timestamp[0]
+        # Extract first entry in first row
+        timestamp = timestamp[0][0]
         isoparse(timestamp)
     except ValueError:
         log_and_raise(
