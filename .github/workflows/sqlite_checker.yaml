@@ -1,4 +1,4 @@
-name: Python unit tests
+name: SQLite checking
 
 on: [push, pull_request]
 
@@ -38,4 +38,4 @@ jobs:
         run: poetry install
 
       - name: What happens?
-        run: python  -c "import sqlite3; print(sqlite3.connect('gbif_backbone_truncated.sqlite').execute('PRAGMA table_list;').fetchall())"
+        run: python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/gbif_backbone_truncated.sqlite').execute('PRAGMA table_list;').fetchall())"
