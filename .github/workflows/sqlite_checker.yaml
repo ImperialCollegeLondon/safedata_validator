@@ -47,5 +47,5 @@ jobs:
         run: | 
           python  -c "import sqlite3; print(sqlite3.sqlite_version)" 
           md5sum test/fixtures/* 
-          python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/gbif_backbone_truncated.sqlite').execute('select name from sqlite_schema;').fetchall())"
-          python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/ncbi_database_truncated.sqlite').execute('select name from sqlite_schema;').fetchall())"
+          python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/gbif_backbone_truncated.sqlite').execute('select name from sqlite_master;').fetchall())"
+          python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/ncbi_database_truncated.sqlite').execute('select name from sqlite_master;').fetchall())"
