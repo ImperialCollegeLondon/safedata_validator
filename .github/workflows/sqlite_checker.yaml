@@ -14,15 +14,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      # In order to avoid throttling from remote APIs, only run one job at
-      # a time on master and release branches. Note that env.SDV_NO_REMOTE
-      # is only available within job steps, and not here. 
-      max-parallel: ${{ fromJSON('[12, 1]')[ (contains(github.ref, 'master') || contains(github.ref, 'release')) ] }}
       matrix:
         python-version: ["3.9", "3.10"]
         os: [ubuntu-18.04, ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v3
+
+      - name: Install coreutils for macOS
+        if: matrix.os == 'macos-latest'
+        run: brew install coreutils
+
+      - name: Update SQLite
+        if: contains(matrix.os, 'ubuntu') 
+        run: |
+          sudo apt-get update
+          sudo apt-get install sqlite3
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v3
@@ -38,13 +44,8 @@ jobs:
         run: poetry install
 
       - name: Which sqlite?
-        run: python  -c "import sqlite3; print(sqlite3.sqlite_version)" 
-
-      - name: Files all where and what expected?
-        run: md5sum test/fixtures/* 
-
-      - name: What happens GBIF?
-        run: python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/gbif_backbone_truncated.sqlite').execute('select name from sqlite_schema;').fetchall())"
-
-      - name: What happens NCBI?
-        run: python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/ncbi_database_truncated.sqlite').execute('select name from sqlite_schema;').fetchall())"
+        run: | 
+          python  -c "import sqlite3; print(sqlite3.sqlite_version)" 
+          md5sum test/fixtures/* 
+          python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/gbif_backbone_truncated.sqlite').execute('select name from sqlite_schema;').fetchall())"
+          python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/ncbi_database_truncated.sqlite').execute('select name from sqlite_schema;').fetchall())"
