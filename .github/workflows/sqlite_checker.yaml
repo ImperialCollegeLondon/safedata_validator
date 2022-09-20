@@ -37,8 +37,11 @@ jobs:
       - name: Install dependencies
         run: poetry install
 
+      - name: Which sqlite?
+        run: python  -c "import sqlite3; print(sqlite3.sqlite_version)" 
+
       - name: What happens GBIF?
-        run: python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/gbif_backbone_truncated.sqlite').execute('PRAGMA table_list;').fetchall())"
+        run: python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/gbif_backbone_truncated.sqlite').execute('select name from sqlite_schema;').fetchall())"
 
       - name: What happens NCBI?
-        run: python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/ncbi_backbone_truncated.sqlite').execute('PRAGMA table_list;').fetchall())"
+        run: python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/ncbi_database_truncated.sqlite').execute('select name from sqlite_schema;').fetchall())"
