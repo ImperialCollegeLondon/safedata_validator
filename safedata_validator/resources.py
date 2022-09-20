@@ -381,7 +381,7 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
         # Check that it is a database by running a query
         try:
             db_tables = conn.execute(
-                "SELECT name FROM sqlite_schema WHERE type ='table';"
+                "SELECT name FROM sqlite_master WHERE type ='table';"
             )
         except sqlite3.DatabaseError:
             log_and_raise(f"Local {db_name} database not an SQLite3 file.", OSError)
