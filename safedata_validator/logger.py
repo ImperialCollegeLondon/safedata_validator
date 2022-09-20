@@ -213,7 +213,7 @@ LOGGER.addHandler(CONSOLE_HANDLER)
 #
 
 
-def log_and_raise(msg: str, exception: Type[Exception]) -> None:
+def log_and_raise(msg: str, exception: Type[Exception], extra: dict = None) -> None:
     """Emit a critical error message and raise an Exception.
 
     This convenience function adds a critical level message to the logger and
@@ -224,9 +224,10 @@ def log_and_raise(msg: str, exception: Type[Exception]) -> None:
     Args:
         msg: A message to add to the log
         exception: An exception type to be raised
+        extra: A dictionary of extra information to be passed to the logger
     """
 
-    LOGGER.critical(msg)
+    LOGGER.critical(msg, extra=extra)
     raise exception(msg)
 
 

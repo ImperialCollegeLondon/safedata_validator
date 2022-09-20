@@ -20,6 +20,11 @@ tx.load(wb['Taxa'])
 import csv
 import sqlite3
 
+from safedata_validator.resources import Resources
+
+# Get the locally configured full databases
+resources = Resources()
+
 # The details file contains some whole row comments, so these are skipped
 fp = open("details_of_test_taxa.csv")
 rdr = csv.DictReader(filter(lambda row: row[0] != "#", fp))
@@ -31,10 +36,10 @@ gbif_ids = set([int(d["gbif_id"]) for d in data])
 gbif_ids.discard(-1)
 
 # Copy truncated database from local non-git copy.
-source_db = sqlite3.connect("../../local_db/gbif_2021-11-26/gbif_backbone.sqlite3")
+source_db = sqlite3.connect(resources.gbif_database)
 dest_db = sqlite3.connect("gbif_backbone_truncated.sqlite")
 
-# create table
+# create backbone table
 cur = source_db.execute(
     "SELECT sql FROM sqlite_master WHERE type='table' AND name='backbone'"
 )
@@ -48,6 +53,19 @@ for each_id in gbif_ids:
     ins = dest_db.execute(
         "insert into backbone values (" + ",".join(["?"] * 29) + ")", cur.fetchone()
     )
+
+dest_db.commit()
+
+# timestamp table
+cur = source_db.execute(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='timestamp'"
+)
+schema = cur.fetchone()[0]
+cur = dest_db.execute(schema)
+
+cur = source_db.execute("SELECT * FROM timestamp")
+timestamp = cur.fetchone()[0]
+ins = dest_db.execute(f'insert into timestamp values ("{timestamp}")')
 
 dest_db.commit()
 

@@ -5,22 +5,26 @@ taxonomy database to a truncated version for inclusion in the test fixtures dire
 for testing local taxon validation. The input is a list of valid NCBI taxa IDs,
 associated names, nodes, and merged nodes are then all retained in the appropriate
 tables. Everything else is chucked out. Only IDs for taxa used are needed, higher taxa
-are found automatically and added to the database. This script should be run with
-safedata_validator as the working directory.
+are found automatically and added to the database.
 """
 
 import csv
 import sqlite3
 
+from safedata_validator.resources import Resources
+
+# Get the locally configured full databases
+resources = Resources()
+
 # The details file contains some whole row comments, so these are skipped
-fp = open("test/fixtures/test_ncbi_taxa_details.csv")
+fp = open("test_ncbi_taxa_details.csv")
 rdr = csv.DictReader(filter(lambda row: row[0] != "#", fp))
 data = list(rdr)
 fp.close()
 
 # Copy truncated database from local non-git copy.
-source_db = sqlite3.connect("local_db/ncbi/ncbi_database.sqlite3")
-dest_db = sqlite3.connect("test/fixtures/ncbi_database_truncated.sqlite")
+source_db = sqlite3.connect(resources.ncbi_database)
+dest_db = sqlite3.connect("ncbi_database_truncated.sqlite")
 
 # Get unique, non-user GBIF IDs from the data
 ncbi_ids = set([int(d["ncbi_id"]) for d in data])
@@ -67,7 +71,7 @@ for each_id in ncbi_ids:
     rqst = cur.fetchall()
     for ind in range(0, len(rqst)):
         ins = dest_db.execute(
-            "insert into names values (" + ",".join(["?"] * 3) + ")", rqst[ind]
+            "insert into names values (" + ",".join(["?"] * 4) + ")", rqst[ind]
         )
     # Search for all IDs that have been merged into this ID
     cur = source_db.execute(f"SELECT * FROM merge WHERE new_tax_id = {each_id}")
@@ -76,6 +80,19 @@ for each_id in ncbi_ids:
         ins = dest_db.execute(
             "insert into merge values (" + ",".join(["?"] * 2) + ")", rqst[ind]
         )
+
+dest_db.commit()
+
+# timestamp table
+cur = source_db.execute(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='timestamp'"
+)
+schema = cur.fetchone()[0]
+cur = dest_db.execute(schema)
+
+cur = source_db.execute("SELECT * FROM timestamp")
+timestamp = cur.fetchone()[0]
+ins = dest_db.execute(f'insert into timestamp values ("{timestamp}")')
 
 dest_db.commit()
 

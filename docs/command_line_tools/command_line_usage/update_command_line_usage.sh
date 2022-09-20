@@ -9,7 +9,7 @@
 # referenced.
 
 
-echo "cl_prompt $ safedata_safedata_validate -h" > safedata_validate.txt
+echo "cl_prompt $ safedata_validate -h" > safedata_validate.txt
 safedata_validate -h >> safedata_validate.txt
 
 
@@ -26,3 +26,9 @@ do
     echo "cl_prompt $ safedata_zenodo $subc -h" > safedata_zenodo_$subc.txt
     safedata_zenodo $subc -h >> safedata_zenodo_$subc.txt
 done
+
+echo "cl_prompt $ safedata_build_local_gbif -h" > safedata_build_local_gbif.txt
+safedata_build_local_gbif -h >> safedata_build_local_gbif.txt
+
+echo "cl_prompt $ safedata_build_local_ncbi -h" > safedata_build_local_ncbi.txt
+safedata_build_local_ncbi -h >> safedata_build_local_ncbi.txt

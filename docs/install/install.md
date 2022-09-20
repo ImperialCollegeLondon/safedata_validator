@@ -45,3 +45,6 @@ The following steps should allow you to install `safedata_validator`:
 5. In addition to the command line option, you should now be able to `import
    safedata_validator` within Python, which will allow you to use the
    class and methods defined in the package within your own code.
+
+6. You will need to [configure](configuration.md) the `safedata_validator` package to
+   point to some data validation resources before further use.

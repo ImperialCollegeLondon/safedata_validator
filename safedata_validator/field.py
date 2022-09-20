@@ -375,6 +375,8 @@ class Dataset:
             #   * dataset_id to link from taxon searches to datasets
             #  * id (what's this? Erroneous row ID in query?)
             # Gbif taxa if they exist
+            gbif_local=self.resources.use_local_gbif,
+            gbif_timestamp=self.resources.gbif_timestamp,
             gbif_taxa=[
                 dict(
                     zip(
@@ -392,6 +394,8 @@ class Dataset:
                 for tx in self.taxa.gbif_taxa.taxon_index
             ],
             # NCBI taxa if they exist
+            ncbi_local=self.resources.use_local_ncbi,
+            ncbi_timestamp=self.resources.ncbi_timestamp,
             ncbi_taxa=[
                 dict(
                     zip(
