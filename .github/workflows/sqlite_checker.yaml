@@ -40,6 +40,9 @@ jobs:
       - name: Which sqlite?
         run: python  -c "import sqlite3; print(sqlite3.sqlite_version)" 
 
+      - name: Files all where and what expected?
+        run: md5sum test/fixtures/* 
+
       - name: What happens GBIF?
         run: python  -c "import sqlite3; print(sqlite3.connect('test/fixtures/gbif_backbone_truncated.sqlite').execute('select name from sqlite_schema;').fetchall())"
 
