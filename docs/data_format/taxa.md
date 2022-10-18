@@ -7,7 +7,7 @@ taxa, all datasets using taxa **must** contain a Taxa spreadsheet, providing tax
 information.
 
 Note that you must only provide details for taxa actually used in the data worksheets. This
-ensures that the taxonomic index for a dataset is accurate and also double checks that it the
+ensures that the taxonomic index for a dataset is accurate and also double checks that the
 omission of a taxon from the data worksheets is not an error.
 
 # Taxon validation
@@ -55,7 +55,7 @@ The other fields are optional and are used to handle the following taxonomic iss
 
 ## Ambiguous taxon names
 
-Some taxon names map to more than one taxon.  For example, the genus _Morus_ can refer to either mulberries or gannets. The checking code will raise an error if it encounters an ambiiguous name.  In these rare cases, you will need to look up the taxon in GBIF and provide the GBIF ID number in the **Taxon ID** field.
+Some taxon names map to more than one taxon.  For example, the genus _Morus_ can refer to either mulberries or gannets. The checking code will raise an error if it encounters an ambiguous name.  In these rare cases, you will need to look up the taxon in GBIF and provide the GBIF ID number in the **Taxon ID** field.
 
 The example in the table allows us to confirm that you mean this _Morus_: [https://www.gbif.org/species/2480962](https://www.gbif.org/species/2480962).
 
