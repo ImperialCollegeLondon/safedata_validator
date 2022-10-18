@@ -8,7 +8,7 @@ researchers to provide some (relatively!) simple metadata information in their d
 This documentation describes:
 
 1. the data formatting required to submit data to SAFE, and
-2. the software used (the python module `safedata_validator` to validate formatted data.
+2. the software used (the python module `safedata_validator`) to validate formatted data.
 
 If you are planning to submit data, the  process in overview is:
 
