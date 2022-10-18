@@ -31,7 +31,7 @@ then the description data should be typed in the columns to the right. The descr
 out the possible summary metadata in blocks.
 
 Some blocks of fields are mandatory (core, authors, worksheets, keywords) but may include 
-optional fields (such as author OrcID). Other blocks are optional, but contain fields that may be 
+optional fields (such as author ORCID). Other blocks are optional, but contain fields that may be 
 mandatory if the block is used. We've tried to make this as clear as possible below!
 
 Some blocks allow multiple records (e.g. authors and data worksheets) with sets of values in adjacent columns  but other blocks only allow a single record (e.g. core fields and geographic extents).
@@ -78,12 +78,12 @@ This block provides a set of core details for the dataset. You can only provide 
 
 
 These rows provide contact details for the authors of the data. If the datasets should be
-credited to more than author, then provide sets of details in adjacent columns. If you have an
+credited to more than one author, then provide sets of details in adjacent columns. If you have an
 [ORCID](https://orcid.org/), provide it here: this is a good way to help link all of your
 academic outputs to you!
 
 Affiliation and email are also optional, but we would **very much prefer complete author
-metadata** (name, affiliation, email) for all authors. However we realise that sometimes this
+metadata** (name, affiliation, email) for all authors. However, we realise that sometimes this
 isn't possible: if you're uploading data collected by past students who you've lost contact
 with, then you might not have these details for **any** author.
 
