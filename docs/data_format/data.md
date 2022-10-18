@@ -59,7 +59,7 @@ This section shows the options that can appear in the `field_type` descriptor, a
 further descriptors that might be needed. See the sections below for details on formatting, but
 the available types are:
 
- * **Date**, **Datetime** and **Time**: when were the data collected? 
+ * **Date**, **Datetime** and **Time**: when was the data collected? 
  * **Location**: where was the data collected? 
  * **Latitude**, **Longitude**: GPS data for the exact location. 
  * **Replicate**: a record of replication, usually just a repeating set of numbers. 
