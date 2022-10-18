@@ -29,7 +29,7 @@ We would prefer data tables to be included as Excel worksheets but there are goo
 
 * **Very large data tables**. Excel struggles with very large numbers of rows and reading data from large Excel files can be very slow. We're happy to accept very large tables submitted in other commonly accessible formats as simple text files, compressed text files, R data files and the like.
 
-* **Structured databases**. If your dataset is a SQL database or something similar, with table definitions, constraints, keys and the like, then forcing it into an Excel workbook is a poor idea. We are happy to accept database dump files, but we these must be text dumps so that they are portable.
+* **Structured databases**. If your dataset is a SQL database or something similar, with table definitions, constraints, keys and the like, then forcing it into an Excel workbook is a poor idea. We are happy to accept database dump files, but these must be text dumps so that they are portable.
 
 If you do provide tabular data in another format, then you will still need to provide an Excel file to provide metadata and this should include completing a data worksheet describing the table metadata. The data worksheet does not need to contain any of the actual data but it will allow us to index the available fields. Briefly:
 
