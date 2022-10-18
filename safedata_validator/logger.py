@@ -48,7 +48,7 @@ def record_factory(*args, **kwargs):
 
     The representation of logging records uses single character codes to show logging
     levels. This record factory adds custom attributes to records to
-    support that behavour.
+    support that behaviour.
 
     """
     record = old_factory(*args, **kwargs)
