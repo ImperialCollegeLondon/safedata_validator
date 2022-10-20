@@ -1,7 +1,7 @@
 # Overview
 
 The `safedata_validator` package is part of a system for validating and publishing
-heterogenous datasets. It was built around the field data collections from the [SAFE
+heterogeneous datasets. It was built around the field data collections from the [SAFE
 Project](https://safeproject.net), which generates large numbers of related datasets
 from a wide range of projects.
 
@@ -36,7 +36,7 @@ The `safedata_validator` package uses the following elements:
 - A separate metadata server, which is used to maintain a searchable interface to the
   full metadata extracted from datasets.
 
-## Code availablility
+## Code availability
 
 The `safedata_validator` package is open source Python and  is maintained on
 [GitHub](https://github.com/ImperialCollegeLondon/safedata_validator). It can

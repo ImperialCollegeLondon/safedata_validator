@@ -7,7 +7,7 @@ the columns to the right. The description below sets out the possible summary
 metadata in blocks.
 
 Some blocks of fields are mandatory (core, authors, worksheets, keywords) but
-may include optional fields (such as author OrcID). Other blocks are optional,
+may include optional fields (such as author ORCID). Other blocks are optional,
 but contain fields that may be mandatory if the block is used. We've tried to
 make this as clear as possible below!
 
@@ -105,12 +105,12 @@ single value for each field.
     **Author ORCID** is optional and the remaining fields are mandatory.
 
 These rows provide contact details for the authors of the data. If the datasets
-should be credited to more than author, then provide sets of details in adjacent
+should be credited to more than one author, then provide sets of details in adjacent
 columns. If you have an [ORCID](https://orcid.org/), provide it here: this is a
 good way to help link all of your academic outputs to you!
 
 Affiliation and email are also optional, but we would **very much prefer
-complete author metadata** (name, affiliation, email) for all authors. However
+complete author metadata** (name, affiliation, email) for all authors. However,
 we realise that sometimes this isn't possible: if you're uploading data
 collected by past students who you've lost contact with, then you might not have
 these details for **any** author.

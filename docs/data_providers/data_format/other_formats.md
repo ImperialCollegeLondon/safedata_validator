@@ -46,7 +46,7 @@ reasons not to use Excel for tabular data:
 
 * **Structured databases**. If your dataset is a SQL database or something similar, with
   table definitions, constraints, keys and the like, then forcing it into an Excel
-  workbook is a poor idea. We are happy to accept database dump files, but we these must
+  workbook is a poor idea. We are happy to accept database dump files, but these must
   be text dumps so that they are portable.
 
 If you do provide tabular data in another format, then you will still need to provide an
