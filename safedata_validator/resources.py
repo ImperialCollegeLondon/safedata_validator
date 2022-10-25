@@ -284,9 +284,8 @@ class Resources:
     def _validate_gbif(self) -> None:
         """Validate the GBIF settings.
 
-        This private function checks whether to use the online API or a local backbone
-        database and then validates the provided sqlite3 database file. It updates the
-        instance with validated details.
+        This private function validates the provided sqlite3 database file and updates
+        the instance with validated details.
         """
 
         self.gbif_timestamp = validate_taxon_db(
@@ -296,9 +295,8 @@ class Resources:
     def _validate_ncbi(self) -> None:
         """Validate the NCBI settings.
 
-        This private function checks whether to use the online API or a local backbone
-        database and then validates the provided sqlite3 database files. It updates the
-        instance with validated details.
+        This private function validates the provided sqlite3 database files and updates
+        the instance with validated details.
         """
 
         self.ncbi_timestamp = validate_taxon_db(

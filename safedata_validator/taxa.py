@@ -286,7 +286,7 @@ def gen_invalid_NCBITaxon() -> NCBITaxon:
 
 
 class GBIFValidator:
-    """Validate taxon data against a local GBIF database.
+    """Validate taxon data against the GBIF database.
 
     This class connects to a local copy of the GBIF database and provides methods to
     validate GBIFTaxon instances and look up GBIF ID values.
@@ -473,7 +473,7 @@ class GBIFValidator:
 
 
 class NCBIValidator:
-    """Validate taxon data against a local NCBI database.
+    """Validate taxon data against the NCBI database.
 
     This class connects to a local copy of the NCBI database and provides methods to
     validate NCBITaxon instances and look up NCBI ID values.

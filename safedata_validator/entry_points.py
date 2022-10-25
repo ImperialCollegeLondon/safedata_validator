@@ -12,7 +12,6 @@ import os
 import sys
 import tempfile
 import textwrap
-from time import time
 
 import simplejson
 
@@ -844,7 +843,7 @@ def _safedata_post_metadata_cli():
 def _build_local_gbif_cli():
     """Build a local GBIF database.
 
-    This tool builds an SQLite database of the GBIF backbone taxonomy to use in local
+    This tool builds an SQLite database of the GBIF backbone taxonomy to use in
     validation by safedata_validate. There are multiple versions of the dataset, and the
     available versions can be seen here:
 
@@ -882,7 +881,7 @@ def _build_local_gbif_cli():
 def _build_local_ncbi_cli():
     """Build a local NCBI database.
 
-    This tool builds an SQLite database of the NCBI  taxonomy to use in local validation
+    This tool builds an SQLite database of the NCBI  taxonomy to use in validation
     by safedata_validate. There are multiple archived versions of the dataset, and the
     available versions can be seen here:
 
