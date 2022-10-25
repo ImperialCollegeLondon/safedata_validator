@@ -196,7 +196,7 @@ def log_check(caplog, expected_log):
 
 
 @pytest.fixture()
-def resources_fixture(config_filesystem):
+def fixture_resources(config_filesystem):
     """Creates a Resource object configured to use local NCBI and GBIF.
 
     Returns:
@@ -248,17 +248,17 @@ def example_ncbi_files(config_filesystem, request):
 
 
 @pytest.fixture()
-def fixture_taxon_validator(resources_fixture):
+def fixture_taxon_validator(fixture_resources):
     """Fixture to return GBIF taxon validators."""
 
-    return GBIFValidator(resources_fixture)
+    return GBIFValidator(fixture_resources)
 
 
 @pytest.fixture()
-def fixture_ncbi_validator(resources_fixture):
+def fixture_ncbi_validator(fixture_resources):
     """Fixture to NCBI validator."""
 
-    return NCBIValidator(resources_fixture)
+    return NCBIValidator(fixture_resources)
 
 
 # Fixtures to provide Taxon, Locations, Dataset, Dataworksheet
@@ -266,13 +266,13 @@ def fixture_ncbi_validator(resources_fixture):
 
 
 @pytest.fixture()
-def fixture_taxa(resources_fixture):
+def fixture_taxa(fixture_resources):
     """Fixture to provide a taxon object with a couple of names.
 
     These examples need to be in the cutdown local GBIF testing database in fixtures.
     """
 
-    taxa = GBIFTaxa(resources_fixture)
+    taxa = GBIFTaxa(fixture_resources)
 
     test_taxa = [
         ("C_born", ["Crematogaster borneensis", "Species", None, None], None),
@@ -286,13 +286,13 @@ def fixture_taxa(resources_fixture):
 
 
 @pytest.fixture()
-def fixture_locations(resources_fixture):
+def fixture_locations(fixture_resources):
     """Fixture to provide a taxon object with a couple of names.
 
     These examples need to be in the cutdown local GBIF testing database in fixtures.
     """
 
-    locations = Locations(resources_fixture)
+    locations = Locations(fixture_resources)
 
     test_locs = ["A_1", "A_2", 1, 2]
 
@@ -302,14 +302,14 @@ def fixture_locations(resources_fixture):
 
 
 @pytest.fixture()
-def fixture_dataset(resources_fixture):
+def fixture_dataset(fixture_resources):
     """Fixture to provide a dataset.
 
     This dataset has been prepopulated with some taxon and location names for field
     tests.
     """
 
-    dataset = Dataset(resources_fixture)
+    dataset = Dataset(fixture_resources)
 
     test_taxa = [
         ("C_born", ["Crematogaster borneensis", "Species", None, None], None),
