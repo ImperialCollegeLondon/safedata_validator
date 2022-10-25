@@ -22,14 +22,12 @@ both dataset locations and taxa. You will need to [create a configuration
 file](../install/configuration.md) to set `safedata_validator` up to find those
 resources.
 
-Note that two key resources - the GBIF and NCBI taxonomy databases - can simply use
-their existing online APIs, and `safedata_validator` will use these by default. This is
-easier for most users but it can be rather slow and requires an internet connection.
-
-If you want to (radically!) improve the speed of `safedata_validator` for frequent use
-or need to be able to use it completely offline, then you can provide local copies of
-the data resources. Two extra scripts are packaged with `safedata_validator` that you
-can use to build these databases
+Note that two key resources - the GBIF and NCBI taxonomy databases - require local
+SQLite3 databases containing the core data from those databases. These are relatively
+large files (~ 2GB in total). The package provides two commands
+([safedata_build_local_gbif](../install/build_local_gbif.md) and
+[safedata_build_local_ncbi](../install/build_local_ncbi.md)) to download and build
+these databases, and the path to those files can then be included in the configuration.
 
 Note that you cannot validate DOIs without an internet connection, but
 this is optional.

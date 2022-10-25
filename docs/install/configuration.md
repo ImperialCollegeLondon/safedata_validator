@@ -33,8 +33,6 @@ contact_orcid = 0000-0003-3378-2814
 [metadata]
 api = https://safeproject.net
 token = xyz
-[ncbi]
-api_key = xyz
 ```
 
 ### Locations
@@ -49,19 +47,13 @@ downloaded from:
 
 ### GBIF database
 
-The `gbif_database` value can be left empty (`gbif_database =`), in which case
-the package will use the online GBIF API for taxon validation. Alternatively,
-the `gbif_database` entry can be used to point to a local copy of the GBIF
-backbone database, which is _very_ much faster but [requires the database to be
-built](build_local_gbif.md).
+The `gbif_database` entry contains the path to the required local copy of the GBIF
+backbone database ([see here](build_local_gbif.md)).
 
 ### NCBI database
 
-The `ncbi_database` value can also be left empty (`ncbi_database =`), in which case the
-package will access the online NCBI taxonomy database using the [Entrez
-system](https://www.ncbi.nlm.nih.gov/Web/Search/entrezfs.html). Alternatively, the
-`ncbi_database` entry can be used to point to a local copy of the NCBI database, which
-is _very_ much faster but again [requires the database to be built](build_local_ncbi.md).
+The `ncbi_database` entry contains the path to the required local copy of the NCBI
+database, ([see here](build_local_ncbi.md)).
 
 ### Extents
 
@@ -112,16 +104,6 @@ server, which provides an API allowing searches across all uploaded datasets. A 
 package in the SAFE data ecosystem
 ([`safedata`](https://imperialcollegelondon.github.io/safedata/)) has been built, in
 order to simplify the process of querying this API for end users.
-
-### NCBI API
-
-Remote NCBI validation is very slow due to requests being rate limited to a maximum of 3
-requests per second. However, if an API key is provided the rate limit increases to 10
-requests per second. An API key can be obtained by registering for an NCBI account and
-then requesting one, instructions for this can be found
-[here](https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/).
-When this key is included in the configuration file `safedata_validator` will make use
-of it for all remote validation requests.
 
 ## Configuration file location
 

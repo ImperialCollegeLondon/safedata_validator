@@ -26,7 +26,7 @@ version can be selected by supplying the version date timestamp from the page ab
 
 Once you have an SQLite3 backbone database, you will then need to edit the
 `gbif_database` entry in your [configuration file](configuration.md) to provide
-the path to your new SQLite file or provide the path as an argument.
+the path to your new SQLite file.
 
 ## Build process overview
 

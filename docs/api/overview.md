@@ -9,14 +9,12 @@ components of the validation process.
   gazetteer and providing a Locations class to be used in validation of the
   [Locations datasheet](../data_providers/data_format/locations.md).
 * Similarly, the [`taxa` module](./taxa.md) handles the creation of taxonomic validation
-  classes, using local databases where available, but otherwise using online APIs. It
-  uses those validator classes to check the contents of the
+  classes, using local databases to check the contents of the
   [GBIF](../data_providers/data_format/gbif_taxa.md) and
   [NCBI](../data_providers/data_format/ncbi_taxa.md) data worksheets.
 * The [`field` module](./field.md) contains all of the code for reading and validating
   data worksheets, along with the main Dataset class used to load and validate entire
   dataset files.
-
 * The [`resources` module](./resources.md) is used to load and validate the
   [configuration file](../install/configuration.md).
 * The [`extent` module](./extent.md) is used to configure and track the [temporal and
