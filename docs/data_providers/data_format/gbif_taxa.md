@@ -156,6 +156,13 @@ the parent taxon that we would naturally use from GBIF and so you will need to p
 replacement. The example in the table is explicitly saying that _Microcopris hidakai_ is
 not a synonym but is a separate taxon that belongs in _Microcopris_.
 
+## Deleted taxa
+
+The GBIF backbone also includes a large number of **deleted** taxon ids: these are a mix
+of duplicated names, typos in the database and other errors. The GBIF ID of these taxa
+are preserved, along with _some_ information, but we do not allow deleted taxa to be
+used in the GBIF Taxa worksheet.
+
 ## My data doesn't contain taxa
 
 Fine. You can omit the Taxa worksheet!

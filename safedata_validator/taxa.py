@@ -1,33 +1,39 @@
 """The taxa submodule.
 
-This module describes classes and methods used to compile taxonomic data from
-datasets and to validate taxonomy against the GBIF backbone database and/or the
-NCBI taxonomy database.
+This module describes classes and methods used to compile taxonomic data from datasets
+and to validate taxonomy against the GBIF backbone database and/or the NCBI taxonomy
+database.
 
-The two parallel Taxon dataclasses (GBIFTaxon and NCBITaxon) are used to store
-data about a taxon entry in a dataset. They are initialised with user data and
-then the relevant taxon Validator classes (GBIF or NCBI) can be used to update a
-Taxon object with the result of validation against a particular database. Online
-GBIF validation can be performed using the online API (`RemoteGBIFValidator`),
-whereas online NCBI validation makes use of the Entrez Eutils (`RemoteNCBIValidator`).
-Faster validation may be performed using local copies of the databases
-(`LocalGBIFValidator` and `LocalNCBIValidator`).
+The two parallel Taxon dataclasses (GBIFTaxon and NCBITaxon) are used to store data
+about a taxon entry in a dataset. They are initialised with user data and then the
+relevant taxon Validator classes (GBIF or NCBI) can be used to update a Taxon object
+with the result of validation against a particular database. Online GBIF validation can
+be performed using the online API (`RemoteGBIFValidator`), whereas online NCBI
+validation makes use of the Entrez Eutils (`RemoteNCBIValidator`). Faster validation may
+be performed using local copies of the databases (`LocalGBIFValidator` and
+`LocalNCBIValidator`).
 
-Parallel 'Taxa' worksheets (GBIFTaxa and NCBITaxa) are defined, which are used to
-load and collate the set of taxonomic entries from a dataset. These are then collected
-in a higher level Taxa object, which additionally records the names used in the
-Data worksheets. This allows us to check that all defined names are used, all used
-names are defined, and that no names are defined in both Taxa worksheets (if both
-sheets are provided).
+Parallel 'Taxa' worksheets (GBIFTaxa and NCBITaxa) are defined, which are used to load
+and collate the set of taxonomic entries from a dataset. These are then collected in a
+higher level Taxa object, which additionally records the names used in the Data
+worksheets. This allows us to check that all defined names are used, all used names are
+defined, and that no names are defined in both Taxa worksheets (if both sheets are
+provided).
 
-Note that we explicitly exclude form and variety from the set of GBIF backbone
-taxonomic levels because they cannot be matched into the backbone hierarchy
-without extra API calls.
+Note that we explicitly exclude form and variety from the set of GBIF backbone taxonomic
+levels because they cannot be matched into the backbone hierarchy without extra API
+calls.
 
-When validating against the NCBI database supplied taxa of any rank (i.e. strain
-or clade) which can be successfully validated will be recorded. However, associated
-higher taxa will only be recorded if their ranks are either a GBIF backbone rank
-or superkingdom.
+When validating against the NCBI database supplied taxa of any rank (i.e. strain or
+clade) which can be successfully validated will be recorded. However, associated higher
+taxa will only be recorded if their ranks are either a GBIF backbone rank or
+superkingdom.
+
+One thing to note here is that taxon validation using the GBIF online API does not
+provide a match for deleted taxa unless a GBIF ID is provided (search vs id APIs), but
+using the local backbone database can find deleted taxa by name and rank alone. The
+local and remote validators therefore given different responses (Not found vs Deleted)
+but neither of these is permitted as a taxon match.
 """
 
 import dataclasses
@@ -459,6 +465,13 @@ class LocalGBIFValidator:
         taxon.taxon_status = taxon_row["status"].lower()
         taxon.parent_id = taxon_row["parent_key"]
 
+        # Detect deleted taxa - these contain a deletion date and (somewhat oddly)
+        # have had hierarchy above phylum removed, so parent taxon points at the phylum
+        if taxon_row["status"].lower() == "deleted":
+            taxon.taxon_status = "deleted"
+            taxon.lookup_status = "Deleted taxon"
+            return taxon
+
         # Add the taxonomic hierarchy, using a mapping of backbone ranks (except
         # subspecies) to backbone table fields.
         taxon.hierarchy = [
@@ -603,6 +616,13 @@ class RemoteGBIFValidator:
         taxon.parent_id = response.get("parentKey")
         taxon.taxon_status = response["taxonomicStatus"].lower()
         taxon.lookup_status = "found"
+
+        # Detect deleted taxa - these contain a deletion date and (somewhat oddly)
+        # have had hierarchy above phylum removed, so parent taxon points at the phylum
+        if "deleted" in response:
+            taxon.taxon_status = "deleted"
+            taxon.lookup_status = "Deleted taxon"
+            return taxon
 
         # Add the taxonomic hierarchy from the accepted usage - these are tuples
         # to be used to extend a set for the taxonomic hierarchy
