@@ -706,19 +706,6 @@ def test_validate_taxon_sanitise(
                 (INFO, "valid parent information"),
             ),
         ),
-        #  - Deleted taxon - need to pick an example taxon here with no accepted taxon
-        #    of the same name and rank.
-        (
-            (
-                "Deleted species",
-                ["Acladium atrum", "species", None, None],
-                None,
-            ),
-            (
-                (INFO, "accepted"),
-                (INFO, "valid parent information"),
-            ),
-        ),
     ],
 )
 def test_validate_taxon_lookup(
