@@ -19,10 +19,18 @@ gbif_id,parent_id,taxon_name,taxon_rank,status
 3623287,7317605,Neoalsomitra simplex,species,accepted
 2480962,9351,Morus,genus,accepted
 1106854,1106852,Zenicomus photuroides,species,accepted
-10025464,1,Cicada,genus,accepted
+10025464,1,Cicada,genus,deleted
+1682542,6049,Cicada,genus,accepted
+6049,809,Cicadidae,family,accepted
+809,216,Hemiptera,order,accepted
 -1,10025464,Cicada sanguinolenta,species,user
-6122612,1941092,Melittia oedippus,species,misapplied
-1941210,1941092,Melittia oedipus,species,accepted
+7968664,2705713,Brachypodium madagascariensis,doubtful
+2705713,3073,Brachypodium,GENUS,ACCEPTED
+2705713,3073,Brachypodium,genus,ACCEPTED
+2705713,3073,Brachypodium,genus,accepted
+3073,1369,Poaceae,family,accepted
+1369,196,Poales,order,accepted
+196,7707728,Liliopsida,class,accepted
 1327248,1327214,Melophorus potteri,species,accepted
 8548608,704,Goniopholis tenuidens,species,synonym
 4822253,704,Goniopholididae,family,accepted
@@ -102,3 +110,4 @@ gbif_id,parent_id,taxon_name,taxon_rank,status
 2435022,9703,Felis,genus,accepted
 8531298,5219404,Felis imperialis,species,synonym
 2684241,3925,Pinus,genus,accepted
+3367489,10240218,Acladium atrum,species,deleted

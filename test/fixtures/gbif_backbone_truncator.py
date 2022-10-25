@@ -26,7 +26,7 @@ from safedata_validator.resources import Resources
 resources = Resources()
 
 # The details file contains some whole row comments, so these are skipped
-fp = open("details_of_test_taxa.csv")
+fp = open("test_gbif_taxa_details.csv")
 rdr = csv.DictReader(filter(lambda row: row[0] != "#", fp))
 data = list(rdr)
 fp.close()
@@ -51,7 +51,7 @@ for each_id in gbif_ids:
 
     cur = source_db.execute(f"SELECT * FROM backbone WHERE id = {each_id}")
     ins = dest_db.execute(
-        "insert into backbone values (" + ",".join(["?"] * 29) + ")", cur.fetchone()
+        "insert into backbone values (" + ",".join(["?"] * 28) + ")", cur.fetchone()
     )
 
 dest_db.commit()
