@@ -29,17 +29,13 @@ superkingdom.
 
 import dataclasses
 import sqlite3
-import time
 from collections import Counter
 from io import StringIO
 from itertools import compress, groupby
-from logging import Formatter
 from typing import Optional, Union
 
-import requests  # type: ignore
 from dominate import tags
 from dominate.util import raw
-from lxml import etree
 from openpyxl import worksheet
 
 from safedata_validator.logger import (
@@ -70,17 +66,9 @@ BACKBONE_RANKS = [
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ["superkingdom"] + BACKBONE_RANKS
 
-# TODO - A lot of complexity could be lost here if the two validation
-#        sources had more similar structure. Could have a row return method
-#        that is used within a generic id_lookup and search class.
-#        Notably there us much less information in the row return from the
-#        local SQL db (e.g. merging acceptedKey and parentKey, but also not
-#        providing parent hierarchy taxon names.  Could define an SQL
-#        document to structure the local database to match remote?
-
 
 class GBIFError(Exception):
-    """Exception class for remote GBIF errors.
+    """Exception class for GBIF errors.
 
     Attributes:
         message: explanation of the error
@@ -92,7 +80,7 @@ class GBIFError(Exception):
 
 
 class NCBIError(Exception):
-    """Exception class for remote NCBI errors.
+    """Exception class for NCBI errors.
 
     Attributes:
         message: explanation of the error
@@ -292,11 +280,7 @@ class NCBITaxon:
 
 
 def gen_invalid_NCBITaxon() -> NCBITaxon:
-    """Generates a standardised invalid NCBITaxon instance.
-
-    This is defined as an independent function so that it can be used by both local and
-    remote NCBI validators.
-    """
+    """Generates a standardised invalid NCBITaxon instance."""
 
     return NCBITaxon("INVALID", "invalid_rank", {"invalid_rank": ("INVALID", -9, None)})
 
