@@ -200,19 +200,14 @@ def build_local_gbif(
     # Get a logical index of which fields are being kept
     drop_index = [True if vl[0] in drop_fields else False for vl in file_schema]
 
-    # Create the final schema for the backbone table, including a new field to show
-    # deleted taxa and insert statements for both the backbone and deleted files
+    # Create the final schema for the backbone table and insert statement
     output_schema = ", ".join(
         [" ".join(val) for val, drop in zip(file_schema, drop_index) if not drop]
     )
-    output_schema = f"CREATE TABLE backbone ({output_schema}, deleted boolean)"
+    output_schema = f"CREATE TABLE backbone ({output_schema})"
 
     insert_placeholders = ",".join(["?"] * (len(drop_index) - sum(drop_index)))
-    insert_statement = f"INSERT INTO backbone VALUES ({insert_placeholders}, False)"
-
-    insert_deleted_statement = (
-        f"INSERT INTO backbone VALUES ({insert_placeholders}, True)"
-    )
+    insert_statement = f"INSERT INTO backbone VALUES ({insert_placeholders})"
 
     # Create the table
     con.execute(output_schema)
@@ -272,7 +267,10 @@ def build_local_gbif(
                         if not drp
                     ]
 
-                    con.execute(insert_deleted_statement, row)
+                    # replace the status with DELETED
+                    row[4] = "DELETED"
+
+                    con.execute(insert_statement, row)
                     pbar.update()
 
         con.commit()
