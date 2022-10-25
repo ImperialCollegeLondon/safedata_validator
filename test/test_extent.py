@@ -1,6 +1,6 @@
 """Test that Extent logs correctly."""
 from contextlib import contextmanager
-from logging import CRITICAL, ERROR, INFO, WARNING
+from logging import CRITICAL, ERROR, WARNING
 
 import pytest
 

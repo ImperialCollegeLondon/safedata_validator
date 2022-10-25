@@ -248,7 +248,7 @@ def example_ncbi_files(config_filesystem, request):
 
 
 @pytest.fixture()
-def fixture_taxon_validator(fixture_resources):
+def fixture_gbif_validator(fixture_resources):
     """Fixture to return GBIF taxon validators."""
 
     return GBIFValidator(fixture_resources)

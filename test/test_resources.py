@@ -312,29 +312,7 @@ def test_load_resources_by_arg(
     "filepath, expected_log",
     [
         (
-            FIXTURE_FILES.vf.fix_cfg_local,
-            (
-                (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Validating local GBIF database: "),
-                (INFO, "Using NCBI online API to validate taxonomy"),
-            ),
-        ),
-        # GBIF defaults to online
-        (
-            FIXTURE_FILES.vf.fix_cfg_remote,
-            (
-                (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Using GBIF online API to validate taxonomy"),
-                (INFO, "Using NCBI online API to validate taxonomy"),
-            ),
-        ),
-        # NCBI online unless set otherwise
-        (
-            FIXTURE_FILES.vf.fix_cfg_local_ncbi,
+            FIXTURE_FILES.vf.fix_config,
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),

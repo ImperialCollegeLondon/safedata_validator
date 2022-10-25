@@ -10,9 +10,9 @@ from .conftest import log_check
 
 
 @pytest.fixture()
-def locations_inst(resources_with_local_gbif):
+def locations_inst(fixture_resources):
     """Fixture to provide a set of locations and aliases."""
-    return Locations(resources_with_local_gbif)
+    return Locations(fixture_resources)
 
 
 @pytest.mark.parametrize(

@@ -9,9 +9,9 @@ from safedata_validator.summary import Summary
 
 
 @pytest.fixture
-def fixture_summary(resources_with_local_gbif):
+def fixture_summary(fixture_resources):
 
-    return Summary(resources_with_local_gbif)
+    return Summary(fixture_resources)
 
 
 # NOTE - _read_block is being tested by repeated _read_`block` calls and

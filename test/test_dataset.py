@@ -16,10 +16,10 @@ from .conftest import FIXTURE_FILES
         ("bad_ncbi_file", 107),
     ],
 )
-def test_DataSet_load_from_file(ncbi_resources_local_and_remote, file_key, n_errors):
+def test_DataSet_load_from_file(fixture_resources, file_key, n_errors):
 
     # Load the taxa and locations
-    ds = Dataset(ncbi_resources_local_and_remote)
+    ds = Dataset(fixture_resources)
     ds.load_from_workbook(FIXTURE_FILES.rf[file_key])
 
     assert ds.n_errors == n_errors
