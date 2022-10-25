@@ -6,13 +6,9 @@ configuration to work. The three main resources for file validation are:
 -   locations: A path to a locations data file, providing a gazetteer of known
     locations and their details.
 
--   gbif_database: Optionally, a path to a local SQLite copy of the GBIF
-    backbone database. If this is not provided, then the slower GBIF online API
-    will be used instead.
+-   gbif_database: The path to a local SQLite copy of the GBIF backbone database.
 
--   ncbi_database: Optionally, a path to a local SQLite copy of the NCBI
-    database files. If this is not provided, then the slower BioEntrez package
-    will be used to access the online APU instead.
+-   ncbi_database: The path to a local SQLite copy of the NCBI database files.
 
 The [Resources][safedata_validator.resources.Resources] class is used to locate
 and validate these resources, and then provide those validated resources to
@@ -30,11 +26,9 @@ import contextlib
 import os
 import sqlite3
 from datetime import date
-from time import time
 from typing import Union
 
 import appdirs
-import requests
 import simplejson
 from configobj import ConfigObj, flatten_errors
 from dateutil.parser import isoparse
@@ -51,8 +45,8 @@ from safedata_validator.logger import (
 
 CONFIGSPEC = {
     "locations": "string()",
-    "gbif_database": "string(default=None)",
-    "ncbi_database": "string(default=None)",
+    "gbif_database": "string()",
+    "ncbi_database": "string()",
     "extents": {
         "temporal_soft_extent": "date_list(min=2, max=2, default=None)",
         "temporal_hard_extent": "date_list(min=2, max=2, default=None)",
@@ -73,7 +67,6 @@ CONFIGSPEC = {
         "contact_orcid": "string(default=None)",
     },
     "metadata": {"api": "string(default=None)", "token": "string(default=None)"},
-    "ncbi": {"api_key": "string(default=None)"},
 }
 """dict: The safedata_validator package use the `configobj.ConfigObj`
 package to handle resource configuration. This dict defines the basic expected
@@ -128,31 +121,25 @@ def date_list(value: str, min: str, max: str) -> list[date]:
 class Resources:
     """Load and check validation resources.
 
-    Creating an instance of this class locates and validate resources for
-    using the `safedata_validator` package, either from the provided
-    configuration details or from the user and then site config locations
-    defined by the appdirs package.
+    Creating an instance of this class locates and validate resources for using the
+    `safedata_validator` package, either from the provided configuration details or from
+    the user and then site config locations defined by the appdirs package.
 
     Args:
-        config: A path to a configuration file, or a dict or list
-            providing package configuration details. The list format
-            should provide a list of strings, each representing a
-            line in the configuration file. The dict format is a
-            dictionary with the required nested dictionary structure
-            and values
+        config:
+            A path to a configuration file, or a dict or list providing package
+            configuration details. The list format should provide a list of strings,
+            each representing a line in the configuration file. The dict format is a
+            dictionary with the required nested dictionary structure and values.
 
     Attributes:
         config_type: The method used to specify the resources. One of
             'init_dict', 'init_list', 'init_file', 'user_config' or 'site_config'.
         locations: The path to the locations file
-        gbif_database: The path to the GBIF database file or None
-        ncbi_database: The path to the NCBI database file or None
-        use_local_gbif: Is a local file used or should the GBIF API be used
-        ncbi_database: The path to the NCBI database file or None
-        use_local_ncbi: Is a local file used or should the NCBI API be used
+        gbif_database: The path to the GBIF database file
+        ncbi_database: The path to the NCBI database file
         valid_locations: The locations defined in the locations file
         location_aliases: Location aliases defined in the locations file
-        ncbi: A DotMap of NCBI information
         extents: A DotMap of extent data
         zenodo: A DotMap of Zenodo information
     """
@@ -210,11 +197,8 @@ class Resources:
         self.extents = config_loaded.extents
         self.zenodo = config_loaded.zenodo
         self.metadata = config_loaded.metadata
-        self.ncbi = config_loaded.ncbi
 
-        self.use_local_gbif = False
         self.gbif_timestamp = None
-        self.use_local_ncbi = False
         self.ncbi_timestamp = None
 
         # Valid locations is a dictionary keying string location names to tuples of
@@ -305,28 +289,9 @@ class Resources:
         instance with validated details.
         """
 
-        if self.gbif_database is None or self.gbif_database == "":
-            LOGGER.info("Using GBIF online API to validate taxonomy")
-
-            # Retrieve from API URL for the backbone dataset
-            gbif_backbone = (
-                "https://api.gbif.org/v1/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c"
-            )
-            data = requests.get(gbif_backbone)
-
-            if not data.ok:
-                log_and_raise(
-                    "Could not read current backbone timestamp from GBIF API", IOError
-                )
-
-            time_data = data.json()["pubDate"]
-            self.gbif_timestamp = isoparse(time_data).date().isoformat()
-
-        else:
-            self.gbif_timestamp = validate_taxon_db(
-                self.gbif_database, "GBIF", ["backbone"]
-            )
-            self.use_local_gbif = True
+        self.gbif_timestamp = validate_taxon_db(
+            self.gbif_database, "GBIF", ["backbone"]
+        )
 
     def _validate_ncbi(self) -> None:
         """Validate the NCBI settings.
@@ -336,15 +301,9 @@ class Resources:
         instance with validated details.
         """
 
-        if self.ncbi_database is None or self.ncbi_database == "":
-            LOGGER.info("Using NCBI online API to validate taxonomy")
-            self.ncbi_timestamp = date.today().isoformat()
-        else:
-
-            self.ncbi_timestamp = validate_taxon_db(
-                self.ncbi_database, "NCBI", ["nodes", "merge", "names"]
-            )
-            self.use_local_ncbi = True
+        self.ncbi_timestamp = validate_taxon_db(
+            self.ncbi_database, "NCBI", ["nodes", "merge", "names"]
+        )
 
 
 def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:

@@ -264,7 +264,6 @@ def test_validator_gbif_lookup_errors(
             ),
         ),
         # Unknown GBIF ID
-        # GBIF ID 15 is not deleted but 404s, so works with remote and local testing
         (
             (
                 "mspecies 1",

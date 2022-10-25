@@ -137,32 +137,6 @@ def nested_set(dic, keys, value):
                 (CRITICAL, "Locations data malformed"),
             ),
         ),
-        # GBIF defaults to online
-        (
-            ((["gbif_database"], ""),),
-            ((1, "gbif_database = "),),
-            None,
-            (
-                (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Using GBIF online API to validate taxonomy"),
-                (INFO, "Validating local NCBI database: "),
-            ),
-        ),
-        # NCBI defaults to online
-        (
-            ((["ncbi_database"], ""),),
-            ((2, "ncbi_database = "),),
-            None,
-            (
-                (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Validating local GBIF database: "),
-                (INFO, "Using NCBI online API to validate taxonomy"),
-            ),
-        ),
         # GBIF is missing
         (
             ((["gbif_database"], FIXTURE_FILES.mf),),
