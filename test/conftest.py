@@ -12,13 +12,7 @@ from dotmap import DotMap
 from safedata_validator.field import Dataset, DataWorksheet
 from safedata_validator.locations import Locations
 from safedata_validator.resources import Resources
-from safedata_validator.taxa import (
-    GBIFTaxa,
-    LocalGBIFValidator,
-    LocalNCBIValidator,
-    RemoteGBIFValidator,
-    RemoteNCBIValidator,
-)
+from safedata_validator.taxa import GBIFTaxa, GBIFValidator, NCBIValidator
 
 
 def fixture_files():
@@ -51,25 +45,12 @@ def fixture_files():
         ("good_ncbi_file", "Test_format_good_NCBI.xlsx"),
     ]
 
-    # Check if testing is part of continuos integration
-    on_github_action = os.getenv("CI", False)
-
-    if not on_github_action:
-        real_files.append(("config_secrets", "config_secrets.ini"))
-
     real_files = {ky: os.path.join(fixture_dir, vl) for ky, vl in real_files}
-
-    # Check that a secrets.ini file has actually been provided
-    if not on_github_action:
-        if not os.path.exists(real_files["config_secrets"]):
-            raise OSError(
-                "config_secrets.ini not found. Use fixtures/config_secrets_template.ini"
-                " to create a config_secrets.ini file for configuring local pytests"
-            )
 
     # Need to provide the path to the certifi CA bundle or requests breaks!
     real_files["certifi"] = certifi.where()
 
+    # Virtual file paths for the locations of config files.
     virtual_files = {
         "user_config": os.path.join(
             appdirs.user_config_dir(), "safedata_validator", "safedata_validator.cfg"
@@ -77,11 +58,7 @@ def fixture_files():
         "site_config": os.path.join(
             appdirs.site_config_dir(), "safedata_validator", "safedata_validator.cfg"
         ),
-        "fix_cfg_local": os.path.join(fixture_dir, "safedata_validator_local.cfg"),
-        "fix_cfg_remote": os.path.join(fixture_dir, "safedata_validator_remote.cfg"),
-        "fix_cfg_local_ncbi": os.path.join(
-            fixture_dir, "safedata_validator_local_ncbi.cfg"
-        ),
+        "fix_config": os.path.join(fixture_dir, "safedata_validator.cfg"),
     }
 
     return DotMap(
@@ -100,31 +77,8 @@ parameterisation as well as within tests, and using fixture values in
 parameterisation is clumsy and complex.
 """
 
-
-def log_check(caplog, expected_log):
-    """Helper function to check that the captured log is as expected.
-
-    Arguments:
-        caplog: An instance of the caplog fixture
-        expected_log: An iterable of 2-tuples containing the
-            log level and message.
-    """
-
-    assert len(expected_log) == len(caplog.records)
-
-    assert all(
-        [exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)]
-    )
-    assert all(
-        [exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)]
-    )
-
-
-"""
-The other contents are fixtures that will be available to all test suites.
-
-
-"""
+# Populate the virtual filesystem along with clones that provide user and site config
+# files
 
 
 @pytest.fixture()
@@ -152,20 +106,6 @@ def config_filesystem(fs):
     for _, val in FIXTURE_FILES.rf.items():
         fs.add_real_file(val)
 
-    # Check if tests are being run as part of continuos integration
-    on_github_action = os.getenv("CI", False)
-    ncbi_api_key = None
-
-    if on_github_action:
-        ncbi_api_key = os.getenv("NCBI_API_KEY")
-    else:
-        conf = configparser.ConfigParser()
-        conf.read(FIXTURE_FILES.rf.config_secrets)
-        ncbi_api_key = conf["ncbi"]["api_key"]
-
-    if ncbi_api_key is None:
-        raise RuntimeError("NCBI_API_KEY not found")
-
     # The config files _cannot_ be real files because they need to
     # contain absolute paths to the resources available on the specific
     # test machine, and so need to be created with those paths
@@ -188,37 +128,25 @@ def config_filesystem(fs):
         "zenodo_sandbox_token = xyz",
         "zenodo_api = https://api.zenodo.org",
         "zenodo_token = xyz",
-        "[ncbi]",
-        f"api_key = {ncbi_api_key}",
     ]
 
-    # Remote config (no gbif database) in the fixture directory
+    # Create config with local paths in the fixture directory
     config_contents[0] += FIXTURE_FILES.rf.loc_file
-    fs.create_file(FIXTURE_FILES.vf.fix_cfg_remote, contents="\n".join(config_contents))
-
-    # Local config (local GBIF database) in the fixture directory
     config_contents[1] += FIXTURE_FILES.rf.gbif_file
-    fs.create_file(FIXTURE_FILES.vf.fix_cfg_local, contents="\n".join(config_contents))
-
-    # Local config (local NCBI database) in the fixture directory
     config_contents[2] += FIXTURE_FILES.rf.ncbi_file
-    fs.create_file(
-        FIXTURE_FILES.vf.fix_cfg_local_ncbi, contents="\n".join(config_contents)
-    )
-
-    # # Local user config
-    # fs.create_file(FIXTURE_FILES.vf.user_config, contents='\n'.join(config_contents))
+    fs.create_file(FIXTURE_FILES.vf.fix_config, contents="\n".join(config_contents))
 
     yield fs
 
 
 @pytest.fixture()
 def user_config_file(config_filesystem):
-    """Attempt to extend the fake fs - does not seem to work."""
-    # Local user config as a duplicate of the existing config in the fixture
-    # directory
+    """Creates local user config.
 
-    with open(FIXTURE_FILES.vf.fix_cfg_local_ncbi) as infile:
+    Duplicate of the existing config in the fixture directory
+    """
+
+    with open(FIXTURE_FILES.vf.fix_config) as infile:
         config_filesystem.create_file(
             FIXTURE_FILES.vf.user_config, contents="".join(infile.readlines())
         )
@@ -228,11 +156,11 @@ def user_config_file(config_filesystem):
 
 @pytest.fixture()
 def site_config_file(config_filesystem):
-    """Attempt to extend the fake fs - does not seem to work."""
-    # Local user config as a duplicate of the existing config in the fixture
-    # directory
+    """Creates local site config.
 
-    with open(FIXTURE_FILES.vf.fix_cfg_local_ncbi) as infile:
+    Duplicate of the existing config in the fixture directory
+    """
+    with open(FIXTURE_FILES.vf.fix_config) as infile:
         config_filesystem.create_file(
             FIXTURE_FILES.vf.site_config, contents="".join(infile.readlines())
         )
@@ -240,85 +168,42 @@ def site_config_file(config_filesystem):
     yield config_filesystem
 
 
+# Helper function for validation of log contents
+
+
+def log_check(caplog, expected_log):
+    """Helper function to check that the captured log is as expected.
+
+    Arguments:
+        caplog: An instance of the caplog fixture
+        expected_log: An iterable of 2-tuples containing the
+            log level and message.
+    """
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all(
+        [exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)]
+    )
+    assert all(
+        [exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)]
+    )
+
+
 # ------------------------------------------
-# Resources: fixtures containing instances of both local and remote GBIF
-#            validators and a parameterised fixture providing both for
-#            duplicating tests on both systems.
+# Resources: fixtures containing local Resources instances
 # ------------------------------------------
 
 
 @pytest.fixture()
-def resources_with_local_gbif(config_filesystem):
-    """Creates a Resource object configured to use a local GBIF database.
+def fixture_resources(config_filesystem):
+    """Creates a Resource object configured to use local NCBI and GBIF.
 
     Returns:
         A safedata_validator.resources.Resources instance
     """
 
-    return Resources(config=FIXTURE_FILES.vf.fix_cfg_local)
-
-
-@pytest.fixture()
-def resources_with_remote_gbif(config_filesystem):
-    """Creates a Resource object configured to use the remote GBIF API.
-
-    Returns:
-        A safedata_validator.resources.Resources instance
-    """
-
-    return Resources(config=FIXTURE_FILES.vf.fix_cfg_remote)
-
-
-@pytest.fixture(params=["remote", "local"])
-def resources_local_and_remote(
-    request, resources_with_local_gbif, resources_with_remote_gbif
-):
-    """Parameterised fixture to run tests using both the local and remote GBIF."""
-
-    if request.param == "remote":
-        if os.getenv("SDV_NO_REMOTE") in ["1", "true", "True"]:
-            pytest.skip("Remote testing turned off via SDV_NO_REMOTE")
-        else:
-            return resources_with_remote_gbif
-    elif request.param == "local":
-        return resources_with_local_gbif
-
-
-@pytest.fixture()
-def resources_with_local_ncbi(config_filesystem):
-    """Creates a Resource object configured to use a local NCBI database.
-
-    Returns:
-        A safedata_validator.resources.Resources instance
-    """
-
-    return Resources(config=FIXTURE_FILES.vf.fix_cfg_local_ncbi)
-
-
-@pytest.fixture()
-def resources_with_remote_ncbi(config_filesystem):
-    """Creates a Resource object configured to use the remote NCBI API.
-
-    Returns:
-        A safedata_validator.resources.Resources instance
-    """
-
-    return Resources(config=FIXTURE_FILES.vf.fix_cfg_remote)
-
-
-@pytest.fixture(params=["remote", "local"])
-def ncbi_resources_local_and_remote(
-    request, resources_with_local_ncbi, resources_with_remote_ncbi
-):
-    """Parameterised fixture to run tests using both the local and remote NCBI."""
-
-    if request.param == "remote":
-        if os.getenv("SDV_NO_REMOTE") in ["1", "true", "True"]:
-            pytest.skip("Remote testing turned off via SDV_NO_REMOTE")
-        else:
-            return resources_with_remote_ncbi
-    elif request.param == "local":
-        return resources_with_local_ncbi
+    return Resources(config=FIXTURE_FILES.vf.fix_config)
 
 
 # ------------------------------------------
@@ -362,32 +247,18 @@ def example_ncbi_files(config_filesystem, request):
         return wb
 
 
-@pytest.fixture(params=["remote", "local"])
-def fixture_taxon_validators(resources_with_local_gbif, request):
-    """Parameterised fixture to return local and remote taxon validators."""
-    if request.param == "remote":
-        if os.getenv("SDV_NO_REMOTE") in ["1", "true", "True"]:
-            pytest.skip("Remote testing turned off via SDV_NO_REMOTE")
-        else:
-            return RemoteGBIFValidator()
+@pytest.fixture()
+def fixture_gbif_validator(fixture_resources):
+    """Fixture to return GBIF taxon validators."""
 
-    elif request.param == "local":
-        return LocalGBIFValidator(resources_with_local_gbif)
+    return GBIFValidator(fixture_resources)
 
 
-@pytest.fixture(params=["remote", "local"])
-def fixture_ncbi_validators(
-    resources_with_local_ncbi, resources_with_remote_ncbi, request
-):
-    """Parameterised fixture to return local and remote NCBI validator."""
-    if request.param == "remote":
-        if os.getenv("SDV_NO_REMOTE") in ["1", "true", "True"]:
-            pytest.skip("Remote testing turned off via SDV_NO_REMOTE")
-        else:
-            return RemoteNCBIValidator(resources_with_remote_ncbi)
+@pytest.fixture()
+def fixture_ncbi_validator(fixture_resources):
+    """Fixture to NCBI validator."""
 
-    elif request.param == "local":
-        return LocalNCBIValidator(resources_with_local_ncbi)
+    return NCBIValidator(fixture_resources)
 
 
 # Fixtures to provide Taxon, Locations, Dataset, Dataworksheet
@@ -395,13 +266,13 @@ def fixture_ncbi_validators(
 
 
 @pytest.fixture()
-def fixture_taxa(resources_with_local_gbif):
+def fixture_taxa(fixture_resources):
     """Fixture to provide a taxon object with a couple of names.
 
     These examples need to be in the cutdown local GBIF testing database in fixtures.
     """
 
-    taxa = GBIFTaxa(resources_with_local_gbif)
+    taxa = GBIFTaxa(fixture_resources)
 
     test_taxa = [
         ("C_born", ["Crematogaster borneensis", "Species", None, None], None),
@@ -415,13 +286,13 @@ def fixture_taxa(resources_with_local_gbif):
 
 
 @pytest.fixture()
-def fixture_locations(resources_with_local_gbif):
+def fixture_locations(fixture_resources):
     """Fixture to provide a taxon object with a couple of names.
 
     These examples need to be in the cutdown local GBIF testing database in fixtures.
     """
 
-    locations = Locations(resources_with_local_gbif)
+    locations = Locations(fixture_resources)
 
     test_locs = ["A_1", "A_2", 1, 2]
 
@@ -431,14 +302,14 @@ def fixture_locations(resources_with_local_gbif):
 
 
 @pytest.fixture()
-def fixture_dataset(resources_with_local_gbif):
+def fixture_dataset(fixture_resources):
     """Fixture to provide a dataset.
 
     This dataset has been prepopulated with some taxon and location names for field
     tests.
     """
 
-    dataset = Dataset(resources_with_local_gbif)
+    dataset = Dataset(fixture_resources)
 
     test_taxa = [
         ("C_born", ["Crematogaster borneensis", "Species", None, None], None),

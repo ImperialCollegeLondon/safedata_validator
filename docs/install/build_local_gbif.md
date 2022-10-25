@@ -14,7 +14,7 @@ To use the GBIF backbone taxonomy as a local data resource for taxon validation,
 `safedata_validator` package requires a version of the database  to be built into a
 SQLite3 database.
 
-## Building a local copy
+## Building the local GBIF database
 
 The `safedata_build_local_gbif` command line tool is used to automatically download and
 build the required file. The command line help is shown below - note that a particular
@@ -26,7 +26,7 @@ version can be selected by supplying the version date timestamp from the page ab
 
 Once you have an SQLite3 backbone database, you will then need to edit the
 `gbif_database` entry in your [configuration file](configuration.md) to provide
-the path to your new SQLite file or provide the path as an argument.
+the path to your new SQLite file.
 
 ## Build process overview
 

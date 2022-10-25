@@ -6,9 +6,6 @@ import openpyxl
 import pytest
 
 from safedata_validator.field import Dataset, DataWorksheet
-from safedata_validator.locations import Locations
-from safedata_validator.resources import Resources
-from safedata_validator.taxa import GBIFTaxa
 
 
 @pytest.mark.parametrize(
@@ -846,7 +843,7 @@ def test_DataWorksheet_load_from_worksheet(
     indirect=["example_excel_files"],  # take actual params from fixture
 )
 def test_DataWorksheet_load_from_file(
-    caplog, resources_with_local_gbif, example_excel_files, wsheet, n_errors
+    caplog, fixture_resources, example_excel_files, wsheet, n_errors
 ):
     """Test loading a dataworksheet from file.
 
@@ -854,7 +851,7 @@ def test_DataWorksheet_load_from_file(
     """
 
     # Load the taxa and locations
-    ds = Dataset(resources_with_local_gbif)
+    ds = Dataset(fixture_resources)
     ds.taxa.gbif_taxa.load(example_excel_files["Taxa"])
     ds.locations.load(example_excel_files["Locations"])
 

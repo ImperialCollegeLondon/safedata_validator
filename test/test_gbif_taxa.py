@@ -4,7 +4,6 @@ from logging import ERROR, INFO, WARNING
 import pytest
 
 from safedata_validator import taxa
-from safedata_validator.resources import Resources
 
 from .conftest import log_check
 
@@ -60,7 +59,7 @@ def test_taxon_init_errors(test_input, expected_exception):
         ),
     ],
 )
-def test_validator_search(fixture_taxon_validators, test_input, expected):
+def test_validator_search(fixture_gbif_validator, test_input, expected):
     """This test checks inputs against expected outputs for both validator classes.
 
     Tests the behaviour for deleted taxa as well - these should not pass checks, even
@@ -68,7 +67,7 @@ def test_validator_search(fixture_taxon_validators, test_input, expected):
     """
 
     tx = taxa.GBIFTaxon(**test_input)
-    srch_out = fixture_taxon_validators.search(tx)
+    srch_out = fixture_gbif_validator.search(tx)
 
     assert srch_out.lookup_status == expected[0]
     assert srch_out.is_canon == expected[1]
@@ -79,40 +78,23 @@ def test_validator_search(fixture_taxon_validators, test_input, expected):
 
 
 @pytest.mark.parametrize(
-    argnames=["fixture_taxon_validators", "test_input", "expected"],
+    argnames=["test_input", "expected"],
     argvalues=[
         (
-            "remote",
-            dict(name="Acladium atrum", rank="species"),
-            ("No match found", False, None, None),
-        ),
-        (
-            "remote",
-            dict(name="Acladium atrum", rank="species", gbif_id=3367489),
-            ("Deleted taxon", False, 3367489, None),
-        ),
-        (
-            "local",
             dict(name="Acladium atrum", rank="species"),
             ("Deleted taxon", False, 3367489, None),
         ),
         (
-            "local",
             dict(name="Acladium atrum", rank="species", gbif_id=3367489),
             ("Deleted taxon", False, 3367489, None),
         ),
     ],
-    indirect=["fixture_taxon_validators"],  # set which validator used from fixture
 )
-def test_validator_search_deleted(fixture_taxon_validators, test_input, expected):
-    """This test checks behaviour for searching for deleted taxa.
-
-    Note the difference between local and remote - local DBs can find deleted species
-    by name and rank only but remote _cannot_.
-    """
+def test_validator_search_deleted(fixture_gbif_validator, test_input, expected):
+    """This test checks behaviour for searching for deleted taxa."""
 
     tx = taxa.GBIFTaxon(**test_input)
-    srch_out = fixture_taxon_validators.search(tx)
+    srch_out = fixture_gbif_validator.search(tx)
 
     assert srch_out.lookup_status == expected[0]
     assert srch_out.is_canon == expected[1]
@@ -130,13 +112,10 @@ def test_validator_search_deleted(fixture_taxon_validators, test_input, expected
         (3367489, ("Deleted taxon", "Acladium atrum")),
     ],
 )
-def test_validator_gbif_lookup_outputs(fixture_taxon_validators, test_input, expected):
-    """This test checks inputs against expected outputs for both validator classes.
+def test_validator_gbif_lookup_outputs(fixture_gbif_validator, test_input, expected):
+    """This test checks inputs against expected outputs for both validator classes."""
 
-    Searching by GBIF ID returns deleted taxa for both online and local GBIF backbones
-    """
-
-    found = fixture_taxon_validators.id_lookup(test_input)
+    found = fixture_gbif_validator.id_lookup(test_input)
 
     assert found.lookup_status == expected[0]
     assert found.name == expected[1]
@@ -152,12 +131,12 @@ def test_validator_gbif_lookup_outputs(fixture_taxon_validators, test_input, exp
     ],
 )
 def test_validator_gbif_lookup_errors(
-    fixture_taxon_validators, test_input, expected_exception
+    fixture_gbif_validator, test_input, expected_exception
 ):
     """This test checks validator.id_lookup inputs throw errors as expected."""
 
     with pytest.raises(expected_exception):
-        _ = fixture_taxon_validators.id_lookup(test_input)
+        _ = fixture_gbif_validator.id_lookup(test_input)
 
 
 # ------------------------------------------
@@ -285,7 +264,6 @@ def test_validator_gbif_lookup_errors(
             ),
         ),
         # Unknown GBIF ID
-        # GBIF ID 15 is not deleted but 404s, so works with remote and local testing
         (
             (
                 "mspecies 1",
@@ -410,13 +388,11 @@ def test_validator_gbif_lookup_errors(
     ],
 )
 def test_validate_taxon_sanitise(
-    caplog, resources_with_local_gbif, taxon_tuple, expected_log_entries
+    caplog, fixture_resources, taxon_tuple, expected_log_entries
 ):
-    # These tests check that bad inputs are caught correctly - the next test
-    # handles anything involving checking against the GBIF database, so this
-    # checks only using the local GBIF option for speed.
+    # These tests check that bad inputs are caught correctly
 
-    taxa_instance = taxa.GBIFTaxa(resources_with_local_gbif)
+    taxa_instance = taxa.GBIFTaxa(fixture_resources)
     taxa_instance.validate_and_add_taxon(taxon_tuple)
 
     log_check(caplog, expected_log_entries)
@@ -709,22 +685,21 @@ def test_validate_taxon_sanitise(
     ],
 )
 def test_validate_taxon_lookup(
-    caplog, resources_local_and_remote, taxon_tuple, expected_log_entries
+    caplog, fixture_resources, taxon_tuple, expected_log_entries
 ):
 
-    taxa_instance = taxa.GBIFTaxa(resources_local_and_remote)
+    taxa_instance = taxa.GBIFTaxa(fixture_resources)
     taxa_instance.validate_and_add_taxon(taxon_tuple)
 
     log_check(caplog, expected_log_entries)
 
 
 @pytest.mark.parametrize(
-    "resources_local_and_remote,taxon_tuple,expected_log_entries",
+    "taxon_tuple,expected_log_entries",
     [
         #  - Deleted taxon - need to pick an example taxon here with no accepted taxon
         #    of the same name and rank.
         (
-            "local",
             (
                 "Deleted species",
                 ["Acladium atrum", "species", None, None],
@@ -733,25 +708,6 @@ def test_validate_taxon_lookup(
             ((ERROR, "Deleted taxon"),),
         ),
         (
-            "local",
-            (
-                "Deleted species",
-                ["Acladium atrum", "species", 3367489, None],
-                None,
-            ),
-            ((ERROR, "Deleted taxon"),),
-        ),
-        (
-            "remote",
-            (
-                "Deleted species",
-                ["Acladium atrum", "species", None, None],
-                None,
-            ),
-            ((ERROR, "Taxon name and rank combination not found"),),
-        ),
-        (
-            "remote",
             (
                 "Deleted species",
                 ["Acladium atrum", "species", 3367489, None],
@@ -760,13 +716,12 @@ def test_validate_taxon_lookup(
             ((ERROR, "Deleted taxon"),),
         ),
     ],
-    indirect=["resources_local_and_remote"],
 )
 def test_validate_deleted_taxon_lookup(
-    caplog, resources_local_and_remote, taxon_tuple, expected_log_entries
+    caplog, fixture_resources, taxon_tuple, expected_log_entries
 ):
 
-    taxa_instance = taxa.GBIFTaxa(resources_local_and_remote)
+    taxa_instance = taxa.GBIFTaxa(fixture_resources)
     taxa_instance.validate_and_add_taxon(taxon_tuple)
 
     log_check(caplog, expected_log_entries)
@@ -780,14 +735,14 @@ def test_validate_deleted_taxon_lookup(
     [("good", 0, 20), ("bad", 20, 20)],
     indirect=["example_excel_files"],  # take actual params from fixture
 )
-def test_taxa_load(example_excel_files, resources_local_and_remote, n_errors, n_taxa):
+def test_taxa_load(example_excel_files, fixture_resources, n_errors, n_taxa):
     """This tests the ensemble loading of taxa from a file.
 
     It uses indirect parameterisation to access the fixtures containing the sample excel
     files.
     """
 
-    tx = taxa.GBIFTaxa(resources_local_and_remote)
+    tx = taxa.GBIFTaxa(fixture_resources)
     tx.load(example_excel_files["Taxa"])
 
     assert tx.n_errors == n_errors

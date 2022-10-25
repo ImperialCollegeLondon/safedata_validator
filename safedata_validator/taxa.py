@@ -7,11 +7,8 @@ database.
 The two parallel Taxon dataclasses (GBIFTaxon and NCBITaxon) are used to store data
 about a taxon entry in a dataset. They are initialised with user data and then the
 relevant taxon Validator classes (GBIF or NCBI) can be used to update a Taxon object
-with the result of validation against a particular database. Online GBIF validation can
-be performed using the online API (`RemoteGBIFValidator`), whereas online NCBI
-validation makes use of the Entrez Eutils (`RemoteNCBIValidator`). Faster validation may
-be performed using local copies of the databases (`LocalGBIFValidator` and
-`LocalNCBIValidator`).
+with the result of validation against a local version of the taxon databases
+(`GBIFValidator` and `NCBIValidator`).
 
 Parallel 'Taxa' worksheets (GBIFTaxa and NCBITaxa) are defined, which are used to load
 and collate the set of taxonomic entries from a dataset. These are then collected in a
@@ -28,27 +25,17 @@ When validating against the NCBI database supplied taxa of any rank (i.e. strain
 clade) which can be successfully validated will be recorded. However, associated higher
 taxa will only be recorded if their ranks are either a GBIF backbone rank or
 superkingdom.
-
-One thing to note here is that taxon validation using the GBIF online API does not
-provide a match for deleted taxa unless a GBIF ID is provided (search vs id APIs), but
-using the local backbone database can find deleted taxa by name and rank alone. The
-local and remote validators therefore given different responses (Not found vs Deleted)
-but neither of these is permitted as a taxon match.
 """
 
 import dataclasses
 import sqlite3
-import time
 from collections import Counter
 from io import StringIO
 from itertools import compress, groupby
-from logging import Formatter
 from typing import Optional, Union
 
-import requests  # type: ignore
 from dominate import tags
 from dominate.util import raw
-from lxml import etree
 from openpyxl import worksheet
 
 from safedata_validator.logger import (
@@ -79,17 +66,9 @@ BACKBONE_RANKS = [
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ["superkingdom"] + BACKBONE_RANKS
 
-# TODO - A lot of complexity could be lost here if the two validation
-#        sources had more similar structure. Could have a row return method
-#        that is used within a generic id_lookup and search class.
-#        Notably there us much less information in the row return from the
-#        local SQL db (e.g. merging acceptedKey and parentKey, but also not
-#        providing parent hierarchy taxon names.  Could define an SQL
-#        document to structure the local database to match remote?
-
 
 class GBIFError(Exception):
-    """Exception class for remote GBIF errors.
+    """Exception class for GBIF errors.
 
     Attributes:
         message: explanation of the error
@@ -101,7 +80,7 @@ class GBIFError(Exception):
 
 
 class NCBIError(Exception):
-    """Exception class for remote NCBI errors.
+    """Exception class for NCBI errors.
 
     Attributes:
         message: explanation of the error
@@ -118,7 +97,7 @@ class GBIFTaxon:
 
     Initialised using user taxonomic information for single taxon, which can be then be
     validated against the GBIF database. Attributes are populated when an instance is
-    passed to one of the validator methods.
+    passed to GBIFValidator.
 
     Args:
         name: A taxonomic name
@@ -205,7 +184,7 @@ class NCBITaxon:
 
     Initialised using user taxonomic information for single taxon, which can be then be
     validated against the NCBI database. Attributes are populated when an instance is
-    passed to one of the validator methods.
+    passed to NCBIValidator.
 
     Args:
         name: A taxonomic name
@@ -301,17 +280,13 @@ class NCBITaxon:
 
 
 def gen_invalid_NCBITaxon() -> NCBITaxon:
-    """Generates a standardised invalid NCBITaxon instance.
-
-    This is defined as an independent function so that it can be used by both local and
-    remote NCBI validators.
-    """
+    """Generates a standardised invalid NCBITaxon instance."""
 
     return NCBITaxon("INVALID", "invalid_rank", {"invalid_rank": ("INVALID", -9, None)})
 
 
-class LocalGBIFValidator:
-    """Validate taxon data against a local GBIF database.
+class GBIFValidator:
+    """Validate taxon data against the GBIF database.
 
     This class connects to a local copy of the GBIF database and provides methods to
     validate GBIFTaxon instances and look up GBIF ID values.
@@ -497,155 +472,8 @@ class LocalGBIFValidator:
         return taxon
 
 
-class RemoteGBIFValidator:
-    """Validate taxon data against the online GBIF API.
-
-    This provides a validate method for a GBIFTaxon using the online GBIF API. Unlike
-    the LocalGBIFValidator, this doesn't need an __init__ method and just contains
-    methods, but duplicates the structure so that the two Validators are
-    interchangeable.
-    """
-
-    def search(self, taxon: GBIFTaxon) -> GBIFTaxon:
-        """Validate a GBIFTaxon instance.
-
-        The method looks for the taxon in the GBIF API using name and rank and an
-        optional GBIF ID for disambiguation. It uses the API endpoint:
-
-            species/match?name=XXX&rank=YYY&strict=true
-
-        The input GBIFTaxon is updated in place and so there is no value returned.
-
-        Args:
-            taxon: A GBIFTaxon instance
-        """
-
-        if not taxon.is_backbone:
-            raise ValueError("Cannot validate non-backbone taxa")
-
-        if taxon.gbif_id is not None:
-
-            # get the record associated with the provided ID
-            try:
-                id_taxon = self.id_lookup(taxon.gbif_id)
-            except GBIFError as err:
-                taxon.lookup_status = f"GBIF ID problem: {err.message}"
-                return taxon
-
-            # Check that name and rank are congruent with id
-            if (id_taxon.name != taxon.name) or (id_taxon.rank != taxon.rank):
-                taxon.lookup_status = "ID does not match name and rank"
-                return taxon
-
-            return id_taxon
-        else:
-
-            # If no ID is provided then use the species/match?name={} endpoint to
-            # try and find an ID for the combination
-            url = (
-                f"http://api.gbif.org/v1/species/match?name={taxon.name}"
-                f"&rank={taxon.rank}&strict=true"
-            )
-            taxon_row = requests.get(url)
-
-            # catch errors
-            if taxon_row.status_code != 200:
-                raise GBIFError("Connection error to remote server")
-
-            response = taxon_row.json()
-
-            # check the response status
-            if response["matchType"] == "NONE":
-                # No match found - look for explanatory notes
-                if "note" in response:
-                    taxon.lookup_status = response["note"]
-                    return taxon
-                else:
-                    taxon.lookup_status = "No match found"
-                    return taxon
-
-            # Return the match
-            return self.id_lookup(response["usageKey"])
-
-    def id_lookup(self, gbif_id: int) -> GBIFTaxon:
-        """Get a GBIFTaxon by GBIF ID.
-
-        This method returns a GBIFTaxon directly from a GBIF ID using the API endpoint:
-
-            species/ID
-
-        It will raise a GBIFError if the provided ID cannot be found or if there is a
-        connection error to the remote GBIF database.
-
-        Args:
-            gbif_id: A GBIF ID number.
-
-        Returns:
-            A populated GBIFTaxon instance for the ID.
-        """
-
-        if not isinstance(gbif_id, int):
-            raise ValueError("Non-integer GBIF code")
-
-        if not gbif_id > 0:
-            raise ValueError("Negative GBIF code")
-
-        # Use the species/{id} endpoint
-        taxon_row = requests.get(f"http://api.gbif.org/v1/species/{gbif_id}")
-
-        # unknown ID numbers return a 404 error
-        if taxon_row.status_code == 404:
-            raise GBIFError()
-        elif taxon_row.status_code != 200:
-            raise GBIFError("Connection error to remote server")
-
-        # Extract the response
-        response = taxon_row.json()
-
-        # Create and populate taxon
-        taxon = GBIFTaxon(
-            name=response["canonicalName"],
-            rank=response["rank"].lower(),
-            gbif_id=response["key"],
-        )
-
-        # First, set the parent key - in the GBIF API, this is always provided
-        # and always points to the true parent taxon, unlike parent_key in
-        # the simple local database. Note that parentKey is not included in the
-        # response for Kingdom level taxa, hence get().
-        taxon.parent_id = response.get("parentKey")
-        taxon.taxon_status = response["taxonomicStatus"].lower()
-        taxon.lookup_status = "found"
-
-        # Detect deleted taxa - these contain a deletion date and (somewhat oddly)
-        # have had hierarchy above phylum removed, so parent taxon points at the phylum
-        if "deleted" in response:
-            taxon.taxon_status = "deleted"
-            taxon.lookup_status = "Deleted taxon"
-            return taxon
-
-        # Add the taxonomic hierarchy from the accepted usage - these are tuples
-        # to be used to extend a set for the taxonomic hierarchy
-        taxon.hierarchy = [
-            (rk, response[ky])
-            for rk, ky in [(r, r + "Key") for r in BACKBONE_RANKS[:-1]]
-            if ky in response and response[ky] is not None
-        ]
-
-        # Now populate the canon details, which requires another look up if the
-        # user details are for a synonym etc.
-        if taxon.taxon_status in ("accepted", "doubtful"):
-            taxon.is_canon = True
-        else:
-            taxon.is_canon = False
-            # acceptedKey is not provided in the response for canon taxa.
-            taxon.canon_usage = self.id_lookup(response["acceptedKey"])
-
-        return taxon
-
-
-class LocalNCBIValidator:
-    """Validate taxon data against a local NCBI database.
+class NCBIValidator:
+    """Validate taxon data against the NCBI database.
 
     This class connects to a local copy of the NCBI database and provides methods to
     validate NCBITaxon instances and look up NCBI ID values.
@@ -1087,551 +915,6 @@ class LocalNCBIValidator:
         return mtaxon
 
 
-class RemoteNCBIValidator:
-    """Validate taxon data using the NCBI Entrez tools.
-
-    This provides a validate method for a NCBITaxon using the online NCBI Entrez
-    tools. This validator duplicates the structure of LocalNCBIValidator so that
-    the two Validators are interchangeable.
-
-    The online tools are rate-limited to prevent abuse. An Entrez API key can be
-    provided via the resources to increase the permitted rate from 3 queries a second
-    to 10 queries a second.
-
-    Args:
-        resources: A Resources instance providing Entrez API details
-    """
-
-    def __init__(self, resources: Resources):
-
-        # Users have to provide an API key, but email and tool are package properties
-        self.api_key = resources.ncbi.api_key
-        self.email = "data@safeproject.net"
-        self.tool = "safedata_validator"
-
-    def _taxonomy_efetch(self, ncbi_id: int) -> etree._Element:
-        """Fetch taxonomic data for an NCBI ID.
-
-        This method uses the online NCBI eutils function efetch to fetch the entry for a
-        specific NCBI ID. This function checks for connection errors.
-
-        Args:
-            ncbi_id: The NCBI ID to fetch the record for
-
-        Returns:
-            NCBI output XML stored as an element tree
-        """
-        # Construct url
-        if self.api_key is not None and self.api_key != "":
-            url = (
-                f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db="
-                f"taxonomy&id={ncbi_id}&api_key={self.api_key}&email={self.email}"
-                f"&tool={self.tool}"
-            )
-        else:
-            url = (
-                f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db="
-                f"taxonomy&id={ncbi_id}&email={self.email}&tool={self.tool}"
-            )
-
-        # Set up while loop to make the request up to 5 times if necessary
-        success = False
-        att = 0
-        while success is False and att < 10:
-            # Increment counter and make the request
-            att += 1
-            recrd = requests.get(url)
-
-            # Wait a 10th of a second after each request (longer if no api_key)
-            if self.api_key is not None:
-                time.sleep(0.1)
-            else:
-                time.sleep(0.3334)
-
-            # exit loop if a proper response is received
-            if recrd.status_code == 200:
-                success = True
-
-        # raise error if a successful response hasn't been obtained
-        if success is False:
-            raise NCBIError("Connection error to remote server")
-
-        # Parse the xml
-        root = etree.fromstring(recrd.content)
-
-        # Check to see if the xml contains any information
-        if len(root) == 0:
-            # If not delete it
-            root = None
-
-        return root
-
-    def _taxonomy_esearch(self, t_name: str) -> etree._Element:
-        """Search NCBI for a taxon name.
-
-        This method uses the online NCBI eutils function esearch to search for a
-        particular taxon name, and to return information on all matching records.
-
-        Params:
-            t_name: taxon name to search for
-
-        Returns:
-            NCBI output XML stored as an element tree
-        """
-        # Construct url
-        if self.api_key is not None and self.api_key != "":
-            url = (
-                f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db="
-                f"taxonomy&term={t_name}&api_key={self.api_key}&email={self.email}"
-                f"&tool={self.tool}"
-            )
-        else:
-            url = (
-                f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db="
-                f"taxonomy&term={t_name}&email={self.email}&tool={self.tool}"
-            )
-
-        # Set up while loop to make the request up to 5 times if necessary
-        success = False
-        att = 0
-        while success is False and att < 10:
-            # Increment counter and make the request
-            att += 1
-            recrd = requests.get(url)
-
-            # Wait a 10th of a second after each request (longer if no api_key)
-            if self.api_key is not None:
-                time.sleep(0.1)
-            else:
-                time.sleep(0.3334)
-
-            # exit loop if a proper response is received
-            if recrd.status_code == 200:
-                success = True
-
-        # raise error if a successful response hasn't been obtained
-        if success is False:
-            raise NCBIError("Connection error to remote server")
-
-        # Parse the xml
-        root = etree.fromstring(recrd.content)
-
-        return root
-
-    # Functionality to find taxa information from genbank ID
-    def id_lookup(self, nnme: str, ncbi_id: int) -> NCBITaxon:
-        """Get an NCBITaxon by taxon ID.
-
-        This method returns full taxonomic information from a NCBI ID. It will raise a
-        NCBIError if the provided ID cannot be found, or if there is a connection error.
-
-        Args:
-            nnme: A nickname to identify the taxon
-            ncbi_id: Unique identifier for the taxon
-
-        Returns:
-            A populated NCBITaxon instance
-        """
-
-        if not isinstance(ncbi_id, int):
-            raise TypeError("Non-integer NCBI taxonomy ID")
-
-        if not isinstance(nnme, str):
-            raise TypeError("Non-string nickname")
-
-        if not ncbi_id > 0:
-            raise ValueError("Negative NCBI taxonomy ID")
-
-        # Use efetch to find taxonomy details based on the index
-        taxon_row = self._taxonomy_efetch(ncbi_id)
-
-        # Catch case where no entry was found
-        if taxon_row is None:
-            raise NCBIError()
-
-        # Track down parent ID
-        PID = taxon_row.findall("./Taxon/ParentTaxId")
-
-        # Use this to decide whether to track down the lineage
-        if PID[0].text != "1":
-            # Preallocate list to store lineage
-            linx = []
-            # Find full lineage
-            Lin = taxon_row.findall("./Taxon/LineageEx/Taxon")
-            # Then loop over elements in the lineage
-            for ind in range(0, len(Lin)):
-                tmp_dic = {}
-                # Store all relevant info
-                tmp_dic["TaxID"] = Lin[ind][0].text
-                tmp_dic["ScientificName"] = Lin[ind][1].text
-                tmp_dic["Rank"] = Lin[ind][2].text
-                # And add all of it to the Lineage
-                linx.append(tmp_dic)
-        # If no lineage raise an error
-        else:
-            LOGGER.error(f"Taxon hierarchy for {nnme} contains no backbone ranks")
-            return gen_invalid_NCBITaxon()
-
-        # Find number of taxonomic ranks
-        tx_len = len(linx)
-        # Extract parent taxa ranks
-        rnks = [linx[i]["Rank"] for i in range(tx_len)]
-
-        # Find rank of the taxon
-        RNK = taxon_row.findall("./Taxon/Rank")
-
-        # Check that the taxon rank provided is a backbone rank
-        if RNK[0].text in BACKBONE_RANKS_EX:
-            # In this case use provided rank
-            rnk = BACKBONE_RANKS_EX.index(RNK[0].text)
-
-        # Filter out ID's with non-backbone ranks (e.g. strains)
-        else:
-            # Set as not a valid taxa
-            vld_tax = False
-            # Find lowest index
-            r_ID = len(BACKBONE_RANKS_EX) - 1
-
-            # While loop that runs until valid taxa is found
-            while vld_tax is False:
-                # Check if taxa id is found
-                if any(
-                    [rnks[i] == f"{BACKBONE_RANKS_EX[r_ID]}" for i in range(tx_len)]
-                ):
-                    # Close loop and store rank number
-                    vld_tax = True
-                    # Add 1 to the rank as only including lineage in this case
-                    rnk = r_ID + 1
-                    # Warn user that non-backbone rank has been supplied
-                    LOGGER.warning(f"{nnme} of non-backbone rank: {RNK[0].text}")
-                # Raise error once backbone ranks have been exhausted
-                elif r_ID < 1:
-                    LOGGER.error(
-                        f"Taxon hierarchy for {nnme} contains no backbone ranks"
-                    )
-                    return gen_invalid_NCBITaxon()
-                else:
-                    r_ID -= 1
-
-        # Make list of backbone ranks we are looking for
-        actual_bb_rnks = BACKBONE_RANKS_EX[0:rnk]
-
-        # Number of missing ranks initialised to zero
-        m_rnk = 0
-
-        # Check that all desired backbone ranks appear in the lineage
-        if all(item in rnks for item in actual_bb_rnks) is False:
-            # Find all missing ranks
-            miss = list(set(actual_bb_rnks).difference(rnks))
-            # Count missing ranks
-            m_rnk = len(miss)
-            # Remove missing ranks from our list of desired ranks
-            for i in range(0, m_rnk):
-                actual_bb_rnks.remove(miss[i])
-
-        # Find valid indices (e.g. those corresponding to backbone ranks)
-        vinds = [idx for idx, element in enumerate(rnks) if element in actual_bb_rnks]
-
-        # Find scientific name and ID of the taxon
-        SNME = taxon_row.findall("./Taxon/ScientificName")
-        TID = taxon_row.findall("./Taxon/TaxId")
-
-        # Create dictionary of valid taxa lineage using a list
-        if len(actual_bb_rnks) != 0:
-            red_taxa: dict[str, tuple] = {
-                f"{actual_bb_rnks[0]}": (
-                    str(linx[vinds[0]]["ScientificName"]),
-                    int(linx[vinds[0]]["TaxID"]),
-                    None,
-                )
-            }
-
-            # Recursively add all the hierarchy data in
-            for i in range(1, rnk - m_rnk):
-                red_taxa[f"{actual_bb_rnks[i]}"] = (
-                    str(linx[vinds[i]]["ScientificName"]),
-                    int(linx[vinds[i]]["TaxID"]),
-                    int(linx[vinds[i - 1]]["TaxID"]),
-                )
-
-            # Then add taxa information as a final entry
-            red_taxa[f"{RNK[0].text}"] = (
-                str(SNME[0].text),
-                int(TID[0].text),
-                int(linx[vinds[-1]]["TaxID"]),
-            )
-        else:
-            # Just make taxa with individual rank if no valid lineage provided
-            red_taxa = {f"{RNK[0].text}": (str(SNME[0].text), int(TID[0].text), None)}
-
-        # Create and populate microbial taxon
-        mtaxon = NCBITaxon(
-            name=SNME[0].text,
-            rank=RNK[0].text,
-            ncbi_id=int(TID[0].text),
-            taxa_hier=red_taxa,
-        )
-
-        # Check if AkaTaxIds exists in taxonomic information
-        AKA = taxon_row.findall("./Taxon/AkaTaxIds")
-        if len(AKA) != 0:
-            # Warn user that they've given a superseded taxa ID
-            LOGGER.warning(
-                f"NCBI ID {ncbi_id} has been superseded by ID " f"{TID[0].text}"
-            )
-            # Record that a superseded NCBI ID has been provided
-            mtaxon.superseed = True
-
-        return mtaxon
-
-    # New function to read in taxa information
-    def taxa_search(self, nnme: str, taxah: dict) -> NCBITaxon:
-        """Find an NCBI taxon given a taxon hierarchy.
-
-        Method that takes in taxonomic information, and finds the corresponding
-        NCBI ID. This NCBI ID is then used to generate a NCBITaxon object,
-        which is returned. This function also makes use of parent taxa information
-        to distinguish between ambiguous taxa names.
-
-        Args:
-            nnme: A nickname to identify the taxon
-            taxah: A dictionary containing taxonomic information
-
-        Returns:
-            A populated NCBITaxon instance
-        """
-
-        if isinstance(taxah, dict) is False:
-            raise TypeError("Taxa hierarchy should be a dictionary")
-        elif all(isinstance(x, str) for x in taxah.keys()) is False:
-            raise ValueError("Not all taxa dictionary keys are strings")
-        elif all(isinstance(x, str) for x in taxah.values()) is False:
-            raise ValueError("Not all taxa dictionary values are strings")
-
-        # Warn user if no backbone ranks have been provided
-        if bool(set(taxah.keys()) & set(BACKBONE_RANKS_EX)) is False:
-            LOGGER.warning(f"No backbone ranks provided in {nnme}'s taxa hierarchy")
-
-        # Find last dictionary key
-        f_key = list(taxah.keys())[-1]
-
-        # Then find corresponding entry as a search term
-        s_term = taxah[f_key]
-
-        # Search the online database
-        rcrds = self._taxonomy_esearch(s_term)
-
-        # Track down record count
-        CNT = rcrds.findall("./Count")
-        c = int(CNT[0].text)
-
-        # Check that a singular record has been provided before proceeding
-        if c == 1:
-            # Find taxa ID as single entry in the list
-            ID = rcrds.findall("./IdList/Id")
-            tID = int(ID[0].text)
-            # Use ID lookup function to generate as a NCBITaxon object
-            mtaxon = self.id_lookup(nnme, tID)
-        # Catch cases where no record is found
-        elif c == 0:
-            # Check if there actually is any higher taxonomy provided
-            if len(taxah.keys()) == 1:
-                LOGGER.error(
-                    f"Taxa {nnme} cannot be found and its higher "
-                    f"taxonomic hierarchy is absent"
-                )
-                return gen_invalid_NCBITaxon()
-
-            # If there is then set up a loop over it
-            fnshd = False
-            cnt = 1
-            while fnshd is False:
-                # Increment counter
-                cnt += 1
-                # Use to find higher taxonomic level to use in search
-                f_key = list(taxah.keys())[-cnt]
-                new_s_term = taxah[f_key]
-
-                # Search the online database
-                rcrds = self._taxonomy_esearch(new_s_term)
-
-                # Track down record count
-                CNT = rcrds.findall("./Count")
-                c = int(CNT[0].text)
-
-                # Check how many records have been found
-                if c == 1:
-                    # Find taxa ID as single entry in the list
-                    ID = rcrds.findall("./IdList/Id")
-                    tID = int(ID[0].text)
-                    # Use ID lookup function to generate as a NCBITaxon object
-                    mtaxon = self.id_lookup(nnme, tID)
-                    # Store originally supplied rank
-                    mtaxon.orig = list(taxah.keys())[-1]
-                    # Warn the user that a higher taxonomic rank is being used
-                    LOGGER.warning(
-                        f"{s_term} not registered with NCBI, but "
-                        f"higher level taxon {new_s_term} is"
-                    )
-                    fnshd = True
-                elif c > 1:  # Not going to handle ambiguities in this case
-                    LOGGER.error(
-                        f"Taxa {nnme} cannot be found and its higher "
-                        f"taxonomic hierarchy is ambiguous"
-                    )
-                    return gen_invalid_NCBITaxon()
-                # Catch when all the provided hierarchy has been exhausted
-                elif cnt == len(taxah.keys()):
-                    fnshd = True
-
-                # If valid higher taxon not found print error
-                if "mtaxon" not in locals():
-                    LOGGER.error(
-                        f"Taxa {nnme} cannot be found and neither can "
-                        f"its higher taxonomic hierarchy"
-                    )
-                    return gen_invalid_NCBITaxon()
-
-        # Case where only one rank has been provided
-        elif len(taxah) == 1:
-            # Preallocate container for the ranks
-            t_ranks = []
-            # Find all the taxa ID's
-            ID = rcrds.findall("./IdList/Id")
-            # First check if multiple taxa have the same rank
-            for i in range(c):
-                # Find taxa ID as specific entry in the list
-                tID = int(ID[i].text)
-                # Use ID lookup function to generate a temporary taxon
-                temp_taxon = self.id_lookup(nnme, tID)
-                # Add rank to list
-                t_ranks.append(list(temp_taxon.taxa_hier.keys())[-1])
-
-            # Record whether ranks match expected rank
-            if f_key == "kingdom":
-                mtch = [
-                    True if x == f_key or x == "superkingdom" else False
-                    for x in t_ranks
-                ]
-            else:
-                mtch = [True if x == f_key else False for x in t_ranks]
-
-            # If there's only one match, we have determined the correct entry
-            if sum(mtch) == 1:
-                # Find relevant index
-                ind = ([i for i, x in enumerate(mtch) if x])[0]
-                # Find taxa ID as single entry in the list
-                tID = int(ID[ind].text)
-                # Use ID lookup function to generate as a NCBITaxon object
-                mtaxon = self.id_lookup(nnme, tID)
-            # Then check whether multiple taxonomic levels have been provided
-            else:
-                # If not raise an error
-                LOGGER.error(
-                    f"Taxa {nnme} cannot be found using only one "
-                    f"taxonomic level, more should be provided"
-                )
-                return gen_invalid_NCBITaxon()
-        # Higher ranks provided
-        else:
-            # Find second from last dictionary key
-            f_key = list(taxah.keys())[-2]
-            # Then find corresponding entry as a search term
-            s_term = taxah[f_key]
-
-            # Search the online database for parent record
-            p_rcrds = self._taxonomy_esearch(s_term)
-
-            # Track down record count
-            PCNT = p_rcrds.findall("./Count")
-            pc = int(PCNT[0].text)
-
-            # Check that single parent taxa exists in records
-            if pc == 0:
-                LOGGER.error(f"Provided parent taxa for {nnme} not found")
-                return gen_invalid_NCBITaxon()
-            elif pc > 1:
-                LOGGER.error(f"More than one possible parent taxa for {nnme} found")
-                return gen_invalid_NCBITaxon()
-            else:
-                # Find parent taxa ID as single entry in the list
-                PAR = p_rcrds.findall("./IdList/Id")
-                pID = int(PAR[0].text)
-                # Then use ID lookup function to find generate as a NCBITaxon object
-                ptaxon = self.id_lookup("parent", pID)
-
-            # Save parent taxa rank and name
-            p_key = list(ptaxon.taxa_hier.keys())[-1]
-            p_val = ptaxon.taxa_hier[p_key]
-
-            # Find ID's of potential child taxa
-            ID = rcrds.findall("./IdList/Id")
-
-            # Use list comprehension to make list of potential taxa
-            potents = [self.id_lookup(f"c{i}", int(ID[i].text)) for i in range(0, c)]
-
-            # Check if relevant rank exists in the child taxa
-            child = [p_key in potents[i].taxa_hier for i in range(0, c)]
-
-            # Then look for matching rank name pairs
-            for i in range(0, c):
-                # Only check cases where rank exists in the child taxa
-                if child[i] is True:
-                    child[i] = potents[i].taxa_hier[f"{p_key}"] == p_val
-
-            # Check for errors relating to finding too many or few child taxa
-            if sum(child) == 0:
-                LOGGER.error(f"Parent taxa not actually a valid parent of {nnme}")
-                return gen_invalid_NCBITaxon()
-            elif sum(child) > 1:
-                LOGGER.error(
-                    f"Parent taxa for {nnme} refers to multiple " f"possible child taxa"
-                )
-                return gen_invalid_NCBITaxon()
-            else:
-                # Find index corresponding to correct child taxa
-                tID = int(ID[child.index(True)].text)
-                # Use ID lookup function to find generate as a NCBITaxon object
-                mtaxon = self.id_lookup(nnme, tID)
-
-        # Check whether mtaxon has actually been populated by the id_lookup
-        if mtaxon.name == "INVALID":
-            return gen_invalid_NCBITaxon()
-
-        # Find last dictionary key
-        f_key = list(mtaxon.taxa_hier.keys())[-1]
-
-        # Check if taxonomic rank supplied is used
-        if (
-            mtaxon.orig is None
-            and f_key != list(taxah.keys())[-1]
-            and f_key != "superkingdom"
-        ):
-            # If not raise an error
-            LOGGER.error(
-                f"{list(taxah.values())[-1]} is a {f_key}"
-                f" not a {list(taxah.keys())[-1]}"
-            )
-            return gen_invalid_NCBITaxon()
-        elif list(taxah.keys())[-1] == "kingdom" and f_key == "superkingdom":
-            # If not print a warning
-            LOGGER.warning(
-                f"NCBI records {(mtaxon.taxa_hier[f_key])[0]} as "
-                f"a superkingdom rather than a kingdom"
-            )
-        # Then check whether originally supplied name is still used
-        elif mtaxon.orig is None and taxah[f_key] != (mtaxon.taxa_hier[f_key])[0]:
-            # If not print a warning
-            LOGGER.warning(
-                f"{taxah[f_key]} not accepted usage should be "
-                f"{(mtaxon.taxa_hier[f_key])[0]} instead"
-            )
-            # And record the fact that usage is superseded
-            mtaxon.superseed = True
-
-        return mtaxon
-
-
 class GBIFTaxa:
     """Manage a set of GBIF taxon data and associated GBIFTaxon instances.
 
@@ -1690,12 +973,8 @@ class GBIFTaxa:
         self.n_errors: Optional[int] = None
         self.taxon_names_used: set[str] = set()
 
-        # Get a validator instance
-        self.validator: Union[LocalGBIFValidator, RemoteGBIFValidator]
-        if resources.use_local_gbif:
-            self.validator = LocalGBIFValidator(resources)
-        else:
-            self.validator = RemoteGBIFValidator()
+        # Get the validator instance
+        self.validator = GBIFValidator(resources)
 
     @loggerinfo_push_pop("Loading GBIFTaxa worksheet")
     def load(self, worksheet: worksheet) -> None:
@@ -2306,12 +1585,8 @@ class NCBITaxa:
         self.hierarchy: set[tuple] = set()
         self.n_errors: Optional[int] = None
 
-        # Get a validator instance
-        self.validator: Union[LocalNCBIValidator, RemoteNCBIValidator]
-        if resources.use_local_ncbi:
-            self.validator = LocalNCBIValidator(resources)
-        else:
-            self.validator = RemoteNCBIValidator(resources)
+        # Get the validator instance
+        self.validator = NCBIValidator(resources)
 
     @loggerinfo_push_pop("Loading NCBITaxa worksheet")
     def load(self, worksheet: worksheet) -> None:

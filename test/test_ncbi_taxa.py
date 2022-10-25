@@ -9,44 +9,6 @@ from safedata_validator import taxa
 
 from .conftest import log_check
 
-
-# Check that SDV_NO_REMOTE has not been set to an invalid parameter
-def test_sdv_no_remote_set_correctly():
-    assert os.getenv("SDV_NO_REMOTE") in [
-        None,
-        "0",
-        "1",
-        "false",
-        "true",
-        "False",
-        "True",
-    ]
-
-
-@pytest.mark.parametrize(
-    "status_code,expected_exception",
-    [
-        (404, ["Connection error to remote server", taxa.NCBIError]),
-        (503, ["Connection error to remote server", taxa.NCBIError]),
-    ],
-)
-# Test that taxonomy efetch and esearch handles status codes correctly
-def test_entrez_status_errors(
-    mocker, resources_with_remote_ncbi, status_code, expected_exception
-):
-    # Configure the mock to return a response with a specific status code.
-    mock_get = mocker.patch("safedata_validator.taxa.requests.get")
-    mock_get.return_value.status_code = status_code
-
-    # Construct remote validator
-    v = taxa.RemoteNCBIValidator(resources_with_remote_ncbi)
-
-    # Call the service, which will send a request to the server.
-    with pytest.raises(expected_exception[1], match=expected_exception[0]):
-        v._taxonomy_efetch(2)
-        v._taxonomy_esearch("Bacteria")
-
-
 # ------------------------------------------
 # Testing NCBITaxon
 # ------------------------------------------
@@ -353,10 +315,10 @@ def test_validate_construct_bi_or_tri(caplog, test_input, expected_log_entries):
         ),
     ],
 )
-def test_id_lookup(fixture_ncbi_validators, test_input, expected):
+def test_id_lookup(fixture_ncbi_validator, test_input, expected):
     """This test checks the results of looking up a specific NCBI taxonomy ID."""
 
-    fnd_tx = fixture_ncbi_validators.id_lookup(**test_input)
+    fnd_tx = fixture_ncbi_validator.id_lookup(**test_input)
 
     assert fnd_tx.name == expected[0]
     assert fnd_tx.rank == expected[1]
@@ -392,11 +354,11 @@ def test_id_lookup(fixture_ncbi_validators, test_input, expected):
     ],
 )
 def test_validate_id_lookup(
-    caplog, test_input, expected_log_entries, fixture_ncbi_validators
+    caplog, test_input, expected_log_entries, fixture_ncbi_validator
 ):
     """Checks the logging of a NCBI taxon ID search."""
 
-    fixture_ncbi_validators.id_lookup(**test_input)
+    fixture_ncbi_validator.id_lookup(**test_input)
 
     log_check(caplog, expected_log_entries)
 
@@ -413,11 +375,11 @@ def test_validate_id_lookup(
         (dict(nnme="E coli", ncbi_id=100000000000000), taxa.NCBIError),  # bad ID
     ],
 )
-def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exception):
+def test_id_lookup_errors(fixture_ncbi_validator, test_input, expected_exception):
     """This test checks that validator.id_lookup inputs throw errors as expected."""
 
     with pytest.raises(expected_exception):
-        _ = fixture_ncbi_validators.id_lookup(**test_input)
+        _ = fixture_ncbi_validator.id_lookup(**test_input)
 
 
 # Then do the same for the taxa search function
@@ -508,10 +470,10 @@ def test_id_lookup_errors(fixture_ncbi_validators, test_input, expected_exceptio
         ),
     ],
 )
-def test_taxa_search(fixture_ncbi_validators, test_input, expected):
+def test_taxa_search(fixture_ncbi_validator, test_input, expected):
     """This test checks the results of searching for a specific taxon."""
 
-    fnd_tx = fixture_ncbi_validators.taxa_search(**test_input)
+    fnd_tx = fixture_ncbi_validator.taxa_search(**test_input)
 
     assert fnd_tx.name == expected[0]
     assert fnd_tx.rank == expected[1]
@@ -670,11 +632,11 @@ def test_taxa_search(fixture_ncbi_validators, test_input, expected):
     ],
 )
 def test_validate_taxa_search(
-    caplog, test_input, expected_log_entries, fixture_ncbi_validators
+    caplog, test_input, expected_log_entries, fixture_ncbi_validator
 ):
     """Checks the error logging of a taxon name search."""
 
-    fixture_ncbi_validators.taxa_search(**test_input)
+    fixture_ncbi_validator.taxa_search(**test_input)
 
     log_check(caplog, expected_log_entries)
 
@@ -703,11 +665,11 @@ def test_validate_taxa_search(
         ),
     ],
 )
-def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_exception):
+def test_taxa_search_errors(fixture_ncbi_validator, test_input, expected_exception):
     """This test checks validator.taxa_search inputs throw errors as expected."""
 
     with pytest.raises(expected_exception):
-        _ = fixture_ncbi_validators.taxa_search(**test_input)
+        _ = fixture_ncbi_validator.taxa_search(**test_input)
 
 
 # ------------------------------------------
@@ -886,10 +848,10 @@ def test_taxa_search_errors(fixture_ncbi_validators, test_input, expected_except
         ),
     ],
 )
-def test_validate_and_add_taxon(ncbi_resources_local_and_remote, test_input, expected):
+def test_validate_and_add_taxon(fixture_resources, test_input, expected):
     """Checks that NCBI taxon validation stores the expected information."""
 
-    ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    ncbi_instance = taxa.NCBITaxa(fixture_resources)
     ncbi_instance.validate_and_add_taxon(test_input)
 
     assert len(ncbi_instance.taxon_index) == expected[0]  # Number of taxa added
@@ -1256,12 +1218,12 @@ def test_validate_and_add_taxon(ncbi_resources_local_and_remote, test_input, exp
     ],
 )
 def test_validate_and_add_taxon_validate(
-    caplog, test_input, expected_log_entries, ncbi_resources_local_and_remote
+    caplog, test_input, expected_log_entries, fixture_resources
 ):
     """Checks the logging of NCBI taxon validation."""
 
     test_input = copy.deepcopy(test_input)
-    ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    ncbi_instance = taxa.NCBITaxa(fixture_resources)
     ncbi_instance.validate_and_add_taxon(test_input)
 
     log_check(caplog, expected_log_entries)
@@ -1281,11 +1243,11 @@ def test_validate_and_add_taxon_validate(
     ],
 )
 def test_validate_and_add_taxon_errors(
-    ncbi_resources_local_and_remote, test_input, expected_exception
+    fixture_resources, test_input, expected_exception
 ):
     """This test checks exception handling of validator.validate_and_add_taxon."""
 
-    ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    ncbi_instance = taxa.NCBITaxa(fixture_resources)
 
     with pytest.raises(expected_exception):
         _ = ncbi_instance.validate_and_add_taxon(test_input)
@@ -1430,10 +1392,10 @@ def test_validate_and_add_taxon_errors(
         ),
     ],
 )
-def test_index_higher_taxa(ncbi_resources_local_and_remote, test_input, expected):
+def test_index_higher_taxa(fixture_resources, test_input, expected):
     """Checks that higher taxonomic ranks for a taxon are stored correctly."""
 
-    ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    ncbi_instance = taxa.NCBITaxa(fixture_resources)
     ncbi_instance.validate_and_add_taxon(test_input)
 
     # Then index higher taxa
@@ -1536,11 +1498,11 @@ def test_index_higher_taxa(ncbi_resources_local_and_remote, test_input, expected
     ],
 )
 def test_validate_index_higher_taxa(
-    caplog, ncbi_resources_local_and_remote, test_input, expected_log_entries
+    caplog, fixture_resources, test_input, expected_log_entries
 ):
     """Checks the function to store higher taxonomic ranks of a taxon logs correctly."""
 
-    ncbi_instance = taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    ncbi_instance = taxa.NCBITaxa(fixture_resources)
     ncbi_instance.validate_and_add_taxon(test_input)
 
     # Then index higher taxa
@@ -1555,16 +1517,14 @@ def test_validate_index_higher_taxa(
     [("good", 0, 10, 30), ("weird", 0, 5, 20), ("bad", 12, 5, 0)],
     indirect=["example_ncbi_files"],  # take actual params from fixture
 )
-def test_taxa_load(
-    ncbi_resources_local_and_remote, example_ncbi_files, n_errors, n_taxa, t_taxa
-):
+def test_taxa_load(fixture_resources, example_ncbi_files, n_errors, n_taxa, t_taxa):
     """This tests the ensemble loading of (ncbi) taxa from a file.
 
     It uses indirect parametrisation to access the fixtures containing the sample excel
     files.
     """
 
-    tx = taxa.NCBITaxa(ncbi_resources_local_and_remote)
+    tx = taxa.NCBITaxa(fixture_resources)
     tx.load(example_ncbi_files["NCBITaxa"])
 
     assert tx.n_errors == n_errors
