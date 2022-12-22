@@ -618,16 +618,21 @@ def _safedata_zenodo_cli():
     elif args.subcommand in ["publish_deposit", "pdep"]:
 
         with open(args.zenodo_json) as zn_json:
-            zenodo_json = simplejson.load(zn_json)
+            zenodo_json_data = simplejson.load(zn_json)
 
         # Run the function
-        response, error = publish_deposit(zenodo=zenodo_json, resources=resources)
+        response, error = publish_deposit(zenodo=zenodo_json_data, resources=resources)
 
         # Report on the outcome.
         if error is not None:
             LOGGER.error(f"Failed to publish deposit: {error}")
-        else:
-            LOGGER.info(f"Published to: {response['links']['record']}")
+            return
+
+        # Update the Zenodo JSON file with publication details
+        LOGGER.info(f"Published to: {response['links']['record']}")
+        with open(args.zenodo_json, "w") as zn_json:
+            simplejson.dump(response, zn_json)
+            LOGGER.info("Zenodo metadata updated")
 
     elif args.subcommand in ["upload_file", "ufile"]:
 
