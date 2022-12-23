@@ -4,20 +4,22 @@ version = "2.0.1-post9000"
 description = "\"Validator for data files in the SAFE data submission format.\""
 readme = "README.md"
 homepage = "https://safedata-validator.readthedocs.io/"
-repository = "https://github.com/imperial_college_london/safedata_validator" 
-classifiers=[
+repository = "https://github.com/imperial_college_london/safedata_validator"
+classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-authors = ["David Orme <d.orme@imperial.ac.uk>",
-           "Jacob Cook <j.cook17@imperial.ac.uk>"]
+authors = [
+    "David Orme <d.orme@imperial.ac.uk>",
+    "Jacob Cook <j.cook17@imperial.ac.uk>",
+]
 license = "MIT"
 
 [tool.poetry.scripts]
 safedata_validate = "safedata_validator.entry_points:_safedata_validator_cli"
 safedata_zenodo = "safedata_validator.entry_points:_safedata_zenodo_cli"
-safedata_post_metadata = "safedata_validator.entry_points:_safedata_post_metadata_cli"
+safedata_server = "safedata_validator.entry_points:_safedata_server_cli"
 safedata_build_local_gbif = "safedata_validator.entry_points:_build_local_gbif_cli"
 safedata_build_local_ncbi = "safedata_validator.entry_points:_build_local_ncbi_cli"
 
