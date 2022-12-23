@@ -3,7 +3,7 @@ usage: safedata_build_local_ncbi [-h] [-t TIMESTAMP] outdir
 
 Build a local NCBI database.
 
-    This tool builds an SQLite database of the NCBI  taxonomy to use in local validation
+    This tool builds an SQLite database of the NCBI  taxonomy to use in validation
     by safedata_validate. There are multiple archived versions of the dataset, and the
     available versions can be seen here:
 

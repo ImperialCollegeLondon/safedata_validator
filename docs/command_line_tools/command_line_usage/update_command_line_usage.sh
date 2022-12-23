@@ -27,6 +27,18 @@ do
     safedata_zenodo $subc -h >> safedata_zenodo_$subc.txt
 done
 
+echo "cl_prompt $ safedata_server -h" > safedata_server_top.txt
+safedata_server -h >> safedata_server_top.txt
+
+subcommands=(post_metadata update_gazetteer)
+
+for subc in "${subcommands[@]}";
+do
+    echo $subc
+    echo "cl_prompt $ safedata_server $subc -h" > safedata_server_$subc.txt
+    safedata_server $subc -h >> safedata_server_$subc.txt
+done
+
 echo "cl_prompt $ safedata_build_local_gbif -h" > safedata_build_local_gbif.txt
 safedata_build_local_gbif -h >> safedata_build_local_gbif.txt
 

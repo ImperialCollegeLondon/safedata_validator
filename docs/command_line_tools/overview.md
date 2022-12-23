@@ -1,6 +1,8 @@
 # Command line tools overview
 
-The `safedata_validator` package provides two command line tools:
+The `safedata_validator` package provides three main command line tools, but see also
+the install documentation for the [GBIF](../install/build_local_gbif.md) and
+[NCBI](../install/build_local_ncbi.md) database tools.
 
 ## `safedata_validate`
 
@@ -12,8 +14,17 @@ For more details, see [here](safedata_validate.md).
 
 ## `safedata_zenodo`
 
-This tools is used to manage the process of publishing a validated dataset to Zenodo and
-posting the metadata to a metadata server. The configuration is a little more complex,
-as it requires the setup of a Zenodo community account and access tokens.
+These tools are used to manage the process of publishing a validated dataset to Zenodo.
+The configuration is a little more complex, as it requires the setup of a Zenodo
+community account and access tokens.
 
 For more details, see [here](safedata_zenodo.md).
+
+## `safedata_server`
+
+These tools are used to manage the updating an instance of the safedata metadata server,
+including adding the details of published datasets and configuring core data such as the
+gazetteer. The configuration requires a URL for a server running the safedata server API
+and an access token for posting data to the server.
+
+For more details, see [here](safedata_server.md).

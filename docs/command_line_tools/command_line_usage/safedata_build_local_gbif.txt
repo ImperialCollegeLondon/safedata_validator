@@ -3,7 +3,7 @@ usage: safedata_build_local_gbif [-h] [-t TIMESTAMP] outdir
 
 Build a local GBIF database.
 
-    This tool builds an SQLite database of the GBIF backbone taxonomy to use in local
+    This tool builds an SQLite database of the GBIF backbone taxonomy to use in
     validation by safedata_validate. There are multiple versions of the dataset, and the
     available versions can be seen here:
 
