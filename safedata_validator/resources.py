@@ -329,11 +329,15 @@ class Resources:
         except IsADirectoryError:
             log_and_raise("Location aliases path is a directory", IsADirectoryError)
 
-        # Simple test for structure
-        if set(dictr.fieldnames) != set(["zenodo_record_id", "location", "alias"]):
-            log_and_raise(
-                "Location aliases file contains wrong field names", ValueError
-            )
+        # Simple test for structure - field names only parsed when called, and this can
+        # throw errors with bad file formats.
+        try:
+            fieldnames = set(dictr.fieldnames)
+        except UnicodeDecodeError:
+            log_and_raise("Location aliases file not readable as CSV", ValueError)
+
+        if fieldnames != set(["zenodo_record_id", "location", "alias"]):
+            log_and_raise("Location aliases has bad headers", ValueError)
 
         self.location_aliases = {la["alias"]: la["location"] for la in dictr}
 
