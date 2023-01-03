@@ -915,12 +915,12 @@ def _safedata_server_cli():
         with open(args.gazetteer_json) as gz_json:
             gazetteer_json = simplejson.load(gz_json)
 
-        with open(args.location_aliases) as aliases_json:
-            location_aliases = simplejson.load(aliases_json)
+        with open(args.location_aliases) as aliases_csv:
+            location_aliases = aliases_csv.read()
 
         # Run the function
         response, error = update_gazetteer(
-            gazetteer_json=gazetteer_json,
+            gazetteer=gazetteer_json,
             location_aliases=location_aliases,
             resources=resources,
         )

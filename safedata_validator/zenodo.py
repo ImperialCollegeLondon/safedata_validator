@@ -598,7 +598,7 @@ def update_gazetteer(
     )
 
     # trap errors in uploading metadata and tidy up
-    if response.status_code != 200:
+    if response.status_code != 201:
         return None, response.content
     else:
         return response.json(), None
