@@ -533,6 +533,9 @@ def delete_file(
         return {"result": "success"}, None
 
 
+# SERVER COMMANDS
+
+
 def post_metadata(
     metadata: dict, zenodo: dict, resources: Resources = None
 ) -> ZenodoFunctionResponseType:
@@ -561,11 +564,44 @@ def post_metadata(
     )
 
     # trap errors in uploading metadata and tidy up
-    print(mtd.content)
     if mtd.status_code != 200:
         return None, mtd.content
     else:
         return mtd.json(), None
+
+
+def update_gazetteer(
+    gazetteer: dict, location_aliases: dict, resources: Resources = None
+) -> ZenodoFunctionResponseType:
+    """Update the gazetteer and location aliases used by the metadata server.
+
+    Args:
+        gazetteer: Updated gazetteer data in GeoJSON format.
+        location_aliases: Updated location aliases in JSON format.
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
+
+    Returns:
+        See [here][safedata_validator.zenodo--function-return-value].
+    """
+
+    # Get resource configuration
+    zres = _resources_to_zenodo_api(resources)
+
+    payload = {"gazetteer": gazetteer, "location_aliases": location_aliases}
+
+    # post the metadata to the server
+    response = requests.post(
+        f"{zres['mdapi']}/update_gazetteer",
+        params={"token": zres["mdtoken"]},
+        json=payload,
+    )
+
+    # trap errors in uploading metadata and tidy up
+    if response.status_code != 201:
+        return None, response.content
+    else:
+        return response.json(), None
 
 
 """

@@ -371,9 +371,6 @@ class Dataset:
             keywords=self.summary.keywords,
             dataworksheets=[dwsh.to_dict() for dwsh in self.dataworksheets],
             # Taxa
-            # TODO: remember that DB API should populate:
-            #   * dataset_id to link from taxon searches to datasets
-            #  * id (what's this? Erroneous row ID in query?)
             # Gbif taxa if they exist
             gbif_timestamp=self.resources.gbif_timestamp,
             gbif_taxa=[
@@ -381,11 +378,11 @@ class Dataset:
                     zip(
                         (
                             "worksheet_name",
-                            "gbif_taxon_id",
-                            "gbif_parent_id",
+                            "taxon_id",
+                            "parent_id",
                             "taxon_name",
                             "taxon_rank",
-                            "gbif_status",
+                            "taxon_status",
                         ),
                         tx,
                     )
@@ -399,11 +396,11 @@ class Dataset:
                     zip(
                         (
                             "worksheet_name",
-                            "ncbi_taxon_id",
-                            "ncbi_parent_id",
+                            "taxon_id",
+                            "parent_id",
                             "taxon_name",
                             "taxon_rank",
-                            "ncbi_status",
+                            "taxon_status",
                         ),
                         tx,
                     )

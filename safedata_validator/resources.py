@@ -157,7 +157,11 @@ class Resources:
         # First try and populate from a config file.
         if config is not None:
             if isinstance(config, str):
-                config_type = "init file"
+                if os.path.exists(config) and os.path.isfile(config):
+                    config_type = "init file"
+                else:
+                    log_and_raise(f"Config file path not found: {config}", RuntimeError)
+                    return
             elif isinstance(config, list):
                 config_type = "init list"
             elif isinstance(config, dict):

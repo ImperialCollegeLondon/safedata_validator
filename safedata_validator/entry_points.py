@@ -36,6 +36,7 @@ from safedata_validator.zenodo import (
     post_metadata,
     publish_deposit,
     sync_local_dir,
+    update_gazetteer,
     update_published_metadata,
     upload_file,
     upload_metadata,
@@ -618,16 +619,21 @@ def _safedata_zenodo_cli():
     elif args.subcommand in ["publish_deposit", "pdep"]:
 
         with open(args.zenodo_json) as zn_json:
-            zenodo_json = simplejson.load(zn_json)
+            zenodo_json_data = simplejson.load(zn_json)
 
         # Run the function
-        response, error = publish_deposit(zenodo=zenodo_json, resources=resources)
+        response, error = publish_deposit(zenodo=zenodo_json_data, resources=resources)
 
         # Report on the outcome.
         if error is not None:
             LOGGER.error(f"Failed to publish deposit: {error}")
-        else:
-            LOGGER.info(f"Published to: {response['links']['record']}")
+            return
+
+        # Update the Zenodo JSON file with publication details
+        LOGGER.info(f"Published to: {response['links']['record']}")
+        with open(args.zenodo_json, "w") as zn_json:
+            simplejson.dump(response, zn_json)
+            LOGGER.info("Zenodo metadata updated")
 
     elif args.subcommand in ["upload_file", "ufile"]:
 
@@ -770,20 +776,19 @@ def _safedata_zenodo_cli():
     return
 
 
-def _safedata_post_metadata_cli():
-    """Post metadata on published datasets to a safedata metadata server.
+def _safedata_server_cli():
+    """Post updated information to a safedata server instance.
 
-    This function posts dataset and Zenodo metadata for a validated and published
-    dataset to an server providing the API for accessing and searching safedata
-    metadata. The metadata server then handles populating a database with the metadata
-    and exposing that data via the server API.
+    This command line tool provides functions to update a web server running the
+    safedata server API. This includes updating the gazetteer data used for the instance
+    and updating the database of published datasets.
 
-    The safedata_validator Resources configuration must contain the URL for
-    the server and an access token.
+    To use these tools, the safedata_validator Resources configuration must contain the
+    URL for the server and an access token.
     """
 
     # create the top-level parser and configure to take subparsers
-    desc = textwrap.dedent(_safedata_post_metadata_cli.__doc__)
+    desc = textwrap.dedent(_safedata_server_cli.__doc__)
     fmt = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
 
@@ -802,9 +807,53 @@ def _safedata_post_metadata_cli():
         help="Suppress normal information messages. ",
     )
 
-    parser.add_argument("zenodo_json", type=str, help="Path to a Zenodo metadata file")
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="subcommand")
+
+    # POST METADATA subcommand
+
+    post_metadata_desc = """
+    This function posts dataset and Zenodo metadata for a validated and published
+    dataset to an server providing the API for accessing and searching safedata
+    metadata. The metadata server then handles populating a database with the metadata
+    and exposing that data via the server API.
+    """
+
+    post_metadata_parser = subparsers.add_parser(
+        "post_metadata",
+        description=textwrap.dedent(post_metadata_desc),
+        help="Post dataset metadata to a safedata server",
+        formatter_class=fmt,
+    )
+
+    # positional argument inputs
+    post_metadata_parser.add_argument(
+        "zenodo_json", type=str, help="Path to a Zenodo metadata file"
+    )
+    post_metadata_parser.add_argument(
         "dataset_json", type=str, help="Path to a dataset metadata file"
+    )
+
+    # UPDATE GAZETTEER subcommand
+
+    update_gazetteer_desc = """
+    This function updates the gazetteer resources being used by a safedata server
+    instance. It uploads both the gazetteer geojson file and location aliases file and
+    the server then validates the file contents.
+    """
+
+    update_gazetteer_parser = subparsers.add_parser(
+        "update_gazetteer",
+        description=textwrap.dedent(update_gazetteer_desc),
+        help="Update the gazetteer data on safedata server",
+        formatter_class=fmt,
+    )
+
+    # positional argument inputs
+    update_gazetteer_parser.add_argument(
+        "gazetteer_json", type=str, help="Path to a gazetteer geojson file"
+    )
+    update_gazetteer_parser.add_argument(
+        "location_aliases", type=str, help="Path to a CSV of location aliases"
     )
 
     # ------------------------------------------------------
@@ -814,27 +863,75 @@ def _safedata_post_metadata_cli():
     # Parse the arguments and set the verbosity
     args = parser.parse_args()
 
+    if args.subcommand is None:
+        parser.print_usage()
+        return
+
+    # Show the package config and exit if requested
+    if args.subcommand == "show_config":
+        resources = Resources(args.resources)
+        print("\nZenodo configuration:")
+        for key, val in resources.zenodo.items():
+            print(f" - {key}: {val}")
+        print("\nMetadata server configuration:")
+        for key, val in resources.metadata.items():
+            print(f" - {key}: {val}")
+        return
+
+    if args.quiet:
+        # Don't suppress error messages
+        CONSOLE_HANDLER.setLevel("ERROR")
+    else:
+        CONSOLE_HANDLER.setLevel("DEBUG")
+
     resources = Resources(args.resources)
 
-    # Open the two JSON files
-    with open(args.dataset_json) as ds_json:
-        dataset_json = simplejson.load(ds_json)
+    # Handle the remaining subcommands
+    if args.subcommand in ["post_metadata", "cdep"]:
 
-    with open(args.zenodo_json) as zn_json:
-        zenodo_json = simplejson.load(zn_json)
+        # Open the two JSON files
+        with open(args.dataset_json) as ds_json:
+            dataset_json = simplejson.load(ds_json)
 
-    # Run the function
-    response, error = post_metadata(
-        metadata=dataset_json, zenodo=zenodo_json, resources=resources
-    )
+        with open(args.zenodo_json) as zn_json:
+            zenodo_json = simplejson.load(zn_json)
 
-    # Report on the outcome.
-    if error is not None:
-        LOGGER.error(f"Failed to post metadata: {error}")
-    else:
-        LOGGER.info("Metadata posted")
+        # Run the function
+        response, error = post_metadata(
+            metadata=dataset_json, zenodo=zenodo_json, resources=resources
+        )
 
-    return
+        # Report on the outcome.
+        if error is not None:
+            LOGGER.error(f"Failed to post metadata: {error}")
+        else:
+            LOGGER.info("Metadata posted")
+
+        return
+
+    if args.subcommand in ["update_gazetteer"]:
+
+        # Open the two JSON files
+        with open(args.gazetteer_json) as gz_json:
+            gazetteer_json = simplejson.load(gz_json)
+
+        with open(args.location_aliases) as aliases_csv:
+            location_aliases = aliases_csv.read()
+
+        # Run the function
+        response, error = update_gazetteer(
+            gazetteer=gazetteer_json,
+            location_aliases=location_aliases,
+            resources=resources,
+        )
+
+        # Report on the outcome.
+        if error is not None:
+            LOGGER.error(f"Failed to update gazetteer: {error}")
+        else:
+            LOGGER.info("Gazetteer updated")
+
+        return
 
 
 # Local Database building

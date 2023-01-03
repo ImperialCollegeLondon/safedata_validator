@@ -505,7 +505,7 @@ class Locations:
 
         self.locations.update(loc_names)
         index_entries = [(lc, False, None) for lc in loc_names]
-        self.location_index.append(index_entries)
+        self.location_index.extend(index_entries)
 
     @property
     def is_empty(self) -> bool:
