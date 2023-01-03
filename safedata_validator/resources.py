@@ -1,23 +1,26 @@
 """Load and check validation resources.
 
-The `safedata_validator` package needs access to some local resources and
-configuration to work. The three main resources for file validation are:
+The `safedata_validator` package needs access to some local resources and configuration
+to work. The three main resources for file validation are:
 
--   locations: A path to a locations data file, providing a gazetteer of known
-    locations and their details.
+-   gazetteer: A path to a GeoJSON formatted gazetteer of known locations and their
+    details.
+
+-   location_aliases: A path to a CSV file containing known aliases of the location
+    names provided in the gazetteer.
 
 -   gbif_database: The path to a local SQLite copy of the GBIF backbone database.
 
 -   ncbi_database: The path to a local SQLite copy of the NCBI database files.
 
-The [Resources][safedata_validator.resources.Resources] class is used to locate
-and validate these resources, and then provide those validated resources to
-other components of the package.
+The [Resources][safedata_validator.resources.Resources] class is used to locate and
+validate these resources, and then provide those validated resources to other components
+of the package.
 
-A configuration file can be passed as `cfg_path` when creating an instance,
-but if no arguments are provided then an attempt is made to find and load
-configuration files in the user and then site config locations defined by the
-`appdirs` package. See [here][usage/usage] for details.
+A configuration file can be passed as `cfg_path` when creating an instance, but if no
+arguments are provided then an attempt is made to find and load configuration files in
+the user and then site config locations defined by the `appdirs` package. See
+[here][usage/usage] for details.
 
 """
 
@@ -25,6 +28,7 @@ configuration files in the user and then site config locations defined by the
 import contextlib
 import os
 import sqlite3
+from csv import DictReader
 from datetime import date
 from typing import Union
 
@@ -33,6 +37,7 @@ import simplejson
 from configobj import ConfigObj, flatten_errors
 from dateutil.parser import isoparse
 from dotmap import DotMap
+from shapely.geometry import shape
 from simplejson.errors import JSONDecodeError
 from validate import Validator, VdtParamError, VdtValueError, is_list
 
@@ -44,7 +49,8 @@ from safedata_validator.logger import (
 )
 
 CONFIGSPEC = {
-    "locations": "string()",
+    "gazetteer": "string()",
+    "location_aliases": "string()",
     "gbif_database": "string()",
     "ncbi_database": "string()",
     "extents": {
@@ -135,7 +141,8 @@ class Resources:
     Attributes:
         config_type: The method used to specify the resources. One of
             'init_dict', 'init_list', 'init_file', 'user_config' or 'site_config'.
-        locations: The path to the locations file
+        gazetteer: The path to the gazetteer file
+        location_aliases: The path to the location_aliases file
         gbif_database: The path to the GBIF database file
         ncbi_database: The path to the NCBI database file
         valid_locations: The locations defined in the locations file
@@ -192,7 +199,8 @@ class Resources:
         #        class containing the config attributes. Having a _function_
         #        that returns a modified ConfigObj instance seems more direct
         #        than having to patch this list of attributes.
-        self.locations = config_loaded.locations
+        self.gaz_path = config_loaded.gazetteer
+        self.localias_path = config_loaded.location_aliases
         self.gbif_database = config_loaded.gbif_database
         self.ncbi_database = config_loaded.ncbi_database
         self.config_type = config_loaded.config_type
@@ -212,7 +220,8 @@ class Resources:
         self.location_aliases: dict[str, str] = dict()
 
         # Validate the resources
-        self._validate_locations()
+        self._validate_gazetteer()
+        self._validate_location_aliases()
         self._validate_gbif()
         self._validate_ncbi()
 
@@ -257,33 +266,76 @@ class Resources:
 
         return config_obj
 
-    def _validate_locations(self) -> None:
-        """Validate and load a locations file.
+    def _validate_gazetteer(self) -> None:
+        """Validate and load a gazetteer file.
 
-        This private function checks whether a locations path: exists, is a JSON file,
-        and contains location and alias data. It populates the instance attributes
+        This private function checks whether a gazetteer path: exists, is a JSON file,
+        and contains location GeoJSON data. It populates the instance attributes
         """
 
-        if self.locations is None or self.locations == "":
-            log_and_raise("Locations file missing in configuration", RuntimeError)
+        if self.gaz_path is None or self.gaz_path == "":
+            log_and_raise("Gazetteer file missing in configuration", RuntimeError)
 
-        LOGGER.info(f"Validating locations: {self.locations}")
+        LOGGER.info(f"Validating gazetteer: {self.gaz_path}")
 
         # Now check to see whether the locations file behaves as expected
-        if not os.path.exists(self.locations) and not os.path.isfile(self.locations):
-            log_and_raise("Local locations file not found", OSError)
+        if not os.path.exists(self.gaz_path) and not os.path.isfile(self.gaz_path):
+            log_and_raise("Gazetteer file not found", OSError)
 
         try:
-            loc_payload = simplejson.load(open(self.locations, mode="r"))
+            loc_payload = simplejson.load(open(self.gaz_path, mode="r"))
         except (JSONDecodeError, UnicodeDecodeError):
-            log_and_raise("Local locations file not JSON encoded.", OSError)
+            log_and_raise("Gazetteer file not valid JSON", OSError)
 
-        # process the locations payload
-        if {"locations", "aliases"} != loc_payload.keys():
-            log_and_raise("Locations data malformed", RuntimeError)
+        # Simple test for GeoJSON
+        if (
+            loc_payload.get("type") is None
+            or loc_payload["type"] != "FeatureCollection"
+        ):
+            log_and_raise(
+                "Gazetteer data not a GeoJSON Feature Collection", RuntimeError
+            )
 
-        self.valid_locations = loc_payload["locations"]
-        self.location_aliases = loc_payload["aliases"]
+        try:
+            self.valid_locations = {
+                ft["properties"]["location"]: shape(ft["geometry"]).bounds
+                for ft in loc_payload["features"]
+            }
+        except KeyError:
+            log_and_raise(
+                "Missing or incomplete location properties for gazetteer features",
+                RuntimeError,
+            )
+
+    def _validate_location_aliases(self) -> None:
+        """Validate and load location aliases.
+
+        This private function checks whether a location_aliases path: exists, is a CSV
+        file, and contains location_alias data. It populates the instance attributes
+        """
+
+        if self.localias_path is None or self.localias_path == "":
+            log_and_raise(
+                "Location aliases file missing in configuration", RuntimeError
+            )
+
+        LOGGER.info(f"Validating location aliases: {self.localias_path}")
+
+        # Now check to see whether the locations file behaves as expected
+        try:
+            dictr = DictReader(open(self.localias_path, mode="r"))
+        except FileNotFoundError:
+            log_and_raise("Location aliases file not found", FileNotFoundError)
+        except IsADirectoryError:
+            log_and_raise("Location aliases path is a directory", IsADirectoryError)
+
+        # Simple test for structure
+        if set(dictr.fieldnames) != set(["zenodo_record_id", "location", "alias"]):
+            log_and_raise(
+                "Location aliases file contains wrong field names", ValueError
+            )
+
+        self.location_aliases = {la["alias"]: la["location"] for la in dictr}
 
     def _validate_gbif(self) -> None:
         """Validate the GBIF settings.
@@ -326,14 +378,17 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
         The database timestamp as an ISO formatted date string.
     """
 
-    LOGGER.info(f"Validating local {db_name} database: {db_path}")
+    LOGGER.info(f"Validating {db_name} database: {db_path}")
+
+    if db_path is None or db_path == "":
+        log_and_raise(f"{db_name} database not set in configuration", ValueError)
 
     # Does the provided path exist and is it a functional SQLite database
     # with a backbone table? Because sqlite3 can 'connect' to any path,
     # use a query attempt to reveal exceptions
 
     if not os.path.exists(db_path):
-        log_and_raise(f"Local {db_name} database not found", OSError)
+        log_and_raise(f"{db_name} database not found", FileNotFoundError)
 
     # Connect to the file (which might or might not be a database containing the
     # required tables)
@@ -345,7 +400,7 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
                 "SELECT name FROM sqlite_master WHERE type ='table';"
             )
         except sqlite3.DatabaseError:
-            log_and_raise(f"Local {db_name} database not an SQLite3 file.", OSError)
+            log_and_raise(f"Local {db_name} database not an SQLite3 file", ValueError)
 
         # Check the required tables against found tables
         db_tables = set([rw[0] for rw in db_tables.fetchall()])
@@ -355,7 +410,7 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
         if missing:
             log_and_raise(
                 f"Local {db_name} database does not contain required tables: ",
-                RuntimeError,
+                ValueError,
                 extra={"join": missing},
             )
 
