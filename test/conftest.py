@@ -36,7 +36,6 @@ def fixture_files():
         ("localias_file", "location_aliases_simple.csv"),
         ("gbif_file", "gbif_backbone_truncated.sqlite"),
         ("ncbi_file", "ncbi_database_truncated.sqlite"),
-        ("sqlite_not_gbif", "database_file_not_gbif.sqlite"),
         ("json_not_locations", "notalocationsjson.json"),
         ("bad_excel_file", "Test_format_bad.xlsx"),
         ("good_excel_file", "Test_format_good.xlsx"),
