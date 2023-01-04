@@ -14,12 +14,7 @@ import requests  # type: ignore
 from openpyxl.worksheet.worksheet import Worksheet
 
 from safedata_validator.extent import Extent
-from safedata_validator.logger import (
-    COUNTER_HANDLER,
-    FORMATTER,
-    LOGGER,
-    loggerinfo_push_pop,
-)
+from safedata_validator.logger import COUNTER_HANDLER, LOGGER, loggerinfo_push_pop
 from safedata_validator.resources import Resources
 from safedata_validator.validators import (
     IsNotSpace,
