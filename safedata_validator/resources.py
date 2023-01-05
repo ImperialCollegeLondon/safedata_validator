@@ -29,6 +29,7 @@ import contextlib
 import os
 import sqlite3
 from csv import DictReader
+from csv import Error as csvError
 from datetime import date
 from typing import Union
 
@@ -333,7 +334,7 @@ class Resources:
         # throw errors with bad file formats.
         try:
             fieldnames = set(dictr.fieldnames)
-        except UnicodeDecodeError:
+        except (UnicodeDecodeError, csvError):
             log_and_raise("Location aliases file not readable as CSV", ValueError)
 
         if fieldnames != set(["zenodo_record_id", "location", "alias"]):
