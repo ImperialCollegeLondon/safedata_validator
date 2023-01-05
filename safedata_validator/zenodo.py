@@ -8,8 +8,31 @@ This module provides functions to:
 2. maintain local copies of datasets in the folder structure expected
    by the safedata R package.
 3. compile a RIS format bibliographic file for published datasets.
+"""
 
-## Function return value
+import copy
+import hashlib
+import os
+import shutil
+from itertools import groupby
+from typing import Optional, Union
+
+import requests  # type: ignore
+import rispy
+import simplejson
+from dominate import tags
+from dominate.util import raw
+from lxml import etree
+from tqdm import tqdm
+from tqdm.utils import CallbackIOWrapper
+
+from safedata_validator.logger import FORMATTER, LOGGER
+from safedata_validator.resources import Resources
+from safedata_validator.taxa import taxon_index_to_text
+
+# Constant definition of zenodo action function response type
+ZenodoFunctionResponseType = tuple[Union[dict, None], Union[str, None]]
+"""Function return value
 
 The functions interacting with Zenodo all return a common format of tuple of length 2:
 
@@ -30,31 +53,8 @@ response, error = zenodo_function(args)
 ```
 """
 
-import copy
-import hashlib
-import os
-import shutil
-from itertools import groupby
-from typing import Union
 
-import requests  # type: ignore
-import rispy
-import simplejson
-from dominate import tags
-from dominate.util import raw
-from lxml import etree
-from tqdm import tqdm
-from tqdm.utils import CallbackIOWrapper
-
-from safedata_validator.logger import FORMATTER, LOGGER
-from safedata_validator.resources import Resources
-from safedata_validator.taxa import ncbi_index_to_text, taxon_index_to_text
-
-# Constant definition of zenodo action function response type
-ZenodoFunctionResponseType = tuple[Union[dict, None], Union[str, None]]
-
-
-def _resources_to_zenodo_api(resources: Resources = None) -> dict:
+def _resources_to_zenodo_api(resources: Optional[Resources] = None) -> dict:
     """Get a dictionary of the Zenodo and Metadata config from Resources.
 
     Args:
@@ -129,7 +129,7 @@ def _zenodo_error_message(response) -> str:
 
 
 def get_deposit(
-    deposit_id: int, resources: Resources = None
+    deposit_id: int, resources: Optional[Resources] = None
 ) -> ZenodoFunctionResponseType:
     """Download the metadata of a Zenodo deposit.
 
@@ -159,7 +159,7 @@ def get_deposit(
 
 
 def create_deposit(
-    concept_id: int = None, resources: Resources = None
+    concept_id: Optional[int] = None, resources: Optional[Resources] = None
 ) -> ZenodoFunctionResponseType:
     """Create a new deposit.
 
@@ -211,7 +211,7 @@ def create_deposit(
 
 
 def upload_metadata(
-    metadata: dict, zenodo: dict, resources: Resources = None
+    metadata: dict, zenodo: dict, resources: Optional[Resources] = None
 ) -> ZenodoFunctionResponseType:
     """Upload dataset metadata.
 
@@ -219,8 +219,8 @@ def upload_metadata(
     metadata and uploads it to a deposit.
 
     Args:
-        metadata: The dataset metadata dictionary for a dataset
-        zenodo: The dataset metadata dictionary for a deposit
+        metadata: The metadata dictionary for a dataset
+        zenodo: The zenodo metadata dictionary for a deposit
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -255,12 +255,13 @@ def upload_metadata(
         ]
 
     # set up the access rights
-    if metadata["access"].lower() == "embargo":
+    dataset_access = metadata["access"].lower()
+    if dataset_access == "embargo":
         zen_md["metadata"]["access_right"] = "embargoed"
         zen_md["metadata"]["embargo_date"] = metadata["embargo_date"]
-    elif metadata["access"].lower() == "open":
+    elif dataset_access == "open":
         zen_md["metadata"]["access_right"] = "open"
-    elif metadata["access"].lower() == "restricted":
+    elif dataset_access == "restricted":
         zen_md["metadata"]["access_right"] = "restricted"
         zen_md["metadata"]["access_conditions"] = metadata["access_conditions"]
     else:
@@ -289,8 +290,8 @@ def upload_metadata(
 
 
 def update_published_metadata(
-    zenodo_md: dict,
-    resources: Resources = None,
+    zenodo: dict,
+    resources: Optional[Resources] = None,
 ) -> ZenodoFunctionResponseType:
     """Update published deposit metadata.
 
@@ -300,7 +301,7 @@ def update_published_metadata(
     published version by altered.
 
     Args:
-        zenodo_md: A Zenodo metadata dictionary, with an updated metadata section
+        zenodo: A Zenodo metadata dictionary, with an updated metadata section
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -311,7 +312,7 @@ def update_published_metadata(
     # Get resource configuration
     zres = _resources_to_zenodo_api(resources)
 
-    links = zenodo_md["links"]
+    links = zenodo["links"]
 
     # Unlock the published deposit for editing
     edt = requests.post(links["edit"], params=zres["ztoken"])
@@ -333,7 +334,7 @@ def update_published_metadata(
         links["self"],
         params=zres["ztoken"],
         headers={"Content-Type": "application/json"},
-        data=simplejson.dumps({"metadata": zenodo_md["metadata"]}),
+        data=simplejson.dumps({"metadata": zenodo["metadata"]}),
     )
 
     success_so_far = 0 if upd.status_code != 200 else 1
@@ -363,9 +364,9 @@ def update_published_metadata(
 def upload_file(
     metadata: dict,
     filepath: str,
-    zenodo_filename: str = None,
+    zenodo_filename: Optional[str] = None,
     progress_bar: bool = True,
-    resources: Resources = None,
+    resources: Optional[Resources] = None,
 ) -> ZenodoFunctionResponseType:
     """Upload a file to Zenodo.
 
@@ -432,7 +433,7 @@ def upload_file(
 
 
 def discard_deposit(
-    metadata: dict, resources: Resources = None
+    metadata: dict, resources: Optional[Resources] = None
 ) -> ZenodoFunctionResponseType:
     """Discard a deposit.
 
@@ -462,7 +463,7 @@ def discard_deposit(
 
 
 def publish_deposit(
-    zenodo: dict, resources: Resources = None
+    zenodo: dict, resources: Optional[Resources] = None
 ) -> ZenodoFunctionResponseType:
     """Publish a created deposit.
 
@@ -490,7 +491,7 @@ def publish_deposit(
 
 
 def delete_file(
-    metadata: dict, filename: str, resources: Resources = None
+    metadata: dict, filename: str, resources: Optional[Resources] = None
 ) -> ZenodoFunctionResponseType:
     """Delete an uploaded file from an unpublished Zenodo deposit.
 
@@ -537,7 +538,7 @@ def delete_file(
 
 
 def post_metadata(
-    metadata: dict, zenodo: dict, resources: Resources = None
+    metadata: dict, zenodo: dict, resources: Optional[Resources] = None
 ) -> ZenodoFunctionResponseType:
     """Post the dataset metadata and zenodo metadata to the metadata server.
 
@@ -571,7 +572,7 @@ def post_metadata(
 
 
 def update_gazetteer(
-    gazetteer: dict, location_aliases: dict, resources: Resources = None
+    gazetteer: dict, location_aliases: dict, resources: Optional[Resources] = None
 ) -> ZenodoFunctionResponseType:
     """Update the gazetteer and location aliases used by the metadata server.
 
@@ -613,8 +614,8 @@ def dataset_description(
     metadata: dict,
     zenodo: dict,
     render: bool = True,
-    extra: str = None,
-    resources: Resources = None,
+    extra: Optional[str] = None,
+    resources: Optional[Resources] = None,
 ) -> Union[tags.div, str]:
     """Create an HTML dataset description.
 
@@ -799,63 +800,43 @@ def dataset_description(
     gbif_taxon_index = metadata.get("gbif_taxa")
     ncbi_taxon_index = metadata.get("ncbi_taxa")
 
-    gbif_text = (
-        " If a dataset uses a synonym, the accepted usage is shown followed by the "
-        "dataset usage in brackets. Taxa that cannot be validated, including new "
-        "species and other unknown taxa, morphospecies, functional groups and "
-        "taxonomic levels not used in the GBIF backbone are shown in square brackets."
-        ""
-    )
-
-    ncbi_text = (
-        " If a dataset uses a synonym, the accepted usage is shown followed by the "
-        "dataset usage in brackets. Taxa that cannot be validated, e.g. new or unknown "
-        "species are shown in square brackets. Non-backbone taxonomic ranks (e.g. "
-        "strains or subphyla) can be validated using the NCBI database. However, they "
-        "will only be shown if the user explicitly provided a non-backbone taxon. When"
-        " they are shown they will be accompanied by an message stating their rank."
-    )
-
     # When NCBI is absent use the old format for backwards compatibility
-    if gbif_taxon_index and not ncbi_taxon_index:
+    if gbif_taxon_index or ncbi_taxon_index:
         desc += tags.p(
             tags.b("Taxonomic coverage: "),
             tags.br(),
-            f" All taxon names are validated against the GBIF backbone taxonomy."
-            f"{gbif_text}",
-            taxon_index_to_text(gbif_taxon_index, True),
+            "This dataset contains data associated with taxa and these have been "
+            "validated against appropriate taxonomic authority databases.",
         )
-    elif gbif_taxon_index and ncbi_taxon_index:
-        desc += tags.p(
-            tags.b("Taxonomic coverage: "),
-            tags.br(),
-            " For this dataset taxon names are validated against both the GBIF backbone"
-            " taxonomy and the NCBI taxonomy database.",
-        )
+
+    if gbif_taxon_index:
         desc += tags.p(
             tags.u("GBIF taxa details: "),
             tags.br(),
             tags.br(),
-            f"{gbif_text}",
-            taxon_index_to_text(gbif_taxon_index, True),
+            "The following taxa were validated against the GBIF backbone dataset."
+            "If a dataset uses a synonym, the accepted usage is shown followed by the "
+            "dataset usage in brackets. Taxa that cannot be validated, including new "
+            "species and other unknown taxa, morphospecies, functional groups and "
+            "taxonomic levels not used in the GBIF backbone are shown in square "
+            "brackets.",
+            taxon_index_to_text(gbif_taxon_index, True, auth="GBIF"),
         )
 
-    # Similar handling used for the NCBI case
-    if ncbi_taxon_index and not gbif_taxon_index:
-        desc += tags.p(
-            tags.b("Taxonomic coverage: "),
-            tags.br(),
-            " All taxon names are validated against the NCBI taxonomy database."
-            f"{ncbi_text}",
-            ncbi_index_to_text(ncbi_taxon_index, True),
-        )
-    elif ncbi_taxon_index and gbif_taxon_index:
+    if ncbi_taxon_index:
         desc += tags.p(
             tags.u("NCBI taxa details: "),
             tags.br(),
             tags.br(),
-            f"{ncbi_text}",
-            ncbi_index_to_text(ncbi_taxon_index, True),
+            "The following taxa were validated against the NCBI taxonomy dataset."
+            " If a dataset uses a synonym, the accepted usage is shown followed by the "
+            "dataset usage in brackets. Taxa that cannot be validated, e.g. new or "
+            "unknown species are shown in square brackets. Non-backbone taxonomic "
+            "ranks (e.g. strains or subphyla) can be validated using the NCBI "
+            "database. However, they will only be shown if the user explicitly "
+            "provided a non-backbone taxon. When they are shown they will be "
+            "accompanied by an message stating their rank.",
+            taxon_index_to_text(ncbi_taxon_index, True, auth="NCBI"),
         )
 
     if render:
@@ -919,7 +900,7 @@ def generate_inspire_xml(
     metadata: dict,
     zenodo_metadata: dict,
     resources: Resources,
-    lineage_statement: str = None,
+    lineage_statement: Optional[str] = None,
 ) -> str:
     """Convert dataset and zenodo metadata into GEMINI XML.
 
@@ -1149,7 +1130,9 @@ def generate_inspire_xml(
     return etree.tostring(tree)
 
 
-def download_ris_data(resources: Resources = None, ris_file: str = None) -> list:
+def download_ris_data(
+    resources: Optional[Resources] = None, ris_file: Optional[str] = None
+) -> list:
     """Downloads SAFE records into a RIS format bibliography file.
 
     This function is used to maintain a bibliography file of the records
@@ -1269,7 +1252,7 @@ def sync_local_dir(
     datadir: str,
     xlsx_only: bool = True,
     replace_modified: bool = False,
-    resources: Resources = None,
+    resources: Optional[Resources] = None,
 ) -> None:
     """Synchronise a local data directory with a Zenodo community.
 
@@ -1296,7 +1279,7 @@ def sync_local_dir(
     """
 
     # Private helper functions
-    def _get_file(url: str, outf: str, params: dict = None) -> None:
+    def _get_file(url: str, outf: str, params: Optional[dict] = None) -> None:
         """Download a file from a URL."""
         resource = requests.get(url, params=params, stream=True)
 
