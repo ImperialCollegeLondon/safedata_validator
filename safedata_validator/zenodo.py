@@ -565,7 +565,7 @@ def post_metadata(
     )
 
     # trap errors in uploading metadata and tidy up
-    if mtd.status_code != 200:
+    if mtd.status_code != 201:
         return None, mtd.content
     else:
         return mtd.json(), None
