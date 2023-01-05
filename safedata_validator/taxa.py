@@ -2121,7 +2121,7 @@ def taxon_index_to_text(
                 else:
                     return f"_{tx['taxon_name']}_"
             elif tx["taxon_rank"] in ["morphospecies", "functional group"]:
-                return f"[{tx['taxon_name']}]"
+                return f"[{tx['worksheet_name']}, {tx['taxon_rank']}]"
             else:
                 return tx["taxon_name"]
 
