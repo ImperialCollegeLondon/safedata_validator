@@ -491,8 +491,8 @@ class Locations:
                 vl for ky, vl in list(self.valid_locations.items()) if ky in bbox_keys
             ]
             bbox = list(zip(*bbox))
-            self.longitudinal_extent.update((min(bbox[0]), max(bbox[1])))
-            self.latitudinal_extent.update((min(bbox[2]), max(bbox[3])))
+            self.longitudinal_extent.update((min(bbox[0]), max(bbox[2])))
+            self.latitudinal_extent.update((min(bbox[1]), max(bbox[3])))
 
         # Update location names and index
         # - test for duplicated names to already added values

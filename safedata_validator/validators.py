@@ -8,7 +8,6 @@ safedata_validator package
 import re
 from collections import Counter
 from collections.abc import Iterable
-from numbers import Number
 from typing import Any
 
 from safedata_validator.logger import LOGGER

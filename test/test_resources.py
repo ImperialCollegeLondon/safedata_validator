@@ -7,7 +7,7 @@ import pytest
 
 from safedata_validator.resources import Resources
 
-from .conftest import FIXTURE_FILES
+from .conftest import FIXTURE_FILES, log_check
 
 
 @contextmanager
@@ -19,7 +19,8 @@ def does_not_raise():
 def config_file_list():
 
     return [
-        f"locations = {FIXTURE_FILES.rf.loc_file}",
+        f"gazetteer = {FIXTURE_FILES.rf.gaz_file}",
+        f"location_aliases = {FIXTURE_FILES.rf.localias_file}",
         f"gbif_database = {FIXTURE_FILES.rf.gbif_file}",
         f"ncbi_database = {FIXTURE_FILES.rf.ncbi_file}",
         "[extents]",
@@ -43,7 +44,8 @@ def config_file_list():
 def config_file_dict():
 
     return {
-        "locations": FIXTURE_FILES.rf.loc_file,
+        "gazetteer": FIXTURE_FILES.rf.gaz_file,
+        "location_aliases": FIXTURE_FILES.rf.localias_file,
         "gbif_database": FIXTURE_FILES.rf.gbif_file,
         "ncbi_database": FIXTURE_FILES.rf.ncbi_file,
         "extents": {
@@ -78,154 +80,237 @@ def nested_set(dic, keys, value):
 @pytest.mark.parametrize(
     "dict_mod, list_mod, expected_exception, expected_log",
     [
-        (
+        pytest.param(
             tuple(),
             tuple(),
             None,
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Validating local GBIF database: "),
-                (INFO, "Validating local NCBI database: "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
             ),
+            id="All correct",
         ),
-        # Locations is mandatory
-        (
-            ((["locations"], ""),),
-            ((0, "locations = "),),
+        pytest.param(
+            ((["gazetteer"], ""),),
+            ((0, "gazetteer = "),),
             RuntimeError,
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),
-                (CRITICAL, "Locations file missing in configuration"),
+                (CRITICAL, "Gazetteer file missing in configuration"),
             ),
+            id="Gazetteer not set",
         ),
-        # Locations is missing
-        (
-            ((["locations"], FIXTURE_FILES.mf),),
-            ((0, f"locations = {FIXTURE_FILES.mf}"),),
+        pytest.param(
+            ((["gazetteer"], FIXTURE_FILES.mf),),
+            ((0, f"gazetteer = {FIXTURE_FILES.mf}"),),
             OSError,
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (CRITICAL, "Local locations file not found"),
+                (INFO, "Validating gazetteer: "),
+                (CRITICAL, "Gazetteer file not found"),
             ),
+            id="Gazetteer path missing",
         ),
-        # Locations is a file but not text
-        (
-            ((["locations"], FIXTURE_FILES.rf.gbif_file),),
-            ((0, f"locations = {FIXTURE_FILES.rf.gbif_file}"),),
+        pytest.param(
+            ((["gazetteer"], FIXTURE_FILES.rf.gbif_file),),
+            ((0, f"gazetteer = {FIXTURE_FILES.rf.gbif_file}"),),
             OSError,
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (CRITICAL, "Local locations file not JSON encoded"),
+                (INFO, "Validating gazetteer: "),
+                (CRITICAL, "Gazetteer file not valid JSON"),
             ),
+            id="Gazetteer not JSON",
         ),
-        # Locations is a json file but not locations
-        (
-            ((["locations"], FIXTURE_FILES.rf.json_not_locations),),
-            ((0, f"locations = {FIXTURE_FILES.rf.json_not_locations}"),),
+        pytest.param(
+            ((["gazetteer"], FIXTURE_FILES.rf.json_not_locations),),
+            ((0, f"gazetteer = {FIXTURE_FILES.rf.json_not_locations}"),),
             RuntimeError,
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (CRITICAL, "Locations data malformed"),
+                (INFO, "Validating gazetteer: "),
+                (CRITICAL, "Gazetteer data not a GeoJSON Feature Collection"),
             ),
+            id="Gazetteer not GeoJSON",
         ),
-        # GBIF is missing
-        (
+        pytest.param(
+            ((["location_aliases"], ""),),
+            ((1, "location_aliases = "),),
+            RuntimeError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (CRITICAL, "Location aliases file missing in configuration"),
+            ),
+            id="Loc aliases not set",
+        ),
+        pytest.param(
+            ((["location_aliases"], FIXTURE_FILES.mf),),
+            ((1, f"location_aliases = {FIXTURE_FILES.mf}"),),
+            OSError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (CRITICAL, "Location aliases file not found"),
+            ),
+            id="Loc aliases path missing",
+        ),
+        pytest.param(
+            ((["location_aliases"], FIXTURE_FILES.rf.gbif_file),),
+            ((1, f"location_aliases = {FIXTURE_FILES.rf.gbif_file}"),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (CRITICAL, "Location aliases file not readable as CSV"),
+            ),
+            id="Loc aliases not text",
+        ),
+        pytest.param(
+            ((["location_aliases"], FIXTURE_FILES.rf.gaz_file),),
+            ((1, f"location_aliases = {FIXTURE_FILES.rf.gaz_file}"),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (CRITICAL, "Location aliases has bad headers"),
+            ),
+            id="Loc text not correct CSV",
+        ),
+        pytest.param(
+            ((["gbif_database"], ""),),
+            ((2, "gbif_database = "),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (CRITICAL, "GBIF database not set in configuration"),
+            ),
+            id="GBIF not set",
+        ),
+        pytest.param(
             ((["gbif_database"], FIXTURE_FILES.mf),),
-            ((1, f"gbif_database = {FIXTURE_FILES.mf}"),),
-            OSError,
+            ((2, f"gbif_database = {FIXTURE_FILES.mf}"),),
+            FileNotFoundError,
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Validating local GBIF database: "),
-                (CRITICAL, "Local GBIF database not found"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (CRITICAL, "GBIF database not found"),
             ),
+            id="GBIF path missing",
         ),
-        # NCBI is missing
-        (
+        pytest.param(
+            ((["gbif_database"], FIXTURE_FILES.rf.gaz_file),),
+            ((2, f"gbif_database = {FIXTURE_FILES.rf.gaz_file}"),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (CRITICAL, "GBIF database not an SQLite3 file"),
+            ),
+            id="GBIF not SQLite",
+        ),
+        pytest.param(
+            ((["gbif_database"], FIXTURE_FILES.rf.ncbi_file),),
+            ((2, f"gbif_database = {FIXTURE_FILES.rf.ncbi_file}"),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (CRITICAL, "GBIF database does not contain required tables"),
+            ),
+            id="GBIF wrong SQLite",
+        ),
+        pytest.param(
+            ((["ncbi_database"], ""),),
+            ((3, "ncbi_database = "),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
+                (CRITICAL, "NCBI database not set in configuration"),
+            ),
+            id="NCBI not set",
+        ),
+        pytest.param(
             ((["ncbi_database"], FIXTURE_FILES.mf),),
-            ((2, f"ncbi_database = {FIXTURE_FILES.mf}"),),
-            OSError,
+            ((3, f"ncbi_database = {FIXTURE_FILES.mf}"),),
+            FileNotFoundError,
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Validating local GBIF database: "),
-                (INFO, "Validating local NCBI database: "),
-                (CRITICAL, "Local NCBI database not found"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
+                (CRITICAL, "NCBI database not found"),
             ),
+            id="NCBI path missing",
         ),
-        # GBIF database is not sqlite
-        (
-            ((["gbif_database"], FIXTURE_FILES.rf.loc_file),),
-            ((1, f"gbif_database = {FIXTURE_FILES.rf.loc_file}"),),
-            OSError,
+        pytest.param(
+            ((["ncbi_database"], FIXTURE_FILES.rf.gaz_file),),
+            ((3, f"ncbi_database = {FIXTURE_FILES.rf.gaz_file}"),),
+            ValueError,
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Validating local GBIF database: "),
-                (CRITICAL, "Local SQLite database not valid"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
+                (CRITICAL, "NCBI database not an SQLite3 file"),
             ),
+            id="NCBI not SQLite",
         ),
-        # NCBI database is not sqlite
-        (
-            ((["ncbi_database"], FIXTURE_FILES.rf.loc_file),),
-            ((2, f"ncbi_database = {FIXTURE_FILES.rf.loc_file}"),),
-            OSError,
+        pytest.param(
+            ((["ncbi_database"], FIXTURE_FILES.rf.gbif_file),),
+            ((3, f"ncbi_database = {FIXTURE_FILES.rf.gbif_file}"),),
+            ValueError,
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Validating local GBIF database: "),
-                (INFO, "Validating local NCBI database: "),
-                (CRITICAL, "Local SQLite database not valid"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
+                (CRITICAL, "NCBI database does not contain required tables"),
             ),
+            id="NCBI wrong SQLite",
         ),
-        # GBIF database is sqlite but not GBIF
-        (
-            ((["gbif_database"], FIXTURE_FILES.rf.sqlite_not_gbif),),
-            ((1, f"gbif_database = {FIXTURE_FILES.rf.sqlite_not_gbif}"),),
-            RuntimeError,
-            (
-                (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Validating local GBIF database: "),
-                (CRITICAL, "Local GBIF database does not contain the backbone table"),
-            ),
-        ),
-        # GBIF database is sqlite but not NCBI
-        (
-            ((["ncbi_database"], FIXTURE_FILES.rf.sqlite_not_gbif),),
-            ((2, f"ncbi_database = {FIXTURE_FILES.rf.sqlite_not_gbif}"),),
-            RuntimeError,
-            (
-                (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Validating local GBIF database: "),
-                (INFO, "Validating local NCBI database: "),
-                (
-                    CRITICAL,
-                    "Local NCBI database is missing either the nodes, names or merge"
-                    " table",
-                ),
-            ),
-        ),
-        # Test another misconfig
-        (
+        pytest.param(
             ((["extents", "latitudinal_hard_extent"], ["-90deg", "90deg"]),),
-            ((6, "latitudinal_hard_extent = -90deg, 90deg"),),
+            ((7, "latitudinal_hard_extent = -90deg, 90deg"),),
             RuntimeError,
             (
                 (INFO, "Configuring Resources"),
@@ -233,6 +318,7 @@ def nested_set(dic, keys, value):
                 (CRITICAL, "Configuration issues"),
                 (CRITICAL, "In config 'extents.latitudinal_hard_extent':"),
             ),
+            id="Testing configparser misconfig",
         ),
     ],
 )
@@ -272,14 +358,7 @@ def test_load_resources_by_arg(
 
         Resources(config)
 
-        assert len(expected_log) == len(caplog.records)
-
-        assert all(
-            [exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)]
-        )
-        assert all(
-            [exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)]
-        )
+    log_check(caplog, expected_log)
 
 
 @pytest.mark.parametrize(
@@ -290,9 +369,10 @@ def test_load_resources_by_arg(
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),
-                (INFO, "Validating locations: "),
-                (INFO, "Validating local GBIF database: "),
-                (INFO, "Validating local NCBI database: "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
             ),
         ),
     ],
@@ -302,14 +382,7 @@ def test_load_resources_by_file(config_filesystem, caplog, filepath, expected_lo
 
     Resources(filepath)
 
-    assert len(expected_log) == len(caplog.records)
-
-    assert all(
-        [exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)]
-    )
-    assert all(
-        [exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)]
-    )
+    log_check(caplog, expected_log)
 
 
 # TODO  - there may be a way to combine these, but they rely on different fake
@@ -334,14 +407,7 @@ def test_load_resources_from_missing_config(config_filesystem, caplog, expected_
 
         Resources()
 
-        assert len(expected_log) == len(caplog.records)
-
-        assert all(
-            [exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)]
-        )
-        assert all(
-            [exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)]
-        )
+        log_check(caplog, expected_log)
 
 
 @pytest.mark.parametrize(
@@ -350,9 +416,10 @@ def test_load_resources_from_missing_config(config_filesystem, caplog, expected_
         (
             (INFO, "Configuring Resources"),
             (INFO, "Configuring resources from user "),
-            (INFO, "Validating locations: "),
-            (INFO, "Validating local GBIF database: "),
-            (INFO, "Validating local NCBI database: "),
+            (INFO, "Validating gazetteer: "),
+            (INFO, "Validating location aliases: "),
+            (INFO, "Validating GBIF database: "),
+            (INFO, "Validating NCBI database: "),
         ),
     ],
 )
@@ -361,14 +428,7 @@ def test_load_resources_from_user_config(user_config_file, caplog, expected_log)
 
     Resources()
 
-    assert len(expected_log) == len(caplog.records)
-
-    assert all(
-        [exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)]
-    )
-    assert all(
-        [exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)]
-    )
+    log_check(caplog, expected_log)
 
 
 @pytest.mark.parametrize(
@@ -377,9 +437,10 @@ def test_load_resources_from_user_config(user_config_file, caplog, expected_log)
         (
             (INFO, "Configuring Resources"),
             (INFO, "Configuring resources from site "),
-            (INFO, "Validating locations: "),
-            (INFO, "Validating local GBIF database: "),
-            (INFO, "Validating local NCBI database: "),
+            (INFO, "Validating gazetteer: "),
+            (INFO, "Validating location aliases: "),
+            (INFO, "Validating GBIF database: "),
+            (INFO, "Validating NCBI database: "),
         ),
     ],
 )
@@ -388,11 +449,4 @@ def test_load_resources_from_site_config(site_config_file, caplog, expected_log)
 
     Resources()
 
-    assert len(expected_log) == len(caplog.records)
-
-    assert all(
-        [exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)]
-    )
-    assert all(
-        [exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)]
-    )
+    log_check(caplog, expected_log)

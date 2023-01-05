@@ -18,37 +18,37 @@ def locations_inst(fixture_resources):
 @pytest.mark.parametrize(
     "known_loc_names,expected_log",
     [
-        (["A_1", "A_2", "A_3"], ((INFO, "Checking known locations"),)),
+        (["E_194", "E_195", "E_196"], ((INFO, "Checking known locations"),)),
         (
-            ["A_1", 2, "A_3"],
+            ["E_194", 195, "E_196"],
             (
                 (INFO, "Checking known locations"),
                 (WARNING, "Locations aliases used"),
             ),
         ),
         (
-            ["A_1", None, "A_3"],
+            ["E_194", None, "E_196"],
             (
                 (INFO, "Checking known locations"),
                 (ERROR, "Location names contains empty cells or whitespace text"),
             ),
         ),
         (
-            ["A_1", "    ", "A_3"],
+            ["E_194", "    ", "E_196"],
             (
                 (INFO, "Checking known locations"),
                 (ERROR, "Location names contains empty cells or whitespace text"),
             ),
         ),
         (
-            ["A_1", "A_2", "Not a location"],
+            ["E_194", "E_195", "Not a location"],
             (
                 (INFO, "Checking known locations"),
                 (ERROR, "Unknown locations found"),
             ),
         ),
         (
-            ["A_1", "A_2", 3.14159],
+            ["E_194", "E_195", 3.14159],
             (
                 (INFO, "Checking known locations"),
                 (
@@ -58,14 +58,14 @@ def locations_inst(fixture_resources):
             ),
         ),
         (
-            ["A_1", "A_2", "A_2"],
+            ["E_194", "E_195", "E_195"],
             (
                 (INFO, "Checking known locations"),
                 (ERROR, "Added names contain duplicated values"),
             ),
         ),
         (
-            ["A_1", "A_2", "A_6"],
+            ["E_194", "E_195", "E_197"],
             (
                 (INFO, "Checking known locations"),
                 (ERROR, "Location names already added to Location instance"),
@@ -77,7 +77,7 @@ def test_add_known_locations(caplog, locations_inst, known_loc_names, expected_l
 
     # Preload site names for testing duplicate capture and remove
     # repeated "Checking known locations" across all test outputs
-    locations_inst.add_known_locations(["A_6"])
+    locations_inst.add_known_locations(["E_197"])
     caplog.clear()
 
     # Test the addition of the parameterised values
@@ -184,7 +184,7 @@ def test_add_known_locations(caplog, locations_inst, known_loc_names, expected_l
             ),
         ),
         (
-            [{"location name": "A_1", "type": "POINT", "wkt": "POINT(117 4)"}],
+            [{"location name": "E_195", "type": "POINT", "wkt": "POINT(117 4)"}],
             (
                 (INFO, "Checking new locations"),
                 (ERROR, "New location names duplicate known names and aliases"),
@@ -371,7 +371,7 @@ def test_add_new_locations(caplog, locations_inst, new_loc_dicts, expected_log):
     [  # Good input - known locations and new locations
         (
             ("location name",),
-            (("A_1",), ("A_2",), ("A_3",)),
+            (("E_194",), ("E_195",), ("E_196",)),
             (
                 (INFO, "Loading Locations worksheet"),
                 (INFO, "Checking known locations"),
@@ -381,8 +381,8 @@ def test_add_new_locations(caplog, locations_inst, new_loc_dicts, expected_log):
         (
             ("location name", "new", "type", "wkt"),
             (
-                ("A_1", "no", None, None),
-                ("A_2", "no", None, None),
+                ("E_194", "no", None, None),
+                ("E_195", "no", None, None),
                 ("New_1", "yes", "point", "POINT(117 4)"),
                 ("New_2", "yes", "point", "POINT(117 4)"),
             ),
@@ -397,7 +397,7 @@ def test_add_new_locations(caplog, locations_inst, new_loc_dicts, expected_log):
         # Duplicated headers
         (
             ("location name", "location name"),
-            (("A_1",), ("A_2",), ("A_3",)),
+            (("E_194",), ("E_195",), ("E_196",)),
             (
                 (INFO, "Loading Locations worksheet"),
                 (ERROR, "Headers contain duplicated values"),
@@ -407,7 +407,7 @@ def test_add_new_locations(caplog, locations_inst, new_loc_dicts, expected_log):
         # Duplicated headers
         (
             ("location_name",),
-            (("A_1",), ("A_2",), ("A_3",)),
+            (("E_194",), ("E_195",), ("E_196",)),
             (
                 (INFO, "Loading Locations worksheet"),
                 (ERROR, "Location name column not found"),
@@ -417,8 +417,8 @@ def test_add_new_locations(caplog, locations_inst, new_loc_dicts, expected_log):
         (
             ("location name", "new", "type", "wkt"),
             (
-                ("A_1", None, None, None),
-                ("A_2", "no", None, None),
+                ("E_194", None, None, None),
+                ("E_195", "no", None, None),
                 ("New_1", "yes", "point", "POINT(117 4)"),
                 ("New_2", "yes", "point", "POINT(117 4)"),
             ),
@@ -435,8 +435,8 @@ def test_add_new_locations(caplog, locations_inst, new_loc_dicts, expected_log):
         (
             ("location name", "new", "type", "wkt"),
             (
-                ("A_1", "known", None, None),
-                ("A_2", "no", None, None),
+                ("E_194", "known", None, None),
+                ("E_195", "no", None, None),
                 ("New_1", "yes", "point", "POINT(117 4)"),
                 ("New_2", "yes", "point", "POINT(117 4)"),
             ),

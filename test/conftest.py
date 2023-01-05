@@ -1,5 +1,4 @@
 """Collection of fixtures to assist the testing scripts."""
-import configparser
 import os
 from collections import OrderedDict
 
@@ -33,10 +32,10 @@ def fixture_files():
     fixture_dir = os.path.join(os.path.dirname(__file__), "fixtures")
 
     real_files = [
-        ("loc_file", "locations.json"),
+        ("gaz_file", "gazetteer_simple.geojson"),
+        ("localias_file", "location_aliases_simple.csv"),
         ("gbif_file", "gbif_backbone_truncated.sqlite"),
         ("ncbi_file", "ncbi_database_truncated.sqlite"),
-        ("sqlite_not_gbif", "database_file_not_gbif.sqlite"),
         ("json_not_locations", "notalocationsjson.json"),
         ("bad_excel_file", "Test_format_bad.xlsx"),
         ("good_excel_file", "Test_format_good.xlsx"),
@@ -103,7 +102,7 @@ def config_filesystem(fs):
     """
 
     # Point to real locations of test fixture example resources
-    for _, val in FIXTURE_FILES.rf.items():
+    for ky, val in FIXTURE_FILES.rf.items():
         fs.add_real_file(val)
 
     # The config files _cannot_ be real files because they need to
@@ -111,7 +110,8 @@ def config_filesystem(fs):
     # test machine, and so need to be created with those paths
 
     config_contents = [
-        "locations = ",
+        "gazetteer = ",
+        "location_aliases = ",
         "gbif_database = ",
         "ncbi_database = ",
         "[extents]",
@@ -131,9 +131,10 @@ def config_filesystem(fs):
     ]
 
     # Create config with local paths in the fixture directory
-    config_contents[0] += FIXTURE_FILES.rf.loc_file
-    config_contents[1] += FIXTURE_FILES.rf.gbif_file
-    config_contents[2] += FIXTURE_FILES.rf.ncbi_file
+    config_contents[0] += FIXTURE_FILES.rf.gaz_file
+    config_contents[1] += FIXTURE_FILES.rf.localias_file
+    config_contents[2] += FIXTURE_FILES.rf.gbif_file
+    config_contents[3] += FIXTURE_FILES.rf.ncbi_file
     fs.create_file(FIXTURE_FILES.vf.fix_config, contents="\n".join(config_contents))
 
     yield fs
