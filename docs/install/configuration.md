@@ -50,8 +50,13 @@ feature will have a set of properties: `safedata_validator` only requires the `l
 property but it is fine for features to have other project specific properties. The
 values of `location` **must be unique** within the gazetteer file.
 
+Gazetteer locations must also be **persistent**: this core resource is used to link
+location names to geographic data and removing locations from the gazetteer breaks that
+link. It is fine to update other properties and the feature geometry.
+
 A simple minimal example of GeoJSON file content is shown below, but this file format is
-commonly used in GIS applications, so can be created and edited using GIS tools.
+commonly used in GIS applications, so can be more easily created and edited using GIS
+tools like [QGIS](https://qgis.org).
 
 ```json
 {    "type": "FeatureCollection",
@@ -75,17 +80,23 @@ commonly used in GIS applications, so can be created and edited using GIS tools.
 
 The location aliases file provides a way to handle commonly used alternative names for
 sampling locations. The file format is a simple CSV file which must contain the field
-header shown below:
+headers shown below:
 
 ```csv
 location,alias,zenodo_record_id
-location_name,loc,null
+location_name,loc,NA
+location_name_2,loc2,NA
 ```
 
 Values added in the `alias` field will be automatically mapped to the given `location`.
 Note that `safedata_validator` will _always_ warn about the use of location aliases.
 Although the location aliases file must be provided, it is _fine_ to only include the
 headers insist that users only use the canonical names from the gazetteer.
+
+The `zenodo_record_id` field can be used to set a location alias for a particular
+dataset - this allows new locations in published datasets to be associated with
+canonical gazetteer locations. Alternatively, a new version of the dataset can be
+published that updates the location data to use the gazetteer locations directly.
 
 ### GBIF database
 

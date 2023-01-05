@@ -1,7 +1,7 @@
 """Load and check validation resources.
 
 The `safedata_validator` package needs access to some local resources and configuration
-to work. The three main resources for file validation are:
+to work. The core resources for file validation are:
 
 -   gazetteer: A path to a GeoJSON formatted gazetteer of known locations and their
     details.
@@ -339,6 +339,7 @@ class Resources:
         if fieldnames != set(["zenodo_record_id", "location", "alias"]):
             log_and_raise("Location aliases has bad headers", ValueError)
 
+        # TODO - zenodo_record_id not being used here.
         self.location_aliases = {la["alias"]: la["location"] for la in dictr}
 
     def _validate_gbif(self) -> None:
