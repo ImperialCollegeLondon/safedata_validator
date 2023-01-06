@@ -1,8 +1,9 @@
 # Configuring the `safedata_validator` package
 
-The `safedata_validator` package needs to be configured to use specific
-resources for data validation. This is done using a configuration file in the
-[INI file format](https://en.wikipedia.org/wiki/INI_file).
+The `safedata_validator` package needs to be configured to use specific resources for
+data validation. This is done using a configuration file in the [INI file
+format](https://en.wikipedia.org/wiki/INI_file). This configuration file **must** always
+be included regardless of what the package is being configured to do.
 
 ## Configuration file format
 
@@ -101,12 +102,14 @@ published that updates the location data to use the gazetteer locations directly
 ### GBIF database
 
 The `gbif_database` entry contains the path to the required local copy of the GBIF
-backbone database ([see here](build_local_gbif.md)).
+backbone database ([see here](build_local_gbif.md)). This database **must** be included
+even when no GBIF taxa are included.
 
 ### NCBI database
 
 The `ncbi_database` entry contains the path to the required local copy of the NCBI
-database, ([see here](build_local_ncbi.md)).
+database, ([see here](build_local_ncbi.md)). This database **must** be included even
+when no NCBI taxa are included.
 
 ### Extents
 
