@@ -215,7 +215,7 @@ class Summary:
 
         self._rows: Optional[dict] = None
         self._ncols = None
-        self.n_errors: Optional[int] = None
+        self.n_errors: int = 0
         self.valid_pid: Optional[list[int]] = None
         self.validate_doi = False
 
