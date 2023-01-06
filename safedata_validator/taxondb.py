@@ -18,6 +18,7 @@ import shutil
 import sqlite3
 import zipfile
 from io import TextIOWrapper
+from typing import Optional
 
 import requests
 from dateutil.parser import isoparse, parse
@@ -26,7 +27,7 @@ from tqdm.auto import tqdm
 from safedata_validator.logger import FORMATTER, LOGGER, log_and_raise
 
 
-def download_gbif_backbone(outdir: str, timestamp: str = None) -> dict:
+def download_gbif_backbone(outdir: str, timestamp: Optional[str] = None) -> dict:
     """Download the GBIF backbone database.
 
     This function downloads the data for a GBIF backbone taxonomy version to a given
@@ -54,36 +55,45 @@ def download_gbif_backbone(outdir: str, timestamp: str = None) -> dict:
         gbif_backbone = (
             "https://api.gbif.org/v1/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c"
         )
-        timestamp = requests.get(gbif_backbone)
+        timestamp_req = requests.get(gbif_backbone)
 
-        if not timestamp.ok:
+        if not timestamp_req.ok:
             log_and_raise(
                 "Could not read current backbone timestamp from GBIF API", IOError
             )
 
-        timestamp = timestamp.json()["pubDate"]
+        timestamp = timestamp_req.json()["pubDate"]
 
-    # Validate the timestamp
+    # Validate the timestamp - must be a str at this point
     try:
-        timestamp = isoparse(timestamp)
+        timestamp_dt = isoparse(timestamp)  # type: ignore
     except ValueError:
         log_and_raise(f"Could not parse timestamp: {timestamp}", ValueError)
 
-    # Render timestamp as ISO date
-    timestamp_fmt = timestamp.date().isoformat()
-    return_dict["timestamp"] = timestamp_fmt
+    # Render timestamp as ISO date string
+    timestamp = timestamp_dt.date().isoformat()
+    return_dict["timestamp"] = timestamp
 
     # Try and download the files - check heads to make sure files exists
-    LOGGER.info(f"Checking for version with timestamp {timestamp_fmt}")
+    LOGGER.info(f"Checking for version with timestamp {timestamp}")
 
-    url = f"https://hosted-datasets.gbif.org/datasets/backbone/{timestamp_fmt}/"
+    url = f"https://hosted-datasets.gbif.org/datasets/backbone/{timestamp}/"
+
+    timestamp_head = requests.head(url + "simple.txt.gz")
+
+    if not timestamp_head.ok:
+        log_and_raise(
+            "Timestamp does not exist. Check the available timestamps at: \n"
+            "    https://hosted-datasets.gbif.org/datasets/backbone",
+            ValueError,
+        )
+
     simple_head = requests.head(url + "simple.txt.gz")
     deleted_head = requests.head(url + "simple-deleted.txt.gz")
 
     if not simple_head.ok:
         log_and_raise(
-            "Backbone file not found. Check the available timestamps at: \n"
-            "    https://hosted-datasets.gbif.org/datasets/backbone",
+            "Timestamp version does not provide simple.txt.gz backbone.",
             ValueError,
         )
 
@@ -119,7 +129,11 @@ def download_gbif_backbone(outdir: str, timestamp: str = None) -> dict:
 
 
 def build_local_gbif(
-    outdir: str, timestamp: str, simple: str, deleted: str = None, keep: bool = False
+    outdir: str,
+    timestamp: str,
+    simple: str,
+    deleted: Optional[str] = None,
+    keep: bool = False,
 ) -> None:
     """Create a local GBIF backbone database.
 
@@ -239,13 +253,13 @@ def build_local_gbif(
 
             # Loop over the lines in the file.
             for row in bb_reader:
-                row = [
+                row_clean = [
                     None if val == "\\N" else val
                     for val, drp in zip(row, drop_index)
                     if not drp
                 ]
 
-                con.execute(insert_statement, row)
+                con.execute(insert_statement, row_clean)
                 pbar.update()
 
         con.commit()
@@ -261,16 +275,16 @@ def build_local_gbif(
 
             with tqdm(total=None) as pbar:
                 for row in dl_reader:
-                    row = [
+                    row_clean = [
                         None if val == "\\N" else val
                         for val, drp in zip(row, drop_index)
                         if not drp
                     ]
 
                     # replace the status with DELETED
-                    row[4] = "DELETED"
+                    row_clean[4] = "DELETED"
 
-                    con.execute(insert_statement, row)
+                    con.execute(insert_statement, row_clean)
                     pbar.update()
 
         con.commit()
@@ -292,7 +306,7 @@ def build_local_gbif(
     FORMATTER.pop()
 
 
-def download_ncbi_taxonomy(outdir: str, timestamp: str = None) -> dict:
+def download_ncbi_taxonomy(outdir: str, timestamp: Optional[str] = None) -> dict:
     """Download the NCBI taxonomy database.
 
     This function downloads the data for the NCBI taxonomy to a given location. By
