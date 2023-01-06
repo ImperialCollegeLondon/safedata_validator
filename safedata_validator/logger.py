@@ -25,7 +25,7 @@ when a new Dataset is being validated.
 import logging
 from functools import wraps
 from io import StringIO
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from typing_extensions import Type
 
@@ -111,7 +111,7 @@ class IndentFormatter(logging.Formatter):
     def __init__(
         self,
         fmt: str = "%(levelcode)s %(message)s",
-        datefmt: str = None,
+        datefmt: Optional[str] = None,
         indent: str = "    ",
     ) -> None:
 
@@ -213,7 +213,9 @@ LOGGER.addHandler(CONSOLE_HANDLER)
 #
 
 
-def log_and_raise(msg: str, exception: Type[Exception], extra: dict = None) -> None:
+def log_and_raise(
+    msg: str, exception: Type[Exception], extra: Optional[dict] = None
+) -> None:
     """Emit a critical error message and raise an Exception.
 
     This convenience function adds a critical level message to the logger and
