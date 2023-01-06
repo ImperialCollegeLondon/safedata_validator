@@ -35,6 +35,7 @@ Fixed:
 * Unit testing for modules.
 * Addition of Zenodo upload and publication tools.
 * Addition of NCBI taxon sheet and validation.
+* Addition of metadata posting to metadata server.
 * Implementation changes:
   - 2.0.1 unintentionally masked multiple equal hits when valid parent taxa were
     provided. You _could_ use parent taxon to resolve multiple hits, but at present the
