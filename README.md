@@ -69,7 +69,14 @@ git push --set-upstream origin release/x.y.z
 This gives all developers an opportunity to fix problems they have noticed, prior to
 release. This can be done by making pull requests against the `release` branch. Once
 these changes have been made, documentation has been checked, and all tests pass, the
-`release` branch is ready to be merged with the `master` branch.
+final commit should bump the version using `poetry` so that the correct version is
+recorded in `pyproject.toml`.
+
+```bash
+poetry version x.y.z
+```
+
+The `release` branch now is ready to be merged with the `master` branch.
 
 ```bash
 git switch master
@@ -94,12 +101,14 @@ git push
 
 Note that the `master` branch should _only_ be used for new releases.
 
-To publish a new version, first create the source distribution and a binary.
+Before the package is published it must first be built, this can be achieved using
+`poetry`.
 
-```{sh}
-# Create distribution
-python setup.py sdist bdist_wheel
+```bash
+poetry build
 ```
+
+This produces both a `sdist` source distribution, and a `wheel` compiled package.
 
 If the distribution is to be tested locally, then the following command can be used to
 install the source distribution:
@@ -116,17 +125,15 @@ the actual local distribution and **not** the outdated cached version.
 
 ### Publishing a new version
 
-Versions are published to PyPi using `twine`.  As a first step, the new package is
-published to the PyPi **test** site, giving a chance to check the package upload before
-committing it to the live PyPi archive.
+Version publication to PyPi also occurs using `poetry`.  As a first step, the new
+package is published to the PyPi **test** site, giving a chance to check the package
+upload before committing it to the live PyPi archive.
 
 ```bash
-# Install twine if you don't have it
-pip install twine
 # Build source dist and binary
-python setup.py sdist bdist_wheel
-# Upload just the new versions to the Test Pypi site and check it out
-twine upload -r testpypi dist/safedata_validator-x.y.z*
+poetry build
+# Upload just the new versions to the Test PyPi site and check it out
+poetry publish -r test-pypi
 # Upload to the real PyPi site
-twine upload -r pypi dist/safedata_validator-x.y.z*
+poetry publish
 ```
