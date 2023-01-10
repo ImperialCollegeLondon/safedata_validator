@@ -52,11 +52,37 @@ whenever commits are made to this repository and for all pull requests.
 
 ### Releasing a new version
 
-The repository uses the `git flow` framework for releasing versions. When the `develop`
-branch contains a version of the code to be released as a new version, `git flow release
-start x.y.z` is used to start a release branch. When that has passed testing, the
-command `git flow release finish x.y.z` creates a new tagged version on the `master`
-branch.
+All new package releases should be from the `master` branch, so the changes to `develop`
+have to be moved here. This is achieved using a `release` branch.
+
+```bash
+git branch release/x.y.z
+```
+
+This branch should be pushed to the remote repo to ensure that other developers have
+access to it.
+
+```bash
+git push --set-upstream origin release/x.y.z
+```
+
+This gives all developers an opportunity to fix problems they have noticed, prior to
+release. This can be done by making pull requests against the `release` branch. Once
+these changes have been made, documentation has been checked, and all tests pass the
+`release` branch is ready to be merged with the `master` branch.
+
+```bash
+git switch master
+git merge release/3.0.0
+```
+
+A tag should be added marking the package version, and then the updated `master` branch
+should be pushed to the remote repository.
+
+```bash
+git tag 3.0.0
+git push origin 3.0.0
+```
 
 Note that the `master` branch should _only_ be used for new releases.
 
