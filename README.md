@@ -68,20 +68,28 @@ git push --set-upstream origin release/x.y.z
 
 This gives all developers an opportunity to fix problems they have noticed, prior to
 release. This can be done by making pull requests against the `release` branch. Once
-these changes have been made, documentation has been checked, and all tests pass the
+these changes have been made, documentation has been checked, and all tests pass, the
 `release` branch is ready to be merged with the `master` branch.
 
 ```bash
 git switch master
-git merge release/3.0.0
+git merge release/x.y.z
 ```
 
 A tag should be added marking the package version, and then the updated `master` branch
 should be pushed to the remote repository.
 
 ```bash
-git tag 3.0.0
-git push origin 3.0.0
+git tag x.y.z
+git push origin x.y.z
+```
+
+Finally, any changes added to the `release` branch should be merged back into `develop`.
+
+```bash
+git switch develop
+git merge release/x.y.z
+git push
 ```
 
 Note that the `master` branch should _only_ be used for new releases.
