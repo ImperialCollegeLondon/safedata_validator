@@ -59,8 +59,17 @@ have to be moved here. This is achieved using a `release` branch.
 git branch release/x.y.z
 ```
 
-This branch should be pushed to the remote repo to ensure that other developers have
-access to it.
+The version of this branch should be updated to a pre-release version using `poetry`.
+There are multiple options here: `premajor` should be used for major versions (e.g.
+`2.0.0`), `preminor` for minor (e.g. `2.1.0`), and prepatch for patch versions (e.g.
+`2.1.1`).
+
+```bash
+poetry version [premajor/preminor/prepatch]
+```
+
+The change this causes to `pyproject.toml` should be committed, and the branch is now
+ready to be pushed to the remote repo to ensure that other developers have access to it.
 
 ```bash
 git push --set-upstream origin release/x.y.z
@@ -73,7 +82,7 @@ final commit should bump the version using `poetry` so that the correct version 
 recorded in `pyproject.toml`.
 
 ```bash
-poetry version x.y.z
+poetry version [major/minor/patch]
 ```
 
 The `release` branch now is ready to be merged with the `master` branch.
@@ -109,19 +118,6 @@ poetry build
 ```
 
 This produces both a `sdist` source distribution, and a `wheel` compiled package.
-
-If the distribution is to be tested locally, then the following command can be used to
-install the source distribution:
-
-```bash
-pip install safedata_validator --no-cache-dir --no-index --find-links dist/safedata_validator-x.y.z.tar.gz
-```
-
-The `--no-index` and `--find-links` options stop `pip` from using the web package index
-and point to the local distribution. The `--no-cache-dir` is vital as `pip` will cache
-the installed package (probably in `/tmp/`) and _unless the version number changes_ will
-just keep using that cache. So, in development, this flag is needed to keep `pip` using
-the actual local distribution and **not** the outdated cached version.
 
 ### Publishing a new version
 
