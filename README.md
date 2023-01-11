@@ -76,16 +76,23 @@ git push --set-upstream origin release/x.y.z
 ```
 
 This gives all developers an opportunity to fix problems they have noticed, prior to
-release. This can be done by making pull requests against the `release` branch. Once
-these changes have been made, documentation has been checked, and all tests pass, the
-final commit should bump the version using `poetry` so that the correct version is
-recorded in `pyproject.toml`.
+release. This can be done by making pull requests against the `release` branch. The
+following checks should also be carried out:
+
+* All GitHub continuous integration tests pass
+* Upload to [Test PyPi](https://test.pypi.org) works correctly
+* Online documentation builds properly for the `release` branch
+
+Once the relevant changes have been made and checks have been performed the final commit
+should bump the version using `poetry` so that the correct version is recorded in
+`pyproject.toml`.
 
 ```bash
 poetry version [major/minor/patch]
 ```
 
-The `release` branch now is ready to be merged with the `master` branch.
+The `release` branch now is ready to be merged with the `master` branch. To do so you
+should switch to the `master` branch and merge the `release` branch into it.
 
 ```bash
 git switch master
