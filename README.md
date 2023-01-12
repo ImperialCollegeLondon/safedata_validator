@@ -130,13 +130,32 @@ This produces both a `sdist` source distribution, and a `wheel` compiled package
 
 Version publication to PyPi also occurs using `poetry`.  As a first step, the new
 package is published to the PyPi **test** site, giving a chance to check the package
-upload before committing it to the live PyPi archive.
+upload before committing it to the live PyPi archive. First, `poetry` must be configured
+to access the PyPi test site, this requires that you provide a valid API access token.
+
+```bash
+poetry config repositories.testpypi_sdv https://test.pypi.org/legacy/
+poetry config pypi-token.testpypi_sdv my_api_token --local
+```
+
+For upload to PyPi an API token should also be provided. If you wish to upload a new
+package version and do not have access to the API tokens please contact one of the
+package maintainers.
+
+```bash
+poetry config repositories.pypi_sdv https://www.pypi.org/legacy/
+poetry config pypi-token.pypi_sdv my_api_token --local
+```
+
+With this configured the package can now be uploaded to the PyPi proper. However, it is
+important to note that a test upload should **always** be done before the package is
+uploaded to PyPi.
 
 ```bash
 # Build source dist and binary
 poetry build
 # Upload just the new versions to the Test PyPi site and check it out
-poetry publish -r test-pypi
+poetry publish -r testpypi_sdv
 # Upload to the real PyPi site
-poetry publish
+poetry publish -r pypi_sdv
 ```
