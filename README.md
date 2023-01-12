@@ -128,34 +128,46 @@ This produces both a `sdist` source distribution, and a `wheel` compiled package
 
 ### Publishing a new version
 
-Version publication to PyPi also occurs using `poetry`.  As a first step, the new
-package is published to the PyPi **test** site, giving a chance to check the package
-upload before committing it to the live PyPi archive. First, `poetry` must be configured
-to access the PyPi test site, this requires that you provide a valid API access token.
+Version publication to PyPi also occurs using `poetry`. Before the package can be
+uploaded an API token for PyPi must be configured.
 
 ```bash
-poetry config repositories.testpypi_sdv https://test.pypi.org/legacy/
-poetry config pypi-token.testpypi_sdv my_api_token --local
+poetry config pypi-token.pypi my_api_token
 ```
 
-For upload to PyPi an API token should also be provided. If you wish to upload a new
-package version and do not have access to the API tokens please contact one of the
-package maintainers.
+This token should be a **personal** API token for PyPi, these can be generated through
+[your PyPi account](https://pypi.org/account/login/). We use **personal** tokens rather
+than a project specific token as the standard setup method with `poetry` only allows one
+PyPi token to be saved. If necessary this issue can be circumvented by adding each
+project as a new repository
+[see](https://python-poetry.org/docs/repositories/#publishable-repositories) (with PyPi
+remaining the repository published to) and then configuring this duplicate repository to
+use the project specific token. We are not using this approach at present as we feel it
+introduces unnecessary complexity. Your **personal** token will only allow you to
+publish new package versions if you are a maintainer. If you wish to upload a new
+package version you should therefore contact the current maintainers to request
+maintainer status.
+
+Before you publish a new package version, you should first publish to the PyPi **test**
+site, which provides the opportunity to check the package upload before committing it to
+the live PyPi archive. This requires that you configure a valid API access token for
+test PyPi. It is important to note that separate accounts are used for PyPi and test
+PyPi, so you the test PyPi token will be not be the same as your standard PyPi token.
 
 ```bash
-poetry config repositories.pypi_sdv https://www.pypi.org/legacy/
-poetry config pypi-token.pypi_sdv my_api_token --local
+poetry config repositories.testpypi https://test.pypi.org/legacy/
+poetry config pypi-token.testpypi my_test_api_token
 ```
 
-With this configured the package can now be uploaded to the PyPi proper. However, it is
-important to note that a test upload should **always** be done before the package is
-uploaded to PyPi.
+It is important to note that a test upload should **always** be done before the package
+is uploaded to PyPi. Thus, when access to both PyPi repositories has been configured,
+the publication procedure is as follows.
 
 ```bash
 # Build source dist and binary
 poetry build
 # Upload just the new versions to the Test PyPi site and check it out
-poetry publish -r testpypi_sdv
+poetry publish -r testpypi
 # Upload to the real PyPi site
-poetry publish -r pypi_sdv
+poetry publish
 ```
