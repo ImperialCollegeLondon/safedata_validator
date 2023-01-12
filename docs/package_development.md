@@ -1,6 +1,6 @@
-# Build notes
+# Package development
 
-TODO Incomplete
+TODO - Add in details from the README
 
 ## Configure `git`
 
