@@ -1,7 +1,5 @@
 # Package development
 
-TODO - Add in details from the README
-
 ## Installing the development version
 
 This package makes use of the `python` dependency manager
@@ -187,16 +185,10 @@ twine upload dist/*1.2.7*
 
 ## Documentation
 
-TODO - WORK IF THIS IS STILL RELEVANT
-
 The package documentation is maintained using [MkDocs](https://www.mkdocs.org/)
 and deployed to
 [https://safedata-validator.readthedocs.io/](https://safedata-validator.readthedocs.io/).
-MkDocs can be installed using:
-
-```sh
-pip install mkdocs
-```
+MkDocs is installed automatically to the `poetry` virtual environment.
 
 In order to build and deploy the documentation.
 
@@ -208,6 +200,7 @@ In order to build and deploy the documentation.
   commands are updated, these inputs need to be recreated.
 * From the package root, run `mkdocs build`. This will create the docs site in
   the `site` folder - note that this folder is not included in the git repo.
-* Once you have checked the local copy of the documentation, then committing the
-  changes to the repository will automatically trigger a rebuild of the package
-  documentation.
+* Changes made to the `master` branch of the repository will automatically trigger a
+  rebuild of the package documentation.
+* To build the documentation for specific branches you need to login to [Read the
+  Docs](https://readthedocs.org). You can then build whichever branch you require.
