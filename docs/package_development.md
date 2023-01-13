@@ -161,28 +161,6 @@ poetry publish -r testpypi
 poetry publish
 ```
 
-## PyPi
-
-To upload the new version to testpypi, checkout master and run
-
-```sh
-python setup.py sdist bdist_wheel
-```
-
-Remembering to change the version number, you can then create an account at pypi
-and testpypi and use `twine` to test:
-
-```sh
-twine upload -r testpypi dist/*1.2.8*
-```
-
-and then - once that seems to have gone ok - release the distribution for use
-via `pip`
-
-```sh
-twine upload dist/*1.2.7*
-```
-
 ## Documentation
 
 The package documentation is maintained using [MkDocs](https://www.mkdocs.org/)
