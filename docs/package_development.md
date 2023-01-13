@@ -106,6 +106,7 @@ git push
 
 Note that the `master` branch should _only_ be used for new releases.
 
+TODO - UPDATE THIS TO MATCH CHANGES TO HOW WE TALK ABOUT PYPI VS TEST PYPI
 Before the package is published it must first be built, this can be achieved using
 `poetry`.
 
@@ -115,7 +116,9 @@ poetry build
 
 This produces both a `sdist` source distribution, and a `wheel` compiled package.
 
-## Publishing a new version
+## TODO - Think of better name
+
+TODO - REFRAME SECTION TO BE JUST ABOUT TEST PYPI
 
 Version publication to PyPi also occurs using `poetry`. Before the package can be
 uploaded an API token for PyPi must be configured.
@@ -182,3 +185,7 @@ In order to build and deploy the documentation.
   rebuild of the package documentation.
 * To build the documentation for specific branches you need to login to [Read the
   Docs](https://readthedocs.org). You can then build whichever branch you require.
+
+## TODO - Think of better name (again)
+
+TODO - Write a section here that details final publication procedure
