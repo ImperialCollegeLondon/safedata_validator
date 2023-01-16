@@ -164,37 +164,35 @@ In order to build and deploy the documentation.
 * To build the documentation for specific branches you need to login to [Read the
   Docs](https://readthedocs.org). You can then build whichever branch you require.
 
-## TODO - Think of better name (again)
+## Final publication of new package version
 
-TODO - Write a section here that details final publication procedure
-
-TODO -  Copy and paste this stuff into the test version where relevant
-
-TODO - SOME OF THIS HAS BEEN MENTIONED IN AN ABOVE SECTION, CHANGE TO ADDRESS THAT
-Before the package can be uploaded an API token for PyPi must be configured.
+Once a `release` branch has passed all the tests and been merged into `master`, it
+should be published to [PyPi](https://pypi.org/). This allows users to install the new
+package version via `pip`. As with test PyPi, publication is handled by the `poetry`
+package manager. PyPi is automatically configured as the default upload repository, so
+in this case you only need to add an API token to the `poetry` configuration for `PyPi`.
 
 ```bash
 poetry config pypi-token.pypi my_api_token
 ```
 
-This token should be a **personal** API token for PyPi, these can be generated through
-[your PyPi account](https://pypi.org/account/login/). We use **personal** tokens rather
-than a project specific token as the standard setup method with `poetry` only allows one
-PyPi token to be saved. If necessary this issue can be circumvented by adding each
-project as a new repository
+As with the token for test PyPi, this token should be a **personal** API token, these
+can be generated through [your PyPi account](https://pypi.org/account/login/). We use
+**personal** tokens rather than a project specific token as the standard setup method
+with `poetry` only allows one PyPi token to be saved. If necessary this issue can be
+circumvented by adding each project as a new repository
 [see](https://python-poetry.org/docs/repositories/#publishable-repositories) (with PyPi
 remaining the repository published to) and then configuring this duplicate repository to
 use the project specific token. We are not using this approach at present as we feel it
-introduces unnecessary complexity. Your **personal** token will only allow you to
-publish new package versions if you are a maintainer. If you wish to upload a new
-package version you should therefore contact the current maintainers to request
-maintainer status.
+introduces unnecessary complexity.
+
+It should be noted that your **personal** token will only allow you to publish new
+package versions if you are a maintainer. If you wish to upload a new package version
+you should therefore contact the current maintainers to request maintainer status.
+
+Once `poetry` has been setup to allow publication of `safedata_validator` to PyPi, the
+new package version can then be published.
 
 ```bash
-# Build source dist and binary
-poetry build
-# Upload just the new versions to the Test PyPi site and check it out
-poetry publish -r testpypi
-# Upload to the real PyPi site
 poetry publish
 ```
