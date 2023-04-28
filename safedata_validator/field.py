@@ -862,13 +862,13 @@ class DataWorksheet:
                 break
 
         # Convert field meta to dict and validate
-        field_meta = dict(((rw[0], rw[1:]) for rw in field_meta))
-        self.validate_field_meta(field_meta)
+        field_meta_dict = dict(((rw[0], rw[1:]) for rw in field_meta))
+        self.validate_field_meta(field_meta_dict)
 
         if self.fields_loaded:
             # Get an iterator on the data rows
             data_rows = worksheet.iter_rows(
-                min_row=len(field_meta) + 1, values_only=True
+                min_row=len(field_meta_dict) + 1, values_only=True
             )
 
             # Load and validate chunks of data
