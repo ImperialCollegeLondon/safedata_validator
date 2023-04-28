@@ -72,13 +72,13 @@ class Dataset:
             dataset.
     """
 
-    def __init__(self, resources: Resources = None) -> None:
+    def __init__(self, resources: Optional[Resources] = None) -> None:
 
         # Try and load the default resources if None provided
         if resources is None:
             resources = Resources()
 
-        self.filename = None
+        self.filename: Optional[str] = None
         self.resources = resources
         self.summary = Summary(resources)
         self.taxa = Taxa(resources)
@@ -120,7 +120,7 @@ class Dataset:
         self,
         filename: str,
         validate_doi: bool = False,
-        valid_pid: List[int] = None,
+        valid_pid: Optional[List[int]] = None,
         chunk_size: int = 1000,
         console_log: bool = True,
     ) -> None:
@@ -251,7 +251,9 @@ class Dataset:
             ):
                 LOGGER.error(
                     "Provided locations not used: ",
-                    extra={"join": self.locations - self.locations_used},
+                    extra={
+                        "join": self.locations.locations - self.locations.locations_used
+                    },
                 )
 
         # check taxa
@@ -474,7 +476,7 @@ class DataWorksheet:
     def __init__(
         self,
         sheet_meta: dict,
-        dataset: Dataset = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
 
         # Set initial values
@@ -492,13 +494,13 @@ class DataWorksheet:
 
         # Create the field meta attributes, populated using validate_field_meta
         self.fields_loaded = False
-        self.field_meta = None
+        self.field_meta: list[dict] = []
         self.field_types = None
-        self.n_fields = None
-        self.n_descriptors = None
-        self.descriptors = None
-        self.fields = []
-        self.taxa_fields = None
+        self.n_fields: Optional[int] = None
+        self.n_descriptors: Optional[int] = None
+        self.descriptors: list = []
+        self.fields: list[Union[EmptyField, BaseField]] = []
+        self.taxa_fields: list = []
 
         # Keep track of row numbering
         self.n_row = 0
@@ -569,7 +571,7 @@ class DataWorksheet:
 
         # Repackage field metadata into a list of per field descriptor
         # dictionaries, _importantly_ preserving the column order.
-        field_meta = [
+        field_meta_list = [
             dict(zip(field_meta.keys(), val)) for val in zip(*field_meta.values())
         ]
 
@@ -578,22 +580,24 @@ class DataWorksheet:
         # fields, so warn and continue. Ignore empty mandatory values - these
         # are handled in field checking.
         field_names = [
-            fld["field_name"] for fld in field_meta if fld["field_name"] is not None
+            fld["field_name"]
+            for fld in field_meta_list
+            if fld["field_name"] is not None
         ]
         dupes = HasDuplicates(field_names)
         if dupes:
             LOGGER.error("Field names duplicated: ", extra={"join": dupes.duplicated})
 
         # Lowercase the field types
-        for fld in field_meta:
+        for fld in field_meta_list:
             fld["field_type"] = (
                 None if fld["field_type"] is None else fld["field_type"].lower()
             )
 
         # Populate the instance variables
         self.fields_loaded = True
-        self.field_meta = field_meta
-        self.n_fields = len(field_meta)
+        self.field_meta = field_meta_list
+        self.n_fields = len(field_meta_list)
 
         # get taxa field names for cross checking observation and trait data
         self.taxa_fields = [
@@ -977,7 +981,7 @@ class BaseField:
     check_interaction_meta = False
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self, meta: dict, dwsh: DataWorksheet = None, dataset: Optional[Dataset] = None
     ) -> None:
 
         self.meta = meta
