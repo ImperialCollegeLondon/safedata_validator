@@ -35,7 +35,7 @@ contact_orcid = 0000-0003-3378-2814
 [metadata]
 api = https://safeproject.net
 token = xyz
-ssl_verify = True
+ssl_verify = true
 ```
 
 ### Locations
