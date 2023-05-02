@@ -401,11 +401,11 @@ class Locations:
 
         # new location names
         # - test for duplicated names to already added values
-        dupes = [lc for lc in loc_names if lc in self.locations]
-        if dupes:
+        duped_names = [lc for lc in loc_names if lc in self.locations]
+        if duped_names:
             LOGGER.error(
                 "Location names already added to Location instance: ",
-                extra={"join": dupes},
+                extra={"join": duped_names},
             )
 
         self.locations.update(loc_names)
@@ -496,11 +496,11 @@ class Locations:
 
         # Update location names and index
         # - test for duplicated names to already added values
-        dupes = [lc for lc in loc_names_as_str if lc in self.locations]
-        if dupes:
+        duped_names = [lc for lc in loc_names_as_str if lc in self.locations]
+        if duped_names:
             LOGGER.error(
                 "Location names already added to Location instance: ",
-                extra={"join": dupes},
+                extra={"join": duped_names},
             )
 
         self.locations.update(loc_names_as_str)
