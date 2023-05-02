@@ -73,7 +73,11 @@ CONFIGSPEC = {
         "contact_affiliation": "string(default=None)",
         "contact_orcid": "string(default=None)",
     },
-    "metadata": {"api": "string(default=None)", "token": "string(default=None)"},
+    "metadata": {
+        "api": "string(default=None)",
+        "token": "string(default=None)",
+        "ssl_verify": "boolean(default=True)",
+    },
 }
 """dict: The safedata_validator package use the `configobj.ConfigObj`
 package to handle resource configuration. This dict defines the basic expected
