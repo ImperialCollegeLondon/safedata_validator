@@ -981,7 +981,10 @@ class BaseField:
     check_interaction_meta = False
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Optional[Dataset] = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
 
         self.meta = meta
@@ -1042,7 +1045,7 @@ class BaseField:
         if self.check_interaction_meta:
             self._check_interaction_meta()
 
-    def _log(self, msg: str, level: int = ERROR, extra: dict = None) -> None:
+    def _log(self, msg: str, level: int = ERROR, extra: Optional[dict] = None) -> None:
         """Adds messages to the field log stack.
 
         Rather than directly emitting a log message, field processing accumulates a
@@ -1669,7 +1672,10 @@ class LocationsField(BaseField):
     field_types = ("locations", "location")
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
 
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
@@ -1736,7 +1742,10 @@ class GeoField(BaseField):
     field_types = ("latitude", "longitude")
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
 
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
@@ -1860,7 +1869,10 @@ class TimeField(BaseField):
     field_types = ("time",)
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
 
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
@@ -1966,7 +1978,10 @@ class DatetimeField(BaseField):
     field_types = ("datetime", "date")
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
 
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
@@ -2113,7 +2128,10 @@ class FileField(BaseField):
     field_types = ("file",)
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
 
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
