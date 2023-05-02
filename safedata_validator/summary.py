@@ -213,8 +213,8 @@ class Summary:
         self.external_files = None
         self.data_worksheets: list[Worksheet] = []
 
-        self._rows: Optional[dict] = None
-        self._ncols = None
+        self._rows: dict = {}
+        self._ncols: int
         self.n_errors: int = 0
         self.valid_pid: Optional[list[int]] = None
         self.validate_doi = False
@@ -319,7 +319,7 @@ class Summary:
 
     def _read_block(
         self, field_desc: tuple, mandatory: bool, title: str, only_one: bool
-    ) -> Union[None, list]:
+    ) -> Optional[list]:
         """Read a block of fields from a summary table.
 
         This internal method takes a given block definition from the Summary class
@@ -359,26 +359,26 @@ class Summary:
             block[ky] = vals.values
 
         # Pivot to dictionary of records
-        block = [dict(zip(block.keys(), vals)) for vals in zip(*block.values())]
+        block_list = [dict(zip(block.keys(), vals)) for vals in zip(*block.values())]
 
         # Drop empty records
-        block = [bl for bl in block if any(bl.values())]
+        block_list = [bl for bl in block_list if any(bl.values())]
 
-        if not block:
+        if not block_list:
             if mandatory:
                 LOGGER.error(f"No {title} metadata found")
             else:
                 LOGGER.info(f"No {title} metadata found")
             return None
         else:
-            LOGGER.info(f"Metadata for {title} found: {len(block)} records")
+            LOGGER.info(f"Metadata for {title} found: {len(block_list)} records")
 
-            if len(block) > 1 and only_one:
+            if len(block_list) > 1 and only_one:
                 LOGGER.error("Only a single record should be present")
 
             # report on block fields
             for fld in mandatory_fields:
-                fld_values = [rec[fld] for rec in block]
+                fld_values = [rec[fld] for rec in block_list]
                 if not all(fld_values):
                     LOGGER.error(f"Missing metadata in mandatory field {fld}")
 
@@ -386,7 +386,7 @@ class Summary:
             for fld in all_fields:
                 bad_values = [
                     rec[fld]
-                    for rec in block
+                    for rec in block_list
                     if rec[fld] is not None
                     and not isinstance(rec[fld], field_types[fld])
                 ]
@@ -400,11 +400,11 @@ class Summary:
             # remap names if provided
             to_rename = (mp for mp in field_map if mp[1] is not None)
             for (old, new) in to_rename:
-                for rec in block:
+                for rec in block_list:
                     rec[new] = rec[old]
                     rec.pop(old)
 
-            return block
+            return block_list
 
     @loggerinfo_push_pop("Loading author metadata")
     def _load_authors(self):
