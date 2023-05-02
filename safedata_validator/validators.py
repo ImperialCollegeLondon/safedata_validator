@@ -503,10 +503,9 @@ class IsInSet:
 class TypeCheck(IsInSet):
     """Check the types of a set of values.
 
-    This class is used to check whether all the values are members of a
-    given set of types. It overrides the base
-    [filter][safedata_validator.validators.IsInSet.filter] method to check that the
-    types of `values` are all instances of test_values.
+    This class is used to check whether all the values are members of a given set of
+    types. It overrides the base [filter][safedata_validator.validators.IsInSet.filter]
+    method to check that the types of `values` are all instances of test_values.
     """
 
     def filter(self, values) -> Any:
