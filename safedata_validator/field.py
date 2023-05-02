@@ -1002,13 +1002,13 @@ class BaseField:
             self.summary = getattr(self.dataset, "summary")
 
         # Attributes
-        self.log_stack = []
+        self.log_stack: list = []
         self.n_rows = 0
         self.n_na = 0
         self.n_blank = 0
         self.n_excel_error = 0
-        self.bad_values = []
-        self.bad_rows = []  # TODO check on implementation of this
+        self.bad_values: list = []
+        self.bad_rows: list = []  # TODO check on implementation of this
 
         # Get a field name - either from the field_meta, or a column letter
         # from col_idx or 'Unknown'
@@ -1543,7 +1543,10 @@ class CategoricalField(BaseField):
     required_descriptors = MANDATORY_DESCRIPTORS + ["levels"]
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
 
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
@@ -1610,7 +1613,10 @@ class TaxaField(BaseField):
     field_types = ("taxa",)
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
 
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
@@ -1790,7 +1796,7 @@ class GeoField(BaseField):
         super().report()
 
         if self.min is None or self.max is None:
-            return ()
+            return
 
         if self.dataset is not None:
             if self.meta["field_type"] == "latitude":
