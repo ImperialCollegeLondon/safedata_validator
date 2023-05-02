@@ -35,6 +35,7 @@ contact_orcid = 0000-0003-3378-2814
 [metadata]
 api = https://safeproject.net
 token = xyz
+ssl_verify = True
 ```
 
 ### Locations
@@ -160,6 +161,11 @@ server, which provides an API allowing searches across all uploaded datasets. A 
 package in the SAFE data ecosystem
 ([`safedata`](https://imperialcollegelondon.github.io/safedata/)) has been built, in
 order to simplify the process of querying this API for end users.
+
+In production use, the metadata server should be set up with a properly validated SSL
+certificate to allow HTTPS, and this is relatively easy using LetsEncrypt. However, when
+setting up and testing a system, requiring a valid certificate can be a road block and
+the SSL verification can be turned off.
 
 ## Configuration file location
 
