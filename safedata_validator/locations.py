@@ -226,18 +226,18 @@ class Locations:
 
         # - ... or not strings. Only allow strings for new locations - known
         #   locations get a pass for integer site codes but not here.
-        loc_names = IsString(loc_names)
-        if not loc_names:
+        loc_names_as_str = IsString(loc_names)
+        if not loc_names_as_str:
             LOGGER.error(
                 "New location names include non-string values: ",
-                extra={"join": loc_names.failed},
+                extra={"join": loc_names_as_str.failed},
             )
 
         # Look for duplicated names in inputs - this includes all types and so
         # could give messy information but can't detect duplicates late on
         # cleaned names because we're dealing with sets by that point and there
         # can be no duplication in sets
-        dupes = HasDuplicates(loc_names)
+        dupes = HasDuplicates(loc_names_as_str)
         if dupes:
             LOGGER.error(
                 "New location names contain duplicated values: ",
@@ -325,17 +325,17 @@ class Locations:
                     # Check for data types _here_ to keep interpretable errors
                     # TODO - maybe simplify Extent objects to _assume_ types.
                     #        Probably no but there is some duplication of effort here
-                    axs_vals = IsNumber(axs_vals, keep_failed=False)
-                    if not axs_vals:
+                    axs_vals_as_number = IsNumber(axs_vals, keep_failed=False)
+                    if not axs_vals_as_number:
                         LOGGER.error(
                             f"Non-numeric {axs} values for new locations: ",
-                            extra={"join": axs_vals.failed},
+                            extra={"join": axs_vals_as_number.failed},
                         )
 
                     # Update extent instances
-                    if axs_vals.values:
+                    if axs_vals_as_number.values:
                         ext = getattr(self, ext_attr)
-                        ext.update(axs_vals)
+                        ext.update(axs_vals_as_number)
 
                 FORMATTER.pop()
 
@@ -437,15 +437,15 @@ class Locations:
         """
 
         # Check for blanks
-        loc_names = IsNotBlank(loc_names, keep_failed=False)
-        if not loc_names:
+        loc_names_no_blanks = IsNotBlank(loc_names, keep_failed=False)
+        if not loc_names_no_blanks:
             LOGGER.error("Location names contains empty cells or whitespace text")
 
         # Look for duplicated values in names - this includes all types and so
         # could give messy information but can't detect duplicates late on
         # cleaned names because we're dealing with sets by that point and there
         # can be no duplication
-        dupes = HasDuplicates(loc_names)
+        dupes = HasDuplicates(loc_names_no_blanks)
         if dupes:
             LOGGER.error(
                 "Added names contain duplicated values: ",
@@ -453,17 +453,17 @@ class Locations:
             )
 
         # Validate and standardise types - strings or integer codes.
-        loc_names = IsLocName(loc_names, keep_failed=False)
+        loc_names_standardised = IsLocName(loc_names_no_blanks, keep_failed=False)
 
-        if not loc_names:
+        if not loc_names_standardised:
             LOGGER.error(
                 "Location names contains values that are not strings or integers: ",
-                extra={"join": loc_names.failed},
+                extra={"join": loc_names_standardised.failed},
             )
 
         # Enforce strings and check loc names exist
-        loc_names = set([str(v) for v in loc_names])
-        unknown = loc_names - self.known_loc_names
+        loc_names_as_str = set([str(v) for v in loc_names_standardised])
+        unknown = loc_names_as_str - self.known_loc_names
         if unknown:
             LOGGER.error(
                 "Unknown locations found: ",
@@ -473,7 +473,7 @@ class Locations:
             )
 
         # are aliases being used?
-        aliased = loc_names & set(self.location_aliases.keys())
+        aliased = loc_names_as_str & set(self.location_aliases.keys())
         if aliased:
             LOGGER.warning(
                 "Locations aliases used. Maybe change to primary location names: ",
@@ -481,7 +481,7 @@ class Locations:
             )
 
         # Get the bounding box of known locations and aliased locations
-        bbox_keys = (loc_names - (unknown | aliased)) | {
+        bbox_keys = (loc_names_as_str - (unknown | aliased)) | {
             self.location_aliases[ky] for ky in aliased
         }
 
@@ -496,15 +496,15 @@ class Locations:
 
         # Update location names and index
         # - test for duplicated names to already added values
-        dupes = [lc for lc in loc_names if lc in self.locations]
+        dupes = [lc for lc in loc_names_as_str if lc in self.locations]
         if dupes:
             LOGGER.error(
                 "Location names already added to Location instance: ",
                 extra={"join": dupes},
             )
 
-        self.locations.update(loc_names)
-        index_entries = [(lc, False, None) for lc in loc_names]
+        self.locations.update(loc_names_as_str)
+        index_entries = [(lc, False, None) for lc in loc_names_as_str]
         self.location_index.extend(index_entries)
 
     @property
