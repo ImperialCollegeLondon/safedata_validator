@@ -213,8 +213,8 @@ class Locations:
             return
 
         # - Do they provide location names...
-        loc_keys = loc_keys.pop()
-        if "location name" not in loc_keys:
+        location_keys = loc_keys.pop()
+        if "location name" not in location_keys:
             LOGGER.error("No location name entries in add_new_locations")
             return
 
@@ -259,7 +259,7 @@ class Locations:
 
         # Type is required - used to indicate the kind of location in the absence
         # of any actual geodata
-        if "type" not in loc_keys:
+        if "type" not in location_keys:
             LOGGER.error("New locations do not provide the location type")
             for this_loc in locs:
                 this_loc["type"] = "MISSING"
@@ -285,13 +285,13 @@ class Locations:
 
         # Geometry information
         # Record which geom columns are present
-        if ("latitude" in loc_keys) ^ ("longitude" in loc_keys):
+        if ("latitude" in location_keys) ^ ("longitude" in location_keys):
             LOGGER.error(
                 "New locations should either latitude _and_ longitude or neither"
             )
 
-        lonlat_provided = "latitude" in loc_keys and "longitude" in loc_keys
-        wkt_provided = "wkt" in loc_keys
+        lonlat_provided = "latitude" in location_keys and "longitude" in location_keys
+        wkt_provided = "wkt" in location_keys
 
         # TODO - supplying both is not an error, and probably shouldn't be. WKT
         # takes priority in the index when both are present, but not testing for
