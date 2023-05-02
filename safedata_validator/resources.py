@@ -409,9 +409,9 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
             log_and_raise(f"Local {db_name} database not an SQLite3 file", ValueError)
 
         # Check the required tables against found tables
-        db_tables = set([rw[0] for rw in db_tables.fetchall()])
+        db_tables_set = set([rw[0] for rw in db_tables.fetchall()])
         required_tables = set(tables + ["timestamp"])
-        missing = required_tables.difference(db_tables)
+        missing = required_tables.difference(db_tables_set)
 
         if missing:
             log_and_raise(
@@ -433,12 +433,12 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
 
     try:
         # Extract first entry in first row
-        timestamp = timestamp[0][0]
-        isoparse(timestamp)
+        timestamp_entry = timestamp[0][0]
+        isoparse(timestamp_entry)
     except ValueError:
         log_and_raise(
             f"Local {db_name} database timestamp value is not an ISO date.",
             RuntimeError,
         )
 
-    return timestamp
+    return timestamp_entry
