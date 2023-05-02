@@ -975,7 +975,7 @@ class BaseField:
     # required descriptors for those field_types. The no_validation attributes is used
     # to suppress data validation for use on e.g. comments fields.
 
-    field_types = None
+    field_types: Optional[tuple[str, ...]] = None
     required_descriptors = MANDATORY_DESCRIPTORS
     check_taxon_meta = False
     check_interaction_meta = False
@@ -2136,7 +2136,7 @@ class FileField(BaseField):
 
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
-        self.unknown_file_names = set()
+        self.unknown_file_names: set[str] = set()
 
         # Check whether filename testing is possible
         if self.summary is None:
