@@ -31,7 +31,7 @@ from safedata_validator.resources import Resources
 from safedata_validator.taxa import taxon_index_to_text
 
 # Constant definition of zenodo action function response type
-ZenodoFunctionResponseType = tuple[Optional[dict], Optional[str]]
+ZenodoFunctionResponseType = tuple[Optional[Union[dict, str, int]], Optional[str]]
 """Function return value
 
 The functions interacting with Zenodo all return a common format of tuple of length 2:
@@ -429,7 +429,7 @@ def upload_file(
     if fls.json()["checksum"] != f"md5:{local_hash}":
         return None, "Mismatch in local and uploaded MD5 hashes"
     else:
-        return fls, None
+        return fls.json(), None
 
 
 def discard_deposit(
