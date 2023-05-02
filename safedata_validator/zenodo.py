@@ -31,7 +31,9 @@ from safedata_validator.resources import Resources
 from safedata_validator.taxa import taxon_index_to_text
 
 # Constant definition of zenodo action function response type
-ZenodoFunctionResponseType = tuple[Optional[Union[dict, str, int]], Optional[str]]
+ZenodoFunctionResponseType = tuple[
+    Optional[Union[dict, str, int]], Optional[Union[str, bytes]]
+]
 """Function return value
 
 The functions interacting with Zenodo all return a common format of tuple of length 2:
