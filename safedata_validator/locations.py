@@ -6,7 +6,7 @@ then also be used to track which of the validated set of locations is used in th
 of the dataset.
 """
 
-from typing import List
+from typing import List, Optional
 
 from openpyxl.worksheet.worksheet import Worksheet
 from shapely import wkt
@@ -60,14 +60,14 @@ class Locations:
     def __init__(
         self,
         resources: Resources,
-        latitudinal_extent: Extent = None,
-        longitudinal_extent: Extent = None,
+        latitudinal_extent: Optional[Extent] = None,
+        longitudinal_extent: Optional[Extent] = None,
     ) -> None:
 
         self.n_errors = 0
-        self.locations = set()
-        self.location_index = []
-        self.locations_used = set()
+        self.locations: set = set()
+        self.location_index: list = []
+        self.locations_used: set = set()
 
         self.valid_locations = resources.valid_locations
         self.location_aliases = resources.location_aliases
@@ -140,8 +140,8 @@ class Locations:
         if "new" in headers:
 
             # Check the New column is just yes, no
-            new_vals = IsLower([rw["new"] for rw in locs])
-            new_vals = IsNotBlank(new_vals, keep_failed=False)
+            new_vals_with_blanks = IsLower([rw["new"] for rw in locs])
+            new_vals = IsNotBlank(new_vals_with_blanks, keep_failed=False)
             if not new_vals:
                 LOGGER.error("Missing values in 'new' field")
 
@@ -219,8 +219,8 @@ class Locations:
             return
 
         # - ... and are any of those names blank ...
-        loc_names = [itm["location name"] for itm in locs]
-        loc_names = IsNotBlank(loc_names, keep_failed=False)
+        loc_names_with_blanks = [itm["location name"] for itm in locs]
+        loc_names = IsNotBlank(loc_names_with_blanks, keep_failed=False)
         if not loc_names:
             LOGGER.error("Location names contains empty cells or whitespace text")
 
@@ -265,10 +265,10 @@ class Locations:
                 this_loc["type"] = "MISSING"
         else:
             # get lowercase types
-            geo_types = set(IsLower([vl["type"] for vl in locs]))
+            geo_types_with_blanks = set(IsLower([vl["type"] for vl in locs]))
 
             # Handle blanks
-            geo_types = IsNotBlank(geo_types, keep_failed=False)
+            geo_types = IsNotBlank(geo_types_with_blanks, keep_failed=False)
             if not geo_types:
                 LOGGER.error(
                     "Types for new locations contains blank or whitespace entries."
@@ -317,8 +317,8 @@ class Locations:
                 ]:
 
                     # Allow NAs for unknown location points
-                    axs_vals = [vl[axs] for vl in locs if vl[axs] != "NA"]
-                    axs_vals = IsNotBlank(axs_vals, keep_failed=False)
+                    axs_vals_with_blanks = [vl[axs] for vl in locs if vl[axs] != "NA"]
+                    axs_vals = IsNotBlank(axs_vals_with_blanks, keep_failed=False)
                     if not axs_vals:
                         LOGGER.error(f"Blank {axs} values for new locations: use NA.")
 
