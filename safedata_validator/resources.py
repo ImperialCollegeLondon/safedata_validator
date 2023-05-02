@@ -31,7 +31,7 @@ import sqlite3
 from csv import DictReader
 from csv import Error as csvError
 from datetime import date
-from typing import Union
+from typing import Optional, Union
 
 import appdirs
 import simplejson
@@ -152,7 +152,7 @@ class Resources:
         zenodo: A DotMap of Zenodo information
     """
 
-    def __init__(self, config: Union[str, list, dict] = None) -> None:
+    def __init__(self, config: Optional[Union[str, list, dict]] = None) -> None:
 
         # User and site config paths
         user_cfg_file = os.path.join(
@@ -211,8 +211,8 @@ class Resources:
         self.zenodo = config_loaded.zenodo
         self.metadata = config_loaded.metadata
 
-        self.gbif_timestamp = None
-        self.ncbi_timestamp = None
+        self.gbif_timestamp: Optional[str] = None
+        self.ncbi_timestamp: Optional[str] = None
 
         # Valid locations is a dictionary keying string location names to tuples of
         # floats describing the location bounding box
