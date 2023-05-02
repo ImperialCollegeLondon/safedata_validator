@@ -95,6 +95,7 @@ def _resources_to_zenodo_api(resources: Optional[Resources] = None) -> dict:
     metadata_token = resources.metadata.token
     if metadata_api is None or metadata_token is None:
         config_fail = True
+    metadata_ssl = resources.metadata.ssl_verify
 
     if config_fail:
         raise RuntimeError("safedata_validator not configured for Zenodo functions")
@@ -108,6 +109,7 @@ def _resources_to_zenodo_api(resources: Optional[Resources] = None) -> dict:
         "zcorc": contact_orcid,
         "mdapi": metadata_api,
         "mdtoken": metadata_token,
+        "mdssl": metadata_ssl,
     }
 
 
@@ -562,6 +564,7 @@ def post_metadata(
         f"{zres['mdapi']}/post_metadata",
         params={"token": zres["mdtoken"]},
         json=payload,
+        verify=zres["mdssl"],
     )
 
     # trap errors in uploading metadata and tidy up
