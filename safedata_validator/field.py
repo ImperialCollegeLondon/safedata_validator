@@ -1260,8 +1260,8 @@ class BaseField:
     def _parse_levels(self, txt: str) -> tuple[list[str], tuple[Optional[str], ...]]:
         """Parse categorical variable level descriptions.
 
-        Splits up category information formatted as label:desc;label:desc, which
-        is used in both levels for categorical data and interaction descriptors.
+        Splits up category information formatted as label:desc;label:desc, which is used
+        in both levels for categorical data and interaction descriptors.
 
         Args:
             txt: The text string to parse
@@ -1269,40 +1269,45 @@ class BaseField:
         Returns:
             A list of tuples containing pair of level labels and descriptions.
         """
-
         # remove terminal semi-colon, if used.
         if txt.endswith(";"):
             txt = txt[:-1]
 
         # - split the text up by semi-colon
-        parts = txt.split(";")
+        levels = txt.split(";")
 
-        # - split descriptions
-        parts_split = [pt.split(":") for pt in parts]
-        n_parts = [len(pt) for pt in parts_split]
+        # - split descriptions and standardize
+        parsed_n_parts: set[int] = set()
+        levels_parsed: list[list] = []
+
+        for each_level in levels:
+            # Split off any description
+            level_parts = each_level.split(":")
+
+            # Check for descriptions and build levels_parsed
+            level_n_parts = len(level_parts)
+            if level_n_parts == 1:
+                levels_parsed.append([level_parts[0], None])
+            else:
+                levels_parsed.append(level_parts[0:2])
+
+            parsed_n_parts.add(level_n_parts)
 
         # simple formatting checks
-        if any([pt > 2 for pt in n_parts]):
+        if any([np > 2 for np in parsed_n_parts]):
             self._log("Extra colons in level description.")
 
-        # standardise descriptions
-        if all([pt == 1 for pt in n_parts]):
-            parts = [[pt[0], None] for pt in parts_split]
-        elif all([pt > 1 for pt in n_parts]):
-            # truncate extra colons
-            parts = [pt[0:2] for pt in parts_split]
-        else:
+        if len(parsed_n_parts) > 1:
             self._log("Provide descriptions for either all or none of the categories")
-            parts = [pt[0:2] if len(pt) >= 2 else [pt[0], None] for pt in parts_split]
 
-        level_labels, level_desc = zip(*parts)
+        level_labels, level_desc = zip(*levels_parsed)
 
         # - repeated labels?
         if len(set(level_labels)) < len(level_labels):
             self._log("Repeated level labels")
 
         # - check for numeric level names: integers would be more common
-        #   but don't let floats sneak through either!
+        # but don't let floats sneak through either!
         level_labels_not_numeric = IsNotNumericString(level_labels)
         if not level_labels_not_numeric:
             self._log("Numeric level names not permitted")
