@@ -38,7 +38,7 @@ class Extent:
     def __init__(
         self,
         label: str,
-        datatype: Union[type, Tuple[type, ...]],
+        datatype: Tuple[type, ...],
         hard_bounds: Optional[tuple] = None,
         soft_bounds: Optional[tuple] = None,
     ):
@@ -76,7 +76,7 @@ class Extent:
         return f"Extent: {self.label} {self.extent}"
 
     @property
-    def datatype(self) -> Union[type, Tuple[type, ...]]:
+    def datatype(self) -> Tuple[type, ...]:
         """Returns the data types accepted by the Extent object."""
         return self._datatype
 
