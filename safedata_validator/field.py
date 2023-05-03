@@ -1143,6 +1143,8 @@ class BaseField:
             elif tx_fd not in self.dwsh.taxa_fields:
                 self._log(f"Taxon field not found in this worksheet: {tx_fd}")
                 return False
+            else:
+                return True
         else:
             return True
 
@@ -1171,13 +1173,6 @@ class BaseField:
                 "At least one of interaction name or interaction field must be provided"
             )
             return False
-        elif iact_fd_prov and self.dwsh is None:
-            self._log(
-                f"Interaction field provided but no dataworksheet provided for this "
-                f"field: {iact_fd}",
-                CRITICAL,
-            )
-            return False
 
         if iact_nm_prov:
             # Check that self.taxa has actually been populated
@@ -1197,7 +1192,7 @@ class BaseField:
             self.taxa.taxon_names_used.update(iact_nm_lab)
 
             # check they are found
-            iact_nm_lab_in_set = IsInSet(iact_nm_lab, self.taxa.taxon_names)
+            iact_nm_lab_in_set = IsInSet(iact_nm_lab, tuple(self.taxa.taxon_names))
 
             if not iact_nm_lab_in_set:
                 self._log(
@@ -1216,10 +1211,18 @@ class BaseField:
             nm_check = True
 
         if iact_fd_prov:
+            # Check that self.dwsh has been populated properly
+            if self.dwsh is None:
+                self._log(
+                    f"Interaction field provided but no dataworksheet provided for this"
+                    f" field: {iact_fd}",
+                    CRITICAL,
+                )
+                return False
             # check any field labels match to known taxon fields
             iact_fd_lab, iact_fd_desc = self._parse_levels(str(iact_fd))
 
-            iact_fd_lab_in_set = IsInSet(iact_fd_lab, self.dwsh.taxa_fields)
+            iact_fd_lab_in_set = IsInSet(iact_fd_lab, tuple(self.dwsh.taxa_fields))
             if not iact_fd_lab_in_set:
                 self._log(
                     "Unknown taxon fields in interaction_field descriptor",
