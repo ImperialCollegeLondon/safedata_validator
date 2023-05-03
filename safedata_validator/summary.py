@@ -84,7 +84,7 @@ class Summary:
     # in the summary sheet, if that field is mandatory within the set and
     # an internal field name, if needed in the code or by Zenodo.
 
-    fields = dict(
+    fields: dict[str, tuple[list, bool, str, bool]] = dict(
         core=(
             [
                 ("safe project id", True, "pid", int),
