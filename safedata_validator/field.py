@@ -1360,14 +1360,14 @@ class BaseField:
         self.n_rows += len(data)
 
         # Look for NAs
-        data = IsNotNA(data, keep_failed=False)
-        if not data:
-            self.n_na += len(data.failed)
+        data_no_na = IsNotNA(data, keep_failed=False)
+        if not data_no_na:
+            self.n_na += len(data_no_na.failed)
 
         # Look for blank data
-        data = IsNotBlank(data, keep_failed=False)
-        if not data:
-            self.n_blank += len(data.failed)
+        data_no_blanks = IsNotBlank(data_no_na, keep_failed=False)
+        if not data_no_blanks:
+            self.n_blank += len(data_no_blanks.failed)
 
         # Look for formula errors:
 
@@ -1380,12 +1380,12 @@ class BaseField:
         #
         # https://groups.google.com/g/openpyxl-users/c/iNi1MKSP-Bc/m/2q_7cHavBQAJ
 
-        data = IsNotExcelError(data, keep_failed=False)
-        if not data:
-            self.n_excel_error += len(data.failed)
+        data_no_excel_errors = IsNotExcelError(data_no_blanks, keep_failed=False)
+        if not data_no_excel_errors:
+            self.n_excel_error += len(data_no_excel_errors.failed)
 
         # Return cleaned data for use in further checking.
-        return data.values
+        return data_no_excel_errors.values
 
     def report(self) -> None:
         """Report on field creation and data validation.
@@ -1554,7 +1554,7 @@ class CategoricalField(BaseField):
         # Additional code to validate the levels metadata and store a set of
         # values
         self.level_labels = set()
-        self.reported_levels = set()
+        self.reported_levels: set[str] = set()
         levels = meta.get("levels")
 
         if levels is not None and isinstance(levels, str) and not levels.isspace():
@@ -1771,21 +1771,29 @@ class GeoField(BaseField):
         """
         data = super().validate_data(data)
 
-        data = IsNumber(data, keep_failed=False)
+        data_as_number = IsNumber(data, keep_failed=False)
 
-        if not data:
+        if not data_as_number:
             self._log("Field contains non-numeric data")
 
-            if any([RE_DMS.search(str(dt)) for dt in data.failed]):
+            if any([RE_DMS.search(str(dt)) for dt in data_as_number.failed]):
                 self._log(
                     "Possible degrees minutes and seconds formatting? Use decimal "
                     "degrees",
                     WARNING,
                 )
 
-        if data.values:
-            self.min = min(data.values + [self.min]) if self.min else min(data.values)
-            self.max = max(data.values + [self.max]) if self.max else max(data.values)
+        if data_as_number.values:
+            self.min = (
+                min(data_as_number.values + [self.min])
+                if self.min
+                else min(data_as_number.values)
+            )
+            self.max = (
+                max(data_as_number.values + [self.max])
+                if self.max
+                else max(data_as_number.values)
+            )
 
     def report(self) -> None:
         """Report on field creation and data validation for latitude and longitude data.
@@ -1884,15 +1892,15 @@ class TimeField(BaseField):
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         # Defaults
-        self.first_data_class_set = None
+        self.first_data_class_set: Optional[set] = None
         self.consistent_class = True
         self.expected_class = True
 
-        self.bad_strings = []
+        self.bad_strings: list[str] = []
         self.min = None
         self.max = None
 
-    def validate_data(self, data: list):
+    def validate_data(self, data: list) -> None:
         """Validate time field data.
 
         Extends the BaseField
@@ -1996,12 +2004,12 @@ class DatetimeField(BaseField):
             self._log("No dataset object provided - cannot update extents")
 
         # Defaults
-        self.first_data_class_set = None
+        self.first_data_class_set: Optional[set] = None
         self.consistent_class = True
         self.expected_class = True
         self.all_midnight = True
 
-        self.bad_strings = []
+        self.bad_strings: list[str] = []
         self.min = None
         self.max = None
 
