@@ -1185,25 +1185,25 @@ class BaseField:
 
         if iact_nm_prov:
             # get the taxon names and descriptions from interaction name providers
-            iact_nm_lab, iact_nm_desc = self._parse_levels(iact_nm)
+            iact_nm_lab, iact_nm_desc = self._parse_levels(str(iact_nm))
 
             # add names to used taxa
             self.taxa.taxon_names_used.update(iact_nm_lab)
 
             # check they are found
-            iact_nm_lab = IsInSet(iact_nm_lab, self.taxa.taxon_names)
+            iact_nm_lab_in_set = IsInSet(iact_nm_lab, self.taxa.taxon_names)
 
-            if not iact_nm_lab:
+            if not iact_nm_lab_in_set:
                 self._log(
                     "Unknown taxa in interaction_name descriptor",
-                    extra={"join": iact_nm_lab.failed},
+                    extra={"join": iact_nm_lab_in_set.failed},
                 )
                 nm_check = False
             else:
 
                 nm_check = True
 
-            iact_nm_lab = iact_nm_lab.values
+            iact_nm_lab = iact_nm_lab_in_set.values
         else:
             iact_nm_lab = []
             iact_nm_desc = ()
@@ -1211,19 +1211,19 @@ class BaseField:
 
         if iact_fd_prov:
             # check any field labels match to known taxon fields
-            iact_fd_lab, iact_fd_desc = self._parse_levels(iact_fd)
+            iact_fd_lab, iact_fd_desc = self._parse_levels(str(iact_fd))
 
-            iact_fd_lab = IsInSet(iact_fd_lab, self.dwsh.taxa_fields)
-            if not iact_fd_lab:
+            iact_fd_lab_in_set = IsInSet(iact_fd_lab, self.dwsh.taxa_fields)
+            if not iact_fd_lab_in_set:
                 self._log(
                     "Unknown taxon fields in interaction_field descriptor",
-                    extra={"join": iact_fd_lab.failed},
+                    extra={"join": iact_fd_lab_in_set.failed},
                 )
                 fd_check = False
             else:
                 fd_check = True
 
-            iact_fd_lab = iact_fd_lab.values
+            iact_fd_lab = iact_fd_lab_in_set.values
         else:
             iact_fd_lab = []
             iact_fd_desc = ()
@@ -1248,7 +1248,7 @@ class BaseField:
         else:
             return False
 
-    def _parse_levels(self, txt: str) -> list[tuple[str, Union[str, None]]]:
+    def _parse_levels(self, txt: str) -> tuple[list[str], Union[str, None]]:
         """Parse categorical variable level descriptions.
 
         Splits up category information formatted as label:desc;label:desc, which
