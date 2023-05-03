@@ -1117,28 +1117,32 @@ class BaseField:
         elif not tx_nm_prov and not tx_fd_prov:
             self._log("One of taxon name or taxon field must be provided")
             return False
-        elif tx_nm_prov and self.taxa is None:
-            self._log("Taxon name provided but no Taxa instance available", CRITICAL)
-            return False
-        elif tx_nm_prov and self.taxa.is_empty:
-            self._log("Taxon name provided but no taxa loaded")
-            return False
-        elif tx_nm_prov and tx_nm not in self.taxa.taxon_names:
-            self._log("Taxon name not found in the Taxa worksheet")
-            return False
         elif tx_nm_prov:
-            self.taxa.taxon_names_used.add(tx_nm)
-            return True
-        elif tx_fd_prov and self.dwsh is None:
-            self._log(
-                f"Taxon field provided but no dataworksheet provided for this "
-                f"field: {tx_fd}",
-                CRITICAL,
-            )
-            return False
-        elif tx_fd_prov and tx_fd not in self.dwsh.taxa_fields:
-            self._log(f"Taxon field not found in this worksheet: {tx_fd}")
-            return False
+            if self.taxa is None:
+                self._log(
+                    "Taxon name provided but no Taxa instance available", CRITICAL
+                )
+                return False
+            elif self.taxa.is_empty:
+                self._log("Taxon name provided but no taxa loaded")
+                return False
+            elif tx_nm not in self.taxa.taxon_names:
+                self._log("Taxon name not found in the Taxa worksheet")
+                return False
+            else:
+                self.taxa.taxon_names_used.add(tx_nm)
+                return True
+        elif tx_fd_prov:
+            if self.dwsh is None:
+                self._log(
+                    f"Taxon field provided but no dataworksheet provided for this "
+                    f"field: {tx_fd}",
+                    CRITICAL,
+                )
+                return False
+            elif tx_fd not in self.dwsh.taxa_fields:
+                self._log(f"Taxon field not found in this worksheet: {tx_fd}")
+                return False
         else:
             return True
 
@@ -1167,14 +1171,6 @@ class BaseField:
                 "At least one of interaction name or interaction field must be provided"
             )
             return False
-        elif iact_nm_prov and self.taxa is None:
-            self._log(
-                "Interaction name provided but no Taxa instance available", CRITICAL
-            )
-            return False
-        elif iact_nm_prov and self.taxa.is_empty:
-            self._log("Interaction name provided but no taxa loaded")
-            return False
         elif iact_fd_prov and self.dwsh is None:
             self._log(
                 f"Interaction field provided but no dataworksheet provided for this "
@@ -1184,6 +1180,16 @@ class BaseField:
             return False
 
         if iact_nm_prov:
+            # Check that self.taxa has actually been populated
+            if self.taxa is None:
+                self._log(
+                    "Interaction name provided but no Taxa instance available", CRITICAL
+                )
+                return False
+            elif self.taxa.is_empty:
+                self._log("Interaction name provided but no taxa loaded")
+                return False
+
             # get the taxon names and descriptions from interaction name providers
             iact_nm_lab, iact_nm_desc = self._parse_levels(str(iact_nm))
 
