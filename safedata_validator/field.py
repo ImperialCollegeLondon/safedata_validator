@@ -1267,8 +1267,8 @@ class BaseField:
         parts = txt.split(";")
 
         # - split descriptions
-        parts = [pt.split(":") for pt in parts]
-        n_parts = [len(pt) for pt in parts]
+        parts_desc = [pt.split(":") for pt in parts]
+        n_parts = [len(pt) for pt in parts_desc]
 
         # simple formatting checks
         if any([pt > 2 for pt in n_parts]):
@@ -1276,13 +1276,13 @@ class BaseField:
 
         # standardise descriptions
         if all([pt == 1 for pt in n_parts]):
-            parts = [[pt[0], None] for pt in parts]
+            parts = [[pt[0], None] for pt in parts_desc]
         elif all([pt > 1 for pt in n_parts]):
             # truncate extra colons
-            parts = [pt[0:2] for pt in parts]
+            parts = [pt[0:2] for pt in parts_desc]
         else:
             self._log("Provide descriptions for either all or none of the categories")
-            parts = [pt[0:2] if len(pt) >= 2 else [pt[0], None] for pt in parts]
+            parts = [pt[0:2] if len(pt) >= 2 else [pt[0], None] for pt in parts_desc]
 
         level_labels, level_desc = zip(*parts)
 
@@ -1513,7 +1513,7 @@ class NumericField(BaseField):
     fields.
     """
 
-    field_types = ("numeric",)
+    field_types: tuple[str, ...] = ("numeric",)
     required_descriptors = MANDATORY_DESCRIPTORS + ["method", "units"]
 
     def validate_data(self, data: list) -> None:
@@ -1539,7 +1539,7 @@ class CategoricalField(BaseField):
     validation.
     """
 
-    field_types = ("categorical", "ordered categorical")
+    field_types: tuple[str, ...] = ("categorical", "ordered categorical")
     required_descriptors = MANDATORY_DESCRIPTORS + ["levels"]
 
     def __init__(
@@ -1574,11 +1574,11 @@ class CategoricalField(BaseField):
         # data, convert to unicode to handle checking of numeric labels and
         # then check the reported levels are a subset of the descriptors.
         # XLRD reads all numbers as floats, so coerce floats back to int
-        data = IsString(data, keep_failed=False)
-        if not data:
+        data_as_string = IsString(data, keep_failed=False)
+        if not data_as_string:
             self._log("Cells contain non-text values")
 
-        self.reported_levels.update(data)
+        self.reported_levels.update(data_as_string)
 
     def report(self) -> None:
         """Report on field creation and data validation for categorical fields.
@@ -1624,7 +1624,7 @@ class TaxaField(BaseField):
         if self.taxa is None:
             self._log("No taxon details provided for dataset")
 
-        self.taxa_found = set()
+        self.taxa_found: set[str] = set()
 
     def validate_data(self, data: list) -> None:
         """Validate taxa field data.
@@ -1635,14 +1635,14 @@ class TaxaField(BaseField):
         """
         data = super().validate_data(data)
 
-        data = IsString(data, keep_failed=False)
+        data_as_string = IsString(data, keep_failed=False)
 
-        if not data:
+        if not data_as_string:
             self._log("Cells contain non-string values")
 
         if self.taxa is not None:
-            self.taxa_found.update(data)
-            self.taxa.taxon_names_used.update(data)
+            self.taxa_found.update(data_as_string)
+            self.taxa.taxon_names_used.update(data_as_string)
 
     def report(self) -> None:
         """Report on field creation and data validation for taxa fields.
@@ -1689,7 +1689,7 @@ class LocationsField(BaseField):
         if self.locations is None:
             self._log("No location details provided for dataset")
 
-        self.locations_found = set()
+        self.locations_found: set[str] = set()
 
     def validate_data(self, data: list) -> None:
         """Validate location field data.
@@ -1700,14 +1700,14 @@ class LocationsField(BaseField):
         """
         data = super().validate_data(data)
 
-        data = IsLocName(data, keep_failed=False)
+        data_locs = IsLocName(data, keep_failed=False)
 
-        if not data:
+        if not data_locs:
             self._log("Cells contain invalid location values")
 
         # Now should be strings and integer codes - convert to string
         # representations as used in the locations
-        data = [str(v) for v in data]
+        data = [str(v) for v in data_locs]
 
         if self.locations is not None:
             self.locations_found.update(data)
