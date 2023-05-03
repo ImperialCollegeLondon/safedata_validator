@@ -1257,7 +1257,7 @@ class BaseField:
         else:
             return False
 
-    def _parse_levels(self, txt: str) -> tuple[list[str], Optional[str]]:
+    def _parse_levels(self, txt: str) -> tuple[list[str], tuple[Optional[str], ...]]:
         """Parse categorical variable level descriptions.
 
         Splits up category information formatted as label:desc;label:desc, which
