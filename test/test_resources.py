@@ -193,6 +193,19 @@ def nested_set(dic, keys, value):
             id="Loc text not correct CSV",
         ),
         pytest.param(
+            ((["location_aliases"], FIXTURE_FILES.rf.empty_localias_file),),
+            ((1, f"location_aliases = {FIXTURE_FILES.rf.empty_localias_file}"),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (CRITICAL, "Location aliases file is empty"),
+            ),
+            id="Loc alias file empty",
+        ),
+        pytest.param(
             ((["gbif_database"], ""),),
             ((2, "gbif_database = "),),
             ValueError,

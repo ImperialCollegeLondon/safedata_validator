@@ -34,6 +34,7 @@ def fixture_files():
     real_files = [
         ("gaz_file", "gazetteer_simple.geojson"),
         ("localias_file", "location_aliases_simple.csv"),
+        ("empty_localias_file", "location_aliases_empty.csv"),
         ("gbif_file", "gbif_backbone_truncated.sqlite"),
         ("ncbi_file", "ncbi_database_truncated.sqlite"),
         ("json_not_locations", "notalocationsjson.json"),

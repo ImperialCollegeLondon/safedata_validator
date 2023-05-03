@@ -333,7 +333,10 @@ class Resources:
         # Simple test for structure - field names only parsed when called, and this can
         # throw errors with bad file formats.
         try:
-            fieldnames = set(dictr.fieldnames)
+            if not dictr.fieldnames:
+                log_and_raise("Location aliases file is empty", ValueError)
+            else:
+                fieldnames = set(dictr.fieldnames)
         except (UnicodeDecodeError, csvError):
             log_and_raise("Location aliases file not readable as CSV", ValueError)
 
