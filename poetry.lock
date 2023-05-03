@@ -863,7 +863,7 @@ python-versions = "*"
 name = "types-requests"
 version = "2.28.11.17"
 description = "Typing stubs for requests"
-category = "main"
+category = "dev"
 optional = false
 python-versions = "*"
 
@@ -882,7 +882,7 @@ python-versions = "*"
 name = "types-urllib3"
 version = "1.26.25.11"
 description = "Typing stubs for urllib3"
-category = "main"
+category = "dev"
 optional = false
 python-versions = "*"
 
@@ -950,7 +950,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "1a15e516ace0418ae0d31fb2ac5385de8512849987539ea995b0abaee1091267"
+content-hash = "6dff9cc6fa9f9141d720b8e81ab7efbee34b07065368321460dda879d14fbeb8"
 
 [metadata.files]
 appdirs = [
