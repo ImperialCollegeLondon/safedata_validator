@@ -6,6 +6,8 @@ safedata_validator, responsible for opening a file containing formatted data,
 and loading and validating the field metadata and data rows in the main data tables.
 """
 
+from __future__ import annotations
+
 import datetime
 import os
 from itertools import islice
@@ -1292,15 +1294,15 @@ class BaseField:
 
         # - check for numeric level names: integers would be more common
         #   but don't let floats sneak through either!
-        level_labels = IsNotNumericString(level_labels)
-        if not level_labels:
+        level_labels_not_numeric = IsNotNumericString(level_labels)
+        if not level_labels_not_numeric:
             self._log("Numeric level names not permitted")
 
         # Remove white space around the labels: simple spacing in the text
         # makes it easier to read and insisting on no space is unnecessary
-        level_labels = [vl.strip() for vl in level_labels]
+        level_labels_clean = [vl.strip() for vl in level_labels_not_numeric]
 
-        return level_labels, level_desc
+        return level_labels_clean, level_desc
 
     @classmethod
     def field_type_map(cls):
@@ -1421,7 +1423,7 @@ class BaseField:
         FORMATTER.pop()
 
 
-def field_to_dict(fld: Type[BaseField], col_idx: int) -> dict:
+def field_to_dict(fld: Union[EmptyField, BaseField], col_idx: int) -> dict:
     """Convert a object inheriting from BaseField into a dictionary.
 
     A function to return a dictionary representation of a field object. This would more
