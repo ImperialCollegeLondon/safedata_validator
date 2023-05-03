@@ -1248,7 +1248,7 @@ class BaseField:
         else:
             return False
 
-    def _parse_levels(self, txt: str) -> tuple[list[str], Union[str, None]]:
+    def _parse_levels(self, txt: str) -> tuple[list[str], Optional[str]]:
         """Parse categorical variable level descriptions.
 
         Splits up category information formatted as label:desc;label:desc, which
@@ -1269,8 +1269,8 @@ class BaseField:
         parts = txt.split(";")
 
         # - split descriptions
-        parts_desc = [pt.split(":") for pt in parts]
-        n_parts = [len(pt) for pt in parts_desc]
+        parts_split = [pt.split(":") for pt in parts]
+        n_parts = [len(pt) for pt in parts_split]
 
         # simple formatting checks
         if any([pt > 2 for pt in n_parts]):
@@ -1278,13 +1278,13 @@ class BaseField:
 
         # standardise descriptions
         if all([pt == 1 for pt in n_parts]):
-            parts = [[pt[0], None] for pt in parts_desc]
+            parts = [[pt[0], None] for pt in parts_split]
         elif all([pt > 1 for pt in n_parts]):
             # truncate extra colons
-            parts = [pt[0:2] for pt in parts_desc]
+            parts = [pt[0:2] for pt in parts_split]
         else:
             self._log("Provide descriptions for either all or none of the categories")
-            parts = [pt[0:2] if len(pt) >= 2 else [pt[0], None] for pt in parts_desc]
+            parts = [pt[0:2] if len(pt) >= 2 else [pt[0], None] for pt in parts_split]
 
         level_labels, level_desc = zip(*parts)
 
