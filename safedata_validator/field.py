@@ -1333,7 +1333,16 @@ class BaseField:
 
         return field_type_map
 
-    def validate_data(self, data: list) -> list:
+    def validate_data(self, data: list) -> None:
+        """Standard method to validate data.
+
+        Most classes that inherit from BaseField will overwrite this to include more
+        specific validation rules.
+        """
+
+        data = self.run_common_validation(data)
+
+    def run_common_validation(self, data: list) -> list:
         """Validates a list of data provided for a field.
 
         This base class method runs the common shared validation steps for input data
@@ -1343,11 +1352,11 @@ class BaseField:
         * Empty cells, which is an error.
         * Excel cell error codes (such as `#VALUE!`)
 
-        The method can be overloaded by subclasses to provide field specific testing. To
-        ensure that only the data that passes the common checks is subjected to extra
-        testing, overloaded subclasses should use:
+        Subclasses should also carry out field specific testing. To ensure that only the
+        data that passes the common checks is subjected to extra testing, within their
+        data validation methods subclasses should use:
 
-            data = super().validate_data(data)
+            data = self.run_common_validation(data)
 
         Args:
             data: a set of values from a data table for the field.
@@ -1487,7 +1496,7 @@ class CommentField(BaseField):
 
     field_types = ("comments",)
 
-    def validate_data(self, data: list) -> list:
+    def validate_data(self, data: list) -> None:
         """Validate data in comment fields.
 
         This overrides the BaseField
@@ -1495,7 +1504,7 @@ class CommentField(BaseField):
         remove any checking on comments fields.
         """
 
-        return data
+        return
 
 
 class ReplicateField(BaseField):
@@ -1521,11 +1530,11 @@ class NumericField(BaseField):
     def validate_data(self, data: list) -> None:
         """Validate numeric field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        also ensure that data values are numeric.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method and also ensures that data values are numeric.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         numeric = IsNumber(data)
 
@@ -1566,11 +1575,12 @@ class CategoricalField(BaseField):
     def validate_data(self, data: list) -> None:
         """Validate categorical field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        check that string values are provided and populate the set of reported levels.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method and also checks that string values are provided and populates the set of
+        reported levels.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         # Now look for consistency: get the unique values reported in the
         # data, convert to unicode to handle checking of numeric labels and
@@ -1631,11 +1641,12 @@ class TaxaField(BaseField):
     def validate_data(self, data: list) -> None:
         """Validate taxa field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        look for non-string values and track unused or unknown taxon names.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method and also looks for non-string values and tracks unused or unknown taxon
+        names.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         data_as_string = IsString(data, keep_failed=False)
 
@@ -1696,11 +1707,11 @@ class LocationsField(BaseField):
     def validate_data(self, data: list) -> None:
         """Validate location field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        check that location names are all known.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method and also checks that location names are all known.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         data_locs = IsLocName(data, keep_failed=False)
 
@@ -1767,11 +1778,12 @@ class GeoField(BaseField):
     def validate_data(self, data: list) -> None:
         """Validate latitude and longitude data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        check for non-decimal formatting (e.g. 12°24'32"W) and collate the data range.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method, and also checks for non-decimal formatting (e.g. 12°24'32"W) and
+        collates the data range.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         data_as_number = IsNumber(data, keep_failed=False)
 
@@ -1905,11 +1917,12 @@ class TimeField(BaseField):
     def validate_data(self, data: list) -> None:
         """Validate time field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        check that time data has consistent formatting and are valid time values.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        methoda nd also checks that time data has consistent formatting and are valid
+        time values.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         # TODO: report row number of issues - problem of mismatch between
         # self.n_rows (_all_ rows) and index in data (non-NA rows)
@@ -2018,13 +2031,13 @@ class DatetimeField(BaseField):
     def validate_data(self, data: list) -> None:
         """Validate date and datetime field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        check that time data has consistent formatting and are valid date or datetime
-        values.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method and also checks that time data has consistent formatting and are valid
+        date or datetime values.
         """
 
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         # TODO: report row number of issues - problem of mismatch between
         # self.n_rows (_all_ rows) and index in data (non-NA rows)
@@ -2181,12 +2194,12 @@ class FileField(BaseField):
     def validate_data(self, data: list):
         """Validate file field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        track unknown files given in a file field.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method, and also checks for unknown files given in a file field.
         """
 
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         # If the files are listed in external and not provided in a file
         # container then check they are all present

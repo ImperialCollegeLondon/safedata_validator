@@ -590,7 +590,7 @@ def test_BaseField_init(caplog, field_meta, expected_log):
         ),
     ],
 )
-def test_BaseField_validate_data(caplog, data, expected_log):
+def test_BaseField_run_common_validation(caplog, data, expected_log):
     """Testing behaviour of the BaseField class in using _validate_data."""
 
     fld = BaseField(
@@ -602,7 +602,7 @@ def test_BaseField_validate_data(caplog, data, expected_log):
         None,
     )
 
-    fld.validate_data(data)
+    fld.run_common_validation(data)
     fld.report()
 
     assert len(expected_log) == len(caplog.records)
