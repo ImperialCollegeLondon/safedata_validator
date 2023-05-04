@@ -7,6 +7,8 @@ be included regardless of what the package is being configured to do.
 
 ## Configuration file format
 
+TODO - Update this once I have decided on a format for the config option.
+
 The file structure for the configuration file is a simple text file containing
 the details below:
 

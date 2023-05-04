@@ -49,11 +49,14 @@ from safedata_validator.logger import (
     loggerinfo_push_pop,
 )
 
+# TODO - Work out whether CONFIGSPEC needs to be tested
+
 CONFIGSPEC = {
     "gazetteer": "string()",
     "location_aliases": "string()",
     "gbif_database": "string()",
     "ncbi_database": "string()",
+    "use_project_ids": "boolean(default=True)",
     "extents": {
         "temporal_soft_extent": "date_list(min=2, max=2, default=None)",
         "temporal_hard_extent": "date_list(min=2, max=2, default=None)",
