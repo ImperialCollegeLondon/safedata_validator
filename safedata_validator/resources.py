@@ -342,10 +342,16 @@ class Resources:
             else:
                 fieldnames = set(dictr.fieldnames)
         except (UnicodeDecodeError, csvError):
-            log_and_raise("Location aliases file not readable as CSV", ValueError)
+            log_and_raise(
+                "Location aliases file not readable as a CSV file with valid headers",
+                ValueError,
+            )
 
         if fieldnames != set(["zenodo_record_id", "location", "alias"]):
-            log_and_raise("Location aliases has bad headers", ValueError)
+            log_and_raise(
+                "Location aliases file not readable as a CSV file with valid headers",
+                ValueError,
+            )
 
         # TODO - zenodo_record_id not being used here.
         self.location_aliases = {la["alias"]: la["location"] for la in dictr}
