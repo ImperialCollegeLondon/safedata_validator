@@ -31,7 +31,7 @@ import sqlite3
 from csv import DictReader
 from csv import Error as csvError
 from datetime import date
-from typing import Union
+from typing import Optional, Union
 
 import appdirs
 import simplejson
@@ -156,7 +156,7 @@ class Resources:
         zenodo: A DotMap of Zenodo information
     """
 
-    def __init__(self, config: Union[str, list, dict] = None) -> None:
+    def __init__(self, config: Optional[Union[str, list, dict]] = None) -> None:
 
         # User and site config paths
         user_cfg_file = os.path.join(
@@ -215,8 +215,8 @@ class Resources:
         self.zenodo = config_loaded.zenodo
         self.metadata = config_loaded.metadata
 
-        self.gbif_timestamp = None
-        self.ncbi_timestamp = None
+        self.gbif_timestamp: Optional[str] = None
+        self.ncbi_timestamp: Optional[str] = None
 
         # Valid locations is a dictionary keying string location names to tuples of
         # floats describing the location bounding box
@@ -337,12 +337,21 @@ class Resources:
         # Simple test for structure - field names only parsed when called, and this can
         # throw errors with bad file formats.
         try:
-            fieldnames = set(dictr.fieldnames)
+            if not dictr.fieldnames:
+                log_and_raise("Location aliases file is empty", ValueError)
+            else:
+                fieldnames = set(dictr.fieldnames)
         except (UnicodeDecodeError, csvError):
-            log_and_raise("Location aliases file not readable as CSV", ValueError)
+            log_and_raise(
+                "Location aliases file not readable as a CSV file with valid headers",
+                ValueError,
+            )
 
         if fieldnames != set(["zenodo_record_id", "location", "alias"]):
-            log_and_raise("Location aliases has bad headers", ValueError)
+            log_and_raise(
+                "Location aliases file not readable as a CSV file with valid headers",
+                ValueError,
+            )
 
         # TODO - zenodo_record_id not being used here.
         self.location_aliases = {la["alias"]: la["location"] for la in dictr}
@@ -413,9 +422,9 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
             log_and_raise(f"Local {db_name} database not an SQLite3 file", ValueError)
 
         # Check the required tables against found tables
-        db_tables = set([rw[0] for rw in db_tables.fetchall()])
+        db_tables_set = set([rw[0] for rw in db_tables.fetchall()])
         required_tables = set(tables + ["timestamp"])
-        missing = required_tables.difference(db_tables)
+        missing = required_tables.difference(db_tables_set)
 
         if missing:
             log_and_raise(
@@ -437,12 +446,12 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
 
     try:
         # Extract first entry in first row
-        timestamp = timestamp[0][0]
-        isoparse(timestamp)
+        timestamp_entry = timestamp[0][0]
+        isoparse(timestamp_entry)
     except ValueError:
         log_and_raise(
             f"Local {db_name} database timestamp value is not an ISO date.",
             RuntimeError,
         )
 
-    return timestamp
+    return timestamp_entry

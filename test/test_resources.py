@@ -175,7 +175,11 @@ def nested_set(dic, keys, value):
                 (INFO, "Configuring resources from init "),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
-                (CRITICAL, "Location aliases file not readable as CSV"),
+                (
+                    CRITICAL,
+                    "Location aliases file not readable as a CSV file with valid "
+                    "headers",
+                ),
             ),
             id="Loc aliases not text",
         ),
@@ -188,9 +192,26 @@ def nested_set(dic, keys, value):
                 (INFO, "Configuring resources from init "),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
-                (CRITICAL, "Location aliases has bad headers"),
+                (
+                    CRITICAL,
+                    "Location aliases file not readable as a CSV file with valid "
+                    "headers",
+                ),
             ),
             id="Loc text not correct CSV",
+        ),
+        pytest.param(
+            ((["location_aliases"], FIXTURE_FILES.rf.empty_localias_file),),
+            ((1, f"location_aliases = {FIXTURE_FILES.rf.empty_localias_file}"),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (CRITICAL, "Location aliases file is empty"),
+            ),
+            id="Loc alias file empty",
         ),
         pytest.param(
             ((["gbif_database"], ""),),

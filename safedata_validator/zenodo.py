@@ -31,7 +31,9 @@ from safedata_validator.resources import Resources
 from safedata_validator.taxa import taxon_index_to_text
 
 # Constant definition of zenodo action function response type
-ZenodoFunctionResponseType = tuple[Union[dict, None], Union[str, None]]
+ZenodoFunctionResponseType = tuple[
+    Optional[Union[dict, str, int]], Optional[Union[str, bytes]]
+]
 """Function return value
 
 The functions interacting with Zenodo all return a common format of tuple of length 2:
@@ -431,7 +433,7 @@ def upload_file(
     if fls.json()["checksum"] != f"md5:{local_hash}":
         return None, "Mismatch in local and uploaded MD5 hashes"
     else:
-        return fls, None
+        return fls.json(), None
 
 
 def discard_deposit(
@@ -521,13 +523,13 @@ def delete_file(
         return None, _zenodo_error_message(files)
 
     # get a dictionary of file links
-    files = {f["filename"]: f["links"]["self"] for f in files.json()}
+    files_dict = {f["filename"]: f["links"]["self"] for f in files.json()}
 
-    if filename not in files:
+    if filename not in files_dict:
         return None, f"{filename} is not a file in the deposit"
 
     # get the delete link to the file and call
-    delete_api = files[filename]
+    delete_api = files_dict[filename]
     file_del = requests.delete(delete_api, params=params)
 
     if file_del.status_code != 204:
@@ -1135,7 +1137,7 @@ def generate_inspire_xml(
 
 def download_ris_data(
     resources: Optional[Resources] = None, ris_file: Optional[str] = None
-) -> list:
+) -> None:
     """Downloads SAFE records into a RIS format bibliography file.
 
     This function is used to maintain a bibliography file of the records
@@ -1163,7 +1165,7 @@ def download_ris_data(
     known_recids = []
     new_doi = []
 
-    if os.path.exists(ris_file):
+    if ris_file and os.path.exists(ris_file):
         with open(ris_file, "r") as bibliography_file:
             entries = rispy.load(bibliography_file)
             for entry in entries:
@@ -1193,18 +1195,18 @@ def download_ris_data(
             raise IOError("Cannot access Zenodo API")
         else:
             # Retrieve the record data and store the DOI for each record
-            safe_data = safe_data.json()
-            for hit in safe_data["hits"]["hits"]:
+            safe_data_dict = safe_data.json()
+            for hit in safe_data_dict["hits"]["hits"]:
                 if hit["id"] not in known_recids:
                     new_doi.append(hit["doi"])
 
             # Reporting
-            n_records += len(safe_data["hits"]["hits"])
+            n_records += len(safe_data_dict["hits"]["hits"])
             LOGGER.info(f"{n_records}")
 
             # Update the link for the next page, unless there is no next page
-            if "next" in safe_data["links"]:
-                api = safe_data["links"]["next"]
+            if "next" in safe_data_dict["links"]:
+                api = safe_data_dict["links"]["next"]
             else:
                 break
 
@@ -1239,16 +1241,18 @@ def download_ris_data(
 
     FORMATTER.pop()
 
-    if os.path.exists(ris_file):
-        LOGGER.info(f"Appending RIS data for {len(data)} new records to {ris_file}")
-        write_mode = "a"
-    else:
-        LOGGER.info(f"Writing RIS data for {len(data)} records to {ris_file}")
-        write_mode = "w"
+    # Writing only occurs if a ris file path has actually been provided
+    if ris_file:
+        if os.path.exists(ris_file):
+            LOGGER.info(f"Appending RIS data for {len(data)} new records to {ris_file}")
+            write_mode = "a"
+        else:
+            LOGGER.info(f"Writing RIS data for {len(data)} records to {ris_file}")
+            write_mode = "w"
 
-    with open(ris_file, write_mode) as ris_file:
-        for this_entry in data:
-            ris_file.write(this_entry)
+        with open(ris_file, write_mode) as ris_file_out:
+            for this_entry in data:
+                ris_file_out.write(this_entry)
 
 
 def sync_local_dir(

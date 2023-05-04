@@ -852,6 +852,41 @@ slack = ["slack-sdk"]
 telegram = ["requests"]
 
 [[package]]
+name = "types-python-dateutil"
+version = "2.8.19.12"
+description = "Typing stubs for python-dateutil"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[[package]]
+name = "types-requests"
+version = "2.28.11.17"
+description = "Typing stubs for requests"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+types-urllib3 = "<1.27"
+
+[[package]]
+name = "types-simplejson"
+version = "3.19.0.0"
+description = "Typing stubs for simplejson"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[[package]]
+name = "types-urllib3"
+version = "1.26.25.11"
+description = "Typing stubs for urllib3"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "typing-extensions"
 version = "4.4.0"
 description = "Backported and Experimental Type Hints for Python 3.7+"
@@ -915,7 +950,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "9dfe7d86692f4497088344b842ac5e87b68fe31a77428e043b1a9f9a5ba07484"
+content-hash = "6dff9cc6fa9f9141d720b8e81ab7efbee34b07065368321460dda879d14fbeb8"
 
 [metadata.files]
 appdirs = [
@@ -1548,6 +1583,22 @@ tomli = [
 tqdm = [
     {file = "tqdm-4.64.1-py2.py3-none-any.whl", hash = "sha256:6fee160d6ffcd1b1c68c65f14c829c22832bc401726335ce92c52d395944a6a1"},
     {file = "tqdm-4.64.1.tar.gz", hash = "sha256:5f4f682a004951c1b450bc753c710e9280c5746ce6ffedee253ddbcbf54cf1e4"},
+]
+types-python-dateutil = [
+    {file = "types-python-dateutil-2.8.19.12.tar.gz", hash = "sha256:355b2cb82b31e556fd18e7b074de7c350c680ab80608f0cc55ba6770d986d67d"},
+    {file = "types_python_dateutil-2.8.19.12-py3-none-any.whl", hash = "sha256:fe5b545e678ec13e3ddc83a0eee1545c1b5e2fba4cfc39b276ab6f4e7604a923"},
+]
+types-requests = [
+    {file = "types-requests-2.28.11.17.tar.gz", hash = "sha256:0d580652ce903f643f8c3b494dd01d29367ea57cea0c7ad7f65cf3169092edb0"},
+    {file = "types_requests-2.28.11.17-py3-none-any.whl", hash = "sha256:cc1aba862575019306b2ed134eb1ea994cab1c887a22e18d3383e6dd42e9789b"},
+]
+types-simplejson = [
+    {file = "types-simplejson-3.19.0.0.tar.gz", hash = "sha256:64aff3d151104e0458bfc9d64ffb78efd0157ff740a9f00904a30a5465f7c013"},
+    {file = "types_simplejson-3.19.0.0-py3-none-any.whl", hash = "sha256:38982991785db84c78f9012f5b9a03069ec3be020f468fb8fcd950b23e3a3341"},
+]
+types-urllib3 = [
+    {file = "types-urllib3-1.26.25.11.tar.gz", hash = "sha256:697102ddf4f781eed6f692353f40cee1098643526f5a8b99f49d2ede90fd3754"},
+    {file = "types_urllib3-1.26.25.11-py3-none-any.whl", hash = "sha256:04235e792139cf3624b25d38faab593456738fbdb7439634046172e3b1339400"},
 ]
 typing-extensions = [
     {file = "typing_extensions-4.4.0-py3-none-any.whl", hash = "sha256:16fa4864408f655d35ec496218b85f79b3437c829e93320c7c9215ccfd92489e"},
