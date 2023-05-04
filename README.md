@@ -1,5 +1,7 @@
 # The safedata_validator package
 
+[![codecov](https://codecov.io/gh/ImperialCollegeLondon/safedata_validator/branch/develop/graph/badge.svg)](https://codecov.io/gh/ImperialCollegeLondon/safedata_validator)
+
 This package provides methods to validate XLSX files containing formatted data and
 metadata using the SAFE Project data format.
 
