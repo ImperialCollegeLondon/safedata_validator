@@ -23,6 +23,7 @@ def config_file_list():
         f"location_aliases = {FIXTURE_FILES.rf.localias_file}",
         f"gbif_database = {FIXTURE_FILES.rf.gbif_file}",
         f"ncbi_database = {FIXTURE_FILES.rf.ncbi_file}",
+        "use_project_ids = False",
         "[extents]",
         "temporal_soft_extent = 2002-02-01, 2030-02-01",
         "temporal_hard_extent = 2002-02-01, 2030-02-01",
@@ -48,6 +49,7 @@ def config_file_dict():
         "location_aliases": FIXTURE_FILES.rf.localias_file,
         "gbif_database": FIXTURE_FILES.rf.gbif_file,
         "ncbi_database": FIXTURE_FILES.rf.ncbi_file,
+        "use_project_ids": True,
         "extents": {
             "temporal_soft_extent": ["2002-02-01", "2030-02-01"],
             "temporal_hard_extent": ["2002-02-01", "2030-02-01"],
@@ -331,7 +333,7 @@ def nested_set(dic, keys, value):
         ),
         pytest.param(
             ((["extents", "latitudinal_hard_extent"], ["-90deg", "90deg"]),),
-            ((7, "latitudinal_hard_extent = -90deg, 90deg"),),
+            ((8, "latitudinal_hard_extent = -90deg, 90deg"),),
             RuntimeError,
             (
                 (INFO, "Configuring Resources"),

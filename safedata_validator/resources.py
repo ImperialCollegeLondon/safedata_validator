@@ -154,6 +154,7 @@ class Resources:
         location_aliases: The path to the location_aliases file
         gbif_database: The path to the GBIF database file
         ncbi_database: The path to the NCBI database file
+        use_project_ids: Whether organisation uses project IDs or not
         valid_locations: The locations defined in the locations file
         location_aliases: Location aliases defined in the locations file
         extents: A DotMap of extent data
@@ -214,7 +215,7 @@ class Resources:
         self.ncbi_database = config_loaded.ncbi_database
         self.config_type = config_loaded.config_type
         self.config_source = config_loaded.config_source
-        self.use_project_ids = config_loaded.config_source
+        self.use_project_ids = config_loaded.use_project_ids
 
         self.extents = config_loaded.extents
         self.zenodo = config_loaded.zenodo
