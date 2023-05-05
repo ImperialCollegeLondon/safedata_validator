@@ -49,8 +49,6 @@ from safedata_validator.logger import (
     loggerinfo_push_pop,
 )
 
-# TODO - Work out whether CONFIGSPEC needs to be tested
-
 CONFIGSPEC = {
     "gazetteer": "string()",
     "location_aliases": "string()",
@@ -131,7 +129,6 @@ def date_list(value: str, min: str, max: str) -> list[date]:
     return out
 
 
-# TODO - Work out whether the changes to __init__ need to be tested
 @loggerinfo_push_pop("Configuring Resources")
 class Resources:
     """Load and check validation resources.

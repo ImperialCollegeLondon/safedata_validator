@@ -332,6 +332,18 @@ def nested_set(dic, keys, value):
             id="NCBI wrong SQLite",
         ),
         pytest.param(
+            ((["use_project_ids"], ["nonsense"]),),
+            ((4, "use_project_ids = nonsense"),),
+            RuntimeError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (CRITICAL, "Configuration issues"),
+                (CRITICAL, "In config 'use_project_ids':"),
+            ),
+            id="Testing use_project_ids not bool",
+        ),
+        pytest.param(
             ((["extents", "latitudinal_hard_extent"], ["-90deg", "90deg"]),),
             ((8, "latitudinal_hard_extent = -90deg, 90deg"),),
             RuntimeError,
