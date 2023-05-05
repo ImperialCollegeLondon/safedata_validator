@@ -46,10 +46,8 @@ class Summary:
         resources: An instance of Resources providing the safedata_validator
             configuration.
 
-    Class Attributes:
-        fields: A dictionary setting the expected metadata fields for summary tables.
-
     Attributes:
+        fields: A dictionary setting the expected metadata fields for summary tables.
         project_id: An integer project ID code
         title: A string giving the dataset title.
         description: A string giving a description of the dataset
@@ -68,121 +66,6 @@ class Summary:
         valid_pid: A list of valid project ID values.
         validate_doi: A boolean flag indicating whether DOI values should be validated.
     """
-
-    # Class attribute to define the metadata that may be present.
-    # These are defined in blocks of related rows described in 4-tuples:
-    #  0: a list of tuples giving the rows in the block:
-    #     * row header key
-    #     * mandatory within the block
-    #     * 'internal' name - also maps to Zenodo fields
-    #     * accepted types
-    #  1: is the block mandatory (bool)
-    #  2: the title of the block for the logger
-    #  3: should there be only one record (bool)
-    #
-    # Each entry in the list of rows provides the row header that appears
-    # in the summary sheet, if that field is mandatory within the set and
-    # an internal field name, if needed in the code or by Zenodo.
-
-    # TODO - Change field here to allow multiple options for project ID
-    # TODO - Change so that no project ID has to be provided (if that's how the config
-    # is setup)
-    fields: dict[str, tuple[list, bool, str, bool]] = dict(
-        core=(
-            [
-                ("safe project id", True, "pid", int),
-                ("title", True, None, str),
-                ("description", True, None, str),
-            ],
-            True,
-            "Core fields",
-            True,
-        ),
-        access=(
-            [
-                ("access status", True, "access", str),
-                ("embargo date", False, "embargo_date", datetime.datetime),
-                ("access conditions", False, "access_conditions", str),
-            ],
-            True,
-            "Access details",
-            True,
-        ),
-        keywords=([("keywords", True, None, str)], True, "Keywords", False),
-        doi=([("publication doi", True, None, str)], False, "DOI", False),
-        date=(
-            [
-                ("start date", True, None, datetime.datetime),
-                ("end date", True, None, datetime.datetime),
-            ],
-            False,
-            "Date Extents",
-            True,
-        ),
-        geo=(
-            [
-                ("west", True, None, float),
-                ("east", True, None, float),
-                ("south", True, None, float),
-                ("north", True, None, float),
-            ],
-            False,
-            "Geographic Extents",
-            True,
-        ),
-        authors=(
-            [
-                ("author name", True, "name", str),
-                ("author affiliation", False, "affiliation", str),
-                ("author email", False, "email", str),
-                ("author orcid", False, "orcid", str),
-            ],
-            True,
-            "Authors",
-            False,
-        ),
-        funding=(
-            [
-                ("funding body", True, "body", str),
-                ("funding type", True, "type", str),
-                ("funding reference", False, "ref", (str, int, float)),
-                ("funding link", False, "url", str),
-            ],
-            False,
-            "Funding Bodies",
-            False,
-        ),
-        external=(
-            [
-                ("external file", True, "file", str),
-                ("external file description", True, "description", str),
-            ],
-            False,
-            "External Files",
-            False,
-        ),
-        worksheet=(
-            [
-                ("worksheet name", True, "name", str),
-                ("worksheet title", True, "title", str),
-                ("worksheet description", True, "description", str),
-                ("worksheet external file", False, "external", str),
-            ],
-            False,
-            "Worksheets",
-            False,
-        ),
-        permits=(
-            [
-                ("permit type", True, "type", str),
-                ("permit authority", True, "authority", str),
-                ("permit number", True, "number", (str, int, float)),
-            ],
-            False,
-            "Permits",
-            False,
-        ),
-    )
 
     def __init__(self, resources: Resources):
 
@@ -221,6 +104,120 @@ class Summary:
         self.n_errors: int = 0
         self.valid_pid: Optional[list[int]] = None
         self.validate_doi = False
+
+        # Class attribute to define the metadata that may be present.
+        # These are defined in blocks of related rows described in 4-tuples:
+        #  0: a list of tuples giving the rows in the block:
+        #     * row header key
+        #     * mandatory within the block
+        #     * 'internal' name - also maps to Zenodo fields
+        #     * accepted types
+        #  1: is the block mandatory (bool)
+        #  2: the title of the block for the logger
+        #  3: should there be only one record (bool)
+        #
+        # Each entry in the list of rows provides the row header that appears
+        # in the summary sheet, if that field is mandatory within the set and
+        # an internal field name, if needed in the code or by Zenodo.
+
+        # TODO - Change field here to allow multiple options for project ID
+        # TODO - Check that this change to make project_ids optional works as intended
+        self.fields: dict[str, tuple[list, bool, str, bool]] = dict(
+            core=(
+                [
+                    ("safe project id", resources.use_project_ids, "pid", int),
+                    ("title", True, None, str),
+                    ("description", True, None, str),
+                ],
+                True,
+                "Core fields",
+                True,
+            ),
+            access=(
+                [
+                    ("access status", True, "access", str),
+                    ("embargo date", False, "embargo_date", datetime.datetime),
+                    ("access conditions", False, "access_conditions", str),
+                ],
+                True,
+                "Access details",
+                True,
+            ),
+            keywords=([("keywords", True, None, str)], True, "Keywords", False),
+            doi=([("publication doi", True, None, str)], False, "DOI", False),
+            date=(
+                [
+                    ("start date", True, None, datetime.datetime),
+                    ("end date", True, None, datetime.datetime),
+                ],
+                False,
+                "Date Extents",
+                True,
+            ),
+            geo=(
+                [
+                    ("west", True, None, float),
+                    ("east", True, None, float),
+                    ("south", True, None, float),
+                    ("north", True, None, float),
+                ],
+                False,
+                "Geographic Extents",
+                True,
+            ),
+            authors=(
+                [
+                    ("author name", True, "name", str),
+                    ("author affiliation", False, "affiliation", str),
+                    ("author email", False, "email", str),
+                    ("author orcid", False, "orcid", str),
+                ],
+                True,
+                "Authors",
+                False,
+            ),
+            funding=(
+                [
+                    ("funding body", True, "body", str),
+                    ("funding type", True, "type", str),
+                    ("funding reference", False, "ref", (str, int, float)),
+                    ("funding link", False, "url", str),
+                ],
+                False,
+                "Funding Bodies",
+                False,
+            ),
+            external=(
+                [
+                    ("external file", True, "file", str),
+                    ("external file description", True, "description", str),
+                ],
+                False,
+                "External Files",
+                False,
+            ),
+            worksheet=(
+                [
+                    ("worksheet name", True, "name", str),
+                    ("worksheet title", True, "title", str),
+                    ("worksheet description", True, "description", str),
+                    ("worksheet external file", False, "external", str),
+                ],
+                False,
+                "Worksheets",
+                False,
+            ),
+            permits=(
+                [
+                    ("permit type", True, "type", str),
+                    ("permit authority", True, "authority", str),
+                    ("permit number", True, "number", (str, int, float)),
+                ],
+                False,
+                "Permits",
+                False,
+            ),
+        )
 
     # TODO - Work if this function needs to change now that project IDs are optional
     @loggerinfo_push_pop("Checking Summary worksheet")
