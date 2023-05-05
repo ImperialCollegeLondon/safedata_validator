@@ -131,6 +131,7 @@ def date_list(value: str, min: str, max: str) -> list[date]:
     return out
 
 
+# TODO - Work out whether the changes to __init__ need to be tested
 @loggerinfo_push_pop("Configuring Resources")
 class Resources:
     """Load and check validation resources.
@@ -213,6 +214,7 @@ class Resources:
         self.ncbi_database = config_loaded.ncbi_database
         self.config_type = config_loaded.config_type
         self.config_source = config_loaded.config_source
+        self.use_project_ids = config_loaded.config_source
 
         self.extents = config_loaded.extents
         self.zenodo = config_loaded.zenodo
@@ -244,9 +246,11 @@ class Resources:
             config: Passed from Resources.__init__()
             cfg_type: Identifies the route used to provide the configuration details
 
+        Raises:
+            RuntimeError: If the file does not exist, or has issues.
+
         Returns:
-             If the file does not exist, the function returns None. Otherwise,
-             it returns a DotMap of config parameters.
+            Returns a DotMap of config parameters.
         """
 
         # Otherwise, there is a file, so try and use it and now raise if there
