@@ -84,6 +84,9 @@ class Summary:
     # in the summary sheet, if that field is mandatory within the set and
     # an internal field name, if needed in the code or by Zenodo.
 
+    # TODO - Change field here to allow multiple options for project ID
+    # TODO - Change so that no project ID has to be provided (if that's how the config
+    # is setup)
     fields: dict[str, tuple[list, bool, str, bool]] = dict(
         core=(
             [
@@ -219,6 +222,7 @@ class Summary:
         self.valid_pid: Optional[list[int]] = None
         self.validate_doi = False
 
+    # TODO - Work if this function needs to change now that project IDs are optional
     @loggerinfo_push_pop("Checking Summary worksheet")
     def load(
         self,
@@ -748,6 +752,7 @@ class Summary:
 
         self.access = access
 
+    # TODO - Change this to make providing a project ID optional
     @loggerinfo_push_pop("Loading core metadata")
     def _load_core(self):
 
@@ -764,8 +769,7 @@ class Summary:
         # Check the value is in the provided list
         if pid is not None and self.valid_pid is not None and pid not in self.valid_pid:
             LOGGER.error(
-                f"SAFE Project ID in file ({pid}) does not match any "
-                f"provided project ids: ",
+                f"Project ID in file ({pid}) does not match any provided project ids: ",
                 extra={"join": self.valid_pid},
             )
         else:

@@ -151,7 +151,7 @@ class Resources:
         location_aliases: The path to the location_aliases file
         gbif_database: The path to the GBIF database file
         ncbi_database: The path to the NCBI database file
-        use_project_ids: Whether organisation uses project IDs or not
+        use_project_ids: Whether this organisation uses project IDs or not
         valid_locations: The locations defined in the locations file
         location_aliases: Location aliases defined in the locations file
         extents: A DotMap of extent data
