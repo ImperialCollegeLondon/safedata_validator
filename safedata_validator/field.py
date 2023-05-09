@@ -494,6 +494,7 @@ class DataWorksheet:
         self.field_meta: list[dict] = []
         self.field_types = None
         self.n_fields: int
+        self.n_trailing_empty_fields: int
         self.n_descriptors: int
         self.descriptors: list = []
         self.fields: list[Union[EmptyField, BaseField]] = []
@@ -595,7 +596,7 @@ class DataWorksheet:
         self.fields_loaded = True
         self.field_meta = field_meta_list
         self.n_fields = len(field_meta_list)
-        self.n_trailing_empty = 0
+        self.n_trailing_empty_fields = 0
 
         # get taxa field names for cross checking observation and trait data
         self.taxa_fields = [
@@ -619,6 +620,7 @@ class DataWorksheet:
             all(field_meta_empty[-(n + 1) :]) for n in range(0, len(field_meta_empty))
         ]
         trailing_empty.reverse()
+        self.n_trailing_empty_fields = sum(trailing_empty)
 
         # Get the type map and field list
         field_subclass_map = BaseField.field_type_map()
@@ -797,7 +799,8 @@ class DataWorksheet:
         # report on detected size
         LOGGER.info(
             f"Worksheet '{self.name}' contains {self.n_descriptors} descriptors, "
-            f"{self.n_row} data rows and {self.n_fields} fields"
+            f"{self.n_row} data rows and "
+            f"{self.n_fields - self.n_trailing_empty_fields} fields"
         )
 
         # reporting
@@ -897,7 +900,7 @@ class DataWorksheet:
         output = dict(
             taxa_fields=self.taxa_fields,
             max_row=self.n_row + self.n_descriptors,
-            max_col=len(fields),
+            max_col=self.n_fields - self.n_trailing_empty_fields,
             name=self.name,
             title=self.title,
             description=self.description,
