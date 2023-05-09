@@ -75,7 +75,6 @@ class Dataset:
     """
 
     def __init__(self, resources: Optional[Resources] = None) -> None:
-
         # Try and load the default resources if None provided
         if resources is None:
             resources = Resources()
@@ -298,7 +297,6 @@ class Dataset:
         )
 
         for label, this_extent in extents_to_check:
-
             dataset_extent = getattr(self, this_extent)
             summary_extent = getattr(self.summary, this_extent)
 
@@ -312,14 +310,12 @@ class Dataset:
                 (dataset_extent.extent[0] < summary_extent.extent[0])
                 or (dataset_extent.extent[1] > summary_extent.extent[1])
             ):
-
                 LOGGER.error(
                     f"{label} extent values from the data fall outside the extents "
                     f"set in the Summary sheet "
                     f"({[str(x) for x in dataset_extent.extent]})"
                 )
             elif dataset_extent.populated and summary_extent.populated:
-
                 LOGGER.warning(
                     f"The {label} extent is set in Summary but also "
                     f"is populated from the data - this may be deliberate!"
@@ -480,7 +476,6 @@ class DataWorksheet:
         sheet_meta: dict,
         dataset: Optional[Dataset] = None,
     ) -> None:
-
         # Set initial values
 
         # TODO - checks on sheetmeta
@@ -600,6 +595,7 @@ class DataWorksheet:
         self.fields_loaded = True
         self.field_meta = field_meta_list
         self.n_fields = len(field_meta_list)
+        self.n_trailing_empty = 0
 
         # get taxa field names for cross checking observation and trait data
         self.taxa_fields = [
@@ -631,7 +627,6 @@ class DataWorksheet:
         for col_idx, (tr_empty, fd_empty, fmeta) in enumerate(
             zip(trailing_empty, field_meta_empty, self.field_meta)
         ):
-
             fmeta["col_idx"] = col_idx + 1
 
             # Consider cases
@@ -876,7 +871,6 @@ class DataWorksheet:
             # Load and validate chunks of data
             n_chunks = ((max_row - self.n_descriptors) // row_chunk_size) + 1
             for chunk in range(n_chunks):
-
                 # itertools.islice handles generators and StopIteration, and also
                 # trap empty slices
                 data = list(islice(data_rows, row_chunk_size))
@@ -890,16 +884,26 @@ class DataWorksheet:
     def to_dict(self) -> dict:
         """Return a dictionary representation of a DataWorksheet instance."""
 
+        # Update the fields to account for EmptyFields that have been validated: they
+        # have no field metadata and there is no content in the rows below. EmptyFields
+        # are always trailing empty fields.
+
+        fields = [
+            field_to_dict(fld, idx + 1)
+            for idx, fld in enumerate(self.fields)
+            if not isinstance(fld, EmptyField)
+        ]
+
         output = dict(
             taxa_fields=self.taxa_fields,
             max_row=self.n_row + self.n_descriptors,
-            max_col=self.n_fields,
+            max_col=len(fields),
             name=self.name,
             title=self.title,
             description=self.description,
             descriptors=self.descriptors,
             external=self.external,
-            fields=[field_to_dict(fld, idx + 1) for idx, fld in enumerate(self.fields)],
+            fields=fields,
             field_name_row=self.n_descriptors,
             n_data_row=self.n_row,
         )
@@ -988,7 +992,6 @@ class BaseField:
         dwsh: Optional[DataWorksheet] = None,
         dataset: Optional[Dataset] = None,
     ) -> None:
-
         self.meta = meta
         self.dwsh = dwsh
 
@@ -1201,7 +1204,6 @@ class BaseField:
                 )
                 nm_check = False
             else:
-
                 nm_check = True
 
             iact_nm_lab = iact_nm_lab_in_set.values
@@ -1573,7 +1575,6 @@ class CategoricalField(BaseField):
         dwsh: Optional[DataWorksheet] = None,
         dataset: Optional[Dataset] = None,
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         # Additional code to validate the levels metadata and store a set of
@@ -1644,7 +1645,6 @@ class TaxaField(BaseField):
         dwsh: Optional[DataWorksheet] = None,
         dataset: Optional[Dataset] = None,
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.taxa is None:
@@ -1710,7 +1710,6 @@ class LocationsField(BaseField):
         dwsh: Optional[DataWorksheet] = None,
         dataset: Optional[Dataset] = None,
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.locations is None:
@@ -1780,7 +1779,6 @@ class GeoField(BaseField):
         dwsh: Optional[DataWorksheet] = None,
         dataset: Optional[Dataset] = None,
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.dataset is None:
@@ -1916,7 +1914,6 @@ class TimeField(BaseField):
         dwsh: Optional[DataWorksheet] = None,
         dataset: Optional[Dataset] = None,
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         # Defaults
@@ -1944,7 +1941,6 @@ class TimeField(BaseField):
         # Check for consistent class formatting, using first row. Do not try and
         # validate further when data is not consistently formatted.
         if self.consistent_class and self.expected_class:
-
             cell_types = [type(dt) for dt in data]
             cell_type_set = set(cell_types)
 
@@ -1970,7 +1966,6 @@ class TimeField(BaseField):
         # There is no need to check time objects passed in, just time formatted
         # strings
         if self.first_data_class_set == {str}:
-
             for val in data:
                 try:
                     _ = parser.isoparser().parse_isotime(val)
@@ -2026,7 +2021,6 @@ class DatetimeField(BaseField):
         dwsh: Optional[DataWorksheet] = None,
         dataset: Optional[Dataset] = None,
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.dataset is None:
@@ -2059,7 +2053,6 @@ class DatetimeField(BaseField):
         # Check for consistent class formatting, using first row. Do not try and
         # validate further when data is not consistently formatted.
         if self.consistent_class and self.expected_class:
-
             cell_types = [type(dt) for dt in data]
             cell_type_set = set(cell_types)
 
@@ -2101,7 +2094,6 @@ class DatetimeField(BaseField):
             data = parsed_strings
 
         elif self.first_data_class_set == {datetime.datetime}:
-
             for val in data:
                 if val.time() != midnight:
                     self.all_midnight = False
@@ -2176,7 +2168,6 @@ class FileField(BaseField):
         dwsh: Optional[DataWorksheet] = None,
         dataset: Optional[Dataset] = None,
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         self.unknown_file_names: set[str] = set()
@@ -2253,7 +2244,6 @@ class EmptyField:
     """
 
     def __init__(self, meta: dict) -> None:
-
         self.meta = meta
         self.empty = True
         # Get a field name - either a column letter from col_idx if set or 'Unknown'
