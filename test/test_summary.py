@@ -1087,3 +1087,13 @@ def test_summary_load(fixture_summary, example_excel_files, n_errors):
     )
 
     assert fixture_summary.n_errors == n_errors
+
+
+# TODO - Flesh out this test
+# Might have to make PID checking a separate function to make testing easier
+# 1) Valid PID + checking => No error
+# 2) Valid PID + no checking => ???
+# 3) No PID + no checking => No error
+# 4) No PID + checking => Error
+def test_project_id(fixture_summary):
+    """Tests that project ID are only checked when required."""
