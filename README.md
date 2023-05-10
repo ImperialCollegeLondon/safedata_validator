@@ -7,7 +7,7 @@ metadata using the SAFE Project data format.
 
 See the main documentation for a detailed description and usage:
 
-> [https://safedata_validator.readthedocs.io](https://safedata_validator.readthedocs.io)
+> [https://safedata-validator.readthedocs.io](https://safedata-validator.readthedocs.io)
 
 ## Development notes
 
