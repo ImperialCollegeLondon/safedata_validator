@@ -732,7 +732,7 @@ def test_validate_deleted_taxon_lookup(
 
 
 @pytest.mark.parametrize(
-    argnames=["mock_output", "expected_log"],
+    argnames=["mock_output", "expected_log_entries"],
     argvalues=[
         pytest.param(
             DotMap({"data_columns": []}),
@@ -799,9 +799,10 @@ def test_validate_deleted_taxon_lookup(
     ],
 )
 def test_load_worksheet_headers(
-    caplog, mocker, fixture_resources, mock_output, expected_log
+    caplog, mocker, fixture_resources, mock_output, expected_log_entries
 ):
     """Test that unexpected header names are caught by load."""
+    from safedata_validator.logger import FORMATTER
 
     # Create GBIFTaxa class
     tx = taxa.GBIFTaxa(fixture_resources)
@@ -812,7 +813,8 @@ def test_load_worksheet_headers(
 
     tx.load("meaningless_string")
 
-    log_check(caplog, expected_log)
+    log_check(caplog, expected_log_entries)
+    FORMATTER.pop()
 
 
 @pytest.mark.parametrize(
