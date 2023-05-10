@@ -1016,6 +1016,31 @@ class GBIFTaxa:
             LOGGER.error("Missing core fields: ", extra={"join": missing_core})
             return
 
+        # TODO - Test this new behaviour
+        # Fields used to describe taxa (not including comments)
+        tx_fields = [
+            "name",
+            "taxon name",
+            "taxon type",
+            "taxon id",
+            "ignore id",
+            "parent name",
+            "parent type",
+            "parent id",
+        ]
+        all_fields = set(tx_fields + ["comments"])
+
+        # Now check that there are no unexpected (i.e. likely misspelled) fields
+        unexpected_headers = set(headers).difference(all_fields)
+
+        if unexpected_headers:
+            # An unexpected header (which might well be misspelled) was found
+            LOGGER.error(
+                "Unexpected (or misspelled) headers found:",
+                extra={"join": unexpected_headers},
+            )
+            return
+
         # Any duplication in names
         dupl_taxon_names = HasDuplicates([dframe.data_columns[headers.index("name")]])
 
@@ -1035,16 +1060,6 @@ class GBIFTaxa:
 
         # Standardise to the expected fields, filling in None for any
         # completely missing fields (parent fields could be missing).
-        tx_fields = [
-            "name",
-            "taxon name",
-            "taxon type",
-            "taxon id",
-            "ignore id",
-            "parent name",
-            "parent type",
-            "parent id",
-        ]
         taxa = [{fld: tx.get(fld) for fld in tx_fields} for tx in taxa]
 
         # Standardize the taxon representation into lists of taxon and parent data
