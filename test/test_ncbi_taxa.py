@@ -4,6 +4,7 @@ import os
 from logging import ERROR, INFO, WARNING
 
 import pytest
+from dotmap import DotMap
 
 from safedata_validator import taxa
 
@@ -1507,6 +1508,131 @@ def test_validate_index_higher_taxa(
 
     # Then index higher taxa
     ncbi_instance.index_higher_taxa()
+
+    log_check(caplog, expected_log_entries)
+
+
+# TO FEW BACKBONE RANKS
+# SPECIES WITHOUT GENUS
+# SUBSPECIES WITHOUT SPECIES
+@pytest.mark.parametrize(
+    argnames=["mock_output", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            DotMap({"data_columns": []}),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (ERROR, "No data or only headers in Taxa worksheet"),
+            ),
+            id="No data in sheet",
+        ),
+        pytest.param(
+            DotMap({"data_columns": ["some_columns"], "bad_headers": "duplicated"}),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (ERROR, "Cannot parse taxa with duplicated headers"),
+            ),
+            id="Duplicated headers",
+        ),
+        pytest.param(
+            DotMap({"data_columns": ["some_columns"], "headers": ["name"]}),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (ERROR, "Missing core fields:"),
+            ),
+            id="Missing core field",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": ["some_columns"],
+                    "headers": ["name", "ncbi id", "non-existent rank"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (ERROR, "Unexpected (or misspelled) headers found:"),
+            ),
+            id="Unexpected header",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": ["some_columns"],
+                    "headers": ["name", "ncbi id", "gennus"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (ERROR, "Unexpected (or misspelled) headers found:"),
+            ),
+            id="Misspelled header",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": ["some_columns"],
+                    "headers": ["name", "ncbi id", "phylum", "subphylum"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (ERROR, "Less than two backbone taxonomic ranks are provided"),
+            ),
+            id="Only one backbone rank",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": ["some_columns"],
+                    "headers": ["name", "ncbi id", "family", "species"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (ERROR, "If species is provided so must genus"),
+            ),
+            id="species without genus",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": ["some_columns"],
+                    "headers": ["name", "ncbi id", "family", "genus", "subspecies"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (ERROR, "If subspecies is provided so must species"),
+            ),
+            id="subspecies without species",
+        ),
+    ],
+)
+def test_load_worksheet_headers(
+    caplog, mocker, fixture_resources, mock_output, expected_log_entries
+):
+    """Test that unexpected header names are caught by load."""
+    from safedata_validator.logger import FORMATTER
+
+    # Create GBIFTaxa class
+    tx = taxa.NCBITaxa(fixture_resources)
+
+    # Setup mocking
+    mock_get = mocker.patch("safedata_validator.taxa.GetDataFrame")
+    mock_get.return_value = mock_output
+
+    tx.load("meaningless_string")
+    # This is needed to ensure that the logging depth is not altered by this test
+    FORMATTER.pop()
 
     log_check(caplog, expected_log_entries)
 
