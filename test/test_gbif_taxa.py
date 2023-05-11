@@ -812,9 +812,10 @@ def test_load_worksheet_headers(
     mock_get.return_value = mock_output
 
     tx.load("meaningless_string")
+    # This is needed to ensure that the logging depth is not altered by this test
+    FORMATTER.pop()
 
     log_check(caplog, expected_log_entries)
-    FORMATTER.pop()
 
 
 @pytest.mark.parametrize(
