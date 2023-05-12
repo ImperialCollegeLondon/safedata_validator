@@ -4,6 +4,7 @@ from logging import ERROR, INFO
 
 import pytest
 from dotmap import DotMap
+from openpyxl import Workbook
 from sympy import Sum
 
 from safedata_validator.logger import LOGGER
@@ -1338,3 +1339,36 @@ def test_load_worksheet_project_ids(
         fixture_summary.load(DotMap({"max_column": 20}), ())
 
     log_check(caplog, expected_log_entries)
+
+
+@pytest.mark.parametrize(
+    argnames=["data", "expected_rows"],
+    argvalues=[
+        pytest.param(
+            [["header"]],
+            [("header",)],
+            id="simple case",
+        ),
+        pytest.param(
+            [["header_1", 1, 3], ["header_2", 2, 6], ["header_3", 3, 9]],
+            [("header_1", 1, 3), ("header_2", 2, 6), ("header_3", 3, 9)],
+            id="complex case",
+        ),
+    ],
+)
+def test_load_rows_from_worksheet(data, expected_rows):
+    """Test that function to load rows from a worksheet works as intended."""
+    from safedata_validator.summary import load_rows_from_worksheet
+
+    # Make an empty worksheet
+    workbook = Workbook()
+    worksheet = workbook.active
+
+    # Loop through the rows of the list of lists and add them to the worksheet
+    for row in data:
+        worksheet.append(row)
+
+    rows = load_rows_from_worksheet(worksheet)
+
+    # Test parsed rows match what was expected
+    assert rows == expected_rows

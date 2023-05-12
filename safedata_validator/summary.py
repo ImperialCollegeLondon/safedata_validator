@@ -786,8 +786,7 @@ class Summary:
             self.project_id = pid
 
 
-# TODO - Work out how to test this function
-def load_rows_from_worksheet(worksheet: Worksheet) -> list[str]:
+def load_rows_from_worksheet(worksheet: Worksheet) -> list[tuple]:
     """Load worksheet rows, removing blank rows.
 
     Args:
