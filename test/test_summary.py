@@ -1,11 +1,14 @@
 """Tests to check that the summary sheet functions work as intended."""
 import datetime
+from logging import ERROR, INFO
 
 import pytest
 from sympy import Sum
 
 from safedata_validator.logger import LOGGER
 from safedata_validator.summary import Summary
+
+from .conftest import log_check
 
 
 @pytest.fixture
@@ -1089,11 +1092,101 @@ def test_summary_load(fixture_summary, example_excel_files, n_errors):
     assert fixture_summary.n_errors == n_errors
 
 
-# TODO - Flesh out this test
+@pytest.mark.parametrize(
+    argnames=["valid_pids", "checking", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            None,
+            False,
+            ((INFO, "Checking Summary worksheet"),),
+            id="no ID no checking",
+        ),
+        pytest.param(
+            1,
+            False,
+            (
+                (INFO, "Checking Summary worksheet"),
+                (
+                    ERROR,
+                    "Project IDs should not be provided, as your data manager does not "
+                    "use them!",
+                ),
+            ),
+            id="1 ID no checking",
+        ),
+        pytest.param(
+            [1, 3, 57],
+            False,
+            (
+                (INFO, "Checking Summary worksheet"),
+                (
+                    ERROR,
+                    "Project IDs should not be provided, as your data manager does not "
+                    "use them!",
+                ),
+            ),
+            id="3 IDs no checking",
+        ),
+        pytest.param(
+            None,
+            True,
+            ((INFO, "Checking Summary worksheet"),),
+            id="no ID checking",
+        ),
+        pytest.param(
+            23,
+            True,
+            ((INFO, "Checking Summary worksheet"),),
+            id="valid ID checking",
+        ),
+        pytest.param(
+            [1, 7, 23],
+            True,
+            ((INFO, "Checking Summary worksheet"),),
+            id="multiple valid IDs checking",
+        ),
+        pytest.param(
+            "25",
+            True,
+            (
+                (INFO, "Checking Summary worksheet"),
+                (
+                    ERROR,
+                    "Provided project id must be an integer or list of integers",
+                ),
+            ),
+            id="project ID as string",
+        ),
+        pytest.param(
+            [1, 2, "25"],
+            True,
+            (
+                (INFO, "Checking Summary worksheet"),
+                (ERROR, "Invalid value in list of project_ids."),
+            ),
+            id="one string project ID",
+        ),
+    ],
+)
+def test_load_project_ids(
+    caplog, fixture_summary, checking, expected_log_entries, valid_pids
+):
+    """Tests that project IDs provided to summary are only checked when required."""
+
+    # Overwrite fixture default for checking
+    fixture_summary.use_project_ids = checking
+
+    # All these tests will eventually result in an exception because only partial input
+    # has been provided
+    with pytest.raises(Exception):
+        fixture_summary.load("no worksheet", (), valid_pid=valid_pids)
+
+    log_check(caplog, expected_log_entries)
+
+
+# TODO - New test for when the project IDs are read from the sheet
 # Might have to make PID checking a separate function to make testing easier
 # 1) Valid PID + checking => No error
-# 2) Valid PID + no checking => ???
+# 2) Valid PID + no checking => Error
 # 3) No PID + no checking => No error
 # 4) No PID + checking => Error
-def test_project_id(fixture_summary):
-    """Tests that project ID are only checked when required."""
