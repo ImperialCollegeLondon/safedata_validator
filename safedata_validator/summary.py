@@ -62,6 +62,7 @@ class Summary:
         longitudinal_extent: Extent instance for the longitudinal extent of the Dataset.
         external_files: A list of dictionaries of external file metadata.
         data_worksheets: A list of dictionaries of data tables in the Dataset.
+        use_project_ids: Does this deployment uses project IDs
         n_errors: A count of the number of errors from loading a summary table.
         valid_pid: A list of valid project ID values.
         validate_doi: A boolean flag indicating whether DOI values should be validated.
@@ -98,6 +99,7 @@ class Summary:
         )
         self.external_files = None
         self.data_worksheets: list[Worksheet] = []
+        self.use_project_ids = resources.use_project_ids
 
         self._rows: dict = {}
         self._ncols: int
@@ -122,10 +124,12 @@ class Summary:
 
         # TODO - Change field here to allow multiple options for project ID
         # TODO - Check that this change to make project_ids optional works as intended
+        # TODO - Need to make sure metadata is saved correctly when there's no project
+        # ID
         self.fields: dict[str, tuple[list, bool, str, bool]] = dict(
             core=(
                 [
-                    ("safe project id", resources.use_project_ids, "pid", int),
+                    ("safe project id", self.use_project_ids, "pid", int),
                     ("title", True, None, str),
                     ("description", True, None, str),
                 ],
@@ -219,7 +223,6 @@ class Summary:
             ),
         )
 
-    # TODO - Work if this function needs to change now that project IDs are optional
     @loggerinfo_push_pop("Checking Summary worksheet")
     def load(
         self,
@@ -245,6 +248,12 @@ class Summary:
         # validate project_id is one of None, an integer or a list of integers
         if valid_pid is None:
             pass
+        elif not self.use_project_ids:
+            LOGGER.error(
+                "Project IDs should not be provided, as your data manager does not use "
+                "them!"
+            )
+            self.valid_pid = None
         elif isinstance(valid_pid, int):
             self.valid_pid = [valid_pid]
         elif isinstance(valid_pid, list):
@@ -297,6 +306,14 @@ class Summary:
             LOGGER.error(
                 "Unknown metadata fields: ", extra={"join": found - valid_fields}
             )
+
+        # Finally check that project ID field isn't included if project IDs are not used
+        if not self.use_project_ids:
+            if "project id" in found or "safe project id" in found:
+                LOGGER.error(
+                    "Project ID field should not be included, as your data manager "
+                    "does not use projects!"
+                )
 
         # Now process the field blocks
         self._load_core()
@@ -749,7 +766,8 @@ class Summary:
 
         self.access = access
 
-    # TODO - Change this to make providing a project ID optional
+    # TODO - I think the problems of adding a no-pid option are fixed in the function
+    # that calls this one, but should check this later
     @loggerinfo_push_pop("Loading core metadata")
     def _load_core(self):
 
