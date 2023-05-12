@@ -123,6 +123,7 @@ class Summary:
         # an internal field name, if needed in the code or by Zenodo.
 
         # TODO - Change field here to allow multiple options for project ID
+        # TODO - Once this alias is defined check that it is properly documented
         # TODO - Check that these changes to make project_ids optional works as intended
         # TODO - Need to make sure metadata is saved correctly when there's no project
         # ID
