@@ -268,12 +268,7 @@ class Summary:
 
         self.validate_doi = validate_doi
 
-        # load worksheet rows, removing blank rows
-        # TODO - make 'internal' blank rows an error.
-        rows = []
-        for this_row in worksheet.iter_rows(values_only=True):
-            if not all([blank_value(vl) for vl in this_row]):
-                rows.append(this_row)
+        rows = load_rows_from_worksheet(worksheet)
 
         self._ncols = worksheet.max_column
 
@@ -789,3 +784,19 @@ class Summary:
             )
         else:
             self.project_id = pid
+
+
+# TODO - Work out how to test this function
+def load_rows_from_worksheet(worksheet: Worksheet) -> list[str]:
+    """Load worksheet rows, removing blank rows.
+
+    Args:
+        worksheet: An openpyxl worksheet instance.
+    """
+    # TODO - make 'internal' blank rows an error.
+    rows = []
+    for this_row in worksheet.iter_rows(values_only=True):
+        if not all([blank_value(vl) for vl in this_row]):
+            rows.append(this_row)
+
+    return rows
