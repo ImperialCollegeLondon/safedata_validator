@@ -1512,9 +1512,6 @@ def test_validate_index_higher_taxa(
     log_check(caplog, expected_log_entries)
 
 
-# TO FEW BACKBONE RANKS
-# SPECIES WITHOUT GENUS
-# SUBSPECIES WITHOUT SPECIES
 @pytest.mark.parametrize(
     argnames=["mock_output", "expected_log_entries"],
     argvalues=[
