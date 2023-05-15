@@ -124,7 +124,6 @@ class Summary:
         # an internal field name, if needed in the code or by Zenodo.
 
         # TODO - Once this alias is defined check that it is properly documented
-        # TODO - Check that these changes to make project_ids optional works as intended
         # TODO - Need to make sure metadata is saved correctly when there's no project
         # ID
         self.fields: dict[str, tuple[list, bool, str, bool]] = dict(
@@ -316,7 +315,7 @@ class Summary:
                 )
 
         # Now process the field blocks
-        self._load_core()
+        self._load_core(found)
         self._load_access_details()
         self._load_authors()
         self._load_keywords()
@@ -816,15 +815,21 @@ class Summary:
 
         self.access = access
 
-    # TODO - I think the problems of adding a no-pid option are fixed in the function
-    # that calls this one, but should check this later
-    # Whether this function needs to change hinges on exactly how self._read_block works
-    # Pretty certain that there needs to be changes
     @loggerinfo_push_pop("Loading core metadata")
-    def _load_core(self):
+    def _load_core(self, found):
 
-        # Now check core rows
-        core = self._read_block(*self.fields["core"])
+        # Extract all core fields
+        core_fields = self.fields["core"]
+
+        # Make list of all core aliases
+        aliases = [core_field[4] for core_field in core_fields[0]]
+        # Then replace core field names with an alias where appropriate
+        for idx, alias_set in enumerate(aliases):
+            for alias in alias_set:
+                if alias in found:
+                    core_fields[0][idx] = (alias,) + core_fields[0][idx][1:4]
+
+        core = self._read_block(*core_fields)
         core = core[0]
 
         self.title = core["title"]
