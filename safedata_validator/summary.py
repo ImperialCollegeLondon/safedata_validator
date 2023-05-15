@@ -114,6 +114,7 @@ class Summary:
         #     * mandatory within the block
         #     * 'internal' name - also maps to Zenodo fields
         #     * accepted types
+        #     * list of aliases for the fieldname (this generally will be blank)
         #  1: is the block mandatory (bool)
         #  2: the title of the block for the logger
         #  3: should there be only one record (bool)
@@ -122,7 +123,6 @@ class Summary:
         # in the summary sheet, if that field is mandatory within the set and
         # an internal field name, if needed in the code or by Zenodo.
 
-        # TODO - Change field here to allow multiple options for project ID
         # TODO - Once this alias is defined check that it is properly documented
         # TODO - Check that these changes to make project_ids optional works as intended
         # TODO - Need to make sure metadata is saved correctly when there's no project
@@ -130,9 +130,15 @@ class Summary:
         self.fields: dict[str, tuple[list, bool, str, bool]] = dict(
             core=(
                 [
-                    ("safe project id", self.use_project_ids, "pid", int),
-                    ("title", True, None, str),
-                    ("description", True, None, str),
+                    (
+                        "safe project id",
+                        self.use_project_ids,
+                        "pid",
+                        int,
+                        ["project id"],
+                    ),
+                    ("title", True, None, str, []),
+                    ("description", True, None, str, []),
                 ],
                 True,
                 "Core fields",
@@ -140,20 +146,20 @@ class Summary:
             ),
             access=(
                 [
-                    ("access status", True, "access", str),
-                    ("embargo date", False, "embargo_date", datetime.datetime),
-                    ("access conditions", False, "access_conditions", str),
+                    ("access status", True, "access", str, []),
+                    ("embargo date", False, "embargo_date", datetime.datetime, []),
+                    ("access conditions", False, "access_conditions", str, []),
                 ],
                 True,
                 "Access details",
                 True,
             ),
-            keywords=([("keywords", True, None, str)], True, "Keywords", False),
-            doi=([("publication doi", True, None, str)], False, "DOI", False),
+            keywords=([("keywords", True, None, str, [])], True, "Keywords", False),
+            doi=([("publication doi", True, None, str, [])], False, "DOI", False),
             date=(
                 [
-                    ("start date", True, None, datetime.datetime),
-                    ("end date", True, None, datetime.datetime),
+                    ("start date", True, None, datetime.datetime, []),
+                    ("end date", True, None, datetime.datetime, []),
                 ],
                 False,
                 "Date Extents",
@@ -161,10 +167,10 @@ class Summary:
             ),
             geo=(
                 [
-                    ("west", True, None, float),
-                    ("east", True, None, float),
-                    ("south", True, None, float),
-                    ("north", True, None, float),
+                    ("west", True, None, float, []),
+                    ("east", True, None, float, []),
+                    ("south", True, None, float, []),
+                    ("north", True, None, float, []),
                 ],
                 False,
                 "Geographic Extents",
@@ -172,10 +178,10 @@ class Summary:
             ),
             authors=(
                 [
-                    ("author name", True, "name", str),
-                    ("author affiliation", False, "affiliation", str),
-                    ("author email", False, "email", str),
-                    ("author orcid", False, "orcid", str),
+                    ("author name", True, "name", str, []),
+                    ("author affiliation", False, "affiliation", str, []),
+                    ("author email", False, "email", str, []),
+                    ("author orcid", False, "orcid", str, []),
                 ],
                 True,
                 "Authors",
@@ -183,10 +189,10 @@ class Summary:
             ),
             funding=(
                 [
-                    ("funding body", True, "body", str),
-                    ("funding type", True, "type", str),
-                    ("funding reference", False, "ref", (str, int, float)),
-                    ("funding link", False, "url", str),
+                    ("funding body", True, "body", str, []),
+                    ("funding type", True, "type", str, []),
+                    ("funding reference", False, "ref", (str, int, float), []),
+                    ("funding link", False, "url", str, []),
                 ],
                 False,
                 "Funding Bodies",
@@ -194,8 +200,8 @@ class Summary:
             ),
             external=(
                 [
-                    ("external file", True, "file", str),
-                    ("external file description", True, "description", str),
+                    ("external file", True, "file", str, []),
+                    ("external file description", True, "description", str, []),
                 ],
                 False,
                 "External Files",
@@ -203,10 +209,10 @@ class Summary:
             ),
             worksheet=(
                 [
-                    ("worksheet name", True, "name", str),
-                    ("worksheet title", True, "title", str),
-                    ("worksheet description", True, "description", str),
-                    ("worksheet external file", False, "external", str),
+                    ("worksheet name", True, "name", str, []),
+                    ("worksheet title", True, "title", str, []),
+                    ("worksheet description", True, "description", str, []),
+                    ("worksheet external file", False, "external", str, []),
                 ],
                 False,
                 "Worksheets",
@@ -214,9 +220,9 @@ class Summary:
             ),
             permits=(
                 [
-                    ("permit type", True, "type", str),
-                    ("permit authority", True, "authority", str),
-                    ("permit number", True, "number", (str, int, float)),
+                    ("permit type", True, "type", str, []),
+                    ("permit authority", True, "authority", str, []),
+                    ("permit number", True, "number", (str, int, float), []),
                 ],
                 False,
                 "Permits",
@@ -284,15 +290,7 @@ class Summary:
         self._rows = {rw[0].lower(): rw[1:] for rw in rows}
 
         # Check the minimal keys are expected - mandatory fields in mandatory blocks
-        required_blocks = (blk[0] for blk in list(self.fields.values()) if blk[1])
-        required = {fld[0] for blk in required_blocks for fld in blk if fld[1]}
-
-        found = set(self._rows.keys())
-
-        if not found.issuperset(required):
-            LOGGER.error(
-                "Missing mandatory metadata fields: ", extra={"join": required - found}
-            )
+        found = self._check_for_mandatory_fields()
 
         # Check only valid keys are found
         valid_blocks = (blk[0] for blk in list(self.fields.values()))
@@ -331,6 +329,37 @@ class Summary:
         else:
             LOGGER.info("Summary formatted correctly")
 
+    # TODO - Add a test for this function
+    def _check_for_mandatory_fields(self) -> set[str]:
+        """Check that all mandatory fields are present.
+
+        This function also checks that if a field has an alias only one out of the alias
+        and the original name is provided.
+
+        Returns:
+            A set containing all the field headers which were found
+        """
+
+        # Find all required blocks
+        required_blocks = (blk[0] for blk in list(self.fields.values()) if blk[1])
+
+        required = set()
+
+        # Add all required headers to the set
+        for required_block in required_blocks:
+            for header in required_block:
+                if header[1]:
+                    required.add(header[0])
+
+        found = set(self._rows.keys())
+
+        if not found.issuperset(required):
+            LOGGER.error(
+                "Missing mandatory metadata fields: ", extra={"join": required - found}
+            )
+
+        return found
+
     def _read_block(
         self, field_desc: tuple, mandatory: bool, title: str, only_one: bool
     ) -> Optional[list]:
@@ -343,7 +372,7 @@ class Summary:
         specific functions to handle unique tests.
 
         Args:
-            field_desc:  A list of tuples describing fields.
+            field_desc: A list of tuples describing fields.
             mandatory: Is the block mandatory?
             title: The display title for the block
             only_one: Are multiple records for the field an error?
@@ -764,6 +793,8 @@ class Summary:
 
     # TODO - I think the problems of adding a no-pid option are fixed in the function
     # that calls this one, but should check this later
+    # Whether this function needs to change hinges on exactly how self._read_block works
+    # Pretty certain that there needs to be changes
     @loggerinfo_push_pop("Loading core metadata")
     def _load_core(self):
 
