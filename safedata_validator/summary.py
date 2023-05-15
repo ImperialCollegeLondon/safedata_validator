@@ -290,16 +290,22 @@ class Summary:
         self._rows = {rw[0].lower(): rw[1:] for rw in rows}
 
         # Check the minimal keys are expected - mandatory fields in mandatory blocks
-        found = self._check_for_mandatory_fields()
+        found, aliases = self._check_for_mandatory_fields()
 
         # Check only valid keys are found
         valid_blocks = (blk[0] for blk in list(self.fields.values()))
         valid_fields = {fld[0] for blk in valid_blocks for fld in blk}
 
+        # Add all aliases as valid fields
+        valid_fields.update(aliases)
+
         if found - valid_fields:
             LOGGER.error(
                 "Unknown metadata fields: ", extra={"join": found - valid_fields}
             )
+
+        # TODO - the check below could probably be generalised for all aliases, but that
+        # doesn't seem a sensible use of time until we have more than one set
 
         # Finally check that project ID field isn't included if project IDs are not used
         if not self.use_project_ids:
@@ -329,14 +335,15 @@ class Summary:
         else:
             LOGGER.info("Summary formatted correctly")
 
-    def _check_for_mandatory_fields(self) -> set[str]:
+    def _check_for_mandatory_fields(self) -> tuple[set[str], set[str]]:
         """Check that all mandatory fields are present.
 
         This function also checks that if a field has an alias only one out of the alias
         and the original name is provided.
 
         Returns:
-            A set containing all the field headers which were found
+            A tuple of sets, the first tuple element contains all the field headers
+            which were found, and the second tuple element contains all aliases.
         """
 
         # Find all required blocks
@@ -376,7 +383,7 @@ class Summary:
                     extra={"join": alias_set},
                 )
 
-        return found
+        return found, set().union(*aliases)
 
     def _read_block(
         self, field_desc: tuple, mandatory: bool, title: str, only_one: bool

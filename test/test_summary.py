@@ -1186,6 +1186,7 @@ def test_load_valid_project_ids(
     log_check(caplog, expected_log_entries)
 
 
+# Should fail if both provided
 @pytest.mark.parametrize(
     argnames=["checking", "header_row", "expected_log_entries"],
     argvalues=[
@@ -1220,11 +1221,30 @@ def test_load_valid_project_ids(
             ],
             (
                 (INFO, "Checking Summary worksheet"),
-                (ERROR, "Missing mandatory metadata fields:"),
+                (ERROR, "One of the following fields must be included:"),
                 (INFO, "Loading core metadata"),
                 (ERROR, "No Core fields metadata found"),
             ),
             id="missing pid header",
+        ),
+        pytest.param(
+            True,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+                ["project id"],
+                ["safe project id"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (ERROR, "Only one of the following fields should be included:"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="duplicated pid header",
         ),
         pytest.param(
             False,
@@ -1235,6 +1255,29 @@ def test_load_valid_project_ids(
                 ["author name"],
                 ["keywords"],
                 ["safe project id"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (ERROR, "Unknown metadata fields:"),
+                (
+                    ERROR,
+                    "Project ID field should not be included, as your data manager does"
+                    " not use projects!",
+                ),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="unexpected pid header (legacy)",
+        ),
+        pytest.param(
+            False,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+                ["project id"],
             ],
             (
                 (INFO, "Checking Summary worksheet"),
@@ -1257,6 +1300,23 @@ def test_load_valid_project_ids(
                 ["author name"],
                 ["keywords"],
                 ["safe project id"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="all fine with checking (legacy)",
+        ),
+        pytest.param(
+            True,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+                ["project id"],
             ],
             (
                 (INFO, "Checking Summary worksheet"),
