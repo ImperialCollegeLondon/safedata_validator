@@ -1372,3 +1372,115 @@ def test_load_rows_from_worksheet(data, expected_rows):
 
     # Test parsed rows match what was expected
     assert rows == expected_rows
+
+
+@pytest.mark.parametrize(
+    argnames=["use_pids", "rows", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            True,
+            {
+                "safe project id": [],
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "Missing mandatory metadata fields:"),),
+            id="no title with pid",
+        ),
+        pytest.param(
+            False,
+            {
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "Missing mandatory metadata fields:"),),
+            id="no title without pid",
+        ),
+        pytest.param(
+            False,
+            {
+                "title": [],
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            (),
+            id="good without pid",
+        ),
+        pytest.param(
+            True,
+            {
+                "title": [],
+                "description": [],
+                "project id": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            (),
+            id="good with pid",
+        ),
+        pytest.param(
+            True,
+            {
+                "title": [],
+                "description": [],
+                "safe project id": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            (),
+            id="good legacy with pid",
+        ),
+        pytest.param(
+            True,
+            {
+                "title": [],
+                "description": [],
+                "project id": [],
+                "safe project id": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "Only one of the following fields should be included:"),),
+            id="both aliases",
+        ),
+        pytest.param(
+            True,
+            {
+                "title": [],
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "One of the following fields must be included:"),),
+            id="no alias",
+        ),
+    ],
+)
+def test_check_for_mandatory_fields(
+    caplog, fixture_summary, use_pids, rows, expected_log_entries
+):
+    """Test that function to check mandatory fields works as expected."""
+
+    # Overwrite fixture default for checking
+    fixture_summary.use_project_ids = use_pids
+    pid_details = list(fixture_summary.fields["core"][0][0])
+    pid_details[1] = use_pids
+    fixture_summary.fields["core"][0][0] = tuple(pid_details)
+
+    # Add rows to fixture
+    fixture_summary._rows = rows
+
+    # Check that row row headers contain mandatory fields
+    fixture_summary._check_for_mandatory_fields()
+
+    log_check(caplog, expected_log_entries)

@@ -131,11 +131,11 @@ class Summary:
             core=(
                 [
                     (
-                        "safe project id",
+                        "project id",
                         self.use_project_ids,
                         "pid",
                         int,
-                        ["project id"],
+                        ["safe project id"],
                     ),
                     ("title", True, None, str, []),
                     ("description", True, None, str, []),
@@ -329,7 +329,6 @@ class Summary:
         else:
             LOGGER.info("Summary formatted correctly")
 
-    # TODO - Add a test for this function
     def _check_for_mandatory_fields(self) -> set[str]:
         """Check that all mandatory fields are present.
 
@@ -344,11 +343,16 @@ class Summary:
         required_blocks = (blk[0] for blk in list(self.fields.values()) if blk[1])
 
         required = set()
+        aliases = []
 
-        # Add all required headers to the set
+        # Add all required headers to either required set or aliases set
         for required_block in required_blocks:
             for header in required_block:
-                if header[1]:
+                # Required field with an alias
+                if header[1] and header[4]:
+                    alias_list = [header[0]] + header[4]
+                    aliases.append(set(alias_list))
+                elif header[1]:  # Required field without an alias
                     required.add(header[0])
 
         found = set(self._rows.keys())
@@ -357,6 +361,20 @@ class Summary:
             LOGGER.error(
                 "Missing mandatory metadata fields: ", extra={"join": required - found}
             )
+
+        # Check that one of each required alias is included
+        for alias_set in aliases:
+            present = found.intersection(alias_set)
+            if len(present) == 0:
+                LOGGER.error(
+                    "One of the following fields must be included: ",
+                    extra={"join": alias_set},
+                )
+            elif len(present) > 1:
+                LOGGER.error(
+                    "Only one of the following fields should be included: ",
+                    extra={"join": alias_set},
+                )
 
         return found
 
