@@ -123,9 +123,6 @@ class Summary:
         # in the summary sheet, if that field is mandatory within the set and
         # an internal field name, if needed in the code or by Zenodo.
 
-        # TODO - Once this alias is defined check that it is properly documented
-        # TODO - Need to make sure metadata is saved correctly when there's no project
-        # ID
         self.fields: dict[str, tuple[list, bool, str, bool]] = dict(
             core=(
                 [
@@ -815,6 +812,7 @@ class Summary:
 
         self.access = access
 
+    # TODO - Need to check that this actually handles the no pid case
     @loggerinfo_push_pop("Loading core metadata")
     def _load_core(self, found):
 
