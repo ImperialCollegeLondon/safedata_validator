@@ -1544,3 +1544,102 @@ def test_check_for_mandatory_fields(
     fixture_summary._check_for_mandatory_fields()
 
     log_check(caplog, expected_log_entries)
+
+
+@pytest.mark.parametrize(
+    argnames=["use_pids", "found", "alterations", "project_id", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            True,
+            set(["title", "description", "safe project id"]),
+            {
+                "safe project id": (77,),
+            },
+            77,
+            (
+                (INFO, "Loading core metadata"),
+                (INFO, "Metadata for Core fields found: 1 records"),
+            ),
+            id="legacy pid with checking",
+        ),
+        pytest.param(
+            True,
+            set(["title", "description", "project id"]),
+            {
+                "project id": (77,),
+            },
+            77,
+            (
+                (INFO, "Loading core metadata"),
+                (INFO, "Metadata for Core fields found: 1 records"),
+            ),
+            id="new pid with checking",
+        ),
+        pytest.param(
+            False,
+            set(["title", "description"]),
+            {},
+            None,
+            (
+                (INFO, "Loading core metadata"),
+                (INFO, "Metadata for Core fields found: 1 records"),
+            ),
+            id="without checking",
+        ),
+        pytest.param(
+            True,
+            set(["title", "description"]),
+            {
+                "project id": (100,),
+            },
+            None,
+            (
+                (INFO, "Loading core metadata"),
+                (INFO, "Metadata for Core fields found: 1 records"),
+                (
+                    ERROR,
+                    "Project ID in file (100) does not match any provided project ids:",
+                ),
+            ),
+            id="invalid pid",
+        ),
+    ],
+)
+def test_core(
+    caplog,
+    fixture_summary,
+    use_pids,
+    found,
+    alterations,
+    project_id,
+    expected_log_entries,
+):
+    """Test that function to load in core block works as expected."""
+
+    # Overwrite fixture default for checking
+    fixture_summary.use_project_ids = use_pids
+    pid_details = list(fixture_summary.fields["core"][0][0])
+    pid_details[1] = use_pids
+    fixture_summary.fields["core"][0][0] = tuple(pid_details)
+
+    # Valid set of information
+    input = {
+        "title": ("Test data set",),
+        "description": ("An example data set to test core loading",),
+    }
+
+    # Update valid to test error conditions and populate _rows
+    # directly (bypassing .load() and need to pack in worksheet object
+    fixture_summary._rows = input | alterations
+    fixture_summary._ncols = 2
+    fixture_summary.valid_pid = range(1, 100)
+
+    # Test the block load
+    fixture_summary._load_core(found)
+
+    # check that relevant attributes have be populated correctly
+    assert fixture_summary.title == "Test data set"
+    assert fixture_summary.description == "An example data set to test core loading"
+    assert fixture_summary.project_id == project_id
+
+    log_check(caplog, expected_log_entries)

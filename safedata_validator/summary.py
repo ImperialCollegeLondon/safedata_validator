@@ -812,7 +812,6 @@ class Summary:
 
         self.access = access
 
-    # TODO - Need to check that this actually handles the no pid case
     @loggerinfo_push_pop("Loading core metadata")
     def _load_core(self, found):
 
