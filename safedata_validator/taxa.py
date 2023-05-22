@@ -66,6 +66,45 @@ BACKBONE_RANKS = [
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ["superkingdom"] + BACKBONE_RANKS
 
+# These are the extra ranks defined by NCBI, they may have to be updated in future
+EXTRA_NCBI_RANKS = [
+    "biotype",
+    "clade",
+    "cohort",
+    "forma",
+    "forma specialis",
+    "genotype",
+    "infraclass",
+    "infraorder",
+    "isolate",
+    "morph",
+    "no rank",
+    "parvorder",
+    "pathogroup",
+    "section",
+    "series",
+    "serogroup",
+    "serotype",
+    "species group",
+    "species subgroup",
+    "strain",
+    "subclass",
+    "subcohort",
+    "subfamily",
+    "subgenus",
+    "subkingdom",
+    "suborder",
+    "subphylum",
+    "subsection",
+    "subtribe",
+    "superclass",
+    "superfamily",
+    "superorder",
+    "superphylum",
+    "tribe",
+    "varietas",
+]
+
 
 class GBIFError(Exception):
     """Exception class for GBIF errors.
@@ -1016,6 +1055,31 @@ class GBIFTaxa:
             LOGGER.error("Missing core fields: ", extra={"join": missing_core})
             return
 
+        # TODO - Test this new behaviour
+        # Fields used to describe taxa (not including comments)
+        tx_fields = [
+            "name",
+            "taxon name",
+            "taxon type",
+            "taxon id",
+            "ignore id",
+            "parent name",
+            "parent type",
+            "parent id",
+        ]
+        all_fields = set(tx_fields + ["comments"])
+
+        # Now check that there are no unexpected (i.e. likely misspelled) fields
+        unexpected_headers = set(headers).difference(all_fields)
+
+        if unexpected_headers:
+            # An unexpected header (which might well be misspelled) was found
+            LOGGER.error(
+                "Unexpected (or misspelled) headers found:",
+                extra={"join": unexpected_headers},
+            )
+            return
+
         # Any duplication in names
         dupl_taxon_names = HasDuplicates([dframe.data_columns[headers.index("name")]])
 
@@ -1035,16 +1099,6 @@ class GBIFTaxa:
 
         # Standardise to the expected fields, filling in None for any
         # completely missing fields (parent fields could be missing).
-        tx_fields = [
-            "name",
-            "taxon name",
-            "taxon type",
-            "taxon id",
-            "ignore id",
-            "parent name",
-            "parent type",
-            "parent id",
-        ]
         taxa = [{fld: tx.get(fld) for fld in tx_fields} for tx in taxa]
 
         # Standardize the taxon representation into lists of taxon and parent data
@@ -1626,6 +1680,23 @@ class NCBITaxa:
         if missing_core:
             # core names are not found so can't continue
             LOGGER.error("Missing core fields: ", extra={"join": missing_core})
+            return
+
+        # Possible fields in this case are the two core fields + comments + all
+        # taxonomic ranks defined in NCBI
+        all_fields = set(
+            list(core_fields) + BACKBONE_RANKS_EX + EXTRA_NCBI_RANKS + ["comments"]
+        )
+
+        # Now check that there are no unexpected (i.e. likely misspelled) fields
+        unexpected_headers = set(headers).difference(all_fields)
+
+        if unexpected_headers:
+            # An unexpected header (which might well be misspelled) was found
+            LOGGER.error(
+                "Unexpected (or misspelled) headers found:",
+                extra={"join": unexpected_headers},
+            )
             return
 
         # Check that at least two backbone taxa have been provided
