@@ -115,17 +115,16 @@ when no NCBI taxa are included.
 
 ### Project IDs
 
-The SAFE data system was initially developed as part of the SAFE project, which
+The `safedata` system was initially developed as part of the SAFE project, which
 organises datasets into projects. Each project is identified using a unique
 identification number, and each dataset is associated with one or more projects using
-these project ID numbers. We anticipate that other deployments of the SAFE data system
+these project ID numbers. We anticipate that other deployments of the `safedata` system
 may not wish to organise datasets in this manner. If so, the checking of project IDs can
 be turned off by setting the `use_project_ids` option  to `False`. With this option off,
 datasets will **fail validation** if they contain project IDs.
 
 !!! Warning
-
-  Each deployment of the SAFE data system will have to make a choice of whether or not
+  Each deployment of the `safedata` system will have to make a choice of whether or not
   to organise datasets into project. Once this choice has been made it will be binding.
   As such, this option should only be changed by the relevant data manager during the
   initial setup of the data system.
