@@ -54,8 +54,8 @@ a single value for each field.
 
 * **Project ID**: This is only used if the organisation you are uploading to uses
   projects to group datasets. If they are then you should obtain relevant project IDs
-  from the organisation's data manager and add them in your Summary worksheet. 
-  The legacy name for this field is `SAFE Project ID`: using this name will still work 
+  from the organisation's data manager and add them in your Summary worksheet.
+  The legacy name for this field is `SAFE Project ID`: using this name will still work
   but is not the preferred option.
 * **Title**: This should be a short informative title for the dataset: it will
   be used as the public title for the dataset so make sure it is clear and
@@ -123,7 +123,7 @@ shown below, not the full URL [](http://orcid.org/0000-0002-7005-1394).
 |                    |                         |  |  |
 |--------------------|-------------------------|--|--|
 | Author name        | Orme, David             |  |  |
-| Author email       | d.orme@imperial.ac.uk   |  |  |
+| Author email       | <d.orme@imperial.ac.uk>   |  |  |
 | Author affiliation | Imperial College London |  |  |
 | Author ORCID       | 0000-0002-7005-1394     |  |  |
 
@@ -322,7 +322,7 @@ at SAFE.
 | Access status             | Embargo                                                     |                                                              |                                  |
 | Embargo date              | 03/09/18                                                    |                                                              |                                  |
 | Author name               | Orme, David                                                 |                                                              |                                  |
-| Author email              | d.orme@imperial.ac.uk                                       |                                                              |                                  |
+| Author email              | <d.orme@imperial.ac.uk>                                       |                                                              |                                  |
 | Author affiliation        | Imperial College London                                     |                                                              |                                  |
 | Author ORCID              | 0000-0002-7005-1394                                         |                                                              |                                  |
 | Worksheet name            | DF                                                          | Incidence                                                    | Transects                        |
