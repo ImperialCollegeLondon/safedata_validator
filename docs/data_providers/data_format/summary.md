@@ -54,11 +54,9 @@ a single value for each field.
 
 * **Project ID**: This is only used if the organisation you are uploading to uses
   projects to group datasets. If they are then you should obtain relevant project IDs
-  from the organisation's data manager. Then when you upload your dataset, you will also
-  be asked to choose a project for your dataset: these two numbers must match. Note that
-  you can only upload data to a project of which you are a member. The legacy name for
-  this field is **SAFE Project ID**, using this name will still work but is not the
-  preferred option.
+  from the organisation's data manager and add them in your Summary worksheet. 
+  The legacy name for this field is `SAFE Project ID`: using this name will still work 
+  but is not the preferred option.
 * **Title**: This should be a short informative title for the dataset: it will
   be used as the public title for the dataset so make sure it is clear and
   grammatical!
