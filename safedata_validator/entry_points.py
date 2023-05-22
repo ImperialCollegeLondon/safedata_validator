@@ -74,9 +74,9 @@ def _safedata_validator_cli():
         default=None,
         type=int,
         action="append",
-        help="If provided, check that the project ID within the file "
-        "matches this integer. Multiple values can be provided "
-        "to generate a set of valid IDs.",
+        help="If provided, check that the project ID within the file matches this "
+        "integer. Multiple values can be provided to generate a set of valid IDs. This "
+        "option only makes sense to use if your organisation uses project IDs.",
         dest="valid_pid",
     )
     parser.add_argument(

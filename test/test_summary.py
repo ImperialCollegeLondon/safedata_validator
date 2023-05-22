@@ -1,11 +1,16 @@
 """Tests to check that the summary sheet functions work as intended."""
 import datetime
+from logging import ERROR, INFO
 
 import pytest
+from dotmap import DotMap
+from openpyxl import Workbook
 from sympy import Sum
 
 from safedata_validator.logger import LOGGER
 from safedata_validator.summary import Summary
+
+from .conftest import log_check
 
 
 @pytest.fixture
@@ -1087,3 +1092,554 @@ def test_summary_load(fixture_summary, example_excel_files, n_errors):
     )
 
     assert fixture_summary.n_errors == n_errors
+
+
+@pytest.mark.parametrize(
+    argnames=["valid_pids", "checking", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            None,
+            False,
+            ((INFO, "Checking Summary worksheet"),),
+            id="no ID no checking",
+        ),
+        pytest.param(
+            1,
+            False,
+            (
+                (INFO, "Checking Summary worksheet"),
+                (
+                    ERROR,
+                    "Project IDs should not be provided, as your data manager does not "
+                    "use them!",
+                ),
+            ),
+            id="1 ID no checking",
+        ),
+        pytest.param(
+            [1, 3, 57],
+            False,
+            (
+                (INFO, "Checking Summary worksheet"),
+                (
+                    ERROR,
+                    "Project IDs should not be provided, as your data manager does not "
+                    "use them!",
+                ),
+            ),
+            id="3 IDs no checking",
+        ),
+        pytest.param(
+            None,
+            True,
+            ((INFO, "Checking Summary worksheet"),),
+            id="no ID checking",
+        ),
+        pytest.param(
+            23,
+            True,
+            ((INFO, "Checking Summary worksheet"),),
+            id="valid ID checking",
+        ),
+        pytest.param(
+            [1, 7, 23],
+            True,
+            ((INFO, "Checking Summary worksheet"),),
+            id="multiple valid IDs checking",
+        ),
+        pytest.param(
+            "25",
+            True,
+            (
+                (INFO, "Checking Summary worksheet"),
+                (
+                    ERROR,
+                    "Provided project id must be an integer or list of integers",
+                ),
+            ),
+            id="project ID as string",
+        ),
+        pytest.param(
+            [1, 2, "25"],
+            True,
+            (
+                (INFO, "Checking Summary worksheet"),
+                (ERROR, "Invalid value in list of project_ids."),
+            ),
+            id="one string project ID",
+        ),
+    ],
+)
+def test_load_valid_project_ids(
+    caplog, fixture_summary, checking, expected_log_entries, valid_pids
+):
+    """Tests that project IDs provided to summary are only checked when required."""
+
+    # Overwrite fixture default for checking
+    fixture_summary.use_project_ids = checking
+
+    # All these tests will eventually result in an exception because only partial input
+    # has been provided
+    with pytest.raises(AttributeError):
+        fixture_summary.load("no worksheet", (), valid_pid=valid_pids)
+
+    log_check(caplog, expected_log_entries)
+
+
+# Should fail if both provided
+@pytest.mark.parametrize(
+    argnames=["checking", "header_row", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            False,
+            [["header1"], [23]],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (ERROR, "Summary metadata fields column contains non text values :"),
+            ),
+            id="non text header",
+        ),
+        pytest.param(
+            False,
+            [["title"], ["description"], ["access status"], ["author name"]],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (ERROR, "Missing mandatory metadata fields:"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="missing header",
+        ),
+        pytest.param(
+            True,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (ERROR, "One of the following fields must be included:"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="missing pid header",
+        ),
+        pytest.param(
+            True,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+                ["project id"],
+                ["safe project id"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (ERROR, "Only one of the following fields should be included:"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="duplicated pid header",
+        ),
+        pytest.param(
+            False,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+                ["safe project id"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (ERROR, "Unknown metadata fields:"),
+                (
+                    ERROR,
+                    "Project ID field should not be included, as your data manager does"
+                    " not use projects!",
+                ),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="unexpected pid header (legacy)",
+        ),
+        pytest.param(
+            False,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+                ["project id"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (
+                    ERROR,
+                    "Project ID field should not be included, as your data manager does"
+                    " not use projects!",
+                ),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="unexpected pid header",
+        ),
+        pytest.param(
+            True,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+                ["safe project id"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="all fine with checking (legacy)",
+        ),
+        pytest.param(
+            True,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+                ["project id"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="all fine with checking",
+        ),
+        pytest.param(
+            False,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="all fine without checking",
+        ),
+        pytest.param(
+            False,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+                ["access conditions"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="expected additional header",
+        ),
+        pytest.param(
+            False,
+            [
+                ["title"],
+                ["description"],
+                ["access status"],
+                ["author name"],
+                ["keywords"],
+                ["latitude"],
+            ],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (ERROR, "Unknown metadata fields:"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="expected additional header",
+        ),
+    ],
+)
+def test_load_worksheet_project_ids(
+    mocker, caplog, fixture_summary, checking, header_row, expected_log_entries
+):
+    """Tests that project IDs provided in worksheets are only checked when required."""
+
+    # Overwrite fixture default for checking
+    fixture_summary.use_project_ids = checking
+    pid_details = list(fixture_summary.fields["core"][0][0])
+    pid_details[1] = checking
+    fixture_summary.fields["core"][0][0] = tuple(pid_details)
+
+    # Mock the function that returns the rows
+    mock_load_rows = mocker.patch("safedata_validator.summary.load_rows_from_worksheet")
+    mock_load_rows.return_value = header_row
+
+    # All these tests will eventually result in an exception because only partial input
+    # has been provided
+    with pytest.raises((AttributeError, TypeError)):
+        fixture_summary.load(DotMap({"max_column": 20}), ())
+
+    log_check(caplog, expected_log_entries)
+
+
+@pytest.mark.parametrize(
+    argnames=["data", "expected_rows"],
+    argvalues=[
+        pytest.param(
+            [["header"]],
+            [("header",)],
+            id="simple case",
+        ),
+        pytest.param(
+            [["header_1", 1, 3], ["header_2", 2, 6], ["header_3", 3, 9]],
+            [("header_1", 1, 3), ("header_2", 2, 6), ("header_3", 3, 9)],
+            id="complex case",
+        ),
+    ],
+)
+def test_load_rows_from_worksheet(data, expected_rows):
+    """Test that function to load rows from a worksheet works as intended."""
+    from safedata_validator.summary import load_rows_from_worksheet
+
+    # Make an empty worksheet
+    workbook = Workbook()
+    worksheet = workbook.active
+
+    # Loop through the rows of the list of lists and add them to the worksheet
+    for row in data:
+        worksheet.append(row)
+
+    rows = load_rows_from_worksheet(worksheet)
+
+    # Test parsed rows match what was expected
+    assert rows == expected_rows
+
+
+@pytest.mark.parametrize(
+    argnames=["use_pids", "rows", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            True,
+            {
+                "safe project id": [],
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "Missing mandatory metadata fields:"),),
+            id="no title with pid",
+        ),
+        pytest.param(
+            False,
+            {
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "Missing mandatory metadata fields:"),),
+            id="no title without pid",
+        ),
+        pytest.param(
+            False,
+            {
+                "title": [],
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            (),
+            id="good without pid",
+        ),
+        pytest.param(
+            True,
+            {
+                "title": [],
+                "description": [],
+                "project id": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            (),
+            id="good with pid",
+        ),
+        pytest.param(
+            True,
+            {
+                "title": [],
+                "description": [],
+                "safe project id": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            (),
+            id="good legacy with pid",
+        ),
+        pytest.param(
+            True,
+            {
+                "title": [],
+                "description": [],
+                "project id": [],
+                "safe project id": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "Only one of the following fields should be included:"),),
+            id="both aliases",
+        ),
+        pytest.param(
+            True,
+            {
+                "title": [],
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "One of the following fields must be included:"),),
+            id="no alias",
+        ),
+    ],
+)
+def test_check_for_mandatory_fields(
+    caplog, fixture_summary, use_pids, rows, expected_log_entries
+):
+    """Test that function to check mandatory fields works as expected."""
+
+    # Overwrite fixture default for checking
+    fixture_summary.use_project_ids = use_pids
+    pid_details = list(fixture_summary.fields["core"][0][0])
+    pid_details[1] = use_pids
+    fixture_summary.fields["core"][0][0] = tuple(pid_details)
+
+    # Add rows to fixture
+    fixture_summary._rows = rows
+
+    # Check that row row headers contain mandatory fields
+    fixture_summary._check_for_mandatory_fields()
+
+    log_check(caplog, expected_log_entries)
+
+
+@pytest.mark.parametrize(
+    argnames=["use_pids", "found", "alterations", "project_id", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            True,
+            set(["title", "description", "safe project id"]),
+            {
+                "safe project id": (77,),
+            },
+            77,
+            (
+                (INFO, "Loading core metadata"),
+                (INFO, "Metadata for Core fields found: 1 records"),
+            ),
+            id="legacy pid with checking",
+        ),
+        pytest.param(
+            True,
+            set(["title", "description", "project id"]),
+            {
+                "project id": (77,),
+            },
+            77,
+            (
+                (INFO, "Loading core metadata"),
+                (INFO, "Metadata for Core fields found: 1 records"),
+            ),
+            id="new pid with checking",
+        ),
+        pytest.param(
+            False,
+            set(["title", "description"]),
+            {},
+            None,
+            (
+                (INFO, "Loading core metadata"),
+                (INFO, "Metadata for Core fields found: 1 records"),
+            ),
+            id="without checking",
+        ),
+        pytest.param(
+            True,
+            set(["title", "description"]),
+            {
+                "project id": (100,),
+            },
+            None,
+            (
+                (INFO, "Loading core metadata"),
+                (INFO, "Metadata for Core fields found: 1 records"),
+                (
+                    ERROR,
+                    "Project ID in file (100) does not match any provided project ids:",
+                ),
+            ),
+            id="invalid pid",
+        ),
+    ],
+)
+def test_core(
+    caplog,
+    fixture_summary,
+    use_pids,
+    found,
+    alterations,
+    project_id,
+    expected_log_entries,
+):
+    """Test that function to load in core block works as expected."""
+
+    # Overwrite fixture default for checking
+    fixture_summary.use_project_ids = use_pids
+    pid_details = list(fixture_summary.fields["core"][0][0])
+    pid_details[1] = use_pids
+    fixture_summary.fields["core"][0][0] = tuple(pid_details)
+
+    # Valid set of information
+    input = {
+        "title": ("Test data set",),
+        "description": ("An example data set to test core loading",),
+    }
+
+    # Update valid to test error conditions and populate _rows
+    # directly (bypassing .load() and need to pack in worksheet object
+    fixture_summary._rows = input | alterations
+    fixture_summary._ncols = 2
+    fixture_summary.valid_pid = range(1, 100)
+
+    # Test the block load
+    fixture_summary._load_core(found)
+
+    # check that relevant attributes have be populated correctly
+    assert fixture_summary.title == "Test data set"
+    assert fixture_summary.description == "An example data set to test core loading"
+    assert fixture_summary.project_id == project_id
+
+    log_check(caplog, expected_log_entries)

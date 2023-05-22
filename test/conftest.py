@@ -115,6 +115,7 @@ def config_filesystem(fs):
         "location_aliases = ",
         "gbif_database = ",
         "ncbi_database = ",
+        "use_project_ids = True",
         "[extents]",
         "temporal_soft_extent = 2002-02-02, 2030-01-31",
         "temporal_hard_extent = 2002-02-01, 2030-02-01",

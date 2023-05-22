@@ -54,6 +54,7 @@ CONFIGSPEC = {
     "location_aliases": "string()",
     "gbif_database": "string()",
     "ncbi_database": "string()",
+    "use_project_ids": "boolean(default=True)",
     "extents": {
         "temporal_soft_extent": "date_list(min=2, max=2, default=None)",
         "temporal_hard_extent": "date_list(min=2, max=2, default=None)",
@@ -150,6 +151,7 @@ class Resources:
         location_aliases: The path to the location_aliases file
         gbif_database: The path to the GBIF database file
         ncbi_database: The path to the NCBI database file
+        use_project_ids: Whether this organisation uses project IDs or not
         valid_locations: The locations defined in the locations file
         location_aliases: Location aliases defined in the locations file
         extents: A DotMap of extent data
@@ -210,6 +212,7 @@ class Resources:
         self.ncbi_database = config_loaded.ncbi_database
         self.config_type = config_loaded.config_type
         self.config_source = config_loaded.config_source
+        self.use_project_ids = config_loaded.use_project_ids
 
         self.extents = config_loaded.extents
         self.zenodo = config_loaded.zenodo
@@ -241,9 +244,11 @@ class Resources:
             config: Passed from Resources.__init__()
             cfg_type: Identifies the route used to provide the configuration details
 
+        Raises:
+            RuntimeError: If the file does not exist, or has issues.
+
         Returns:
-             If the file does not exist, the function returns None. Otherwise,
-             it returns a DotMap of config parameters.
+            Returns a DotMap of config parameters.
         """
 
         # Otherwise, there is a file, so try and use it and now raise if there

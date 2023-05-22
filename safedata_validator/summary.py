@@ -46,10 +46,8 @@ class Summary:
         resources: An instance of Resources providing the safedata_validator
             configuration.
 
-    Class Attributes:
-        fields: A dictionary setting the expected metadata fields for summary tables.
-
     Attributes:
+        fields: A dictionary setting the expected metadata fields for summary tables.
         project_id: An integer project ID code
         title: A string giving the dataset title.
         description: A string giving a description of the dataset
@@ -64,122 +62,11 @@ class Summary:
         longitudinal_extent: Extent instance for the longitudinal extent of the Dataset.
         external_files: A list of dictionaries of external file metadata.
         data_worksheets: A list of dictionaries of data tables in the Dataset.
+        use_project_ids: Does this deployment uses project IDs
         n_errors: A count of the number of errors from loading a summary table.
         valid_pid: A list of valid project ID values.
         validate_doi: A boolean flag indicating whether DOI values should be validated.
     """
-
-    # Class attribute to define the metadata that may be present.
-    # These are defined in blocks of related rows described in 4-tuples:
-    #  0: a list of tuples giving the rows in the block:
-    #     * row header key
-    #     * mandatory within the block
-    #     * 'internal' name - also maps to Zenodo fields
-    #     * accepted types
-    #  1: is the block mandatory (bool)
-    #  2: the title of the block for the logger
-    #  3: should there be only one record (bool)
-    #
-    # Each entry in the list of rows provides the row header that appears
-    # in the summary sheet, if that field is mandatory within the set and
-    # an internal field name, if needed in the code or by Zenodo.
-
-    fields: dict[str, tuple[list, bool, str, bool]] = dict(
-        core=(
-            [
-                ("safe project id", True, "pid", int),
-                ("title", True, None, str),
-                ("description", True, None, str),
-            ],
-            True,
-            "Core fields",
-            True,
-        ),
-        access=(
-            [
-                ("access status", True, "access", str),
-                ("embargo date", False, "embargo_date", datetime.datetime),
-                ("access conditions", False, "access_conditions", str),
-            ],
-            True,
-            "Access details",
-            True,
-        ),
-        keywords=([("keywords", True, None, str)], True, "Keywords", False),
-        doi=([("publication doi", True, None, str)], False, "DOI", False),
-        date=(
-            [
-                ("start date", True, None, datetime.datetime),
-                ("end date", True, None, datetime.datetime),
-            ],
-            False,
-            "Date Extents",
-            True,
-        ),
-        geo=(
-            [
-                ("west", True, None, float),
-                ("east", True, None, float),
-                ("south", True, None, float),
-                ("north", True, None, float),
-            ],
-            False,
-            "Geographic Extents",
-            True,
-        ),
-        authors=(
-            [
-                ("author name", True, "name", str),
-                ("author affiliation", False, "affiliation", str),
-                ("author email", False, "email", str),
-                ("author orcid", False, "orcid", str),
-            ],
-            True,
-            "Authors",
-            False,
-        ),
-        funding=(
-            [
-                ("funding body", True, "body", str),
-                ("funding type", True, "type", str),
-                ("funding reference", False, "ref", (str, int, float)),
-                ("funding link", False, "url", str),
-            ],
-            False,
-            "Funding Bodies",
-            False,
-        ),
-        external=(
-            [
-                ("external file", True, "file", str),
-                ("external file description", True, "description", str),
-            ],
-            False,
-            "External Files",
-            False,
-        ),
-        worksheet=(
-            [
-                ("worksheet name", True, "name", str),
-                ("worksheet title", True, "title", str),
-                ("worksheet description", True, "description", str),
-                ("worksheet external file", False, "external", str),
-            ],
-            False,
-            "Worksheets",
-            False,
-        ),
-        permits=(
-            [
-                ("permit type", True, "type", str),
-                ("permit authority", True, "authority", str),
-                ("permit number", True, "number", (str, int, float)),
-            ],
-            False,
-            "Permits",
-            False,
-        ),
-    )
 
     def __init__(self, resources: Resources):
 
@@ -212,12 +99,132 @@ class Summary:
         )
         self.external_files = None
         self.data_worksheets: list[Worksheet] = []
+        self.use_project_ids = resources.use_project_ids
 
         self._rows: dict = {}
         self._ncols: int
         self.n_errors: int = 0
         self.valid_pid: Optional[list[int]] = None
         self.validate_doi = False
+
+        # Class attribute to define the metadata that may be present.
+        # These are defined in blocks of related rows described in 4-tuples:
+        #  0: a list of tuples giving the rows in the block:
+        #     * row header key
+        #     * mandatory within the block
+        #     * 'internal' name - also maps to Zenodo fields
+        #     * accepted types
+        #     * list of aliases for the fieldname (this generally will be blank)
+        #  1: is the block mandatory (bool)
+        #  2: the title of the block for the logger
+        #  3: should there be only one record (bool)
+        #
+        # Each entry in the list of rows provides the row header that appears
+        # in the summary sheet, if that field is mandatory within the set and
+        # an internal field name, if needed in the code or by Zenodo.
+
+        self.fields: dict[str, tuple[list, bool, str, bool]] = dict(
+            core=(
+                [
+                    (
+                        "project id",
+                        self.use_project_ids,
+                        "pid",
+                        int,
+                        ["safe project id"],
+                    ),
+                    ("title", True, None, str, []),
+                    ("description", True, None, str, []),
+                ],
+                True,
+                "Core fields",
+                True,
+            ),
+            access=(
+                [
+                    ("access status", True, "access", str, []),
+                    ("embargo date", False, "embargo_date", datetime.datetime, []),
+                    ("access conditions", False, "access_conditions", str, []),
+                ],
+                True,
+                "Access details",
+                True,
+            ),
+            keywords=([("keywords", True, None, str, [])], True, "Keywords", False),
+            doi=([("publication doi", True, None, str, [])], False, "DOI", False),
+            date=(
+                [
+                    ("start date", True, None, datetime.datetime, []),
+                    ("end date", True, None, datetime.datetime, []),
+                ],
+                False,
+                "Date Extents",
+                True,
+            ),
+            geo=(
+                [
+                    ("west", True, None, float, []),
+                    ("east", True, None, float, []),
+                    ("south", True, None, float, []),
+                    ("north", True, None, float, []),
+                ],
+                False,
+                "Geographic Extents",
+                True,
+            ),
+            authors=(
+                [
+                    ("author name", True, "name", str, []),
+                    ("author affiliation", False, "affiliation", str, []),
+                    ("author email", False, "email", str, []),
+                    ("author orcid", False, "orcid", str, []),
+                ],
+                True,
+                "Authors",
+                False,
+            ),
+            funding=(
+                [
+                    ("funding body", True, "body", str, []),
+                    ("funding type", True, "type", str, []),
+                    ("funding reference", False, "ref", (str, int, float), []),
+                    ("funding link", False, "url", str, []),
+                ],
+                False,
+                "Funding Bodies",
+                False,
+            ),
+            external=(
+                [
+                    ("external file", True, "file", str, []),
+                    ("external file description", True, "description", str, []),
+                ],
+                False,
+                "External Files",
+                False,
+            ),
+            worksheet=(
+                [
+                    ("worksheet name", True, "name", str, []),
+                    ("worksheet title", True, "title", str, []),
+                    ("worksheet description", True, "description", str, []),
+                    ("worksheet external file", False, "external", str, []),
+                ],
+                False,
+                "Worksheets",
+                False,
+            ),
+            permits=(
+                [
+                    ("permit type", True, "type", str, []),
+                    ("permit authority", True, "authority", str, []),
+                    ("permit number", True, "number", (str, int, float), []),
+                ],
+                False,
+                "Permits",
+                False,
+            ),
+        )
 
     @loggerinfo_push_pop("Checking Summary worksheet")
     def load(
@@ -244,6 +251,12 @@ class Summary:
         # validate project_id is one of None, an integer or a list of integers
         if valid_pid is None:
             pass
+        elif not self.use_project_ids:
+            LOGGER.error(
+                "Project IDs should not be provided, as your data manager does not use "
+                "them!"
+            )
+            self.valid_pid = None
         elif isinstance(valid_pid, int):
             self.valid_pid = [valid_pid]
         elif isinstance(valid_pid, list):
@@ -258,12 +271,7 @@ class Summary:
 
         self.validate_doi = validate_doi
 
-        # load worksheet rows, removing blank rows
-        # TODO - make 'internal' blank rows an error.
-        rows = []
-        for this_row in worksheet.iter_rows(values_only=True):
-            if not all([blank_value(vl) for vl in this_row]):
-                rows.append(this_row)
+        rows = load_rows_from_worksheet(worksheet)
 
         self._ncols = worksheet.max_column
 
@@ -278,27 +286,33 @@ class Summary:
         self._rows = {rw[0].lower(): rw[1:] for rw in rows}
 
         # Check the minimal keys are expected - mandatory fields in mandatory blocks
-        required_blocks = (blk[0] for blk in list(self.fields.values()) if blk[1])
-        required = {fld[0] for blk in required_blocks for fld in blk if fld[1]}
-
-        found = set(self._rows.keys())
-
-        if not found.issuperset(required):
-            LOGGER.error(
-                "Missing mandatory metadata fields: ", extra={"join": required - found}
-            )
+        found, aliases = self._check_for_mandatory_fields()
 
         # Check only valid keys are found
         valid_blocks = (blk[0] for blk in list(self.fields.values()))
         valid_fields = {fld[0] for blk in valid_blocks for fld in blk}
+
+        # Add all aliases as valid fields
+        valid_fields.update(aliases)
 
         if found - valid_fields:
             LOGGER.error(
                 "Unknown metadata fields: ", extra={"join": found - valid_fields}
             )
 
+        # TODO - the check below could probably be generalised for all aliases, but that
+        # doesn't seem a sensible use of time until we have more than one set
+
+        # Finally check that project ID field isn't included if project IDs are not used
+        if not self.use_project_ids:
+            if "project id" in found or "safe project id" in found:
+                LOGGER.error(
+                    "Project ID field should not be included, as your data manager "
+                    "does not use projects!"
+                )
+
         # Now process the field blocks
-        self._load_core()
+        self._load_core(found)
         self._load_access_details()
         self._load_authors()
         self._load_keywords()
@@ -317,6 +331,56 @@ class Summary:
         else:
             LOGGER.info("Summary formatted correctly")
 
+    def _check_for_mandatory_fields(self) -> tuple[set[str], set[str]]:
+        """Check that all mandatory fields are present.
+
+        This function also checks that if a field has an alias only one out of the alias
+        and the original name is provided.
+
+        Returns:
+            A tuple of sets, the first tuple element contains all the field headers
+            which were found, and the second tuple element contains all aliases.
+        """
+
+        # Find all required blocks
+        required_blocks = (blk[0] for blk in list(self.fields.values()) if blk[1])
+
+        required = set()
+        aliases = []
+
+        # Add all required headers to either required set or aliases set
+        for required_block in required_blocks:
+            for header in required_block:
+                # Required field with an alias
+                if header[1] and header[4]:
+                    alias_list = [header[0]] + header[4]
+                    aliases.append(set(alias_list))
+                elif header[1]:  # Required field without an alias
+                    required.add(header[0])
+
+        found = set(self._rows.keys())
+
+        if not found.issuperset(required):
+            LOGGER.error(
+                "Missing mandatory metadata fields: ", extra={"join": required - found}
+            )
+
+        # Check that one of each required alias is included
+        for alias_set in aliases:
+            present = found.intersection(alias_set)
+            if len(present) == 0:
+                LOGGER.error(
+                    "One of the following fields must be included: ",
+                    extra={"join": alias_set},
+                )
+            elif len(present) > 1:
+                LOGGER.error(
+                    "Only one of the following fields should be included: ",
+                    extra={"join": alias_set},
+                )
+
+        return found, set().union(*aliases)
+
     def _read_block(
         self, field_desc: tuple, mandatory: bool, title: str, only_one: bool
     ) -> Optional[list]:
@@ -329,7 +393,7 @@ class Summary:
         specific functions to handle unique tests.
 
         Args:
-            field_desc:  A list of tuples describing fields.
+            field_desc: A list of tuples describing fields.
             mandatory: Is the block mandatory?
             title: The display title for the block
             only_one: Are multiple records for the field an error?
@@ -749,10 +813,20 @@ class Summary:
         self.access = access
 
     @loggerinfo_push_pop("Loading core metadata")
-    def _load_core(self):
+    def _load_core(self, found):
 
-        # Now check core rows
-        core = self._read_block(*self.fields["core"])
+        # Extract all core fields
+        core_fields = self.fields["core"]
+
+        # Make list of all core aliases
+        aliases = [core_field[4] for core_field in core_fields[0]]
+        # Then replace core field names with an alias where appropriate
+        for idx, alias_set in enumerate(aliases):
+            for alias in alias_set:
+                if alias in found:
+                    core_fields[0][idx] = (alias,) + core_fields[0][idx][1:4]
+
+        core = self._read_block(*core_fields)
         core = core[0]
 
         self.title = core["title"]
@@ -764,9 +838,23 @@ class Summary:
         # Check the value is in the provided list
         if pid is not None and self.valid_pid is not None and pid not in self.valid_pid:
             LOGGER.error(
-                f"SAFE Project ID in file ({pid}) does not match any "
-                f"provided project ids: ",
+                f"Project ID in file ({pid}) does not match any provided project ids: ",
                 extra={"join": self.valid_pid},
             )
         else:
             self.project_id = pid
+
+
+def load_rows_from_worksheet(worksheet: Worksheet) -> list[tuple]:
+    """Load worksheet rows, removing blank rows.
+
+    Args:
+        worksheet: An openpyxl worksheet instance.
+    """
+    # TODO - make 'internal' blank rows an error.
+    rows = []
+    for this_row in worksheet.iter_rows(values_only=True):
+        if not all([blank_value(vl) for vl in this_row]):
+            rows.append(this_row)
+
+    return rows
