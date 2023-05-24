@@ -1,6 +1,4 @@
-"""The taxondb module.
-
-This module contains functions to:
+"""This module contains functions to:
 
 1. download versions of the GBIF backbone taxonomy and NCBI taxonomy databases, and
 2. build and index SQLite3 databases of those datasets for use in local taxon
@@ -8,7 +6,7 @@ This module contains functions to:
 
 The functions also store the timestamp of each database version in the SQLite3 files, so
 that datasets can include a taxonomy timestamp.
-"""
+"""  # noqa D415
 
 import csv
 import ftplib
@@ -247,7 +245,6 @@ def build_local_gbif(
     LOGGER.info("Adding core backbone taxa")
 
     with gzip.open(simple, "rt") as bbn:
-
         # The files are tab delimited but the quoting is sometimes unclosed,
         # so turning off quoting - includes quotes in the fields where present
         bb_reader = csv.reader(bbn, delimiter="\t", quoting=csv.QUOTE_NONE)
@@ -257,7 +254,6 @@ def build_local_gbif(
         # progress bar with real percentages, so just show a progress meter to show
         # things happening
         with tqdm(total=None) as pbar:
-
             # Loop over the lines in the file.
             for row in bb_reader:
                 row_clean = [
@@ -275,7 +271,6 @@ def build_local_gbif(
         LOGGER.info("Adding deleted taxa")
 
         with gzip.open(deleted, "rt") as dlt:
-
             # The files are tab delimited but the quoting is sometimes unclosed,
             # so turning off quoting - includes quotes in the fields where present
             dl_reader = csv.reader(dlt, delimiter="\t", quoting=csv.QUOTE_NONE)
@@ -373,7 +368,6 @@ def download_ncbi_taxonomy(outdir: str, timestamp: Optional[str] = None) -> dict
     LOGGER.info(f"Downloading taxonomy to: {out_file}")
 
     with open(out_file, "wb") as outf:
-
         with tqdm(
             total=int(total),
             unit="B",
@@ -490,7 +484,6 @@ def build_local_ncbi(
 
     # Process each table
     for tbl, info in tables.items():
-
         # Get a logical index of which fields are being kept for this table
         drop_index = [True if vl[0] in info["drop"] else False for vl in info["schema"]]
 
@@ -511,7 +504,6 @@ def build_local_ncbi(
 
         # Import data from the archive
         with archive.open(str(info["file"]), "r") as data:
-
             LOGGER.info(f"Populating {tbl} table from {info['file']}")
 
             # Use TextIOWrapper to expose the binary data from the Zip as text for CSV

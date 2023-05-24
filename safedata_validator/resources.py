@@ -1,7 +1,5 @@
-"""# Load and check validation resources.
-
-The `safedata_validator` package needs access to some local resources and configuration
-to work. The core resources for file validation are:
+"""The `safedata_validator` package needs access to some local resources and
+configuration to work. The core resources for file validation are:
 
 -   gazetteer: A path to a GeoJSON formatted gazetteer of known locations and their
     details.
@@ -21,7 +19,7 @@ A configuration file can be passed as `config` when creating an instance, but if
 arguments are provided then an attempt is made to find and load configuration files in
 the user and then site config locations defined by the `appdirs` package. See
 [here](../install/configuration.md#configuration-file-location) for details.
-"""
+"""  # noqa D415
 
 
 import contextlib
