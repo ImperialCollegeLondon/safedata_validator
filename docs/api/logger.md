@@ -1,7 +1,7 @@
 # The `logger` submodule
 
 ::: safedata_validator.logger
-    selection:
+    options:
       members: no
 
 ## Custom logging classes
