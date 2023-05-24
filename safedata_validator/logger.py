@@ -1,6 +1,4 @@
-"""Logging setup for safedata_validator.
-
-This submodule extends the standard logging setup to provide extra functionality
+"""This submodule extends the standard logging setup to provide extra functionality
 and to expose some global logging objects for use throughout the code.
 
 The submodule defines CounterHandler as a subclass of logging.StreamHandler,
@@ -20,7 +18,7 @@ Note that the handlers are created when the module is loaded, so when running
 behind a web server, the content of the handlers persist between runs of the
 code. To avoid constant concatenation of outputs, the logger should be cleared
 when a new Dataset is being validated.
-"""
+"""  # noqa D415
 
 import logging
 from functools import wraps
@@ -64,7 +62,6 @@ class CounterHandler(logging.StreamHandler):
     """Subclass of `logging.StreamHandler` counting calls emitted at each log level."""
 
     def __init__(self, *args, **kwargs) -> None:
-
         logging.StreamHandler.__init__(self, *args, **kwargs)
         self.counters = {"DEBUG": 0, "INFO": 0, "WARNING": 0, "ERROR": 0, "CRITICAL": 0}
 
@@ -114,7 +111,6 @@ class IndentFormatter(logging.Formatter):
         datefmt: Optional[str] = None,
         indent: str = "    ",
     ) -> None:
-
         logging.Formatter.__init__(self, fmt, datefmt)
         self.depth = 0
         self.indent = indent
@@ -251,7 +247,6 @@ def loggerinfo_push_pop(wrapper_message: str) -> Callable:
     def decorator_func(function: Callable) -> Callable:
         @wraps(function)
         def wrapped_func(*args, **kwargs: Any):
-
             # Emit the logger info and step in a level
             LOGGER.info(wrapper_message)
             FORMATTER.push()
