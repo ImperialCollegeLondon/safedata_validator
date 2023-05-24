@@ -1,10 +1,8 @@
-"""The location module.
-
-This module provides the Locations class, which used to validate a set of known and or
+"""This module provides the Locations class, which used to validate a set of known and or
 new location information, formatted in the safedata_validator style. An instance can
 then also be used to track which of the validated set of locations is used in the rest
 of the dataset.
-"""
+"""  # noqa D415
 
 from typing import List, Optional
 
@@ -63,7 +61,6 @@ class Locations:
         latitudinal_extent: Optional[Extent] = None,
         longitudinal_extent: Optional[Extent] = None,
     ) -> None:
-
         self.n_errors = 0
         self.locations: set = set()
         self.location_index: list = []
@@ -138,7 +135,6 @@ class Locations:
 
         # Split up old and new if there are there any new ones?
         if "new" in headers:
-
             # Check the New column is just yes, no
             new_vals_with_blanks = IsLower([rw["new"] for rw in locs])
             new_vals = IsNotBlank(new_vals_with_blanks, keep_failed=False)
@@ -308,14 +304,12 @@ class Locations:
             # Check Lat Long and WKT
 
             if lonlat_provided:
-
                 LOGGER.info("Validating lat / long data")
                 FORMATTER.push()
                 for axs, ext_attr in [
                     ("latitude", "latitudinal_extent"),
                     ("longitude", "longitudinal_extent"),
                 ]:
-
                     # Allow NAs for unknown location points
                     axs_vals_with_blanks = [vl[axs] for vl in locs if vl[axs] != "NA"]
                     axs_vals = IsNotBlank(axs_vals_with_blanks, keep_failed=False)
@@ -340,7 +334,6 @@ class Locations:
                 FORMATTER.pop()
 
             if wkt_provided:
-
                 LOGGER.info("Validating WKT data")
                 FORMATTER.push()
 
@@ -350,7 +343,6 @@ class Locations:
                 bounds = []
 
                 for this_new_loc in locs:
-
                     if this_new_loc["wkt"] is None:
                         blank_wkt.append(this_new_loc["location name"])
                     elif not isinstance(this_new_loc["wkt"], str):
@@ -361,7 +353,6 @@ class Locations:
                         pass
 
                     else:
-
                         # Run the potential WKT through the parser
                         try:
                             this_new_geom = wkt.loads(this_new_loc["wkt"])
@@ -411,7 +402,6 @@ class Locations:
         self.locations.update(loc_names)
 
         for this_new_loc in locs:
-
             if wkt_provided and this_new_loc["wkt"] != "NA":
                 geom = this_new_loc["wkt"]
             elif lonlat_provided and (

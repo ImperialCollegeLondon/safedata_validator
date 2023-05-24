@@ -1,10 +1,8 @@
-"""The summary module.
-
-This module handles the parsing and validation of the summary table for a Dataset. The
+"""This module handles the parsing and validation of the summary table for a Dataset. The
 table consists of rows of information, with row labels in the first column. The module
 defines the single [Summary object][safedata_validator.summary.Summary] which provides
 methods for loading the summary data from file.
-"""
+"""  # noqa D415
 
 import datetime
 import re
@@ -69,7 +67,6 @@ class Summary:
     """
 
     def __init__(self, resources: Resources):
-
         self.project_id = None
         self.title = None
         self.description = None
@@ -463,7 +460,7 @@ class Summary:
 
             # remap names if provided
             to_rename = (mp for mp in field_map if mp[1] is not None)
-            for (old, new) in to_rename:
+            for old, new in to_rename:
                 for rec in block_list:
                     rec[new] = rec[old]
                     rec.pop(old)
@@ -472,12 +469,10 @@ class Summary:
 
     @loggerinfo_push_pop("Loading author metadata")
     def _load_authors(self):
-
         authors = self._read_block(*self.fields["authors"])
 
         # Author specific validation
         if authors is not None:
-
             # Badly formatted names
             bad_names = [
                 rec["name"]
@@ -516,7 +511,6 @@ class Summary:
 
     @loggerinfo_push_pop("Loading keywords metadata")
     def _load_keywords(self):
-
         keywords = self._read_block(*self.fields["keywords"])
 
         # extra data validation for keywords
@@ -533,7 +527,6 @@ class Summary:
 
     @loggerinfo_push_pop("Loading permit metadata")
     def _load_permits(self):
-
         # LOOK FOR PERMIT DETAILS - users provide a permit authority, number and permit
         # type
 
@@ -555,13 +548,11 @@ class Summary:
 
     @loggerinfo_push_pop("Loading DOI metadata")
     def _load_doi(self):
-
         # CHECK FOR PUBLICATION DOIs
         pub_doi = self._read_block(*self.fields["doi"])
 
         # Extra data validation for DOIs
         if pub_doi is not None:
-
             # Check DOI URLS _are_ urls
             pub_doi_re = [
                 RE_DOI.search(v["publication doi"])
@@ -586,7 +577,6 @@ class Summary:
 
     @loggerinfo_push_pop("Loading funding metadata")
     def _load_funders(self):
-
         # LOOK FOR FUNDING DETAILS - users provide a funding body and a description
         # of the funding type and then optionally a reference number and a URL
 
@@ -599,12 +589,10 @@ class Summary:
 
     @loggerinfo_push_pop("Loading temporal extent metadata")
     def _load_temporal_extent(self):
-
         temp_extent = self._read_block(*self.fields["date"])
 
         # temporal extent validation and updating
         if temp_extent is not None:
-
             start_date = temp_extent[0]["start date"]
             end_date = temp_extent[0]["end date"]
 
@@ -630,12 +618,10 @@ class Summary:
 
     @loggerinfo_push_pop("Loading geographic extent metadata")
     def _load_geographic_extent(self):
-
         # Geographic extents
         geo_extent = self._read_block(*self.fields["geo"])
 
         if geo_extent is not None:
-
             bbox = geo_extent[0]
 
             if all([isinstance(v, float) for v in bbox.values()]):
@@ -651,7 +637,6 @@ class Summary:
 
     @loggerinfo_push_pop("Loading external file metadata")
     def _load_external_files(self):
-
         # LOAD EXTERNAL FILES - small datasets will usually be contained
         # entirely in a single Excel file, but where formatting or size issues
         # require external files, then names and descriptions are included in
@@ -661,7 +646,6 @@ class Summary:
 
         # external file specific validation - no internal spaces.
         if external_files is not None:
-
             bad_names = [
                 exf["file"]
                 for exf in external_files
@@ -678,14 +662,12 @@ class Summary:
 
     @loggerinfo_push_pop("Loading data worksheet metadata")
     def _load_data_worksheets(self, sheetnames):
-
         # Load the WORKSHEETS block
         data_worksheets = self._read_block(*self.fields["worksheet"])
 
         # Strip out faulty inclusion of Taxa and Location worksheets in
         # data worksheets before considering combinations of WS and external files
         if data_worksheets is not None:
-
             cited_sheets = [ws["name"] for ws in data_worksheets]
 
             if ("Locations" in cited_sheets) or ("Taxa" in cited_sheets):
@@ -757,7 +739,6 @@ class Summary:
 
     @loggerinfo_push_pop("Loading access metadata")
     def _load_access_details(self):
-
         # Load the ACCESS DETAILS block
         access = self._read_block(*self.fields["access"])
         access = access[0]
@@ -765,7 +746,6 @@ class Summary:
         # Access specific validation - bad types handled by _read_block
         # - status must be in list of three accepted values
         if isinstance(access["access"], str):
-
             status = access["access"].lower()
             embargo_date = access["embargo_date"]
 
@@ -776,7 +756,6 @@ class Summary:
                 )
 
             if status == "embargo":
-
                 if embargo_date is None:
                     LOGGER.error("Dataset embargoed but no embargo date provided")
                 elif isinstance(embargo_date, datetime.datetime):
@@ -814,7 +793,6 @@ class Summary:
 
     @loggerinfo_push_pop("Loading core metadata")
     def _load_core(self, found):
-
         # Extract all core fields
         core_fields = self.fields["core"]
 

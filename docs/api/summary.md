@@ -4,4 +4,8 @@
     options:
         show_source: true
         group_by_category: false
-        members_order: source
+        members:
+            - Summary
+            - load_rows_from_worksheet
+        show_root_heading: false
+        show_root_toc_entry: false
