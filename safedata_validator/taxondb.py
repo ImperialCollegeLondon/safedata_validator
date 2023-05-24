@@ -79,7 +79,7 @@ def download_gbif_backbone(outdir: str, timestamp: Optional[str] = None) -> dict
 
     url = f"https://hosted-datasets.gbif.org/datasets/backbone/{timestamp}/"
 
-    timestamp_head = requests.head(url + "simple.txt.gz")
+    timestamp_head = requests.head(url)
 
     if not timestamp_head.ok:
         log_and_raise(
@@ -88,21 +88,28 @@ def download_gbif_backbone(outdir: str, timestamp: Optional[str] = None) -> dict
             ValueError,
         )
 
+    # Two possible names for the key backbone file: backbone in earlier snapshots.
     simple_head = requests.head(url + "simple.txt.gz")
+    backbone_head = requests.head(url + "backbone.txt.gz")
     deleted_head = requests.head(url + "simple-deleted.txt.gz")
 
-    if not simple_head.ok:
+    if not (simple_head.ok or backbone_head.ok):
         log_and_raise(
-            "Timestamp version does not provide simple.txt.gz backbone.",
+            "Timestamp version does not provide simple.txt.gz or backbone.txt.gz",
             ValueError,
         )
 
-    deleted_exists = deleted_head.ok
+    # Download files to target directory - alternative names for simple backbone dump
+    if simple_head.ok:
+        targets = [
+            ("simple", "simple.txt.gz", int(simple_head.headers["Content-Length"]))
+        ]
+    elif backbone_head.ok:
+        targets = [
+            ("simple", "backbone.txt.gz", int(backbone_head.headers["Content-Length"]))
+        ]
 
-    # Download files to target directory
-    targets = [("simple", "simple.txt.gz", int(simple_head.headers["Content-Length"]))]
-
-    if deleted_exists:
+    if deleted_head.ok:
         targets += [
             (
                 "deleted",

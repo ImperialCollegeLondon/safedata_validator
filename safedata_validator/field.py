@@ -436,8 +436,8 @@ class Dataset:
             "total": self.n_errors,
             "summary": self.summary.n_errors,
             "locations": self.locations.n_errors,
-            "gbif": self.taxa.gbif_taxa.n_errors or 0,
-            "ncbi": self.taxa.ncbi_taxa.n_errors or 0,
+            "gbif": self.taxa.gbif_taxa.n_errors,
+            "ncbi": self.taxa.ncbi_taxa.n_errors,
             "data": [(d.name, d.n_errors) for d in self.dataworksheets],
         }
 
