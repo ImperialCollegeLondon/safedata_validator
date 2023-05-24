@@ -15,6 +15,7 @@ import textwrap
 
 import simplejson
 
+from safedata_validator import __version__
 from safedata_validator.field import Dataset
 from safedata_validator.logger import CONSOLE_HANDLER, FORMATTER, LOGGER
 from safedata_validator.resources import Resources
@@ -24,7 +25,6 @@ from safedata_validator.taxondb import (
     download_gbif_backbone,
     download_ncbi_taxonomy,
 )
-from safedata_validator.version import __version__
 from safedata_validator.zenodo import (
     create_deposit,
     dataset_description,
@@ -74,9 +74,9 @@ def _safedata_validator_cli():
         default=None,
         type=int,
         action="append",
-        help="If provided, check that the project ID within the file "
-        "matches this integer. Multiple values can be provided "
-        "to generate a set of valid IDs.",
+        help="If provided, check that the project ID within the file matches this "
+        "integer. Multiple values can be provided to generate a set of valid IDs. This "
+        "option only makes sense to use if your organisation uses project IDs.",
         dest="valid_pid",
     )
     parser.add_argument(

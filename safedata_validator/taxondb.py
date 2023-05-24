@@ -510,7 +510,7 @@ def build_local_ncbi(
         insert_statement = f"INSERT INTO {tbl} VALUES ({placeholders})"
 
         # Import data from the archive
-        with archive.open(info["file"], "r") as data:
+        with archive.open(str(info["file"]), "r") as data:
 
             LOGGER.info(f"Populating {tbl} table from {info['file']}")
 

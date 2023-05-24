@@ -34,6 +34,7 @@ def fixture_files():
     real_files = [
         ("gaz_file", "gazetteer_simple.geojson"),
         ("localias_file", "location_aliases_simple.csv"),
+        ("empty_localias_file", "location_aliases_empty.csv"),
         ("gbif_file", "gbif_backbone_truncated.sqlite"),
         ("ncbi_file", "ncbi_database_truncated.sqlite"),
         ("json_not_locations", "notalocationsjson.json"),
@@ -114,6 +115,7 @@ def config_filesystem(fs):
         "location_aliases = ",
         "gbif_database = ",
         "ncbi_database = ",
+        "use_project_ids = True",
         "[extents]",
         "temporal_soft_extent = 2002-02-02, 2030-01-31",
         "temporal_hard_extent = 2002-02-01, 2030-02-01",

@@ -15,6 +15,7 @@ gazetteer = /path/to/gazeteer.geojson
 location_aliases = /path/to/location_aliases.csv
 gbif_database = /path/to/local/backbone.sqlite3
 ncbi_database = /path/to/local/ncbi_database.sqlite3
+use_project_ids = True
 [extents]
 temporal_soft_extent = 2002-02-02, 2030-01-31
 temporal_hard_extent = 2002-02-01, 2030-02-01
@@ -35,6 +36,7 @@ contact_orcid = 0000-0003-3378-2814
 [metadata]
 api = https://safeproject.net
 token = xyz
+ssl_verify = true
 ```
 
 ### Locations
@@ -111,6 +113,22 @@ The `ncbi_database` entry contains the path to the required local copy of the NC
 database, ([see here](build_local_ncbi.md)). This database **must** be included even
 when no NCBI taxa are included.
 
+### Project IDs
+
+The `safedata` system was initially developed as part of the SAFE project, which
+organises datasets into projects. Each project is identified using a unique
+identification number, and each dataset is associated with one or more projects using
+these project ID numbers. We anticipate that other deployments of the `safedata` system
+may not wish to organise datasets in this manner. If so, the checking of project IDs can
+be turned off by setting the `use_project_ids` option  to `False`. With this option off,
+datasets will **fail validation** if they contain project IDs.
+
+!!! Warning
+  Each deployment of the `safedata` system will have to make a choice of whether or not
+  to organise datasets into project. Once this choice has been made it will be binding.
+  As such, this option should only be changed by the relevant data manager during the
+  initial setup of the data system.
+
 ### Extents
 
 The `safedata_validator` package tracks the geographic and temporal extents of
@@ -160,6 +178,11 @@ server, which provides an API allowing searches across all uploaded datasets. A 
 package in the SAFE data ecosystem
 ([`safedata`](https://imperialcollegelondon.github.io/safedata/)) has been built, in
 order to simplify the process of querying this API for end users.
+
+In production use, the metadata server should be set up with a properly validated SSL
+certificate to allow HTTPS, and this is relatively easy using LetsEncrypt. However, when
+setting up and testing a system, requiring a valid certificate can be a road block and
+the SSL verification can be turned off.
 
 ## Configuration file location
 

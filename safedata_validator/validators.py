@@ -149,7 +149,7 @@ class Filter:
         return True
 
     @staticmethod
-    def rfunc(val) -> bool:
+    def rfunc(val) -> Any:
         """Clean a value that has failed testing."""
         return val
 
@@ -432,7 +432,7 @@ class HasDuplicates:
     @staticmethod
     def _get_duplicates(values) -> Any:
         # https://stackoverflow.com/questions/46554866
-        c = Counter()
+        c: Counter = Counter()
         seen = set()
         for i in values:
             c[i] += 1
@@ -471,7 +471,7 @@ class IsInSet:
 
     def __init__(self, values: Iterable, test_values: tuple):
 
-        self.failed = []
+        self.failed: list = []
         self.test_values = test_values
         self.values = [v for v in self.filter(values)]
 
@@ -487,7 +487,7 @@ class IsInSet:
             else:
                 self.failed.append(val)
 
-    def __bool__(self) -> str:
+    def __bool__(self) -> bool:
         """Class compares as False when all values in test set."""
         return not self.failed
 
@@ -503,10 +503,9 @@ class IsInSet:
 class TypeCheck(IsInSet):
     """Check the types of a set of values.
 
-    This class is used to check whether all the values are members of a
-    given set of types. It overrides the base
-    [filter][safedata_validator.validators.IsInSet.filter] method to check that the
-    types of `values` are all instances of test_values.
+    This class is used to check whether all the values are members of a given set of
+    types. It overrides the base [filter][safedata_validator.validators.IsInSet.filter]
+    method to check that the types of `values` are all instances of test_values.
     """
 
     def filter(self, values) -> Any:
