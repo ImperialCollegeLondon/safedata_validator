@@ -31,14 +31,14 @@ from safedata_validator.resources import Resources
 from safedata_validator.taxa import taxon_index_to_text
 
 # Constant definition of zenodo action function response type
-ZenodoFunctionResponseType = tuple[
-    Optional[Union[dict, str, int]], Optional[Union[str, bytes]]
-]
+ZenodoFunctionResponseType = tuple[Optional[dict], Optional[str]]
 """Function return value
 
 The functions interacting with Zenodo all return a common format of tuple of length 2:
 
-* A dictionary containing the response content or None on error
+* A dictionary containing the response content or None on error. For responses that do
+  not generate a response content but just indicate success via HTTP status codes, an
+  empty dictionary is returned.
 * An error message on failure or None on success
 
 So, for example:
@@ -143,7 +143,7 @@ def get_deposit(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo--function-return-value].
+        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
     """
 
     zres = _resources_to_zenodo_api(resources)
@@ -177,7 +177,7 @@ def create_deposit(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo--function-return-value].
+        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
     """
 
     # Get resource configuration
@@ -229,7 +229,7 @@ def upload_metadata(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo--function-return-value].
+        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
     """
 
     # Get resource configuration
@@ -290,7 +290,7 @@ def upload_metadata(
     if mtd.status_code != 200:
         return None, mtd.reason
     else:
-        return "success", None
+        return {}, None
 
 
 def update_published_metadata(
@@ -310,7 +310,7 @@ def update_published_metadata(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo--function-return-value].
+        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
     """
 
     # Get resource configuration
@@ -322,7 +322,7 @@ def update_published_metadata(
     edt = requests.post(links["edit"], params=zres["ztoken"])
 
     if edt.status_code != 201:
-        return 1, edt.json()
+        return None, edt.json()
 
     # # Amend the metadata
     # for key, val in new_values.items():
@@ -355,14 +355,14 @@ def update_published_metadata(
     # notice
 
     if success_so_far:
-        return 0, ret
+        return ret, None
     else:
         dsc = requests.post(links["discard"], params=zres["ztoken"])
         success_so_far = 0 if dsc.status_code != 201 else 1
         if not success_so_far:
             ret = dsc.json()
 
-        return 1, ret
+        return None, ret
 
 
 def upload_file(
@@ -387,7 +387,7 @@ def upload_file(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo--function-return-value].
+        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
     """
 
     # Get resource configuration
@@ -410,7 +410,6 @@ def upload_file(
     api = f"{metadata['links']['bucket']}/{file_name}"
 
     with open(filepath, "rb") as file_io:
-
         if progress_bar:
             with tqdm(
                 total=file_size, unit="B", unit_scale=True, unit_divisor=1024
@@ -451,7 +450,7 @@ def discard_deposit(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo--function-return-value].
+        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
     """
 
     # Get resource configuration
@@ -477,7 +476,7 @@ def publish_deposit(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo--function-return-value].
+        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
     """
 
     # Get resource configuration
@@ -506,7 +505,7 @@ def delete_file(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo--function-return-value].
+        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
     """
 
     # Get resource configuration
@@ -553,7 +552,7 @@ def post_metadata(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo--function-return-value].
+        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
     """
 
     # Get resource configuration
@@ -571,7 +570,7 @@ def post_metadata(
 
     # trap errors in uploading metadata and tidy up
     if mtd.status_code != 201:
-        return None, mtd.content
+        return None, mtd.text
     else:
         return mtd.json(), None
 
@@ -588,7 +587,7 @@ def update_gazetteer(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo--function-return-value].
+        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
     """
 
     # Get resource configuration
@@ -605,7 +604,7 @@ def update_gazetteer(
 
     # trap errors in uploading metadata and tidy up
     if response.status_code != 201:
-        return None, response.content
+        return None, response.text
     else:
         return response.json(), None
 
@@ -1187,7 +1186,6 @@ def download_ris_data(
     # to the next page of records, so keep looping until there are no more next
     n_records = 0
     while True:
-
         # Get the data
         safe_data = requests.get(api)
 
@@ -1226,7 +1224,6 @@ def download_ris_data(
     FORMATTER.push()
 
     for doi in new_doi:
-
         ris_data = requests.get(
             f"https://data.datacite.org/application/x-research-info-systems/{doi}"
         )
@@ -1357,7 +1354,6 @@ def sync_local_dir(
 
     # Download the files
     for dep in deposits:
-
         con_rec_id = str(dep["conceptrecid"])
         rec_id = str(dep["record_id"])
 
@@ -1378,7 +1374,6 @@ def sync_local_dir(
 
         # loop over the files in the record
         for this_file in dep["files"]:
-
             if xlsx_only and not this_file["filename"].endswith(".xlsx"):
                 LOGGER.info(f"Skipping non-excel file {this_file['filename']}")
                 continue
