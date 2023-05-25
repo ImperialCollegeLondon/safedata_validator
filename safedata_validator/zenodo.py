@@ -1,6 +1,4 @@
-"""# The `zenodo` module.
-
-This module provides functions to:
+"""This module provides functions to:
 
 1. handle the publication of datasets after they have been validated
    using safedata_validate, including the generation of HTML descriptions
@@ -8,7 +6,7 @@ This module provides functions to:
 2. maintain local copies of datasets in the folder structure expected
    by the safedata R package.
 3. compile a RIS format bibliographic file for published datasets.
-"""
+"""  # noqa D415
 
 import copy
 import hashlib
