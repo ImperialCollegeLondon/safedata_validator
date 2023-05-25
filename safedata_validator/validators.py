@@ -10,6 +10,8 @@ from collections import Counter
 from collections.abc import Iterable
 from typing import Any
 
+from openpyxl.worksheet.worksheet import Worksheet
+
 from safedata_validator.logger import LOGGER
 
 RE_WSPACE_ONLY = re.compile(r"^\s*$")
@@ -128,13 +130,11 @@ class Filter:
     """
 
     def __init__(self, values, keep_failed=True):
-
         self.failed = []
         self.keep_failed = keep_failed
         self.values = [v for v in self._filter(values)]
 
     def _filter(self, values):
-
         for val in values:
             if self.tfunc(val):
                 yield val
@@ -426,7 +426,6 @@ class HasDuplicates:
     """
 
     def __init__(self, values: Iterable):
-
         self.duplicated = list(self._get_duplicates(values))
 
     @staticmethod
@@ -470,7 +469,6 @@ class IsInSet:
     """
 
     def __init__(self, values: Iterable, test_values: tuple):
-
         self.failed: list = []
         self.test_values = test_values
         self.values = [v for v in self.filter(values)]
@@ -541,8 +539,7 @@ class GetDataFrame:
         bad_headers: A dictionary of malformed header values
     """
 
-    def __init__(self, ws, header_row=1):
-
+    def __init__(self, ws: Worksheet, header_row: int = 1):
         self.headers = []
         self.bad_headers = dict()
         self.data_columns = []
@@ -587,30 +584,31 @@ class GetDataFrame:
 
         # Check the headers
         # - should not be blank
-        headers = IsNotBlank(headers)
-        if not headers:
+        headers_chk: Filter = IsNotBlank(headers)
+        if not headers_chk:
             LOGGER.error("Headers contain empty or whitespace cells")
-            self.bad_headers["blank"] = headers.failed
+            self.bad_headers["blank"] = headers_chk.failed
 
         # - should be strings
-        headers = IsString(headers)
-        if not headers:
+        headers_chk = IsString(headers_chk)
+        if not headers_chk:
             LOGGER.error(
-                "Headers contain non-string values: ", extra={"join": headers.failed}
+                "Headers contain non-string values: ",
+                extra={"join": headers_chk.failed},
             )
-            self.bad_headers["non_string"] = headers.failed
+            self.bad_headers["non_string"] = headers_chk.failed
 
         # - should have no padding
-        headers = IsNotPadded(headers)
-        if not headers:
+        headers_chk = IsNotPadded(headers_chk)
+        if not headers_chk:
             LOGGER.error(
                 "Headers contain whitespace padded strings: ",
-                extra={"join": headers.failed},
+                extra={"join": headers_chk.failed},
             )
-            self.bad_headers["padded"] = headers.failed
+            self.bad_headers["padded"] = headers_chk.failed
 
         # - should be unique (after removing whitespace)
-        dupes = HasDuplicates(headers)
+        dupes = HasDuplicates(headers_chk)
         if dupes:
             LOGGER.error(
                 "Headers contain duplicated values: ", extra={"join": dupes.duplicated}
@@ -619,5 +617,5 @@ class GetDataFrame:
 
         # Do not package headers and columns into a dict - will lose duplicated
         # keys and can still validate fields with dupe keys
-        self.headers = headers.values
+        self.headers = headers_chk.values
         self.data_columns = data_columns
