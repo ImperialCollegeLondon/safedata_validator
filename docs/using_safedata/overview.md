@@ -22,7 +22,7 @@ data management and discovery. This system comprises:
    package that makes it easy for users to discover and download datasets of interest
    from your community.
 
-## Use recipes
+## Use case recipes
 
 The sections below provide examples of using the `safedata_validator` package to
 administer datasets. Typical use will be from the command line using a Unix-like shell
