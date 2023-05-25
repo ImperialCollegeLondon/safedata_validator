@@ -30,15 +30,25 @@ or [Windows subsystem for Linux](https://learn.microsoft.com/en-us/windows/wsl/i
 but the examples also show how to use the programmatic API for `safedata_validator` from
 within Python.
 
+<!--- 
+The include extension does not seem to work when including content within tabbed blocks
+in the use case recipes below so for the moment keeping the code in sections not tabs
+and including the code from source files that can be validated by pre-commit
+-->
+
 ### Validating and publishing a dataset
 
 These examples show the typical workflow for publishing a dataset and accompanying
 metadata using `safedata_validator`.
 
-=== Shell
+#### Shell
 
 ```sh
 {!docs/using_safedata/publish_script.sh!}
 ```
 
-=== Python
+#### Python
+
+```sh
+{!docs/using_safedata/publish_script.py!}
+```

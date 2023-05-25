@@ -937,8 +937,8 @@ class BaseField:
     The base class also has a much more complex signature than the base
     functionality requires. Various subclasses need access to:
 
-        * Dataset level information - extents, taxa and locations.
-        * Dataworksheet level information - taxon fields
+    * Dataset level information - extents, taxa and locations.
+    * Dataworksheet level information - taxon fields
 
     Rather than having complex inheritance with changing subclass signatures
     and kwargs, the BaseField class makes all information available to all

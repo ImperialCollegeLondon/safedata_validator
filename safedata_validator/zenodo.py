@@ -29,21 +29,22 @@ from safedata_validator.resources import Resources
 from safedata_validator.taxa import taxon_index_to_text
 
 # Constant definition of zenodo action function response type
-ZenodoFunctionResponseType = tuple[Optional[dict], Optional[str]]
+ZenodoFunctionResponseType = tuple[dict, Optional[str]]
 """Function return value
 
 The functions interacting with Zenodo all return a common format of tuple of length 2:
 
-* A dictionary containing the response content or None on error. For responses that do
-  not generate a response content but just indicate success via HTTP status codes, an
-  empty dictionary is returned.
+* A dictionary containing the response content. For responses that do not generate a
+  response content but just indicate success via HTTP status codes, an empty dictionary
+  is returned. An empty dictionary is also returned when the function results in an
+  error.
 * An error message on failure or None on success
 
 So, for example:
 
 ```{python}
 ({'key': 'value'}, None)
-(None, 'Something went wrong')
+({}, 'Something went wrong')
 ```
 
 The expected use pattern is then:
@@ -157,7 +158,7 @@ def get_deposit(
     if dep.status_code == 200:
         return dep.json(), None
     else:
-        return None, _zenodo_error_message(dep)
+        return {}, _zenodo_error_message(dep)
 
 
 def create_deposit(
@@ -194,7 +195,7 @@ def create_deposit(
 
     # trap errors in creating the new version (not 201: created)
     if new_draft.status_code != 201:
-        return None, _zenodo_error_message(new_draft)
+        return {}, _zenodo_error_message(new_draft)
 
     if concept_id is None:
         return new_draft.json(), None
@@ -207,7 +208,7 @@ def create_deposit(
     # trap errors in creating the resource - successful creation of new version
     #  drafts returns 200
     if dep.status_code != 200:
-        return None, _zenodo_error_message(dep)
+        return {}, _zenodo_error_message(dep)
     else:
         return dep.json(), None
 
@@ -286,7 +287,7 @@ def upload_metadata(
 
     # trap errors in uploading metadata and tidy up
     if mtd.status_code != 200:
-        return None, mtd.reason
+        return {}, mtd.reason
     else:
         return {}, None
 
@@ -320,7 +321,7 @@ def update_published_metadata(
     edt = requests.post(links["edit"], params=zres["ztoken"])
 
     if edt.status_code != 201:
-        return None, edt.json()
+        return {}, edt.json()
 
     # # Amend the metadata
     # for key, val in new_values.items():
@@ -360,7 +361,7 @@ def update_published_metadata(
         if not success_so_far:
             ret = dsc.json()
 
-        return None, ret
+        return {}, ret
 
 
 def upload_file(
@@ -421,14 +422,14 @@ def upload_file(
     # trap errors in uploading file
     # - no success or mismatch in md5 checksums
     if fls.status_code != 200:
-        return None, _zenodo_error_message(fls)
+        return {}, _zenodo_error_message(fls)
 
     # TODO - could this be inside with above? - both are looping over the file contents
     # https://medium.com/codex/chunked-uploads-with-binary-files-in-python-f0c48e373a91
     local_hash = _compute_md5(filepath)
 
     if fls.json()["checksum"] != f"md5:{local_hash}":
-        return None, "Mismatch in local and uploaded MD5 hashes"
+        return {}, "Mismatch in local and uploaded MD5 hashes"
     else:
         return fls.json(), None
 
@@ -460,7 +461,7 @@ def discard_deposit(
     if delete.status_code == 204:
         return {"result": "success"}, None
     else:
-        return None, _zenodo_error_message(delete)
+        return {}, _zenodo_error_message(delete)
 
 
 def publish_deposit(
@@ -486,7 +487,7 @@ def publish_deposit(
 
     # trap errors in publishing, otherwise return the publication metadata
     if pub.status_code != 202:
-        return None, pub.json()
+        return {}, pub.json()
     else:
         return pub.json(), None
 
@@ -517,20 +518,20 @@ def delete_file(
     # check the result of the files request
     if files.status_code != 200:
         # failed to get the files
-        return None, _zenodo_error_message(files)
+        return {}, _zenodo_error_message(files)
 
     # get a dictionary of file links
     files_dict = {f["filename"]: f["links"]["self"] for f in files.json()}
 
     if filename not in files_dict:
-        return None, f"{filename} is not a file in the deposit"
+        return {}, f"{filename} is not a file in the deposit"
 
     # get the delete link to the file and call
     delete_api = files_dict[filename]
     file_del = requests.delete(delete_api, params=params)
 
     if file_del.status_code != 204:
-        return None, _zenodo_error_message(file_del)
+        return {}, _zenodo_error_message(file_del)
     else:
         return {"result": "success"}, None
 
@@ -568,7 +569,7 @@ def post_metadata(
 
     # trap errors in uploading metadata and tidy up
     if mtd.status_code != 201:
-        return None, mtd.text
+        return {}, mtd.text
     else:
         return mtd.json(), None
 
@@ -602,7 +603,7 @@ def update_gazetteer(
 
     # trap errors in uploading metadata and tidy up
     if response.status_code != 201:
-        return None, response.text
+        return {}, response.text
     else:
         return response.json(), None
 
