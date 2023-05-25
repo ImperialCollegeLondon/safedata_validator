@@ -1,10 +1,8 @@
-"""The field module.
-
-This module contains the Dataset, Dataworksheet and BaseField classes, along with
+"""This module contains the Dataset, Dataworksheet and BaseField classes, along with
 subclasses of BaseField for different data types. These are the core functions of
 safedata_validator, responsible for opening a file containing formatted data,
 and loading and validating the field metadata and data rows in the main data tables.
-"""
+"""  # noqa D415
 
 from __future__ import annotations
 
@@ -12,7 +10,7 @@ import datetime
 import os
 from itertools import islice
 from logging import CRITICAL, ERROR, WARNING
-from typing import List, Optional, Type, Union
+from typing import List, Optional, Union
 
 import simplejson
 from dateutil import parser
