@@ -1,6 +1,4 @@
-"""Tracking the extent of key variables within a dataset.
-
-The extent submodule defines the Extent class to track the extent of a
+"""The extent submodule defines the Extent class to track the extent of a
 particular variable across a dataset. It is designed to track the extents
 required by GEMINI 2: latitude, longitude and date, but the implementation is
 general. Values are fed to a class instance using the
@@ -9,12 +7,13 @@ extent as necessary.
 
 Typical usage:
 
+    ```python
     ext = Extent('latitude', (int, float), hard_bounds=(-90, 90))
     ext.update([1,2,3,4,5,6])
+    ```
+"""  # noqa D415
 
-"""
-
-from typing import Iterable, Optional, Tuple, Union
+from typing import Iterable, Optional, Tuple
 
 from safedata_validator.logger import LOGGER, log_and_raise
 from safedata_validator.validators import TypeCheck
@@ -42,7 +41,6 @@ class Extent:
         hard_bounds: Optional[tuple] = None,
         soft_bounds: Optional[tuple] = None,
     ):
-
         # The extent is stored internally as a list for ease of update
         # but only accessible via the property as a tuple to avoid it
         # being modifiable by reference. All other variables are similarly

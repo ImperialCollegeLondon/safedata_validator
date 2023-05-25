@@ -1,7 +1,5 @@
-"""Load and check validation resources.
-
-The `safedata_validator` package needs access to some local resources and configuration
-to work. The core resources for file validation are:
+"""The `safedata_validator` package needs access to some local resources and
+configuration to work. The core resources for file validation are:
 
 -   gazetteer: A path to a GeoJSON formatted gazetteer of known locations and their
     details.
@@ -17,12 +15,11 @@ The [Resources][safedata_validator.resources.Resources] class is used to locate 
 validate these resources, and then provide those validated resources to other components
 of the package.
 
-A configuration file can be passed as `cfg_path` when creating an instance, but if no
+A configuration file can be passed as `config` when creating an instance, but if no
 arguments are provided then an attempt is made to find and load configuration files in
 the user and then site config locations defined by the `appdirs` package. See
-[here][usage/usage] for details.
-
-"""
+[here](../install/configuration.md#configuration-file-location) for details.
+"""  # noqa D415
 
 
 import contextlib
@@ -117,7 +114,6 @@ def date_list(value: str, min: str, max: str) -> list[date]:
     # noting that this strips out time information
     out = []
     for entry in value:
-
         try:
             parsed_entry = isoparse(entry).date()
         except ValueError:
@@ -159,7 +155,6 @@ class Resources:
     """
 
     def __init__(self, config: Optional[Union[str, list, dict]] = None) -> None:
-
         # User and site config paths
         user_cfg_file = os.path.join(
             appdirs.user_config_dir(), "safedata_validator", "safedata_validator.cfg"
@@ -417,7 +412,6 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
     # Connect to the file (which might or might not be a database containing the
     # required tables)
     with contextlib.closing(sqlite3.connect(db_path)) as conn:
-
         # Check that it is a database by running a query
         try:
             db_tables = conn.execute(

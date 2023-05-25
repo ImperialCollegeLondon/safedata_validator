@@ -1,6 +1,4 @@
-"""The taxa submodule.
-
-This module describes classes and methods used to compile taxonomic data from datasets
+"""This module describes classes and methods used to compile taxonomic data from datasets
 and to validate taxonomy against the GBIF backbone database and/or the NCBI taxonomy
 database.
 
@@ -25,7 +23,7 @@ When validating against the NCBI database supplied taxa of any rank (i.e. strain
 clade) which can be successfully validated will be recorded. However, associated higher
 taxa will only be recorded if their ranks are either a GBIF backbone rank or
 superkingdom.
-"""
+"""  # noqa D415
 
 import dataclasses
 import sqlite3
@@ -335,7 +333,6 @@ class GBIFValidator:
     """
 
     def __init__(self, resources: Resources) -> None:
-
         conn = sqlite3.connect(resources.gbif_database)
         conn.row_factory = sqlite3.Row
         self.gbif_conn = conn
@@ -362,7 +359,6 @@ class GBIFValidator:
             raise ValueError("Cannot validate non-backbone taxa")
 
         if taxon.gbif_id is not None:
-
             # get the record associated with the provided ID
             try:
                 id_taxon = self.id_lookup(taxon.gbif_id)
@@ -522,7 +518,6 @@ class NCBIValidator:
     """
 
     def __init__(self, resources: Resources) -> None:
-
         conn = sqlite3.connect(resources.ncbi_database)
         conn.row_factory = sqlite3.Row
         self.ncbi_conn = conn
@@ -1004,7 +999,6 @@ class GBIFTaxa:
     """
 
     def __init__(self, resources: Resources) -> None:
-
         self.taxon_index: list[list] = []
         self.taxon_names: set[str] = set()
         self.parents: dict[tuple, GBIFTaxon] = dict()
@@ -1108,7 +1102,6 @@ class GBIFTaxa:
         #       [parent name, parent type, parent id]]
 
         for idx, row in enumerate(taxa):
-
             # Standardise blank values to None
             row = {ky: None if blank_value(vl) else vl for ky, vl in row.items()}
             taxon_info = [
@@ -1404,7 +1397,6 @@ class GBIFTaxa:
                 )
 
         elif not m_taxon.is_backbone:
-
             # Now handle non-backbone cases - just needs a valid parent.
             if p_taxon is None:
                 LOGGER.error(
@@ -1430,7 +1422,6 @@ class GBIFTaxa:
             m_taxon = self.validator.search(m_taxon)
 
             if m_taxon.found and p_taxon is None:
-
                 # Add the index entry and update hierarchy
                 self.taxon_index.append(
                     [
@@ -1478,9 +1469,7 @@ class GBIFTaxa:
                     )
 
             elif m_taxon.found and p_taxon is not None:
-
                 if p_taxon.found:
-
                     # Good backbone with good parent - are they compatible? Check if all
                     # entries in the parent hierarchy appear in the taxon hierarchy
                     if not set(p_taxon.hierarchy).issubset(m_taxon.hierarchy):
@@ -1517,7 +1506,6 @@ class GBIFTaxa:
                 )
 
             elif not m_taxon.found:
-
                 if p_taxon is None:
                     # Taxon is a backbone type but is not found in GBIF and has no
                     # parent info
@@ -1633,7 +1621,6 @@ class NCBITaxa:
     """
 
     def __init__(self, resources: Resources) -> None:
-
         self.taxon_index: list[list] = []
         self.taxon_names: set[str] = set()
         self.hierarchy: set[tuple] = set()
@@ -1765,7 +1752,6 @@ class NCBITaxa:
         # dictionary.
 
         for idx, row in enumerate(taxa):
-
             # Strip k__ notation so that the text is appropriate for the search
             for rnk in non_core:
                 row[rnk], match = taxa_strip(row[rnk], rnk)
@@ -2176,14 +2162,12 @@ def taxon_index_to_text(
     """
 
     def _indent(n: int, use_html: bool = html):
-
         if use_html:
             return raw("&ensp;-&ensp;" * n)
         else:
             return " " * indent_width * (n - 1)
 
     def _format_name(tx: dict, use_html: bool = html, auth: str = "GBIF"):
-
         if auth == "GBIF":
             # format the canonical name
             if tx["taxon_rank"] in ["genus", "species", "subspecies"]:
@@ -2271,7 +2255,6 @@ def taxon_index_to_text(
     stack = [({"current": grouped[None][0]}, {"next": grouped[None][1:]})]
 
     while stack:
-
         # Handle the current top of the stack: format the canonical name
         current = stack[-1][0]["current"]
         canon_name = _format_name(current)
