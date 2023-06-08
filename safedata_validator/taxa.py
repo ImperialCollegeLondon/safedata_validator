@@ -1030,11 +1030,13 @@ class GBIFTaxa:
 
         if not dframe.data_columns:
             LOGGER.error("No data or only headers in GBIFTaxa worksheet")
+            FORMATTER.pop()
             return
 
         # Dupe headers likely cause serious issues, so stop
         if "duplicated" in dframe.bad_headers:
             LOGGER.error("Cannot parse taxa with duplicated headers")
+            FORMATTER.pop()
             return
 
         # Get the headers
@@ -1047,6 +1049,7 @@ class GBIFTaxa:
         if missing_core:
             # core names are not found so can't continue
             LOGGER.error("Missing core fields: ", extra={"join": missing_core})
+            FORMATTER.pop()
             return
 
         # TODO - Test this new behaviour
@@ -1072,6 +1075,7 @@ class GBIFTaxa:
                 "Unexpected (or misspelled) headers found:",
                 extra={"join": unexpected_headers},
             )
+            FORMATTER.pop()
             return
 
         # Any duplication in names
