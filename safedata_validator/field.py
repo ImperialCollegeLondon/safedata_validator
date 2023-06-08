@@ -491,8 +491,8 @@ class DataWorksheet:
         self.fields_loaded = False
         self.field_meta: list[dict] = []
         self.field_types = None
-        self.n_fields: int
-        self.n_trailing_empty_fields: int
+        self.n_fields: int = 0
+        self.n_trailing_empty_fields: int = 0
         self.n_descriptors: int
         self.descriptors: list = []
         self.fields: list[Union[EmptyField, BaseField]] = []
