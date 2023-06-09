@@ -1035,11 +1035,13 @@ class GBIFTaxa:
 
         if not dframe.data_columns:
             LOGGER.error("No data or only headers in GBIFTaxa worksheet")
+            FORMATTER.pop()
             return
 
         # Dupe headers likely cause serious issues, so stop
         if "duplicated" in dframe.bad_headers:
             LOGGER.error("Cannot parse taxa with duplicated headers")
+            FORMATTER.pop()
             return
 
         # Get the headers
@@ -1052,6 +1054,7 @@ class GBIFTaxa:
         if missing_core:
             # core names are not found so can't continue
             LOGGER.error("Missing core fields: ", extra={"join": missing_core})
+            FORMATTER.pop()
             return
 
         # TODO - Test this new behaviour
@@ -1077,6 +1080,7 @@ class GBIFTaxa:
                 "Unexpected (or misspelled) headers found:",
                 extra={"join": unexpected_headers},
             )
+            FORMATTER.pop()
             return
 
         # Any duplication in names
@@ -1655,11 +1659,13 @@ class NCBITaxa:
 
         if not dframe.data_columns:
             LOGGER.error("No data or only headers in Taxa worksheet")
+            FORMATTER.pop()
             return
 
         # Dupe headers likely cause serious issues, so stop
         if "duplicated" in dframe.bad_headers:
             LOGGER.error("Cannot parse taxa with duplicated headers")
+            FORMATTER.pop()
             return
 
         # Get the headers
@@ -1672,6 +1678,7 @@ class NCBITaxa:
         if missing_core:
             # core names are not found so can't continue
             LOGGER.error("Missing core fields: ", extra={"join": missing_core})
+            FORMATTER.pop()
             return
 
         # Possible fields in this case are the two core fields + comments + all
@@ -1689,6 +1696,7 @@ class NCBITaxa:
                 "Unexpected (or misspelled) headers found:",
                 extra={"join": unexpected_headers},
             )
+            FORMATTER.pop()
             return
 
         # Check that at least two backbone taxa have been provided
@@ -1697,6 +1705,7 @@ class NCBITaxa:
         if len(fnd_rnks) < 2:
             # can't continue if less than two backbone ranks are provided
             LOGGER.error("Less than two backbone taxonomic ranks are provided")
+            FORMATTER.pop()
             return
 
         # Find core field indices and use to isolate non core (i.e. taxonomic) headers
@@ -1710,6 +1719,7 @@ class NCBITaxa:
                 LOGGER.error(
                     "If 'Comments' is provided as a field it must be the last column"
                 )
+                FORMATTER.pop()
                 return
             else:
                 # If it's the last header go ahead and delete it
@@ -1726,12 +1736,14 @@ class NCBITaxa:
         if "subspecies" in headers:
             if "species" not in headers:
                 LOGGER.error("If subspecies is provided so must species")
+                FORMATTER.pop()
                 return
 
         # Same check
         if "species" in headers:
             if "genus" not in headers:
                 LOGGER.error("If species is provided so must genus")
+                FORMATTER.pop()
                 return
 
         # Any duplication in names
