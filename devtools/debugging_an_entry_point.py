@@ -4,6 +4,21 @@ This script is used to debug the entry point function imported and run below. Th
 function expecting to be provided with values via command line arguments and argparse,
 and so debugging requires a way to pass those arguments in to the function.
 
+In the example provided here, the function would normally be run from the command line
+using:
+
+```sh
+safedata_validate \
+    -r local/config_files/live_safeweb_gbif_2016_07_25.cfg \
+    ../safedata_directory/1198522/1237724/template_SinghRamesh.xlsx
+```
+
+The `safedata_validate` command line function is a pointer to the
+`safedata_validator.entry_points._safedata_validator_cli` function, which then handles
+parsing those command line arguments using `argparse`. In order to allow this to be
+debugged, the _Python_ function needs to be run from within a Python debugger, and hence
+needs a way to provide those arguments to `argparse`.
+
 Within Visual Studio Code, a new debug configuration can be added to .vscode/launch.json
 containing the required arguments, which will then be passed into the script as it runs.
 The JSON to do that looks like this:
