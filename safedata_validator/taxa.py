@@ -483,11 +483,16 @@ class GBIFValidator:
             return taxon
 
         # Add the taxonomic hierarchy, using a mapping of backbone ranks (except
-        # subspecies) to backbone table fields.
+        # subspecies) to backbone table fields. This needs to omit missing keys and
+        # more nested taxon levels: so for example a genus will have 'species_key' but
+        # it will be None (or possibly an empty string in older backbone versions that
+        # use that rather than explicit \\N in conversion)
         taxon.hierarchy = [
             (rk, taxon_row[ky])
             for rk, ky in [(r, r + "_key") for r in BACKBONE_RANKS[:-1]]
-            if ky in taxon_row.keys() and taxon_row[ky] is not None
+            if ky in taxon_row.keys()
+            and taxon_row[ky] is not None
+            and not taxon_row[ky] == ""
         ]
 
         # parent key in the local database has the odd property that the parent
