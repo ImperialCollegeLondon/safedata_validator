@@ -320,7 +320,7 @@ class Dataset:
                 )
 
         # Dedent for final result
-        FORMATTER.pop()
+        FORMATTER.pop(n=2)
 
         if COUNTER_HANDLER.counters["ERROR"] > 0:
             self.n_errors = COUNTER_HANDLER.counters["ERROR"]
