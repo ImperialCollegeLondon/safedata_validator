@@ -1,9 +1,10 @@
 # Overview
 
 The `safedata_validator` package is part of a system for validating and publishing
-heterogeneous datasets. It was built around the field data collections from the [SAFE
-Project](https://safeproject.net), which generates large numbers of related datasets
-from a wide range of projects.
+heterogeneous datasets (the `safedata` system). It was originally built to handle the
+field data collections from the [SAFE Project](https://safeproject.net), which generates
+large numbers of related datasets. However, it is a general tool suitable for use within
+long term ecological projects.
 
 ## User starting points
 
