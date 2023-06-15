@@ -26,12 +26,12 @@ The `safedata_validator` package uses the following elements:
   locations and taxonomic references and a standard set of summary metadata.
 - The `safedata_validator` package itself, written in Python, which is used to check
   that a dataset meets the standard format. The package provides:
-  - A programmatic API: `safedata_validator` can be imported and then used to
-    implement validation within another program.
-  - An implementation of the format checking process for data stored in Excel files,
-    although implementations for other formats are possible.
-  - Command line tools for both the validation (`safedata_validate`) and publication
-    (`safedata_zenodo`) of datasets
+    - A programmatic API: `safedata_validator` can be imported and then used to
+      implement validation within another program.
+    - An implementation of the format checking process for data stored in Excel files,
+      although implementations for other formats are possible.
+    - Command line tools for both the validation (`safedata_validate`) and publication
+      (`safedata_zenodo`) of datasets
 - A data store to archive validated datasets. The `safedata_validator` packages
   currently uses [Zenodo](https://zenodo.org) to store datasets.
 - A separate metadata server, which is used to maintain a searchable interface to the

@@ -95,14 +95,14 @@ If this is the first version of a dataset to be published, an administrator will
 do the following:
 
 * When the Excel metadata file passes checks, log in to Zenodo using our Zenodo curation
-  account (`the_safe_project`, tied to info@safeproject.net).
+  account (`the_safe_project`, tied to <info@safeproject.net>).
 * Navigate to the [Zenodo deposit page](https://zenodo.org/deposit) and click on 'New
   upload'.
 * On the 'New upload' page, upload the external files and fill in the following fields:
-  * Upload type: set to dataset.
-  * Title, orders and description: these will be overwritten when the dataset is
-    published, so these field just need to be non-blank so that the draft can be saved.
-    It is fine to type `test` in all three!
+    * Upload type: set to dataset.
+    * Title, orders and description: these will be overwritten when the dataset is
+      published, so these field just need to be non-blank so that the draft can be
+      saved. It is fine to type `test` in all three!
 * Click 'Save' (**NOT** 'Publish') and then note down the deposit number for the new
   draft that appears in the URL.
 * Go to the [dataset administration
@@ -116,7 +116,7 @@ do the following:
 If this is an update to an existing dataset, then the process is broadly similar:
 
 * When the Excel metadata file passes checks, log in to Zenodo using our Zenodo curation
-  account (`the_safe_project`, tied to info@safeproject.net).
+  account (`the_safe_project`, tied to <info@safeproject.net>).
 * Do not create a new upload. Instead find the published dataset and click on the 'New
   version' button.
 * Upload any new or changed files and delete any outdated files. You **must** delete the
