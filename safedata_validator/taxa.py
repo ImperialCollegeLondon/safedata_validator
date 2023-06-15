@@ -1430,7 +1430,7 @@ class GBIFTaxa:
             # Otherwise try and validate backbone taxon
             m_taxon = self.validator.search(m_taxon)
 
-            if m_taxon.found and p_taxon is None:
+            if m_taxon.found:
                 # Add the index entry and update hierarchy
                 self.taxon_index.append(
                     [
@@ -1443,22 +1443,15 @@ class GBIFTaxa:
                     ]
                 )
 
-                self.hierarchy.update(
-                    [rw for rw in m_taxon.hierarchy if rw[1] is not None]
-                )
+                # default to named taxon hierarchy
+                hier_to_use = m_taxon.hierarchy
 
-                # Good backbone with no parent, provide info on taxon status
-                if m_taxon.is_canon:
-                    LOGGER.info(
-                        f"Taxon found in GBIF backbone ({m_taxon.taxon_status})"
-                    )
-                elif m_taxon.canon_usage:
-                    LOGGER.warning(
-                        f"Taxon considered a {m_taxon.taxon_status} "
-                        f"of {m_taxon.canon_usage.name} in GBIF backbone"
-                    )
-
-                    # Add the canon index entry and update hierarchy
+                # Now check for non-canon usage, adding the canon taxa and switching the
+                # taxon hierarchy to step up above the canon usage:
+                #    (non-canon -> canon -> rest of hierarchy)
+                if m_taxon.canon_usage is not None:
+                    # Add the canon index entry under the worksheet name and update to
+                    # using the canon hierarchy
                     self.taxon_index.append(
                         [
                             m_name,
@@ -1469,50 +1462,46 @@ class GBIFTaxa:
                             m_taxon.canon_usage.taxon_status,
                         ]
                     )
-                    self.hierarchy.update(
-                        [
-                            rw
-                            for rw in m_taxon.canon_usage.hierarchy
-                            if rw[1] is not None
-                        ]
-                    )
 
-            elif m_taxon.found and p_taxon is not None:
-                if p_taxon.found:
-                    # Good backbone with good parent - are they compatible? Check if all
-                    # entries in the parent hierarchy appear in the taxon hierarchy
-                    if not set(p_taxon.hierarchy).issubset(m_taxon.hierarchy):
-                        LOGGER.error(
-                            f"Taxon in GBIF backbone ({m_taxon.taxon_status}) with "
-                            f"incompatible parent information"
-                        )
-                    else:
+                    hier_to_use = m_taxon.canon_usage.hierarchy
+
+                # Now update the hierarchy
+                self.hierarchy.update([rw for rw in hier_to_use if rw[1] is not None])
+
+                # Reporting
+                if p_taxon is None:
+                    if m_taxon.is_canon:
                         LOGGER.info(
-                            f"Taxon in GBIF backbone ({m_taxon.taxon_status}) with "
-                            f"compatible parent information"
+                            f"Taxon found in GBIF backbone ({m_taxon.taxon_status})"
+                        )
+                    elif m_taxon.canon_usage is not None:
+                        LOGGER.warning(
+                            f"Taxon considered a {m_taxon.taxon_status} "
+                            f"of {m_taxon.canon_usage.name} in GBIF backbone"
                         )
 
-                else:
-                    # Good backbone with bad parent
-                    LOGGER.error(
-                        f"Taxon in GBIF backbone ({m_taxon.taxon_status}) but with "
-                        f"invalid parent information."
-                    )
+                elif p_taxon is not None:
+                    if p_taxon.found:
+                        # Good backbone with good parent - are they compatible? Check if
+                        # all entries in the parent hierarchy appear in the taxon
+                        # hierarchy
+                        if not set(p_taxon.hierarchy).issubset(m_taxon.hierarchy):
+                            LOGGER.error(
+                                f"Taxon in GBIF backbone ({m_taxon.taxon_status}) with "
+                                f"incompatible parent information"
+                            )
+                        else:
+                            LOGGER.info(
+                                f"Taxon in GBIF backbone ({m_taxon.taxon_status}) with "
+                                f"compatible parent information"
+                            )
 
-                # Add to index and hierarchy
-                self.taxon_index.append(
-                    [
-                        m_name,
-                        m_taxon.gbif_id,
-                        m_taxon.parent_id,
-                        m_taxon.name,
-                        m_taxon.rank,
-                        m_taxon.taxon_status,
-                    ]
-                )
-                self.hierarchy.update(
-                    [rw for rw in m_taxon.hierarchy if rw[1] is not None]
-                )
+                    else:
+                        # Good backbone with bad parent
+                        LOGGER.error(
+                            f"Taxon in GBIF backbone ({m_taxon.taxon_status}) but with "
+                            f"invalid parent information."
+                        )
 
             elif not m_taxon.found:
                 if p_taxon is None:
