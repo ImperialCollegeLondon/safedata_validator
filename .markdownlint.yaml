@@ -3,3 +3,6 @@ MD013:
   # Number of characters
   line_length: 88
 
+# Mkdocs uses 4 indents rather than 2 for nesting
+MD007: 
+  indent: 4
