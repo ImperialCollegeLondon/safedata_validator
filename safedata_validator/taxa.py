@@ -473,7 +473,11 @@ class GBIFValidator:
         )
         taxon.lookup_status = "found"
         taxon.taxon_status = taxon_row["status"].lower()
-        taxon.parent_id = taxon_row["parent_key"]
+        # Trap empty string rather None in parent ID - 2016 GBIF doesn't use \N to
+        # represent None and root kingdoms end up with parent_key = ''
+        taxon.parent_id = (
+            None if taxon_row["parent_key"] == "" else taxon_row["parent_key"]
+        )
 
         # Detect deleted taxa - these contain a deletion date and (somewhat oddly)
         # have had hierarchy above phylum removed, so parent taxon points at the phylum
