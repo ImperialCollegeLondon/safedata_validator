@@ -1326,8 +1326,11 @@ def sync_local_dir(
     )
 
     # Get the deposits associated with the account, which includes a list of download
-    # links
+    # links. The response is paginated and defaults to only the most recent versions,
+    # so set the starting page, increase page size (10 -> 25) and include all versions.
     params["page"] = 1
+    params["size"] = 25
+    params["all_versions"] = 1
     deposits = []
 
     LOGGER.info("Scanning Zenodo deposits")
@@ -1351,8 +1354,16 @@ def sync_local_dir(
 
     LOGGER.info(f"Processing {len(deposits)} deposits")
 
-    # Download the files
+    # Download the files - tracking how many updates needed
+    n_up_to_date = 0
+    total_files = 0
+    total_metadata = 0
+
     for dep in deposits:
+        up_to_date = True
+        n_files_downloaded = 0
+        metadata_downloaded = False
+
         con_rec_id = str(dep["conceptrecid"])
         rec_id = str(dep["record_id"])
 
@@ -1386,10 +1397,12 @@ def sync_local_dir(
             if not local_copy:
                 LOGGER.info("Downloading")
                 _get_file(this_file["links"]["download"], outf, params=params)
+                n_files_downloaded += 1
             elif local_copy and _compute_md5(outf) != this_file["checksum"]:
                 if replace_modified:
                     LOGGER.info("Replacing locally modified file")
                     _get_file(this_file["links"]["download"], outf, params=params)
+                    n_files_downloaded += 1
                 else:
                     LOGGER.warning("Local copy modified")
             else:
@@ -1404,5 +1417,22 @@ def sync_local_dir(
         else:
             LOGGER.info("Downloading JSON metadata ")
             _get_file(f"{api}/api/record/{rec_id}", metadata)
+            metadata_downloaded = True
 
         FORMATTER.pop()
+
+        if n_files_downloaded or metadata_downloaded:
+            up_to_date = False
+
+        total_files += n_files_downloaded
+        total_metadata += metadata_downloaded
+        n_up_to_date += up_to_date
+
+    n_dep = len(deposits)
+    LOGGER.info(
+        f"Checked {n_dep} deposits against local directory.\n"
+        f"- {n_up_to_date} already up to date\n"
+        f"- {n_dep - n_up_to_date} created or updated\n"
+        f"- {total_files} data files downloaded\n"
+        f"- {total_metadata} metadata files downloaded\n"
+    )
