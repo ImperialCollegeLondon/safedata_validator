@@ -1280,16 +1280,6 @@ class GBIFTaxa:
                 self.hierarchy.update(
                     [rw for rw in p_taxon.hierarchy if rw[1] is not None]
                 )
-                self.taxon_index.append(
-                    [
-                        None,
-                        p_taxon.gbif_id,
-                        p_taxon.parent_id,
-                        p_taxon.name,
-                        p_taxon.rank,
-                        p_taxon.taxon_status,
-                    ]
-                )
 
                 if (
                     p_taxon.is_backbone
@@ -1302,16 +1292,6 @@ class GBIFTaxa:
                             rw
                             for rw in p_taxon.canon_usage.hierarchy
                             if rw[1] is not None
-                        ]
-                    )
-                    self.taxon_index.append(
-                        [
-                            None,
-                            p_taxon.canon_usage.gbif_id,
-                            p_taxon.canon_usage.parent_id,
-                            p_taxon.canon_usage.name,
-                            p_taxon.canon_usage.rank,
-                            p_taxon.canon_usage.taxon_status,
                         ]
                     )
 
@@ -1333,8 +1313,6 @@ class GBIFTaxa:
                 )
             else:
                 LOGGER.info(f"Parent taxon ({p_taxon.name}) accepted")
-        # else:
-        #         LOGGER.info('No parent taxon provided')
 
         # Now check main taxa
         #
