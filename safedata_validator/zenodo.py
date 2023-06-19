@@ -1431,8 +1431,8 @@ def sync_local_dir(
     n_dep = len(deposits)
     LOGGER.info(
         f"Checked {n_dep} deposits against local directory.\n"
-        f"- {n_up_to_date} already up to date\n"
-        f"- {n_dep - n_up_to_date} created or updated\n"
-        f"- {total_files} data files downloaded\n"
-        f"- {total_metadata} metadata files downloaded\n"
+        f"  - {n_up_to_date} already up to date\n"
+        f"  - {n_dep - n_up_to_date} created or updated\n"
+        f"  - {total_files} data files downloaded\n"
+        f"  - {total_metadata} metadata files downloaded\n"
     )
