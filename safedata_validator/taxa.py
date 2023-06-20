@@ -1388,9 +1388,15 @@ class GBIFTaxa:
                 LOGGER.info(
                     "Taxon with ignored canon usage has valid parent information."
                 )
-                # Update index - no taxon hierarchy except for parent
+                # Update index - no taxon hierarchy except for parent - link to the
+                # canon usage of parent
+                if p_taxon.is_canon:
+                    pid = p_taxon.gbif_id
+                elif p_taxon.canon_usage is not None:
+                    pid = p_taxon.canon_usage.gbif_id
+
                 self.taxon_index.append(
-                    [m_name, -1, p_taxon.gbif_id, m_taxon.name, m_taxon.rank, "user"]
+                    [m_name, -1, pid, m_taxon.name, m_taxon.rank, "user"]
                 )
 
         elif not m_taxon.is_backbone:
