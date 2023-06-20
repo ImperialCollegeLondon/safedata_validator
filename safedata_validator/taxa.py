@@ -1272,6 +1272,9 @@ class GBIFTaxa:
                 name=parent_info[0], rank=parent_info[1], gbif_id=parent_info[2]
             )
 
+            if p_taxon.name == "Polyrachis":
+                print("ugh")
+
             # Look for a match
             if p_taxon.is_backbone:
                 p_taxon = self.validator.search(p_taxon)
@@ -1281,12 +1284,15 @@ class GBIFTaxa:
                     [rw for rw in p_taxon.hierarchy if rw[1] is not None]
                 )
 
+                # For non-canon taxa, add the canon hierarchy and the non-canon usage as
+                # this is not included in the hierachy (starts with the canon usage)
                 if (
                     p_taxon.is_backbone
                     and p_taxon.found
                     and not p_taxon.is_canon
                     and p_taxon.canon_usage
                 ):
+                    self.hierarchy.add([(p_taxon.rank, p_taxon.gbif_id)])
                     self.hierarchy.update(
                         [
                             rw
