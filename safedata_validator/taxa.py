@@ -1272,9 +1272,6 @@ class GBIFTaxa:
                 name=parent_info[0], rank=parent_info[1], gbif_id=parent_info[2]
             )
 
-            if p_taxon.name == "Polyrachis":
-                print("ugh")
-
             # Look for a match
             if p_taxon.is_backbone:
                 p_taxon = self.validator.search(p_taxon)
@@ -1292,13 +1289,13 @@ class GBIFTaxa:
                     and not p_taxon.is_canon
                     and p_taxon.canon_usage
                 ):
-                    self.hierarchy.add([(p_taxon.rank, p_taxon.gbif_id)])
                     self.hierarchy.update(
                         [
                             rw
                             for rw in p_taxon.canon_usage.hierarchy
                             if rw[1] is not None
                         ]
+                        + [(p_taxon.rank, p_taxon.gbif_id)]
                     )
 
             # Store the parent taxon keyed by parent information (needs tuple)
@@ -1415,9 +1412,15 @@ class GBIFTaxa:
                 LOGGER.info(
                     f"Taxon of type {m_taxon.rank} has valid parent information"
                 )
-                # Update index - no taxon hierarchy except for parent
+                # Update index - no taxon hierarchy except for parent - link to the
+                # canon usage of parent
+                if p_taxon.is_canon:
+                    pid = p_taxon.gbif_id
+                elif p_taxon.canon_usage is not None:
+                    pid = p_taxon.canon_usage.gbif_id
+
                 self.taxon_index.append(
-                    [m_name, -1, p_taxon.gbif_id, m_taxon.name, m_taxon.rank, "user"]
+                    [m_name, -1, pid, m_taxon.name, m_taxon.rank, "user"]
                 )
 
         else:
