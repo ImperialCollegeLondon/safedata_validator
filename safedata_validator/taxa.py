@@ -1064,7 +1064,9 @@ class GBIFTaxa:
         # Check that parent name and type are both present or both missing
         parent_fields = {"parent name", "parent type"}
         parent_fields_found = set(headers).intersection(parent_fields)
-        if (parent_fields_found == parent_fields) or (parent_fields_found == set()):
+        if not (
+            (parent_fields_found == parent_fields) or (parent_fields_found == set())
+        ):
             # core names are not found so can't continue
             LOGGER.error(
                 "Incomplete parent fields, missing: ",
