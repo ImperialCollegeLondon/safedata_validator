@@ -1061,7 +1061,18 @@ class GBIFTaxa:
             FORMATTER.pop()
             return
 
-        # TODO - Test this new behaviour
+        # Check that parent name and type are both present or both missing
+        parent_fields = {"parent name", "parent type"}
+        parent_fields_found = set(headers).intersection(parent_fields)
+        if (parent_fields_found == parent_fields) or (parent_fields_found == set()):
+            # core names are not found so can't continue
+            LOGGER.error(
+                "Incomplete parent fields, missing: ",
+                extra={"join": parent_fields - parent_fields_found},
+            )
+            FORMATTER.pop()
+            return
+
         # Fields used to describe taxa (not including comments)
         tx_fields = [
             "name",
@@ -1075,17 +1086,15 @@ class GBIFTaxa:
         ]
         all_fields = set(tx_fields + ["comments"])
 
-        # Now check that there are no unexpected (i.e. likely misspelled) fields
-        unexpected_headers = set(headers).difference(all_fields)
+        # Now report on any extra taxa headers
+        extra_headers = set(headers).difference(all_fields)
 
-        if unexpected_headers:
+        if extra_headers:
             # An unexpected header (which might well be misspelled) was found
-            LOGGER.error(
-                "Unexpected (or misspelled) headers found:",
-                extra={"join": unexpected_headers},
+            LOGGER.warning(
+                "Extra headers found in GBIF taxa sheet:",
+                extra={"join": extra_headers},
             )
-            FORMATTER.pop()
-            return
 
         # Any duplication in names
         dupl_taxon_names = HasDuplicates([dframe.data_columns[headers.index("name")]])
