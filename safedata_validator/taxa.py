@@ -1521,12 +1521,17 @@ class GBIFTaxa:
                         "Taxon not found in GBIF but has valid parent information"
                     )
 
-                    # Add to index  - parent already in hierarchy so nothing to add
+                    # Add to index  -  link to the canon usage of parent
+                    if p_taxon.is_canon:
+                        pid = p_taxon.gbif_id
+                    elif p_taxon.canon_usage is not None:
+                        pid = p_taxon.canon_usage.gbif_id
+
                     self.taxon_index.append(
                         [
                             m_name,
                             -1,
-                            p_taxon.gbif_id,
+                            pid,
                             m_taxon.name,
                             m_taxon.rank,
                             "user",
