@@ -68,7 +68,7 @@ a single value for each field.
 |                 |                                   |  |  |
 |-----------------|-----------------------------------|--|--|
 | Project ID      | 1                                 |  |  |
-| Title           | Example data for the SAFE Project |  |  |
+| Title           | Example data for the safedata system |  |  |
 | Description     | This is an example dataset.       |  |  |
 
 ## The access block
@@ -317,10 +317,11 @@ at SAFE.
 |                           |                                                             |                                                              |                                  |
 |---------------------------|-------------------------------------------------------------|--------------------------------------------------------------|----------------------------------|
 | Project ID                | 1                                                           |                                                              |                                  |
-| Title                     | Example data for the SAFE Project                           |                                                              |                                  |
+| Title                     | Example data for the safedata system                          |                                                              |                                  |
 | Description               | This is an example dataset.                                 |                                                              |                                  |
 | Access status             | Embargo                                                     |                                                              |                                  |
 | Embargo date              | 03/09/18                                                    |                                                              |                                  |
+| Access conditions         | (see above)             |               |
 | Author name               | Orme, David                                                 |                                                              |                                  |
 | Author email              | <d.orme@imperial.ac.uk>                                       |                                                              |                                  |
 | Author affiliation        | Imperial College London                                     |                                                              |                                  |
