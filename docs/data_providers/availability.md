@@ -53,3 +53,7 @@ for the data will always be to the original set of authors provided in the metad
 Embargoed or restricted data will never be made available within the embargo period or
 without discussion with data authors. Data authors will always be consulted about issues
 arising with their datasets.
+
+!!! Note "safedata at SAFE"
+    For details of the SAFE project's data availability polices see
+    [here](../safedata_at_SAFE.md).
