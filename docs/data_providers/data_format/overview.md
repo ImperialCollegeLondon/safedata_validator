@@ -39,10 +39,10 @@ underscores to separate words.
 
 ### Spreadsheet Template and Examples
 
+<!-- TODO - Switch this link to release/develop/master once I've merged it in -->
 Click on this link to download the [spreadsheet
-template](https://github.com/ImperialCollegeLondon/safedata_validator/blob/master/test_files/Template.xlsx?raw=true)
+template](https://github.com/ImperialCollegeLondon/safedata_validator/blob/feature/docs_update/docs/data_providers/data_format/Template.xlsx)
 containing the required worksheets, labels and headers.
-
 You can also look at existing published datasets (from the SAFE project) to see how the
 format is used:
 
