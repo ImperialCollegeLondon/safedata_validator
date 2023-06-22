@@ -56,5 +56,5 @@ nav:
     - 'NCBI validation notes': 'install/ncbi_validation.md'
   - 'Using the safedata system':
     - 'Overview': 'using_safedata/overview.md'
-  - '`safedata` at the SAFE project': 'safedata_at_SAFE.md'
+  - 'safedata at the SAFE project': 'safedata_at_SAFE.md'
 

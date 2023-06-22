@@ -12,7 +12,7 @@ using the same Excel format.
 
 ## Excel format overview
 
-The basic format for a SAFE dataset submission is an Excel Workbook, which will
+The basic format for a `safedata` dataset submission is an Excel Workbook, which will
 typically contain at least four worksheets. The first four worksheets must use the
 standard names listed below. While both Taxa and NCBITaxa can be included, it is only
 required to include one of them.
@@ -43,7 +43,8 @@ Click on this link to download the [spreadsheet
 template](https://github.com/ImperialCollegeLondon/safedata_validator/blob/master/test_files/Template.xlsx?raw=true)
 containing the required worksheets, labels and headers.
 
-You can also look at existing published datasets to see how the format is used:
+You can also look at existing published datasets (from the SAFE project) to see how the
+format is used:
 
 - [https://safeproject.net/datasets/view_datasets](https://safeproject.net/datasets/view_datasets)
 - [https://zenodo.org/communities/safe/](https://zenodo.org/communities/safe/)
