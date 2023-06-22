@@ -53,10 +53,12 @@ This block provides a set of core details for the dataset. You can only provide
 a single value for each field.
 
 * **Project ID**: This is only used if the organisation you are uploading to uses
-  projects to group datasets. If they are then you should obtain relevant project IDs
-  from the organisation's data manager and add them in your Summary worksheet.
-  The legacy name for this field is `SAFE Project ID`: using this name will still work
-  but is not the preferred option.
+  projects to group datasets. If they are, then you should obtain relevant project IDs
+  from the organisation's data manager and add them in your Summary worksheet. This
+  field can alternatively be given as `SAFE Project ID`. This alternative name is
+  allowed solely in order to make the system backwards compatible with historic
+  datasets. Using it is **not** the preferred option, particularly if you are submitting
+  your data to someone other than the SAFE project.
 * **Title**: This should be a short informative title for the dataset: it will
   be used as the public title for the dataset so make sure it is clear and
   grammatical!
