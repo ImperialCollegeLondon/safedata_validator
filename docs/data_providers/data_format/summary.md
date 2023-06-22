@@ -120,7 +120,7 @@ these details for **any** author.
 
 Author names **must be** formatted as "last name, first name": "Orme, David" not "David
 Orme". Please provide just the numeric part of the ORCIDs, as shown below, not the full
-URL [](http://orcid.org/0000-0002-7005-1394).
+URL `http://orcid.org/0000-0002-7005-1394`.
 
 |                    |                         |  |  |
 |--------------------|-------------------------|--|--|
@@ -214,7 +214,7 @@ the root of the URL.
 
 |                 |                                            |  |  |
 |-----------------|--------------------------------------------|--|--|
-| Publication DOI | [](https://doi.org/10.1098/rstb.2011.0049) |  |  |
+| Publication DOI | `https://doi.org/10.1098/rstb.2011.0049` |  |  |
 
 ## Funders block
 
@@ -239,7 +239,7 @@ one funder.
 | Funding body      | NERC                                                   |  |  |
 | Funding type      | Standard grant                                         |  |  |
 | Funding reference | NE/K006339/1                                           |  |  |
-| Funding link      | [](https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1) |  |  |
+| Funding link      | `https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1` |  |  |
 
 ## Permits block
 
@@ -335,11 +335,11 @@ at SAFE.
 | Keywords                  | Keyword 1                                                   | Keyword 2                                                    |                                  |
 | External file             | bait_trap_images.zip                                          | BaitTrapTransects.geojson                                    |                                  |
 | External file description | Zip file containing 5000 JPEG images of bait trap cards     | GeoJSON file containing polylines of the bait trap transects |                                  |
-| Publication DOI           | [](https://doi.org/10.1098/rstb.2011.0049)                  |                                                              |                                  |
+| Publication DOI           | `https://doi.org/10.1098/rstb.2011.0049`                  |                                                              |                                  |
 | Funding body              | NERC                                                        |                                                              |                                  |
 | Funding type              | Standard grant                                              |                                                              |                                  |
 | Funding reference         | NE/K006339/1                                                |                                                              |                                  |
-| Funding link              | [](https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1)      |                                                              |                                  |
+| Funding link              | `https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1`      |                                                              |                                  |
 | Permit type               | Research                                                    |                                                              |                                  |
 | Permit authority          | Sabah Biodiversity Centre                                   |                                                              |                                  |
 | Permit number             | ABC-123-456                                                 |                                                              |                                  |
