@@ -86,7 +86,7 @@ single value for each field.
 <!-- markdownlint-disable-next-line MD033 -->
 * **Access status**<a name="access-status"></a>: You must enter an Access Status
   of  `Open`, `Embargo` or `Restricted`. We prefer as much data as possible to
-  be open access: see the [statement on data availability](../availability.md).
+  be open access: see the [discussion of data availability](../availability.md).
 * **Embargo date**: If you choose embargoed access status then you must also
   enter the date when the embargo will end. This must be an Excel date formatted
   value and you cannot embargo data for more than two years. Do not provide
@@ -100,7 +100,7 @@ single value for each field.
 |-------------------|-------------|--|--|
 | Access status     | Embargo     |  |  |
 | Embargo date      | 03/09/18    |  |  |
-| Access conditions | (see above) |  |  |
+| Access conditions |             |  |  |
 
 ## The author block
 
@@ -118,9 +118,9 @@ we realise that sometimes this isn't possible: if you're uploading data
 collected by past students who you've lost contact with, then you might not have
 these details for **any** author.
 
-Author names **must be** formatted as "last name, first name": "Orme, C David L"
-not "C David L Orme". Please provide just the numeric part of the ORCIDs, as
-shown below, not the full URL [](http://orcid.org/0000-0002-7005-1394).
+Author names **must be** formatted as "last name, first name": "Orme, David" not "David
+Orme". Please provide just the numeric part of the ORCIDs, as shown below, not the full
+URL [](http://orcid.org/0000-0002-7005-1394).
 
 |                    |                         |  |  |
 |--------------------|-------------------------|--|--|
@@ -184,7 +184,7 @@ worksheet.
 
 !!! Note "Optional block"
     You only need to provide this information if you are also providing data in
-    other file formats, If you do provide this block, all rows are mandatory,
+    other file formats. If you do provide this block, all rows are mandatory.
 
 You can include files in other file formats in your data submission as described
 [here](other_formats.md). If you do so, then these files must be listed in this
@@ -197,7 +197,7 @@ spaces, and a description of the file.
 <!-- markdownlint-disable MD013 -->
 |                           |                                                         |                                                              |  |
 |---------------------------|---------------------------------------------------------|--------------------------------------------------------------|--|
-| External file             | BaitTrapImages.zip                                      | BaitTrapTransects.geojson                                    |  |
+| External file             | bait_trap_images.zip                                      | BaitTrapTransects.geojson                                    |  |
 | External file description | Zip file containing 5000 JPEG images of bait trap cards | GeoJSON file containing polylines of the bait trap transects |  |
 <!-- markdownlint-enable MD013 -->
 
@@ -323,7 +323,7 @@ at SAFE.
 | Description               | This is an example dataset.                                 |                                                              |                                  |
 | Access status             | Embargo                                                     |                                                              |                                  |
 | Embargo date              | 03/09/18                                                    |                                                              |                                  |
-| Access conditions         | (see above)             |               |
+| Access conditions         |                  |               |
 | Author name               | Orme, David                                                 |                                                              |                                  |
 | Author email              | <d.orme@imperial.ac.uk>                                       |                                                              |                                  |
 | Author affiliation        | Imperial College London                                     |                                                              |                                  |
@@ -333,7 +333,7 @@ at SAFE.
 | Worksheet description     | This is a test dataset                                      | A test dataset too                                           | Attribute table for transect GIS |
 | Worksheet external file   |                                                             |                                                              | BaitTrapTransects.geojson        |
 | Keywords                  | Keyword 1                                                   | Keyword 2                                                    |                                  |
-| External file             | BaitTrapImages.zip                                          | BaitTrapTransects.geojson                                    |                                  |
+| External file             | bait_trap_images.zip                                          | BaitTrapTransects.geojson                                    |                                  |
 | External file description | Zip file containing 5000 JPEG images of bait trap cards     | GeoJSON file containing polylines of the bait trap transects |                                  |
 | Publication DOI           | [](https://doi.org/10.1098/rstb.2011.0049)                  |                                                              |                                  |
 | Funding body              | NERC                                                        |                                                              |                                  |
