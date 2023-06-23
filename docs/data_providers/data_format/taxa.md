@@ -22,4 +22,4 @@ a data source.
 
 Note that you must only provide details for taxa actually used in the data worksheets.
 This ensures that the taxonomic index for a dataset is accurate and also double checks
-that it the omission of a taxon from the data worksheets is not an error.
+that the omission of a taxon from the data worksheets is not an error.

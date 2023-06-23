@@ -5,10 +5,10 @@ the Data worksheets. This taxonomic information should be recorded in a format t
 be validated against the GBIF backbone taxonomy. Generally the GBIF backbone taxonomy is
 most suitable for taxa discovered via direct observation (rather than sequencing), so
 this worksheet is most appropriate for storing the details of directly observed taxa. If
-taxa are used anywhere in the dataset either this worksheet or the NCBITaxa worksheet
-must be included. It is also an option to provide both a GBIFTaxa worksheet and a
-NCBITaxa worksheet, e.g. in cases where both sequencing and direct observational data
-are being reported.
+taxa are used anywhere in the dataset either this worksheet or the [NCBITaxa
+worksheet](./ncbi_taxa.md) must be included. It is also an option to provide both a
+GBIFTaxa worksheet and a NCBITaxa worksheet, e.g. in cases where both sequencing and
+direct observational data are being reported.
 
 ## GBIF Taxon validation
 
@@ -130,9 +130,12 @@ You would then get a message in the file validation report saying:
 
 ### Morphospecies and Functional groups
 
-For morphospecies and functional groups, the taxon name is the label to be used in the
-dataset. Set the Scientific name to be 'NA' - it cannot be blank - and then specify the
-taxon type as 'Morphospecies' or 'Functional group'.
+For morphospecies and functional groups, the **Taxon type** should be specified as
+'Morphospecies' or 'Functional group'. The **Name** field should be filled in with
+whatever name is used to label it in the dataset. In this case, the **Taxon name** field
+is not checked or used anywhere in the validation process, so can be filled in with
+whatever you wish. However, this the field still **has** to be filled out. If you do not
+wish to provide a name here, we recommend just filling it in with 'NA'.
 
 Now you need to provide a parent taxon and type. The level of taxonomic certainty for
 morphospecies and functional groups is quite variable, but we'd like the finest
