@@ -3,12 +3,12 @@ usage: safedata_server [-h] [-r RESOURCES] [-q]  ...
 
 Post updated information to a safedata server instance.
 
-    This command line tool provides functions to update a web server running the
-    safedata server API. This includes updating the gazetteer data used for the instance
-    and updating the database of published datasets.
+    This command line tool provides functions to update a web server running
+    the safedata server API. This includes updating the gazetteer data used
+    for the instance and updating the database of published datasets.
 
-    To use these tools, the safedata_validator Resources configuration must contain the
-    URL for the server and an access token.
+    To use these tools, the safedata_validator Resources configuration must
+    contain the URL for the server and an access token.
 
 positional arguments:
   

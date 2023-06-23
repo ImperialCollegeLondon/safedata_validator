@@ -1,7 +1,8 @@
 
 # The `safedata_server` tool
 
-!!! info The subcommands of the `safedata_server` tools require that the `metadata`
+!!! info
+    The subcommands of the `safedata_server` tools require that the `metadata`
     section of the [resources configuration](../install/configuration.md#zenodo) be
     completed. This is not required for simply validating datasets.
 

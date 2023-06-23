@@ -774,12 +774,12 @@ def _safedata_zenodo_cli():
 def _safedata_server_cli():
     """Post updated information to a safedata server instance.
 
-    This command line tool provides functions to update a web server running the
-    safedata server API. This includes updating the gazetteer data used for the instance
-    and updating the database of published datasets.
+    This command line tool provides functions to update a web server running
+    the safedata server API. This includes updating the gazetteer data used
+    for the instance and updating the database of published datasets.
 
-    To use these tools, the safedata_validator Resources configuration must contain the
-    URL for the server and an access token.
+    To use these tools, the safedata_validator Resources configuration must
+    contain the URL for the server and an access token.
     """
 
     # create the top-level parser and configure to take subparsers
@@ -809,8 +809,8 @@ def _safedata_server_cli():
     post_metadata_desc = """
     This function posts dataset and Zenodo metadata for a validated and published
     dataset to an server providing the API for accessing and searching safedata
-    metadata. The metadata server then handles populating a database with the metadata
-    and exposing that data via the server API.
+    metadata. The metadata server then handles populating a database with the
+    metadata and exposing that data via the server API.
     """
 
     post_metadata_parser = subparsers.add_parser(
@@ -832,8 +832,8 @@ def _safedata_server_cli():
 
     update_gazetteer_desc = """
     This function updates the gazetteer resources being used by a safedata server
-    instance. It uploads both the gazetteer geojson file and location aliases file and
-    the server then validates the file contents.
+    instance. It uploads both the gazetteer geojson file and location aliases
+    file and the server then validates the file contents.
     """
 
     update_gazetteer_parser = subparsers.add_parser(
