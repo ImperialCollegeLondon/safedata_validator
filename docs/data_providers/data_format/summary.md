@@ -231,7 +231,8 @@ the root of the URL.
     reference number and a link if possible.
 
 !!! Note "safedata at SAFE"
-    For funder specific details for the SAFE project see [here](../safedata_at_SAFE.md).
+    For funder specific details for the SAFE project see
+    [here](../../safedata_at_SAFE.md).
 
 Funding details are provided by completing a block as follows and,  as with
 Authors and Worksheets, you can use multiple columns to acknowledge more than
@@ -312,7 +313,7 @@ minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
 | North | 5.07   |  |  |
 
 !!! Note "safedata at SAFE"
-    For geographic bounds of the SAFE project see [here](../safedata_at_SAFE.md).
+    For geographic bounds of the SAFE project see [here](../../safedata_at_SAFE.md).
 
 ## Complete example summary table
 
