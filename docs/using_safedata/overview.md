@@ -15,7 +15,8 @@ data management and discovery. This system comprises:
    including text, taxonomy and spatial searches of the published datasets.
 
 3. The project Zenodo community: this is a project specific grouping of Zenodo records
-   which provides DOIs and download access for the actual data files.
+   which provides DOIs and download access for the actual data files. Each project using
+   the `safedata` system will have it's own **separate** Zenodo community.
 
 4. The [`safedata` R
    package](https://cran.r-project.org/web/packages/safedata/index.html), which is an R

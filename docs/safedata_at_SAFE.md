@@ -1,16 +1,42 @@
 # `safedata` at the SAFE project
 
-TODO - Make this into a narrative rather than a bullet point list
+This document contains the specific details needed to use the `safedata_validator`
+system to upload data for the SAFE project.
 
-- For SAFE project data access queries [contact us here](mailto:data@safeproject.net)
-- Embargo period max of 2 years
-- TODO - track down Metadata sever info
-- Zenodo account (`the_safe_project`)
-- This is particularly important for RCUK funded research, who have agreed to let us
-    host all of the SAFE data under a common portal on the condition that Research
-    Council funding is clearly acknowledged.
+## Existing datasets from the SAFE project
 
-## Example bounds
+Existing datasets from the SAFE project are stored on Zenodo as part of the
+[`the_safe_project` Zenodo community](https://zenodo.org/communities/safe/).
+
+## Data managers
+
+The data managers for the SAFE project are at present David Orme and Jacob Cook. If you
+have any data upload or dataset access queries we you can [contact us
+here](mailto:data@safeproject.net).
+
+## Data policies for the SAFE project
+
+The maximum embargo period allowed for datasets submitted to the SAFE project is 2
+years. If you have any queries about this please contact us.
+
+Research Councils UK (RCUK) agreed to allow all data from the SAFE project to be hosted
+under a single portal on the condition that Research Council funding is clearly
+acknowledged. This means that funding details must be included if your research was in
+anyway funding by a UK research council.
+
+## SAFE metadata server
+
+The SAFE project has historically used the [SAFE website](https://safeproject.net) as a
+metadata server. It is not yet clear whether this will continue to be the case in the
+long run or whether the project will transition to using the `safedata_server` tool to
+generate a metadata server. If this transition occurs, we will inform you of the new
+server to upload metadata to.
+
+## SAFE project Geographic extent
+
+Data collected as part of the SAFE project were gathered from the SAFE Project
+experimental site and surrounding area, as well as Maliau, Danum. The bounds given in the
+table below capture that entire area:
 
 |       |        |  |  |
 |-------|--------|--|--|
@@ -19,15 +45,12 @@ TODO - Make this into a narrative rather than a bullet point list
 | South | 4.50   |  |  |
 | North | 5.07   |  |  |
 
-The geographic bounds in the example cover Maliau, Danum and the SAFE Project
-experimental site and surrounding area. While we would prefer something a bit
-more precise, these are sufficient to provide a geographic extent for most work
-at SAFE.
+While we would prefer you to provide something a bit more precise, these are sufficient
+to provide a geographic extent for most work at SAFE.
 
-## Location links
+## The SAFE project gazetteer
 
-You can look at the gazetteer webpage to see the available sites and to download
-location data:
+The full set of locations for the SAFE project can be viewed using the gazetteer::
 
 [https://www.safeproject.net/info/gazetteer](https://www.safeproject.net/info/gazetteer)
 
