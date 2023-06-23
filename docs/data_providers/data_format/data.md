@@ -23,9 +23,13 @@ fields and which **cannot be blank**.
   data, so that it can be used as field headers when loading data from the file
   for analysis.
 
-  Field names _have_ to follow the convention for field names in R. Mostly, this
-  follows the short description above, but names starting with a number (e.g.
-  `1` or `2day`) are also forbidden, along with a small set of reserved words.
+  Field names _have_ to follow the convention for field names in R (see
+  [here](https://adv-r.hadley.nz/names-values.html#non-syntactic)). Mostly, this follows
+  the short description above, but names starting with a number (e.g. `1` or `2day`) are
+  also forbidden, along with a small set of [reserved
+  words](https://stat.ethz.ch/R-manual/R-devel/library/base/html/Reserved.html). In
+  addition, characters not included in the [ASCII
+  standard](https://en.wikipedia.org/wiki/ASCII) cannot be used.
 
 There are also some **additional field descriptors**, which are mandatory for
 some data types (see the descriptions of the data types below). The options are:
