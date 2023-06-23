@@ -38,7 +38,7 @@ nav:
     - 'API Reference':
       - 'Overview': 'api/overview.md'
       - 'Resources': 'api/resources.md'
-      - 'LocalDB': 'api/taxondb.md'
+      - 'Taxon database': 'api/taxondb.md'
       - 'Logger': 'api/logger.md'
       - 'Extents': 'api/extent.md'
       - 'Summary': 'api/summary.md'
