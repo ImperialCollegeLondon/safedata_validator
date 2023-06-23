@@ -9,7 +9,7 @@ data management and discovery. This system comprises:
    to both publish the dataset to the Zenodo community for your datasets and to upload
    the metadata to a seperate metadata server for the project.
 
-2. The metadata server is a web server running the [`safedata_server` server web
+2. The metadata server is a web server running the [`safedata_server` web
    application](https://github.com/ImperialCollegeLondon/safedata_server). This provides
    an index of the published datasets along with a range of APIs to search the metadata,
    including text, taxonomy and spatial searches of the published datasets.
@@ -38,6 +38,8 @@ and including the code from source files that can be validated by pre-commit
 
 ### Validating and publishing a dataset
 
+TODO - David add details of upload of additional (i.e. Non-Excel data) files here
+
 These examples show the typical workflow for publishing a dataset and accompanying
 metadata using `safedata_validator`.
 
@@ -52,3 +54,7 @@ metadata using `safedata_validator`.
 ```sh
 {!docs/using_safedata/publish_script.py!}
 ```
+
+### Updating a published a dataset
+
+TODO - David to add recipes for updating an existing data set here
