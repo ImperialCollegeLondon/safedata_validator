@@ -935,14 +935,14 @@ def _safedata_server_cli():
 def _build_local_gbif_cli():
     """Build a local GBIF database.
 
-    This tool builds an SQLite database of the GBIF backbone taxonomy to use in
-    validation by safedata_validate. There are multiple versions of the dataset, and the
-    available versions can be seen here:
+    This tool builds an SQLite database of the GBIF backbone taxonomy to use
+    in validation by safedata_validate. There are multiple versions of the
+    dataset, and the available versions can be seen here:
 
         https://hosted-datasets.gbif.org/datasets/backbone/
 
-    The tool will optionally take a timestamp - using the format '2021-11-26' -  to
-    build a particular version, but defaults to the most recent version.
+    The tool will optionally take a timestamp - using the format '2021-11-26'
+    - to build a particular version, but defaults to the most recent version.
     """
 
     desc = textwrap.dedent(_build_local_gbif_cli.__doc__)
@@ -973,14 +973,14 @@ def _build_local_gbif_cli():
 def _build_local_ncbi_cli():
     """Build a local NCBI database.
 
-    This tool builds an SQLite database of the NCBI  taxonomy to use in validation
-    by safedata_validate. There are multiple archived versions of the dataset, and the
-    available versions can be seen here:
+    This tool builds an SQLite database of the NCBI  taxonomy to use in
+    validation by safedata_validate. There are multiple archived versions
+    of the dataset, and the available versions can be seen here:
 
         https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/
 
-    The tool will optionally take a timestamp - using the format '2021-11-26' -  to
-    build a particular version, but defaults to the most recent version.
+    The tool will optionally take a timestamp - using the format '2021-11-26'
+    - to build a particular version, but defaults to the most recent version.
     """
 
     desc = textwrap.dedent(_build_local_ncbi_cli.__doc__)
