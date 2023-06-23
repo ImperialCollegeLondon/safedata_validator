@@ -1,10 +1,10 @@
 # The NCBITaxa worksheet
 
-This worksheet plays a similar role to the GBIFTaxa worksheet, that is recording the
-taxonomic information for organisms referred to in the Data worksheets. The key
-difference is that taxonomic information is recorded using NCBI taxonomy rather than
-GBIF taxonomy. This taxonomy better matches the output of sequencing data, and so this
-worksheet is recommended for this class of data. If taxa are used anywhere in the
+This worksheet plays a similar role to the [GBIFTaxa worksheet](./gbif_taxa.md), that is
+recording the taxonomic information for organisms referred to in the Data worksheets.
+The key difference is that taxonomic information is recorded using NCBI taxonomy rather
+than GBIF taxonomy. This taxonomy better matches the output of sequencing data, and so
+this worksheet is recommended for this class of data. If taxa are used anywhere in the
 dataset either this worksheet or the GBIFTaxa worksheet must be included. It is also an
 option to provide both a GBIFTaxa worksheet and a NCBITaxa worksheet, e.g. in cases
 where both sequencing and observational data are being reported.
@@ -37,14 +37,14 @@ two columns (Name, NCBI ID) are mandatory and contain the following:
 
 * **Name**: This column must contain a local name for **all** of the taxa that you are
   going to use in the rest of the dataset, aside those that are already described on a
-  Taxa worksheet. If both a NCBITaxa and a Taxa worksheet are provided the same taxa can
-  be included in both, e.g. a species found both by observation and eDNA sequencing.
-  However, to avoid confusion these should be given different names, i.e. `Vulpes_obs`
-  and `Vulpes_seq` for observed and sequenced instances of `Vulpes`, respectively. Names
-  cannot be duplicated either within a NCBITaxa worksheet or from a Taxa worksheet (when
-  one exists)! Note that these can be abbreviations or codes: if you want to use `Crbe`
-  in your data worksheets, rather than typing out `Crematogaster borneensis` every time,
-  then that is fine.
+  GBIFTaxa worksheet. If both a NCBITaxa and a GBIFTaxa worksheet are provided the same
+  taxa can be included in both, e.g. a species found both by observation and eDNA
+  sequencing. However, to avoid confusion these should be given different names, i.e.
+  `Vulpes_obs` and `Vulpes_seq` for observed and sequenced instances of `Vulpes`,
+  respectively. Names cannot be duplicated either within a NCBITaxa worksheet or from a
+  GBIFTaxa worksheet (when one exists)! Note that these can be abbreviations or codes:
+  if you want to use `Crbe` in your data worksheets, rather than typing out
+  `Crematogaster borneensis` every time, then that is fine.
 
 !!! Note
 
@@ -59,16 +59,16 @@ two columns (Name, NCBI ID) are mandatory and contain the following:
   row entries provide the relevant names for this rank. At least two columns using GBIF
   backbone ranks must be provided. Non-backbone ranks (e.g. subphylum, strain) can also
   be provided, so long as they are defined in the NCBI database. The ranks should be
-  listed in descending order from left to right. It is fine to skip backbone ranks
-  entirely. However, if species is provided as a rank, genus must also be provided, and
-  the same goes for subspecies and species. Species information can either be provided
-  as a binomial or as a single name. Likewise subspecies information can either be
-  provided as the full trinomial or as a single name. Names can be provided in plain
-  text, or alternatively in a commonly used notation, where the rank is indicated by a
-  lower case first letter and the name follows after two underscores (e.g. k__Bacteria
-  for Kingdom Bacteria). Notation of this type should be placed in the correct rank
-  columns, and validation is carried out to check that the rank implied by the notation
-  matches the column rank.
+  listed in descending order from left to right. It is fine to skip specific backbone
+  ranks entirely. However, if species is provided as a rank, genus must also be
+  provided, and the same goes for subspecies and species. Species information can either
+  be provided as a binomial or as a single name. Likewise subspecies information can
+  either be provided as the full trinomial or as a single name. Names can be provided in
+  plain text, or alternatively in a commonly used notation, where the rank is indicated
+  by a lower case first letter and the name follows after two underscores (e.g.
+  k__Bacteria for Kingdom Bacteria). Notation of this type should be placed in the
+  correct rank columns, and validation is carried out to check that the rank implied by
+  the notation matches the column rank.
 
 !!! Note
 
@@ -137,4 +137,4 @@ You should record this data using GBIF format on a Taxa worksheet instead.
 
 ## My data doesn't contain taxa
 
-Fine. You can omit both the Taxa and NCBITaxa worksheet!
+Fine. You can omit both the GBIFTaxa and NCBITaxa worksheet!
