@@ -39,7 +39,7 @@ some data types (see the descriptions of the data types below). The options are:
   record numeric, abundance and trait data.
 * **units**: the units of numeric, abundance or trait variables.
 * **taxon_name**: the name of the taxon for which all of the trait or abundance
-  data in a field is recorded. The taxon name must appear in the Taxa worksheet.
+  data in a field is recorded. The taxon name must appear in a Taxa worksheet.
 * **taxon_field**: the name of a taxon field in the datasheet which shows the
   taxon for which trait or abundance data on that row is recorded.
 * **interaction_name**: a set of names giving the interacting taxa for
@@ -250,40 +250,40 @@ taxon. You need to format your data so that it is clear which taxon each value
 comes from. There are two possible formats:
 
 1. All observations in a column are from **a single taxon**: in this case, you
-   can put a valid taxon name (see Taxa worksheet) in the `taxon_name`
-   descriptor for this column.
+    can put a valid taxon name (see Taxa worksheet) in the `taxon_name`
+    descriptor for this column.
 
-   Example: Observation counts in separate columns for each taxon
+    Example: Observation counts in separate columns for each taxon
 
-   |  |  |  |
-   |---|---|--|
-   | field_type | Abundance | Abundance |
-   | taxon_name | Tiger leech | Brown leech |
-   | method | Exhaustive search of 50cm quadrat | Exhaustive search of 50cm quadrat |
-   | description | quadrat count | quadrat count |
-   | units | individuals | individuals |
-   | field_name | tiger_count | brown_count |
-   | 1 | 24 | 12 |
-   | 2 | 62 | 3 |
+    |  |  |  |
+    |---|---|--|
+    | field_type | Abundance | Abundance |
+    | taxon_name | Tiger leech | Brown leech |
+    | method | Exhaustive search of 50cm quadrat | Exhaustive search of 50cm quadrat |
+    | description | quadrat count | quadrat count |
+    | units | individuals | individuals |
+    | field_name | tiger_count | brown_count |
+    | 1 | 24 | 12 |
+    | 2 | 62 | 3 |
 
 2. Different rows in the column refer to **different taxa**: in this case, you
-   must also have a Taxa column and the `taxon_field` descriptor needs to
-   contain the field name of the appropriate Taxa column.
+    must also have a Taxa column and the `taxon_field` descriptor needs to
+    contain the field name of the appropriate Taxa column.
 
-   Example: Observation counts with different taxa in rows
+    Example: Observation counts with different taxa in rows
 
-   |  |  |  |
-   |---|---|--|
-   | field_type | taxa | Abundance |
-   | taxon_field | | common_name |
-   | method | | Exhaustive search of 50cm quadrat |
-   | description | Species found | Number found |
-   | units |  | individuals |
-   | field_name | common_name | leech_count |
-   | 1 | Tiger leech | 24 |
-   | 2 | Brown leech | 12 |
-   | 3 | Tiger leech | 62 |
-   | 4 | Brown leech | 3 |
+    |  |  |  |
+    |---|---|--|
+    | field_type | taxa | Abundance |
+    | taxon_field | | common_name |
+    | method | | Exhaustive search of 50cm quadrat |
+    | description | Species found | Number found |
+    | units |  | individuals |
+    | field_name | common_name | leech_count |
+    | 1 | Tiger leech | 24 |
+    | 2 | Brown leech | 12 |
+    | 3 | Tiger leech | 62 |
+    | 4 | Brown leech | 3 |
 
 It is an error to provide both `taxon_name` and `taxon_field` descriptors for an
 Abundance or Trait field.
@@ -314,7 +314,8 @@ information, such as survey time or area, then make this clear.
 
 This is just a categorical variable where the groups apply to a taxa. So, we
 need information on the levels used, as for a standard categorical variable, and
-a link to taxonomic information as described in the examples above.
+a link to taxonomic information as described in the examples above. An example
+categorical trait would be the observed life stage of the taxon.
 
 ### Numeric trait
 
@@ -323,9 +324,12 @@ a link to taxonomic information as described in the examples above.
     Field descriptors `units`, `method` and **one** of `taxon_name` or `taxon_field` 
     required
 
-This is just a numeric variable where the groups apply to a taxa. So, we need
-the method and units for the values, as for a standard numeric variable, and a
-link to taxonomic information as described in the examples above.
+A 'trait' in safedata is simply an observation of a property of organisms: that could be
+an observation on a single individual, aggregate measures across a sample of individuals
+or estimates of population or species level values. A numeric trait is just a numeric
+variable where the groups apply to a taxa. So, we need the method and units for the
+values, as for a standard numeric variable, and a link to taxonomic information as
+described in the examples above. An example numeric trait would be mass.
 
 ### Interaction data
 
