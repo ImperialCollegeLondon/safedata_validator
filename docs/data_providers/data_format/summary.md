@@ -261,10 +261,11 @@ permits used to collect this data. The permit type value must be one of `researc
 
 ## Gemini metadata
 
-We provide XML metadata for all datasets that is compliant with the UK
-[GEMINI](https://www.agi.org.uk/agi-groups/standards-committee/uk-gemini)
-standard. This standard includes mandatory **temporal** and **geographic**
-extents.
+It is important to publish dataset metadata using a recognised standard, as this aids
+dataset discovery. The `safedata` system uses the UK
+[GEMINI](https://www.agi.org.uk/agi-groups/standards-committee/uk-gemini) standard, and
+produces XML metadata compliant with this standard for all datasets. In the UK GEMINI
+standard, **temporal** and **geographic** extents are **mandatory**.
 
 Ordinarily, the dataset checking process will calculate these extents
 automatically from the reported locations for the geographic extent and from any
@@ -283,9 +284,9 @@ in your Summary worksheet that provide extent metadata as described below.
 
 ### Temporal extents
 
-!!! Warning "Possibly mandatory block"
-    If you do need to provide this block (see [above](#gemini-metadata)) then all
-    rows are required.
+!!! Warning "Potentially mandatory block"
+    If temporal extents cannot be inferred from your dataset (see
+    [above](#gemini-metadata)) then **all** rows in this block are required.
 
 The start and end date values must be provided as an Excel date formatted cell.
 
@@ -296,9 +297,9 @@ The start and end date values must be provided as an Excel date formatted cell.
 
 ### Geographic extents
 
-!!! Warning "Possibly mandatory block"
-    If you do need to provide this block (see [above](#gemini-metadata)) then all
-    rows are required.
+!!! Warning "Potentially mandatory block"
+    If geographic extents cannot be inferred from your dataset (see
+    [above](#gemini-metadata)) then **all** rows in this block are required.
 
 The geographic extents must be provided as decimal degrees (16.75) not degrees,
 minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
@@ -310,10 +311,8 @@ minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
 | South | 4.50   |  |  |
 | North | 5.07   |  |  |
 
-The geographic bounds in the example cover Maliau, Danum and the SAFE Project
-experimental site and surrounding area. While we would prefer something a bit
-more precise, these are sufficient to provide a geographic extent for most work
-at SAFE.
+!!! Note "safedata at SAFE"
+    For geographic bounds of the SAFE project see [here](../safedata_at_SAFE.md).
 
 ## Complete example summary table
 
