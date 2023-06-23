@@ -249,9 +249,8 @@ Both traits and abundance data tie a value (category or number) to a single
 taxon. You need to format your data so that it is clear which taxon each value
 comes from. There are two possible formats:
 
-1. All observations in a column are from **a single taxon**: in this case, you
-    can put a valid taxon name (see Taxa worksheet) in the `taxon_name`
-    descriptor for this column.
+1. All observations in a column are from **a single taxon**: in this case, you can put a
+  valid taxon name (see Taxa worksheet) in the `taxon_name` descriptor for this column.
 
     Example: Observation counts in separate columns for each taxon
 
@@ -266,9 +265,9 @@ comes from. There are two possible formats:
     | 1 | 24 | 12 |
     | 2 | 62 | 3 |
 
-2. Different rows in the column refer to **different taxa**: in this case, you
-    must also have a Taxa column and the `taxon_field` descriptor needs to
-    contain the field name of the appropriate Taxa column.
+2. Different rows in the column refer to **different taxa**: in this case, you must also
+  have a Taxa column and the `taxon_field` descriptor needs to contain the field name of
+  the appropriate Taxa column.
 
     Example: Observation counts with different taxa in rows
 
@@ -333,9 +332,10 @@ described in the examples above. An example numeric trait would be mass.
 
 ### Interaction data
 
-Interaction data is essentially just a column of categorical or numeric data
-that you want to associate with (at least) two taxon identities, but there are
-lots of ways that the taxon identities could be provided.
+Interaction data is data that involves more than one taxa (e.g. observations of clouded
+leopard hunting success rate with various prey). This data is essentially just a column
+of categorical or numeric data that you want to associate with (at least) two taxon
+identities, but there are lots of ways that the taxon identities could be provided.
 
 Interaction data fields do this by using two alternative descriptors to tie the
 data to taxa: `interaction_name` and `interaction_field`. Each descriptor can
@@ -349,7 +349,7 @@ You can use one or both of the descriptors, depending on how your data is laid
 out. For the most common case of two interacting taxa, the following three
 possibilities exist.
 
-1. Both interacting taxa vary from row to row, so taxon names are provided in two fields
+1. Both interacting taxa vary from row to row, so taxon names are provided in two fields.
 
     Example: Interacting taxa identified in separate columns
 
