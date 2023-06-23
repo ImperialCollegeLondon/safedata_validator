@@ -76,9 +76,9 @@ a single value for each field.
 ## The access block
 
 !!! Warning "Mandatory block"
-    **Embargo date** is only required if the **Access status** value is 'Embargo'.
-    **Access conditions** is only required if the **Access status** value is
-     'Restricted'.
+    **Access status** is required for all datasets. **Embargo date** is only required if
+    the **Access status** value is 'Embargo'. **Access conditions** is only required if
+    the **Access status** value is 'Restricted'.
 
 This block provides the access details for the dataset. You can only provide a
 single value for each field.
@@ -223,12 +223,15 @@ the root of the URL.
     you must provide details of any funding that lead to the collection of the
     data.
 
-    This is particularly important for RCUK funded research, who have agreed to
-    let us host all of the SAFE data under a common portal on the condition that
-    Research Council funding is clearly acknowledged.
+    The inclusion of this information can be a condition for funders to allow data to be
+    hosted under a common portal. Your data manager should inform you of funding
+    organisations that require this.
 
     **Funding body** and **Funding type** are mandatory, but please do provide a
     reference number and a link if possible.
+
+!!! Note "safedata at SAFE"
+    For funder specific details for the SAFE project see [here](../safedata_at_SAFE.md).
 
 Funding details are provided by completing a block as follows and,  as with
 Authors and Worksheets, you can use multiple columns to acknowledge more than
@@ -246,10 +249,9 @@ one funder.
 !!! Note "Optional block"
     If you provide permit details, all the fields are required.
 
-Permits are required for nearly all research conducted at SAFE. Use this block
-to record the permits used to collect this data. The permit type value must be
-one of `research`, `export` or `ethics`. Again, you can use multiple columns to
-record multiple permits.
+Permits are very often required for ecological research. Use this block to record the
+permits used to collect this data. The permit type value must be one of `research`,
+`export` or `ethics`. Again, you can use multiple columns to record multiple permits.
 
 |                  |                           |  |  |
 |------------------|---------------------------|--|--|
