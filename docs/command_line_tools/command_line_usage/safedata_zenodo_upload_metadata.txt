@@ -2,8 +2,8 @@ cl_prompt $ safedata_zenodo upload_metadata -h
 usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ... upload_metadata
        [-h] zenodo_json dataset_json
 
-Uses the dataset metadata created using `safedata_validate` to populate the required
-Zenodo metadata for an unpublished deposit.
+Uses the dataset metadata created using `safedata_validate` to populate the
+required Zenodo metadata for an unpublished deposit.
 
 positional arguments:
   zenodo_json   Path to a Zenodo metadata file
