@@ -13,7 +13,7 @@ The following are the **mandatory field descriptors**, which are needed for all
 fields and which **cannot be blank**.
 
 * **field_type**: This has to be one of the following values indicating the
-  field type (see the options below).
+  field type (see the options [below](#field-types)).
 * **description**: a short description of the field .
 * **field_name**: the name of the variable. The name format should be suitable
   for loading into an analysis package and should not contain spaces: use an
@@ -31,7 +31,7 @@ There are also some **additional field descriptors**, which are mandatory for
 some data types (see the descriptions of the data types below). The options are:
 
 * **levels**: contains the set of level names used in a categorical variable.
-* **method**: a contain a short description of the method and equipment used to
+* **method**: contains a short description of the method and equipment used to
   record numeric, abundance and trait data.
 * **units**: the units of numeric, abundance or trait variables.
 * **taxon_name**: the name of the taxon for which all of the trait or abundance
@@ -181,7 +181,7 @@ permitted) but no other validation occurs.
 
 !!! Note
 
-  Field descriptor `levels` required
+    Field descriptor `levels` required
 
 Both categorical and ordered categorical data (also known as a factors) are made
 up of a set of **levels** showing the different groups or treatment. The data in
@@ -288,7 +288,8 @@ Abundance or Trait field.
 
 !!! Note
 
-    Field descriptors `method`, `units` and one of `taxon_name` or `taxon_field` required
+    Field descriptors `method`, `units` and **one** of `taxon_name` or `taxon_field`
+    required
 
 Abundance is used here as an umbrella term to cover a wide range of
 possibilities from casual observation data ('We saw two clouded leopards on
@@ -305,7 +306,7 @@ information, such as survey time or area, then make this clear.
 
 !!! Note
 
-    Field descriptors `levels` and one of `taxon_name` or `taxon_field` required
+    Field descriptors `levels` and **one** of `taxon_name` or `taxon_field` required
 
 This is just a categorical variable where the groups apply to a taxa. So, we
 need information on the levels used, as for a standard categorical variable, and
@@ -315,7 +316,8 @@ a link to taxonomic information as described in the examples above.
 
 !!! Note
 
-  Field descriptors `units`, `method` and one of `taxon_name` or `taxon_field` required
+    Field descriptors `units`, `method` and **one** of `taxon_name` or `taxon_field` 
+    required
 
 This is just a numeric variable where the groups apply to a taxa. So, we need
 the method and units for the values, as for a standard numeric variable, and a
@@ -396,19 +398,20 @@ interaction names and fields to provide your taxon identities.
 
 !!! Note
 
-  Field descriptors `levels` and `interaction_name` and/or `interaction_field` required
+    Field descriptors `levels` and `interaction_name` and/or `interaction_field` required
 
 ### Numeric interactions
 
 !!! Note
 
-  Field descriptors `units`, `method` and `interaction_name` and/or `interaction_field` required
+    Field descriptors `units`, `method` and `interaction_name` and/or `interaction_field`
+    required
 
 ### File
 
 !!! Note
 
-  Field descriptor `file_container` may be required
+    Field descriptor `file_container` may be required
 
 This type is used to provide references to information stored in external files.
 It can be used in two ways:
