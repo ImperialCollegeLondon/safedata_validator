@@ -10,17 +10,19 @@ Publish validated datasets to Zenodo using a command line interface.
 
     The safedata_zenodo command is used by providing subcommands for the
     different actions required to publish a validated dataset. The list of
-    subcommands (with aliases) is shown below and ndividual help is
+    subcommands (with aliases) is shown below and individual help is
     available for each of the subcommands:
 
         safedata_zenodo subcommand -h
 
-    The subcommands for this tool use two different JSON format metadata files:
+    The subcommands for this tool use two different JSON format metadata
+    files:
 
-    * A dataset metadata file (`dataset_json`). This is the output from using
-        the `safedata_validate` tool. Some of the information in this file
-        is used to create the Zenodo dataset description, and all of the data
-        is used to describe a dataset on the separate metadata server.
+    * A dataset metadata file (`dataset_json`). This is the output from
+        using the `safedata_validate` tool. Some of the information in this
+        file is used to create the Zenodo dataset description, and all of
+        the data is used to describe a dataset on the separate metadata
+        server.
 
     * A Zenodo metadata file (`zenodo_json`), that describes the metadata
         associated with a Zenodo deposit or published record.
@@ -28,32 +30,32 @@ Publish validated datasets to Zenodo using a command line interface.
     Note that most of these actions are also available via the Zenodo website.
 
 positional arguments:
-  {create_deposit,cdep,discard_deposit,ddep,get_deposit,gdep,publish_deposit,pdep,upload_file,ufile,delete_file,dfile,upload_metadata,umeta,amend_metadata,ameta,sync_local_dir,sync,maintain_ris,ris,generate_html,html,generate_xml,xml,show_config,conf}
-    create_deposit (cdep)
+  
+    create_deposit
                 Create a new Zenodo draft deposit
-    discard_deposit (ddep)
+    discard_deposit
                 Discard an unpublished deposit
-    get_deposit (gdep)
+    get_deposit
                 Download and display deposit metadata
-    publish_deposit (pdep)
+    publish_deposit
                 Publish a draft deposit
-    upload_file (ufile)
+    upload_file
                 Upload a file to an unpublished deposit
-    delete_file (dfile)
+    delete_file
                 Delete a file from an unpublished deposit
-    upload_metadata (umeta)
+    upload_metadata
                 Populate the Zenodo metadata
-    amend_metadata (ameta)
+    amend_metadata
                 Update published Zenodo metadata
-    sync_local_dir (sync)
+    sync_local_dir
                 Create or update a local safedata directory
-    maintain_ris (ris)
+    maintain_ris
                 Maintain a RIS bibliography file for datasets
-    generate_html (html)
+    generate_html
                 Generate an HTML dataset description
-    generate_xml (xml)
+    generate_xml
                 Create INSPIRE compliant metadata XML
-    show_config (conf)
+    show_config
                 Report the config being used and exit
 
 options:

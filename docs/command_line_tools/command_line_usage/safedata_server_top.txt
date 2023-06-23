@@ -1,6 +1,5 @@
 cl_prompt $ safedata_server -h
-usage: safedata_server [-h] [-r RESOURCES] [-q]
-                       {post_metadata,update_gazetteer} ...
+usage: safedata_server [-h] [-r RESOURCES] [-q]  ...
 
 Post updated information to a safedata server instance.
 
@@ -12,7 +11,7 @@ Post updated information to a safedata server instance.
     URL for the server and an access token.
 
 positional arguments:
-  {post_metadata,update_gazetteer}
+  
     post_metadata       Post dataset metadata to a safedata server
     update_gazetteer    Update the gazetteer data on safedata server
 

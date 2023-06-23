@@ -55,8 +55,8 @@ As an initial example, the process for publishing a simple dataset
 # Validate the file, creating the Test_format_good.json metadata file
 safedata_validate Test_format_good.xlsx
 
-# Create a new deposit, creating a JSON file of metadata for the Zenodo deposit
-# as - for example - zenodo_1059375.json
+# Create a new deposit, creating a JSON file of metadata for the Zenodo
+# deposit as - for example - zenodo_1059375.json
 safedata_zenodo create_deposit
 
 # Upload the file
