@@ -6,9 +6,9 @@ the install documentation for the [GBIF](../install/build_local_gbif.md) and
 
 ## `safedata_validate`
 
-This tool is simply used to validate a dataset that is in the
-[`safedata_validator` format](../data_providers/data_format/overview.md). The tool needs
-some simple configuration, but is intended to be fairly easy to set up and use.
+This tool is simply used to validate a dataset that is in [`safedata_data`
+format](../data_providers/data_format/overview.md). The tool needs some simple
+configuration, but is intended to be fairly easy to set up and use.
 
 For more details, see [here](safedata_validate.md).
 

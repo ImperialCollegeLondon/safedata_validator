@@ -1,7 +1,7 @@
 # Using the SAFE Dataset Checker
 
 The  `safedata_validator` package contains Python code to validate files
-containing data using SAFE data formatting  and report on any problems. The code
+containing data using `safedata` formatting  and report on any problems. The code
 validates:
 
   1. The data submission formatting of the file.
@@ -10,10 +10,9 @@ validates:
      database](../install/ncbi_validation.md).
   1. All location names against a locations gazetteer.
 
-This package can be used within other frameworks, such as the [SAFE Project
-website](https://safeproject.net/datasets/view_datasets). However, the package also
-provides a command line tool, that allows it to be  installed and run as a standalone
-application, for example by data managers or individual researchers.
+This package can be used within other frameworks. However, the package also provides a
+command line tool, that allows it to be  installed and run as a standalone application,
+for example by data managers or individual researchers.
 
 ## Configuring data resources
 
