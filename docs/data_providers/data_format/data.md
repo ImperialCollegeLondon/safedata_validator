@@ -4,10 +4,14 @@ Finally, we get to the worksheets containing your actual data!
 
 ## Field metadata
 
-The top rows of the worksheet are used to provide metadata descriptors for each
-of the columns ('fields') in your data worksheet. Each descriptor row has a
-label, which must appear in Column A of the worksheet, with the value for each
-field appearing above that column.
+Data worksheets are structured as a "data frame" with each column containing a different
+field or variable. The worksheet is organised into two sections: field metadata appears
+at the top and then the actual data for each field appear below the metadata.
+
+Each data worksheet will require a particular set of metadata descriptors - some are
+mandatory and others are only required for some kinds of field. The field metadata
+descriptors are arranged in rows, with the label of the descriptor  for each row
+appearing in the first column (Column A).
 
 The following are the **mandatory field descriptors**, which are needed for all
 fields and which **cannot be blank**.
@@ -15,21 +19,19 @@ fields and which **cannot be blank**.
 * **field_type**: This has to be one of the following values indicating the
   field type (see the options [below](#field-types)).
 * **description**: a short description of the field .
-* **field_name**: the name of the variable. The name format should be suitable
-  for loading into an analysis package and should not contain spaces: use an
-  underscore (`_`) to put gaps in names. It definitely must not have white space
-  at the start or end and it should only use standard ASCII characters. This
-  descriptor **must always be the last descriptor row**, immediately above the
-  data, so that it can be used as field headers when loading data from the file
-  for analysis.
+* **field_name**: the name of the variable. The name format should be suitable for
+  loading into an analysis package and should not contain spaces: use an underscore
+  (`_`) to put gaps in names. It definitely must not have white space at the start or
+  end and it should only use standard [ASCII](https://en.wikipedia.org/wiki/ASCII)
+  characters. This descriptor **must always be the last descriptor row**, immediately
+  above the data, so that it can be used as field headers when loading data from the
+  file for analysis.
 
   Field names _have_ to follow the convention for field names in R (see
   [here](https://adv-r.hadley.nz/names-values.html#non-syntactic)). Mostly, this follows
   the short description above, but names starting with a number (e.g. `1` or `2day`) are
   also forbidden, along with a small set of [reserved
-  words](https://stat.ethz.ch/R-manual/R-devel/library/base/html/Reserved.html). In
-  addition, characters not included in the [ASCII
-  standard](https://en.wikipedia.org/wiki/ASCII) cannot be used.
+  words](https://stat.ethz.ch/R-manual/R-devel/library/base/html/Reserved.html).
 
 There are also some **additional field descriptors**, which are mandatory for
 some data types (see the descriptions of the data types below). The options are:
