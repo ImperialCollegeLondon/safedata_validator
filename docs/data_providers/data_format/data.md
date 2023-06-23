@@ -349,54 +349,53 @@ You can use one or both of the descriptors, depending on how your data is laid
 out. For the most common case of two interacting taxa, the following three
 possibilities exist.
 
-1. Both interacting taxa vary from row to row, so taxon names are provided in
-   two fields
+1. Both interacting taxa vary from row to row, so taxon names are provided in two fields
 
-   Example: Interacting taxa identified in separate columns
+    Example: Interacting taxa identified in separate columns
 
-   |  |  |  |  |
-   |---|---|---|---|
-   | field_type | Taxon | Taxon | Categorical Interaction |
-   | interaction_field | | | predator;prey |
-   | levels | | | success;failure |
-   | method | Visual observation | Visual observation | Visual observation |
-   | description | Predator observed | Prey observed | Outcome of predation event |
-   | field_name | predator | prey | outcome |
-   | 1 | Clouded leopard | Brown rat | success |
-   | 2 | Flat headed cat | Moon rat | failure |
+    |  |  |  |  |
+    |---|---|---|---|
+    | field_type | Taxon | Taxon | Categorical Interaction |
+    | interaction_field | | | predator;prey |
+    | levels | | | success;failure |
+    | method | Visual observation | Visual observation | Visual observation |
+    | description | Predator observed | Prey observed | Outcome of predation event |
+    | field_name | predator | prey | outcome |
+    | 1 | Clouded leopard | Brown rat | success |
+    | 2 | Flat headed cat | Moon rat | failure |
 
-2. Alternatively, all of the data might refer to the same two taxa, so the taxon
-   names can be provided directly.
+2. Alternatively, all of the data might refer to the same two taxa, so the taxon names
+    can be provided directly.
 
-   Example: Interacting taxa constant
+    Example: Interacting taxa constant
 
-   |  |  |
-   |---|---|
-   | field_type | Categorical Interaction |
-   | interaction_name | Clouded leopard:predator;Brown rat:prey |
-   | levels | success;failure |
-   | method | Visual observation |
-   | description | Outcome of predation event |
-   | field_name | outcome |
-   | 1 | success |
-   | 2 | failure |
+    |  |  |
+    |---|---|
+    | field_type | Categorical Interaction |
+    | interaction_name | Clouded leopard:predator;Brown rat:prey |
+    | levels | success;failure |
+    | method | Visual observation |
+    | description | Outcome of predation event |
+    | field_name | outcome |
+    | 1 | success |
+    | 2 | failure |
 
-3. Finally, one side of the interaction might vary from row to row but the other
-   side is constant for all rows.
+3. Finally, one side of the interaction might vary from row to row but the other side is
+    constant for all rows.
 
-   Example: Interacting taxa identified by name and by column
+    Example: Interacting taxa identified by name and by column
 
-   |  |  |  |
-   |---|---|---|
-   | field_type | Taxon | Categorical Interaction |
-   | interaction_name | | Clouded leopard:predator; |
-   | interaction_field | | prey:prey species; |
-   | levels | | success;failure |
-   | method | Visual observation | Visual observation |
-   | description | Prey observed | Outcome of predation event |
-   | field_name | prey | outcome |
-   | 1 | Brown rat | success |
-   | 2 | Moon rat | failure |
+    |  |  |  |
+    |---|---|---|
+    | field_type | Taxon | Categorical Interaction |
+    | interaction_name | | Clouded leopard:predator; |
+    | interaction_field | | prey:prey species; |
+    | levels | | success;failure |
+    | method | Visual observation | Visual observation |
+    | description | Prey observed | Outcome of predation event |
+    | field_name | prey | outcome |
+    | 1 | Brown rat | success |
+    | 2 | Moon rat | failure |
 
 You must provide at least two taxon names or fields, but you can provide more if
 you have tritrophic interactions! Again, you can use any combination of
@@ -424,50 +423,49 @@ interaction names and fields to provide your taxon identities.
 This type is used to provide references to information stored in external files.
 It can be used in two ways:
 
-1. The values in the data are direct references to external files provided in
-   the Summary worksheet. The values in the field are checked against the list
-   of external file names and they must all appear there.  For example, if the
-   Summary worksheet includes an external file row with `My_raster_1.tiff` and
-   `My_raster_2,tiff`:
+1. The values in the data are direct references to external files provided in the
+  Summary worksheet. The values in the field are checked against the list of external
+  file names and they must all appear there.  For example, if the Summary worksheet
+  includes an external file row with `My_raster_1.tiff` and `My_raster_2,tiff`:
 
-   |  |  |  |
-   |---|---|---|
-   | field_type | Numeric | File |
-   | description | Altitude in metres | DEM  file used for altitude |
-   | method | Extracted from DEM tiffs |  |
-   | taxon_name |  |  |
-   | units | metres |  |
-   | field_name | Altitude | DEM |
-   | 1 | 100 | My_raster_1.tiff |
-   | 2 | 200 | My_raster_1.tiff |
-   | 3 | 300 | My_raster_1.tiff |
-   | 4 | 400 | My_raster_1.tiff |
-   | 5 | 500 | My_raster_2.tiff |
-   | 6 | 600 | My_raster_2.tiff |
-   | 7 | 700 | My_raster_2.tiff |
-   | 8 | 800 | My_raster_2.tiff |
+    |  |  |  |
+    |---|---|---|
+    | field_type | Numeric | File |
+    | description | Altitude in metres | DEM  file used for altitude |
+    | method | Extracted from DEM tiffs |  |
+    | taxon_name |  |  |
+    | units | metres |  |
+    | field_name | Altitude | DEM |
+    | 1 | 100 | My_raster_1.tiff |
+    | 2 | 200 | My_raster_1.tiff |
+    | 3 | 300 | My_raster_1.tiff |
+    | 4 | 400 | My_raster_1.tiff |
+    | 5 | 500 | My_raster_2.tiff |
+    | 6 | 600 | My_raster_2.tiff |
+    | 7 | 700 | My_raster_2.tiff |
+    | 8 | 800 | My_raster_2.tiff |
 
-2. The values in the data are files contained within an external file. In this
-   case, the descriptor `file_container` is used to check the external file is
-   present, but the values in the field are not checked. For example:
+2. The values in the data are files contained within an external file. In this case, the
+  descriptor `file_container` is used to check the external file is present, but the
+  values in the field are not checked. For example:
 
-   |  |  |  |
-   |---|---|---|
-   | field_type | Numeric | File |
-   | description | Altitude in metres | Image of Quadrat |
-   | method | Extracted from DEM tiffs |  |
-   | taxon_name |  |  |
-   | units | metres |  |
-   | file_container |  | My_archive.zip |
-   | field_name | Altitude | Quadrat_image |
-   | 1 | 100 | Site_quadrat_1.jpg |
-   | 2 | 200 | Site_quadrat_2.jpg |
-   | 3 | 300 | Site_quadrat_3.jpg |
-   | 4 | 400 | Site_quadrat_4.jpg |
-   | 5 | 500 | Site_quadrat_5.jpg |
-   | 6 | 600 | Site_quadrat_6.jpg |
-   | 7 | 700 | Site_quadrat_7.jpg |
-   | 8 | 800 | Site_quadrat_8.jpg |
+    |  |  |  |
+    |---|---|---|
+    | field_type | Numeric | File |
+    | description | Altitude in metres | Image of Quadrat |
+    | method | Extracted from DEM tiffs |  |
+    | taxon_name |  |  |
+    | units | metres |  |
+    | file_container |  | My_archive.zip |
+    | field_name | Altitude | Quadrat_image |
+    | 1 | 100 | Site_quadrat_1.jpg |
+    | 2 | 200 | Site_quadrat_2.jpg |
+    | 3 | 300 | Site_quadrat_3.jpg |
+    | 4 | 400 | Site_quadrat_4.jpg |
+    | 5 | 500 | Site_quadrat_5.jpg |
+    | 6 | 600 | Site_quadrat_6.jpg |
+    | 7 | 700 | Site_quadrat_7.jpg |
+    | 8 | 800 | Site_quadrat_8.jpg |
 
 ### Comments
 
