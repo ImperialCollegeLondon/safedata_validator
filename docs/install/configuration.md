@@ -124,10 +124,10 @@ be turned off by setting the `use_project_ids` option  to `False`. With this opt
 datasets will **fail validation** if they contain project IDs.
 
 !!! Warning
-  Each deployment of the `safedata` system will have to make a choice of whether or not
-  to organise datasets into project. Once this choice has been made it will be binding.
-  As such, this option should only be changed by the relevant data manager during the
-  initial setup of the data system.
+    Each deployment of the `safedata` system will have to make a choice of whether or
+    not to organise datasets into project. Once this choice has been made it will be
+    binding. As such, this option should only be changed by the relevant data manager
+    during the initial setup of the data system.
 
 ### Extents
 
@@ -149,15 +149,16 @@ The `safedata_validator` package provides functionality for publishing validated
 datasets to the Zenodo data repository. In order to do this, the Zenodo
 community name and access keys need to be stored in the configuration file.
 
-On Zenodo datasets are generally uploaded to specific communities. The community to
-upload the dataset to is indicated in the configuration file by the `community_name`
-option. In our case it is set to upload datasets to the [SAFE project Zenodo
-community](https://zenodo.org/communities/safe). Uploading to a community requires that
-you hold proper admin credentials for said community. These are provided in the form of
-a `zenodo_token`. It is also important to provide the contact details of the community
-when interacting with the api. These consist of the full community name, affiliation,
-and orchid ID, and are provided by `contact_name`, `contact_affiliation`, and
-`contact_orcid`, respectively.
+On Zenodo datasets are generally uploaded to specific communities. Your data manager
+will have set up a community for the specific deployment of the `safedata` system that
+you are using. Uploading to this specific community requires that you hold proper admin
+credentials for said community. These are provided in the form of a `zenodo_token`. It
+is also important to provide the contact details of the community when interacting with
+the api. These consist of the full community name, affiliation, and orchid ID, and are
+provided by `contact_name`, `contact_affiliation`, and `contact_orcid`, respectively. If
+you do not have these credentials you should contact your organisations data manager.
+They should either provide you with credentials or direct you to someone who can upload
+the dataset on your behalf.
 
 When testing dataset uploads the normal Zenodo api should **not** be used. Instead the
 sandbox api should be used. Documentation of this can be found
@@ -172,12 +173,10 @@ site.
 
 Zenodo only allows a fairly limited amount of metadata to be stored for each dataset.
 While this is completely adequate to describe the contents of a dataset, more extensive
-metadata must be stored elsewhere if detailed searches within datasets are desired. In
-our case, the SAFE project [website](https://safeproject.net) is used as a metadata
-server, which provides an API allowing searches across all uploaded datasets. A further
-package in the SAFE data ecosystem
-([`safedata`](https://imperialcollegelondon.github.io/safedata/)) has been built, in
-order to simplify the process of querying this API for end users.
+metadata must be stored elsewhere if detailed searches within datasets are desired. A
+further package in the `safe_data` ecosystem
+([`safedata_server`](https://github.com/ImperialCollegeLondon/safedata_server)) has been
+built, in order to simplify the process of querying this API for end users.
 
 In production use, the metadata server should be set up with a properly validated SSL
 certificate to allow HTTPS, and this is relatively easy using LetsEncrypt. However, when
