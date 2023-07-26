@@ -2099,16 +2099,18 @@ class DatetimeField(BaseField):
                 if val.time() != midnight:
                     self.all_midnight = False
 
-        # Update range for extents
-        if self.min is None:
-            self.min = min(data)
-        else:
-            self.min = min([self.min] + data)
+        # Check that data isn't empty
+        if data:
+            # Update range for extents
+            if self.min is None:
+                self.min = min(data)
+            else:
+                self.min = min([self.min] + data)
 
-        if self.max is None:
-            self.max = min(data)
-        else:
-            self.max = max([self.max] + data)
+            if self.max is None:
+                self.max = min(data)
+            else:
+                self.max = max([self.max] + data)
 
     def report(self):
         """Report on field creation and data validation for date and datetime fields.
