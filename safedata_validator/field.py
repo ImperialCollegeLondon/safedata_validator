@@ -2064,7 +2064,10 @@ class DatetimeField(BaseField):
 
             # Are the values internally consistent and consistent with
             # previously loaded data
-            if len(cell_type_set) > 1:
+            if len(cell_type_set) == 0:
+                # If data is empty skip consistency checking
+                return
+            elif len(cell_type_set) > 1:
                 self.consistent_class = False
                 return
             elif self.first_data_class_set is None:

@@ -1832,6 +1832,33 @@ def test_TimeField_validate_data(caplog, data, expected_log):
             ((INFO, "Checking field datetimetest"),),
         ),
         (
+            "date",
+            [
+                [
+                    datetime(2022, 1, 6),
+                    datetime(2022, 1, 6),
+                    "NA",
+                    "NA",
+                    datetime(2022, 1, 6),
+                ],
+            ],
+            ((INFO, "Checking field datetimetest"), (WARNING, "2 / 5 values missing")),
+        ),
+        (
+            "date",
+            [
+                ["NA", "NA", "NA", "NA", "NA"],
+                [
+                    datetime(2022, 1, 6),
+                    datetime(2022, 1, 6),
+                    datetime(2022, 1, 6),
+                    datetime(2022, 1, 6),
+                    datetime(2022, 1, 6),
+                ],
+            ],
+            ((INFO, "Checking field datetimetest"), (WARNING, "5 / 10 values missing")),
+        ),
+        (
             "datetime",
             [
                 [
