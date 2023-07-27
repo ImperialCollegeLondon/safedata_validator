@@ -1726,6 +1726,19 @@ def test_GeoField_validate_data(caplog, fixture_dataset, which, data, expected_l
             ],  # Different ISO8601 string formats
             ((INFO, "Checking field time"),),
         ),
+        (
+            [
+                ["11:12:13", "NA", "NA", "11:12:13", "11:12:13"],
+            ],
+            ((INFO, "Checking field time"), (WARNING, "2 / 5 values missing")),
+        ),
+        (
+            [
+                ["NA", "NA", "NA", "NA", "NA"],
+                ["11:12:13", "11:12:13", "11:12:13", "11:12:13", "11:12:13"],
+            ],
+            ((INFO, "Checking field time"), (WARNING, "5 / 10 values missing")),
+        ),
         # Bad inputs
         (
             [
