@@ -1952,7 +1952,10 @@ class TimeField(BaseField):
 
             # Are the values internally consistent and consistent with
             # previously loaded data
-            if len(cell_type_set) > 1:
+            if len(cell_type_set) == 0:
+                # If data is empty skip consistency checking
+                return
+            elif len(cell_type_set) > 1:
                 self.consistent_class = False
                 return
             elif self.first_data_class_set is None:
@@ -2064,7 +2067,10 @@ class DatetimeField(BaseField):
 
             # Are the values internally consistent and consistent with
             # previously loaded data
-            if len(cell_type_set) > 1:
+            if len(cell_type_set) == 0:
+                # If data is empty skip consistency checking
+                return
+            elif len(cell_type_set) > 1:
                 self.consistent_class = False
                 return
             elif self.first_data_class_set is None:
@@ -2099,16 +2105,18 @@ class DatetimeField(BaseField):
                 if val.time() != midnight:
                     self.all_midnight = False
 
-        # Update range for extents
-        if self.min is None:
-            self.min = min(data)
-        else:
-            self.min = min([self.min] + data)
+        # Check that data isn't empty
+        if data:
+            # Update range for extents
+            if self.min is None:
+                self.min = min(data)
+            else:
+                self.min = min([self.min] + data)
 
-        if self.max is None:
-            self.max = min(data)
-        else:
-            self.max = max([self.max] + data)
+            if self.max is None:
+                self.max = min(data)
+            else:
+                self.max = max([self.max] + data)
 
     def report(self):
         """Report on field creation and data validation for date and datetime fields.
