@@ -1,5 +1,29 @@
 # The NCBITaxa worksheet
 
+<!-- markdownlint-disable MD033 -->
+<style>
+
+/*removing table headers and fixing cell widths so everything lines up.*/
+table {
+  table-layout: fixed;
+}
+
+tbody td {
+  width: 14em;
+  min-width: 14em;
+  max-width: 14em;
+  border: 1px solid lightgrey;
+}
+
+thead th {
+  width: 14em;
+  min-width: 14em;
+  max-width: 14em;
+  border: 1px solid lightgrey;
+}
+</style>
+<!-- markdownlint-enable MD033 -->
+
 This worksheet plays a similar role to the [GBIFTaxa worksheet](./gbif_taxa.md), that is
 recording the taxonomic information for organisms referred to in the Data worksheets.
 The key difference is that taxonomic information is recorded using NCBI taxonomy rather
@@ -25,12 +49,14 @@ taxonomic usage!) but the NCBI backbone has extremely good taxonomic coverage.
 
 The table format looks like this:
 
-| Name | NCBI ID | Superkingdom | Kingdom | Phylum | Class | Comments |
-|---|---|---|---|---|---| --- |
-| G_proteobacteria | 1236 | Bacteria |  | Proteobacteria | Gammaproteobacteria |  |
-| E_mycetes | 147545 | Eukaryota | Fungi | Ascomycota | Eurotiomycetes |  |
-| Dinophyceae |  | Eukaryota |  |  | Dinophyceae |  |
-| Acidobact |  |  | k__Bacteria | p__Acidobacteria | c__Acidobacteriia |  |  |
+<!-- markdownlint-disable MD013 -->
+| Name             | NCBI ID | Superkingdom | Kingdom     | Phylum           | Class               | Comments |
+| ---------------- | ------- | ------------ | ----------- | ---------------- | ------------------- | -------- |
+| G_proteobacteria | 1236    | Bacteria     |             | Proteobacteria   | Gammaproteobacteria |          |
+| E_mycetes        | 147545  | Eukaryota    | Fungi       | Ascomycota       | Eurotiomycetes      |          |
+| Dinophyceae      |         | Eukaryota    |             |                  | Dinophyceae         |          |
+| Acidobact        |         |              | k__Bacteria | p__Acidobacteria | c__Acidobacteriia   |          |
+<!-- markdownlint-enable MD013 -->
 
 The table must contain column headers in the **first row** of the worksheet. The first
 two columns (Name, NCBI ID) are mandatory and contain the following:

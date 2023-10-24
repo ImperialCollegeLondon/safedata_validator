@@ -27,14 +27,14 @@ table {
   table-layout: fixed;
 }
 
-tbody tr td {
+tbody td {
   width: 14em;
   min-width: 14em;
   max-width: 14em;
   border: 1px solid lightgrey;
 }
 
-tbody tr td:first-child {
+tbody td:first-child {
   width: 12em;
   min-width: 12em;
   max-width: 12em;
@@ -54,11 +54,8 @@ a single value for each field.
 
 * **Project ID**: This is only used if the organisation you are uploading to uses
   projects to group datasets. If they are, then you should obtain relevant project IDs
-  from the organisation's data manager and add them in your Summary worksheet. This
-  field can alternatively be given as `SAFE Project ID`. This alternative name is
-  allowed solely in order to make the system backwards compatible with historic
-  datasets. Using it is **not** the preferred option, particularly if you are submitting
-  your data to someone other than the SAFE project.
+  from the organisation's data manager and add them in your Summary worksheet. Older
+  datasets may use the field name as `SAFE Project ID` but this is deprecated.
 * **Title**: This should be a short informative title for the dataset: it will
   be used as the public title for the dataset so make sure it is clear and
   grammatical!
@@ -130,7 +127,7 @@ URL `http://orcid.org/0000-0002-7005-1394`.
 | Author ORCID       | 0000-0002-7005-1394     |  |  |
 
 !!! Important
-    The authors provided here will form part of the permanent citation for the
+    The **authors provided here will form part of the permanent citation** for the
     published dataset. Authorship on published datasets should be treated in the
     same way as you would consider authorship on papers: you should include not
     only the people responsible for physically collecting the data but also other
@@ -230,7 +227,7 @@ the root of the URL.
     **Funding body** and **Funding type** are mandatory, but please do provide a
     reference number and a link if possible.
 
-!!! Note "safedata at SAFE"
+!!! Note "`safedata` at the SAFE Project"
     For funder specific details for the SAFE project see
     [here](../../safedata_at_SAFE.md).
 
@@ -312,7 +309,7 @@ minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
 | South | 4.50   |  |  |
 | North | 5.07   |  |  |
 
-!!! Note "safedata at SAFE"
+!!! Note "`safedata` at the SAFE Project"
     For geographic bounds of the SAFE project see [here](../../safedata_at_SAFE.md).
 
 ## Complete example summary table

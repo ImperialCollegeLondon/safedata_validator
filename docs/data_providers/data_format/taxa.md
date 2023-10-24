@@ -7,10 +7,10 @@ providing taxonomic information. There are two kinds:
 
 * A [GBIFTaxa worksheet](gbif_taxa.md), which is typically used for observational data
 * A [NCBITaxa worksheet](ncbi_taxa.md), which is used for data that has been obtained
-  from genetic sequencing which very often can't be converted into GBIF's taxonomic
-  structure.
+  from genetic sequencing which very often cannot be easily mapped onto the GBIF taxonomic
+  backbone.
 
-Both worksheet types can be provided in a single data set - for example, to capture
+Both worksheet types can be provided for a single data set - for example, to capture
 the species of trapped mammals and the sequences associated with their stomach contents.
 
 A taxon can be defined in both sheets (i.e. when a taxon has been both directly observed

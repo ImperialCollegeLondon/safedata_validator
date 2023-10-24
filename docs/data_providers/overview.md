@@ -16,21 +16,24 @@ If you are planning to submit data which needs to pass `safedata_validator`, the
 process in overview is:
 
 * Prepare your data following the [formatting information](data_format/overview.md).
-* Submit the dataset to the relevant metadata server for validation. To find the details
-  of this server please contact the data manager for the organisation you are submitting
-  to. In order to submit data, you will need to be properly registered with the
-  organisation.
+* Submit the dataset to the data manager for the organisation you are submitting
+  to, who will run the `safedata_validator` package on your dataset and provide
+  automated feedback to help you address any issues:
+
     * If the validation succeeds then the dataset will be published on Zenodo. The
     dataset will be associated with the Zenodo community of the organisation you are
     submitting to.
     * If the validation fails then you will get an error report so you can fix the
     problems and resubmit.
 
+* Once the dataset is published, the metadata for your dataset will be added to the
+  organisation metadata server, so that it can be searched to help data discovery.
+
 !!! Warning
     You **must not** publish your dataset directly to Zenodo. This skips validation
     and means that the datasets are not linked together under a single [curation
     account](availability.md#data-curation).
 
-!!! Note "safedata at SAFE"
+!!! Note "`safedata` at the SAFE Project"
     You can see published datasets for the [SAFE Project Zenodo
     community](https://zenodo.org/communities/safe/).

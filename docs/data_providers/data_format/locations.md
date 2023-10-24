@@ -1,5 +1,29 @@
 # The Location worksheet
 
+<!-- markdownlint-disable MD033 -->
+<style>
+
+/*fixing cell widths so everything lines up and adding borders*/
+table {
+  table-layout: fixed;
+}
+
+tbody td {
+  width: 14em;
+  min-width: 14em;
+  max-width: 14em;
+  border: 1px solid lightgrey;
+}
+
+thead th {
+  width: 14em;
+  min-width: 14em;
+  max-width: 14em;
+  border: 1px solid lightgrey;
+}
+</style>
+<!-- markdownlint-enable MD033 -->
+
 All locations used in your data worksheets need to be listed in this worksheet. By
 **location**, we mean the common frequently used areas in which research has happened
 for the project you are submitting data to. You might have more detail about the precise
@@ -37,7 +61,7 @@ locations: chr [1:2691] "SAFE_camp" "Flux_tower" "A_1" "A_2" ...
 
 If you only use known locations, then you _only need to provide the  location name column_.
 
-!!! Note "safedata at SAFE"
+!!! Note "`safedata` at the SAFE Project"
     Details of how to view and use the SAFE project specific gazetteer can be found
     [here](../../safedata_at_SAFE.md).
 

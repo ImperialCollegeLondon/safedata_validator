@@ -1,5 +1,29 @@
 # The GBIFTaxa worksheet
 
+<!-- markdownlint-disable MD033 -->
+<style>
+
+/*fixing cell widths so everything lines up and adding borders*/
+table {
+  table-layout: fixed;
+}
+
+tbody td {
+  width: 14em;
+  min-width: 14em;
+  max-width: 14em;
+  border: 1px solid lightgrey;
+}
+
+thead th {
+  width: 14em;
+  min-width: 14em;
+  max-width: 14em;
+  border: 1px solid lightgrey;
+}
+</style>
+<!-- markdownlint-enable MD033 -->
+
 This worksheet exists to record taxonomic in information for organisms referred to in
 the Data worksheets. This taxonomic information should be recorded in a format that can
 be validated against the GBIF backbone taxonomy. Generally the GBIF backbone taxonomy is
@@ -164,8 +188,8 @@ not a synonym but is a separate taxon that belongs in _Microcopris_.
 The GBIF backbone also includes a large number of **deleted** taxon ids: these are a mix
 of duplicated names, typos in the database and other errors. The GBIF ID of these taxa
 are preserved, along with _some_ information, but we do not allow deleted taxa to be
-used in the GBIF Taxa worksheet.
+used in the GBIFTaxa worksheet.
 
 ## My data doesn't contain taxa
 
-Fine. You can omit the Taxa worksheet!
+Fine. You can omit either or both of the GBIFTaxa and NCBITaxa worksheets!

@@ -2,8 +2,8 @@
 
 In most cases, we expect the data format to be provided as **tabular datasets stored in
 Excel spreadsheets**. This accounts for the vast majority of the data files used by
-researchers. We do support other data files but those files will need to be documented
-using the same Excel format.
+researchers. We do support tabular data stored in other formats but the metadata for
+those files will need to be documented using the same Excel format.
 
 !!! Warning
     The formatting details described in this documentation will be used to automatically
@@ -13,9 +13,7 @@ using the same Excel format.
 ## Excel format overview
 
 The basic format for a `safedata` dataset submission is an Excel Workbook, which will
-typically contain at least four worksheets. The first four worksheets must use the
-standard names listed below. While both Taxa and NCBITaxa can be included, it is only
-required to include one of them.
+typically contain at least four worksheets.
 
 - [**Summary**](summary.md): This contains some simple information about the authors of
   the dataset, access rights and the individual data tables in the dataset.
@@ -31,6 +29,10 @@ required to include one of them.
   like in a single dataset: we don't want you to spend time rearranging your data and
   are happy just to take the data in the natural tables you already use.
 
+The Summary, GBIFTaxa, NCBITaxa and Locations worksheet names should not be used for
+data worksheets. The Summary table **must** be present, but the GBIFTaxa, NCBITaxa and
+Locations can be ommitted if datasets do not contain taxonomic or location data.
+
 ### File naming
 
 Use a simple short name for your spreadsheet - there will be a lot of information giving
@@ -43,8 +45,8 @@ underscores to separate words.
 Click on this link to download the [spreadsheet
 template](https://github.com/ImperialCollegeLondon/safedata_validator/blob/feature/docs_update/docs/data_providers/data_format/Template.xlsx)
 containing the required worksheets, labels and headers.
-You can also look at existing published datasets (from the SAFE project) to see how the
-format is used:
+You can also look at existing published datasets, such as those from the SAFE Project,
+to see how the format is used:
 
 - [https://safeproject.net/datasets/view_datasets](https://safeproject.net/datasets/view_datasets)
 - [https://zenodo.org/communities/safe/](https://zenodo.org/communities/safe/)

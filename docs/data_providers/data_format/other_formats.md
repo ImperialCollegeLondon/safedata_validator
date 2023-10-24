@@ -66,7 +66,7 @@ actual data but it will allow us to index the available fields. Briefly:
 
 Zenodo are pretty generous with their filespace but there are limits. An obvious example
 of very large supporting datasets are bulk media files like audio and camera trap
-images. These will need long-term bulk storage outside of Zenodo and we are currently
+images. These may need long-term bulk storage outside of Zenodo and we are currently
 exploring options to host such data.
 
 ## Submitting data in other file formats

@@ -5,8 +5,9 @@ visible on Zenodo. This includes details of the data fields, the spatial scope, 
 range and the like.
 
 You will also need to set the dataset access rights (see
-[here](data_format/summary.md#access-status)). We prefer that as much data as possible
-is submitted as **Open access** but support two alternative access models:
+[here](data_format/summary.md#access-status)). In general, as much data as possible
+should be submitted as **Open access** but the framework supports two alternative access
+models provided by Zenodo:
 
 ## Embargoed data
 
@@ -48,12 +49,14 @@ curation so that datafiles can always be accessed, records can always be updated
 that there is a final point of contact for data. This helps to ensure the long-term
 availability and maintenance of the organisation's data repository.
 
-This is entirely separate from the authorship and ownership of the data: the citation
-for the data will always be to the original set of authors provided in the metadata.
+This curation account for the collection is entirely separate from the authorship and
+ownership of datasets: **the citation for the data will always be to the original set of
+authors provided in the metadata.**
+
 Embargoed or restricted data will never be made available within the embargo period or
 without discussion with data authors. Data authors will always be consulted about issues
 arising with their datasets.
 
-!!! Note "safedata at SAFE"
+!!! Note "`safedata` at the SAFE Project"
     For details of the SAFE project's data availability polices see
     [here](../safedata_at_SAFE.md).
