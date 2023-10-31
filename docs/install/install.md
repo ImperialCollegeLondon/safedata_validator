@@ -20,7 +20,7 @@ The following steps should allow you to install `safedata_validator`:
      If you do see a Python prompt, but the version is less than 3.9, then you will
      need to update it.
 
-   * Your computer has not been set up to find Python: search
+   * Python has been installed but your computer has not been set up to find it: search
      online for instructions to add python to the `PATH` environment variable. On
      Windows, you will want to add (using the typical install location)
      `C:\Python39` and `C:\Python39\scripts`.
@@ -43,8 +43,8 @@ The following steps should allow you to install `safedata_validator`:
     You should now see the [usage instructions](../command_line_tools/safedata_validate.md#using-safedatavalidate).
 
 5. In addition to the command line option, you should now be able to `import
-   safedata_validator` within Python, which will allow you to use the
-   class and methods defined in the package within your own code.
+   safedata_validator` within Python, which will allow you to use the class and methods
+   defined in the package within your own code.
 
-6. You will need to [configure](configuration.md) the `safedata_validator` package to
-   point to some data validation resources before further use.
+6. You will now need to [configure](configuration.md) the `safedata_validator` package
+   to point to some data validation resources before further use.

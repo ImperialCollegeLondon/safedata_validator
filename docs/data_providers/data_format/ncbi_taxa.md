@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD033 -->
 <style>
 
-/*removing table headers and fixing cell widths so everything lines up.*/
+/*fixing cell widths so everything lines up and adding borders*/
 table {
   table-layout: fixed;
 }
@@ -163,4 +163,4 @@ You should record this data using GBIF format on a Taxa worksheet instead.
 
 ## My data doesn't contain taxa
 
-Fine. You can omit both the GBIFTaxa and NCBITaxa worksheet!
+Fine. You can omit either or both of the GBIFTaxa and NCBITaxa worksheets!
