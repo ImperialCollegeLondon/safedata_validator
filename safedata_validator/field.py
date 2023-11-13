@@ -20,11 +20,9 @@ from openpyxl.utils import get_column_letter
 from safedata_validator.extent import Extent
 from safedata_validator.locations import Locations
 from safedata_validator.logger import (
-    CONSOLE_HANDLER,
-    COUNTER_HANDLER,
     FORMATTER,
-    LOG,
     LOGGER,
+    get_handler,
     loggerinfo_push_pop,
 )
 from safedata_validator.resources import Resources
@@ -73,7 +71,6 @@ class Dataset:
     """
 
     def __init__(self, resources: Resources = None) -> None:
-
         # Try and load the default resources if None provided
         if resources is None:
             resources = Resources()
@@ -146,14 +143,13 @@ class Dataset:
         """
 
         # Handle logging details - flush and reset from previous runs.
-        LOG.seek(0)
-        LOG.truncate(0)
-        COUNTER_HANDLER.reset()
+        handler = get_handler()
+        handler.reset()
 
         if console_log:
-            CONSOLE_HANDLER.setLevel("DEBUG")
+            handler.setLevel("DEBUG")
         else:
-            CONSOLE_HANDLER.setLevel("CRITICAL")
+            handler.setLevel("CRITICAL")
 
         # Open the workbook with:
         #  - read_only to use the memory optimised read_only implementation.
@@ -294,7 +290,6 @@ class Dataset:
         )
 
         for label, this_extent in extents_to_check:
-
             dataset_extent = getattr(self, this_extent)
             summary_extent = getattr(self.summary, this_extent)
 
@@ -308,40 +303,37 @@ class Dataset:
                 (dataset_extent.extent[0] < summary_extent.extent[0])
                 or (dataset_extent.extent[1] > summary_extent.extent[1])
             ):
-
                 LOGGER.error(
                     f"{label} extent values from the data fall outside the extents "
                     f"set in the Summary sheet "
                     f"({[str(x) for x in dataset_extent.extent]})"
                 )
             elif dataset_extent.populated and summary_extent.populated:
-
                 LOGGER.warning(
                     f"The {label} extent is set in Summary but also "
                     f"is populated from the data - this may be deliberate!"
                 )
 
         # Dedent for final result
-        FORMATTER.pop()
+        FORMATTER.pop(n=2)
+        handler = get_handler()
 
-        if COUNTER_HANDLER.counters["ERROR"] > 0:
-            self.n_errors = COUNTER_HANDLER.counters["ERROR"]
-            if COUNTER_HANDLER.counters["WARNING"] > 0:
+        if handler.counters["ERROR"] > 0:
+            self.n_errors = handler.counters["ERROR"]
+            if handler.counters["WARNING"] > 0:
                 LOGGER.info(
-                    f"FAIL: file contained {COUNTER_HANDLER.counters['ERROR']} errors "
-                    f"and {COUNTER_HANDLER.counters['WARNING']} warnings"
+                    f"FAIL: file contained {handler.counters['ERROR']} errors "
+                    f"and {handler.counters['WARNING']} warnings"
                 )
             else:
-                LOGGER.info(
-                    f"FAIL: file contained {COUNTER_HANDLER.counters['ERROR']} errors"
-                )
+                LOGGER.info(f"FAIL: file contained {handler.counters['ERROR']} errors")
         else:
             self.passed = True
 
-            if COUNTER_HANDLER.counters["WARNING"] > 0:
+            if handler.counters["WARNING"] > 0:
                 LOGGER.info(
                     "PASS: file formatted correctly but with "
-                    f"{COUNTER_HANDLER.counters['WARNING']} warnings"
+                    f"{handler.counters['WARNING']} warnings"
                 )
             else:
                 LOGGER.info("PASS: file formatted correctly with no warnings")
@@ -476,7 +468,6 @@ class DataWorksheet:
         sheet_meta: dict,
         dataset: Dataset = None,
     ) -> None:
-
         # Set initial values
 
         # TODO - checks on sheetmeta
@@ -508,7 +499,7 @@ class DataWorksheet:
         self.row_numbers_noninteger = False
         self.blank_rows = False
         self.trailing_blank_rows = False
-        self.start_errors = COUNTER_HANDLER.counters["ERROR"]
+        self.start_errors = get_handler().counters["ERROR"]
         self.n_errors = 0
 
     @loggerinfo_push_pop("Validating field metadata")
@@ -625,7 +616,6 @@ class DataWorksheet:
         for col_idx, (tr_empty, fd_empty, fmeta) in enumerate(
             zip(trailing_empty, field_meta_empty, self.field_meta)
         ):
-
             fmeta["col_idx"] = col_idx + 1
 
             # Consider cases
@@ -800,7 +790,7 @@ class DataWorksheet:
         )
 
         # reporting
-        self.n_errors = COUNTER_HANDLER.counters["ERROR"] - self.start_errors
+        self.n_errors = get_handler().counters["ERROR"] - self.start_errors
         if self.n_errors > 0:
             LOGGER.info(f"Dataframe contains {self.n_errors} errors")
         else:
@@ -870,7 +860,6 @@ class DataWorksheet:
             # Load and validate chunks of data
             n_chunks = ((max_row - self.n_descriptors) // row_chunk_size) + 1
             for chunk in range(n_chunks):
-
                 # itertools.islice handles generators and StopIteration, and also
                 # trap empty slices
                 data = list(islice(data_rows, row_chunk_size))
@@ -979,7 +968,6 @@ class BaseField:
     def __init__(
         self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
     ) -> None:
-
         self.meta = meta
         self.dwsh = dwsh
 
@@ -1191,7 +1179,6 @@ class BaseField:
                 )
                 nm_check = False
             else:
-
                 nm_check = True
 
             iact_nm_lab = iact_nm_lab.values
@@ -1538,7 +1525,6 @@ class CategoricalField(BaseField):
     def __init__(
         self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         # Additional code to validate the levels metadata and store a set of
@@ -1605,7 +1591,6 @@ class TaxaField(BaseField):
     def __init__(
         self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.taxa is None:
@@ -1667,7 +1652,6 @@ class LocationsField(BaseField):
     def __init__(
         self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.locations is None:
@@ -1734,7 +1718,6 @@ class GeoField(BaseField):
     def __init__(
         self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.dataset is None:
@@ -1858,7 +1841,6 @@ class TimeField(BaseField):
     def __init__(
         self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         # Defaults
@@ -1885,7 +1867,6 @@ class TimeField(BaseField):
         # Check for consistent class formatting, using first row. Do not try and
         # validate further when data is not consistently formatted.
         if self.consistent_class and self.expected_class:
-
             cell_types = [type(dt) for dt in data]
             cell_type_set = set(cell_types)
 
@@ -1911,7 +1892,6 @@ class TimeField(BaseField):
         # There is no need to check time objects passed in, just time formatted
         # strings
         if self.first_data_class_set == {str}:
-
             for val in data:
                 try:
                     _ = parser.isoparser().parse_isotime(val)
@@ -1964,7 +1944,6 @@ class DatetimeField(BaseField):
     def __init__(
         self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.dataset is None:
@@ -1997,7 +1976,6 @@ class DatetimeField(BaseField):
         # Check for consistent class formatting, using first row. Do not try and
         # validate further when data is not consistently formatted.
         if self.consistent_class and self.expected_class:
-
             cell_types = [type(dt) for dt in data]
             cell_type_set = set(cell_types)
 
@@ -2039,7 +2017,6 @@ class DatetimeField(BaseField):
             data = parsed_strings
 
         elif self.first_data_class_set == {datetime.datetime}:
-
             for val in data:
                 if val.time() != midnight:
                     self.all_midnight = False
@@ -2111,7 +2088,6 @@ class FileField(BaseField):
     def __init__(
         self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
     ) -> None:
-
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         self.unknown_file_names = set()
@@ -2188,7 +2164,6 @@ class EmptyField:
     """
 
     def __init__(self, meta: dict) -> None:
-
         self.meta = meta
         self.empty = True
         # Get a field name - either a column letter from col_idx if set or 'Unknown'

@@ -12,11 +12,18 @@ import os
 import sys
 import tempfile
 import textwrap
+from pathlib import Path
 
 import simplejson
 
 from safedata_validator.field import Dataset
-from safedata_validator.logger import CONSOLE_HANDLER, FORMATTER, LOGGER
+from safedata_validator.logger import (
+    FORMATTER,
+    LOGGER,
+    get_handler,
+    use_file_logging,
+    use_stream_logging,
+)
 from safedata_validator.resources import Resources
 from safedata_validator.taxondb import (
     build_local_gbif,
@@ -104,6 +111,13 @@ def _safedata_validator_cli():
             "number of rows in a chunk is set by this argument"
         ),
     )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default=None,
+        type=Path,
+        help=("Save the validation report to a file, not print to the console."),
+    )
 
     parser.add_argument(
         "--version",
@@ -113,6 +127,13 @@ def _safedata_validator_cli():
 
     args = parser.parse_args()
 
+    # Configure the logging location
+    if args.output is None:
+        use_stream_logging()
+    else:
+        use_file_logging(args.output)
+
+    # Create the dataset and load from workbook
     ds = Dataset(resources=Resources(args.resources))
     ds.load_from_workbook(
         filename=args.filename,
@@ -128,6 +149,7 @@ def _safedata_validator_cli():
             json_out.write(ds.to_json())
 
         sys.stdout.write("------------------------\n")
+        sys.stdout.write("File validation passed\n")
         sys.stdout.write(f"JSON metadata written to {json_file}\n")
         sys.stdout.write("------------------------\n")
 
@@ -536,17 +558,17 @@ def _safedata_zenodo_cli():
             print(f" - {key}: {val}")
         return
 
+    handler = get_handler()
     if args.quiet:
         # Don't suppress error messages
-        CONSOLE_HANDLER.setLevel("ERROR")
+        handler.setLevel("ERROR")
     else:
-        CONSOLE_HANDLER.setLevel("DEBUG")
+        handler.setLevel("DEBUG")
 
     resources = Resources(args.resources)
 
     # Handle the remaining subcommands
     if args.subcommand in ["create_deposit", "cdep"]:
-
         # Run the command
         response, error = create_deposit(
             concept_id=args.concept_id, resources=resources
@@ -566,7 +588,6 @@ def _safedata_zenodo_cli():
             LOGGER.info(f"Zenodo deposit metadata downloaded to: {outfile}")
 
     elif args.subcommand in ["discard_deposit", "ddep"]:
-
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
@@ -581,7 +602,6 @@ def _safedata_zenodo_cli():
             LOGGER.info("Deposit discarded")
 
     elif args.subcommand in ["get_deposit", "gdep"]:
-
         # Run the command
         response, error = get_deposit(deposit_id=args.zenodo_id, resources=resources)
 
@@ -617,7 +637,6 @@ def _safedata_zenodo_cli():
         LOGGER.info(f"Metadata downloaded to: {outfile}")
 
     elif args.subcommand in ["publish_deposit", "pdep"]:
-
         with open(args.zenodo_json) as zn_json:
             zenodo_json_data = simplejson.load(zn_json)
 
@@ -636,7 +655,6 @@ def _safedata_zenodo_cli():
             LOGGER.info("Zenodo metadata updated")
 
     elif args.subcommand in ["upload_file", "ufile"]:
-
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
@@ -666,7 +684,6 @@ def _safedata_zenodo_cli():
             LOGGER.info("File uploaded")
 
     elif args.subcommand in ["delete_file", "dfile"]:
-
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
@@ -683,7 +700,6 @@ def _safedata_zenodo_cli():
             LOGGER.info("File deleted")
 
     elif args.subcommand in ["upload_metadata", "umeta"]:
-
         # Open the two JSON files
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -703,7 +719,6 @@ def _safedata_zenodo_cli():
             LOGGER.info("Metadata uploaded")
 
     elif args.subcommand in ["amend_metadata", "ameta"]:
-
         with open(args.deposit_json_update) as zn_json_update:
             zenodo_json_update = simplejson.load(zn_json_update)
 
@@ -720,7 +735,6 @@ def _safedata_zenodo_cli():
             LOGGER.info("Metadata updated")
 
     elif args.subcommand in ["sync_local_dir", "sync"]:
-
         sync_local_dir(
             datadir=args.datadir,
             xlsx_only=not args.not_just_xlsx,
@@ -729,12 +743,10 @@ def _safedata_zenodo_cli():
         )
 
     elif args.subcommand in ["maintain_ris", "ris"]:
-
         # Run the download RIS data function
         download_ris_data(ris_file=args.ris_file, resources=resources)
 
     elif args.subcommand in ["generate_html", "html"]:
-
         # Run the download RIS data function
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -745,7 +757,6 @@ def _safedata_zenodo_cli():
             outf.write(desc)
 
     elif args.subcommand in ["generate_xml", "xml"]:
-
         # Open the two JSON files
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -878,17 +889,17 @@ def _safedata_server_cli():
             print(f" - {key}: {val}")
         return
 
+    handler = get_handler()
     if args.quiet:
         # Don't suppress error messages
-        CONSOLE_HANDLER.setLevel("ERROR")
+        handler.setLevel("ERROR")
     else:
-        CONSOLE_HANDLER.setLevel("DEBUG")
+        handler.setLevel("DEBUG")
 
     resources = Resources(args.resources)
 
     # Handle the remaining subcommands
     if args.subcommand in ["post_metadata", "cdep"]:
-
         # Open the two JSON files
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -910,7 +921,6 @@ def _safedata_server_cli():
         return
 
     if args.subcommand in ["update_gazetteer"]:
-
         # Open the two JSON files
         with open(args.gazetteer_json) as gz_json:
             gazetteer_json = simplejson.load(gz_json)
@@ -966,7 +976,6 @@ def _build_local_gbif_cli():
     args = parser.parse_args()
 
     with tempfile.TemporaryDirectory() as download_loc:
-
         file_data = download_gbif_backbone(
             outdir=download_loc, timestamp=args.timestamp
         )
@@ -1004,7 +1013,6 @@ def _build_local_ncbi_cli():
     args = parser.parse_args()
 
     with tempfile.TemporaryDirectory() as download_loc:
-
         file_data = download_ncbi_taxonomy(
             outdir=download_loc, timestamp=args.timestamp
         )
