@@ -272,15 +272,29 @@ class Summary:
 
         self._ncols = worksheet.max_column
 
-        # convert into dictionary using the lower cased first entry as the key
+        # convert into dictionary using the lower cased first entry as the key after
+        # checking for empty values (None) and non-string values.
         row_headers = IsString([r[0] for r in rows])
         if not row_headers:
-            LOGGER.error(
-                "Summary metadata fields column contains non text values :",
-                extra={"join": row_headers.failed},
-            )
+            # Check for None separately because seeing 'None' as a field key in the
+            # report is very confusing for end users.
+            if None in row_headers.failed:
+                LOGGER.error("Summary metadata fields column contains empty cells")
+                row_headers
 
-        self._rows = {rw[0].lower(): rw[1:] for rw in rows}
+            # Get other non-string headers.
+            non_none_failed_headers = [
+                hdr for hdr in row_headers.failed if hdr is not None
+            ]
+            if non_none_failed_headers:
+                LOGGER.error(
+                    "Summary metadata fields column contains non text values: ",
+                    extra={"join": non_none_failed_headers},
+                )
+
+        # Now we have warned about bad values, explicitly cast row keys to None to
+        # continue processing.
+        self._rows = {str(rw[0]).lower(): rw[1:] for rw in rows}
 
         # Check the minimal keys are expected - mandatory fields in mandatory blocks
         found, aliases = self._check_for_mandatory_fields()
