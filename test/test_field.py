@@ -1627,7 +1627,8 @@ def test_GeoField_init(caplog, fixture_dataset, provide_ds_instance, expected_lo
             [111, 112, 113, 114, 115, 116],
             ((INFO, "Checking field geocoords"),),
         ),
-        # Bad inputs
+        # Bad inputs - non numeric, outside extents and no valid data at all to check
+        # updating of dataset extents.
         (
             "latitude",
             [1, "2", 3, 4, 5, 6],
@@ -1681,6 +1682,14 @@ def test_GeoField_init(caplog, fixture_dataset, provide_ds_instance, expected_lo
             "longitude",
             [111, 112, 113, 114, 115, 160],
             ((INFO, "Checking field geocoords"), (WARNING, "exceeds soft bounds")),
+        ),
+        (
+            "longitude",
+            ["111", "112", "113", "114", "115", "116"],
+            (
+                (INFO, "Checking field geocoords"),
+                (ERROR, "Field contains non-numeric data"),
+            ),
         ),
     ],
 )

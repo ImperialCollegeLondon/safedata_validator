@@ -1833,6 +1833,8 @@ class GeoField(BaseField):
         if self.min is None or self.max is None:
             return
 
+        # Note that self.min and self.max can be None here if all data is invalid, but
+        # the update process handles None.
         if self.dataset is not None:
             if self.meta["field_type"] == "latitude":
                 self.dataset.latitudinal_extent.update([self.min, self.max])
@@ -2157,7 +2159,7 @@ class DatetimeField(BaseField):
         # Update extent if possible - note that inheritance means that isinstance
         # in extent.Extent is not successfully testing for datetime.datetime rather
         # than set datatype of datetime.date
-        if self.dataset is not None:
+        if not (self.dataset is None or self.min is None or self.max is None):
             self.dataset.temporal_extent.update([self.min.date(), self.max.date()])
 
 
