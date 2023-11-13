@@ -15,7 +15,6 @@ from .conftest import log_check
 
 @pytest.fixture
 def fixture_summary(fixture_resources):
-
     return Summary(fixture_resources)
 
 
@@ -107,7 +106,6 @@ def fixture_summary(fixture_resources):
     ],
 )
 def test_authors(caplog, fixture_summary, alterations, should_log_error, expected_log):
-
     # Valid set of information
     input = {
         "author name": ("Orme, David",),
@@ -263,7 +261,6 @@ def test_authors(caplog, fixture_summary, alterations, should_log_error, expecte
     ],
 )
 def test_access(caplog, fixture_summary, row_data, should_log_error, expected_log):
-
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
     fixture_summary._rows = row_data
@@ -304,7 +301,6 @@ def test_access(caplog, fixture_summary, row_data, should_log_error, expected_lo
     ],
 )
 def test_keywords(caplog, fixture_summary, alterations, should_log_error, expected_log):
-
     # Valid set of information
     input = {"keywords": ("abc", "def")}
 
@@ -388,7 +384,6 @@ def test_keywords(caplog, fixture_summary, alterations, should_log_error, expect
     ],
 )
 def test_permits(caplog, fixture_summary, alterations, should_log_error, expected_log):
-
     # Valid set of information
     input = {
         "permit type": ("research",),
@@ -444,7 +439,6 @@ def test_permits(caplog, fixture_summary, alterations, should_log_error, expecte
 def test_doi(
     caplog, fixture_summary, alterations, should_log_error, expected_log, do_val_doi
 ):
-
     # Valid set of information
     input = {"publication doi": ("https://doi.org/10.1098/rstb.2011.0049",)}
 
@@ -545,7 +539,6 @@ def test_doi(
     ],
 )
 def test_funders(caplog, fixture_summary, alterations, should_log_error, expected_log):
-
     # Valid set of information
     input = {
         "funding body": ("NERC",),
@@ -634,7 +627,6 @@ def test_funders(caplog, fixture_summary, alterations, should_log_error, expecte
 def test_temporal_extent(
     caplog, fixture_summary, alterations, should_log_error, expected_log
 ):
-
     # Valid set of information - openpyxl loads dates as datetimes but
     # the validation checks that these values are dates
     # (have no time information)
@@ -760,7 +752,6 @@ def test_temporal_extent(
 def test_geographic_extent(
     caplog, fixture_summary, alterations, should_log_error, expected_log
 ):
-
     # Valid set of information
     input = {"west": (116.75,), "east": (117.82,), "south": (4.50,), "north": (5.07,)}
 
@@ -827,7 +818,6 @@ def test_geographic_extent(
 def test_external_files(
     caplog, fixture_summary, alterations, should_log_error, expected_log
 ):
-
     # Valid set of information
     input = {
         "external file": ("BaitTrapImages.zip", "BaitTrapTransects.geojson"),
@@ -1192,10 +1182,27 @@ def test_load_valid_project_ids(
     argvalues=[
         pytest.param(
             False,
-            [["header1"], [23]],
+            [["title"], [None]],
             (
                 (INFO, "Checking Summary worksheet"),
-                (ERROR, "Summary metadata fields column contains non text values :"),
+                (ERROR, "Summary metadata fields column contains empty cells"),
+                (ERROR, "Missing mandatory metadata fields:"),
+                (ERROR, "Unknown metadata fields:"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
+            ),
+            id="empty header",
+        ),
+        pytest.param(
+            False,
+            [["title"], [9]],
+            (
+                (INFO, "Checking Summary worksheet"),
+                (ERROR, "Summary metadata fields column contains non text values: "),
+                (ERROR, "Missing mandatory metadata fields:"),
+                (ERROR, "Unknown metadata fields:"),
+                (INFO, "Loading core metadata"),
+                (ERROR, "No Core fields metadata found"),
             ),
             id="non text header",
         ),
