@@ -1615,6 +1615,7 @@ class CategoricalField(BaseField):
         to handle undeclared or unused level labels.
         """
         super().report()
+        FORMATTER.push()
 
         extra = self.reported_levels.difference(self.level_labels)
         unused = self.level_labels.difference(self.reported_levels)
@@ -1629,6 +1630,8 @@ class CategoricalField(BaseField):
                 "Categories found in levels descriptor not used in data: ",
                 extra={"join": unused},
             )
+
+        FORMATTER.pop()
 
 
 class TaxaField(BaseField):
@@ -1679,6 +1682,7 @@ class TaxaField(BaseField):
         to emit unused or unknown taxon names
         """
         super().report()
+        FORMATTER.push()
 
         # TODO - not sure about this - no other fields test for emptiness?
         if self.taxa_found == set():
@@ -1693,6 +1697,8 @@ class TaxaField(BaseField):
 
             # add the found taxa to the list of taxa used
             self.taxa.taxon_names_used.update(self.taxa_found)
+
+        FORMATTER.pop()
 
 
 class LocationsField(BaseField):
@@ -1747,6 +1753,7 @@ class LocationsField(BaseField):
         to emit undeclared location names.
         """
         super().report()
+        FORMATTER.push()
 
         # TODO - not sure about this - no other fields test for emptiness?
         if self.locations_found == set():
@@ -1763,6 +1770,8 @@ class LocationsField(BaseField):
 
             # add the found taxa to the list of taxa used
             self.locations.locations_used.update(self.locations_found)
+
+        FORMATTER.pop()
 
 
 class GeoField(BaseField):
@@ -1829,6 +1838,7 @@ class GeoField(BaseField):
         to check the coordinate range against the dataset geographic extents.
         """
         super().report()
+        FORMATTER.push()
 
         if self.min is None or self.max is None:
             return
@@ -1840,6 +1850,8 @@ class GeoField(BaseField):
                 self.dataset.latitudinal_extent.update([self.min, self.max])
             elif self.meta["field_type"] == "longitude":
                 self.dataset.longitudinal_extent.update([self.min, self.max])
+
+        FORMATTER.pop()
 
 
 class NumericTaxonField(NumericField):
@@ -1985,6 +1997,7 @@ class TimeField(BaseField):
         to flag inconsistent time formatting and invalid data.
         """
         super().report()
+        FORMATTER.push()
 
         if not self.expected_class:
             LOGGER.error(
@@ -2001,6 +2014,8 @@ class TimeField(BaseField):
                 "ISO time strings contain badly formatted values: e.g.",
                 extra={"join": self.bad_strings[:5]},
             )
+
+        FORMATTER.pop()
 
 
 class DatetimeField(BaseField):
@@ -2127,6 +2142,7 @@ class DatetimeField(BaseField):
         to flag inconsistent  date and datetime formatting and invalid data.
         """
         super().report()
+        FORMATTER.push()
 
         # INconsistent and bad data classes
         if not self.expected_class:
@@ -2161,6 +2177,8 @@ class DatetimeField(BaseField):
         # than set datatype of datetime.date
         if not (self.dataset is None or self.min is None or self.max is None):
             self.dataset.temporal_extent.update([self.min.date(), self.max.date()])
+
+        FORMATTER.pop()
 
 
 class FileField(BaseField):
@@ -2231,12 +2249,15 @@ class FileField(BaseField):
         to flag unknown files.
         """
         super().report()
+        FORMATTER.push()
 
         if self.unknown_file_names:
             LOGGER.error(
                 "Field contains external files not provided in Summary: ",
                 extra={"join": self.unknown_file_names},
             )
+
+        FORMATTER.pop()
 
 
 class EmptyField:
