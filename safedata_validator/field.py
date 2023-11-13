@@ -1,16 +1,16 @@
-"""The field module.
-
-This module contains the Dataset, Dataworksheet and BaseField classes, along with
+"""This module contains the Dataset, Dataworksheet and BaseField classes, along with
 subclasses of BaseField for different data types. These are the core functions of
 safedata_validator, responsible for opening a file containing formatted data,
 and loading and validating the field metadata and data rows in the main data tables.
-"""
+"""  # noqa D415
+
+from __future__ import annotations
 
 import datetime
 import os
 from itertools import islice
 from logging import CRITICAL, ERROR, WARNING
-from typing import List, Optional, Type, Union
+from typing import List, Optional, Union
 
 import simplejson
 from dateutil import parser
@@ -70,12 +70,12 @@ class Dataset:
             dataset.
     """
 
-    def __init__(self, resources: Resources = None) -> None:
+    def __init__(self, resources: Optional[Resources] = None) -> None:
         # Try and load the default resources if None provided
         if resources is None:
             resources = Resources()
 
-        self.filename = None
+        self.filename: Optional[str] = None
         self.resources = resources
         self.summary = Summary(resources)
         self.taxa = Taxa(resources)
@@ -117,7 +117,7 @@ class Dataset:
         self,
         filename: str,
         validate_doi: bool = False,
-        valid_pid: List[int] = None,
+        valid_pid: Optional[List[int]] = None,
         chunk_size: int = 1000,
         console_log: bool = True,
     ) -> None:
@@ -247,7 +247,9 @@ class Dataset:
             ):
                 LOGGER.error(
                     "Provided locations not used: ",
-                    extra={"join": self.locations - self.locations_used},
+                    extra={
+                        "join": self.locations.locations - self.locations.locations_used
+                    },
                 )
 
         # check taxa
@@ -466,7 +468,7 @@ class DataWorksheet:
     def __init__(
         self,
         sheet_meta: dict,
-        dataset: Dataset = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
         # Set initial values
 
@@ -483,13 +485,14 @@ class DataWorksheet:
 
         # Create the field meta attributes, populated using validate_field_meta
         self.fields_loaded = False
-        self.field_meta = None
+        self.field_meta: list[dict] = []
         self.field_types = None
-        self.n_fields = None
-        self.n_descriptors = None
-        self.descriptors = None
-        self.fields = []
-        self.taxa_fields = None
+        self.n_fields: int = 0
+        self.n_trailing_empty_fields: int = 0
+        self.n_descriptors: int
+        self.descriptors: list = []
+        self.fields: list[Union[EmptyField, BaseField]] = []
+        self.taxa_fields: list = []
 
         # Keep track of row numbering
         self.n_row = 0
@@ -560,7 +563,7 @@ class DataWorksheet:
 
         # Repackage field metadata into a list of per field descriptor
         # dictionaries, _importantly_ preserving the column order.
-        field_meta = [
+        field_meta_list = [
             dict(zip(field_meta.keys(), val)) for val in zip(*field_meta.values())
         ]
 
@@ -569,22 +572,25 @@ class DataWorksheet:
         # fields, so warn and continue. Ignore empty mandatory values - these
         # are handled in field checking.
         field_names = [
-            fld["field_name"] for fld in field_meta if fld["field_name"] is not None
+            fld["field_name"]
+            for fld in field_meta_list
+            if fld["field_name"] is not None
         ]
         dupes = HasDuplicates(field_names)
         if dupes:
             LOGGER.error("Field names duplicated: ", extra={"join": dupes.duplicated})
 
         # Lowercase the field types
-        for fld in field_meta:
+        for fld in field_meta_list:
             fld["field_type"] = (
                 None if fld["field_type"] is None else fld["field_type"].lower()
             )
 
         # Populate the instance variables
         self.fields_loaded = True
-        self.field_meta = field_meta
-        self.n_fields = len(field_meta)
+        self.field_meta = field_meta_list
+        self.n_fields = len(field_meta_list)
+        self.n_trailing_empty_fields = 0
 
         # get taxa field names for cross checking observation and trait data
         self.taxa_fields = [
@@ -608,6 +614,7 @@ class DataWorksheet:
             all(field_meta_empty[-(n + 1) :]) for n in range(0, len(field_meta_empty))
         ]
         trailing_empty.reverse()
+        self.n_trailing_empty_fields = sum(trailing_empty)
 
         # Get the type map and field list
         field_subclass_map = BaseField.field_type_map()
@@ -786,7 +793,8 @@ class DataWorksheet:
         # report on detected size
         LOGGER.info(
             f"Worksheet '{self.name}' contains {self.n_descriptors} descriptors, "
-            f"{self.n_row} data rows and {self.n_fields} fields"
+            f"{self.n_row} data rows and "
+            f"{self.n_fields - self.n_trailing_empty_fields} fields"
         )
 
         # reporting
@@ -848,13 +856,13 @@ class DataWorksheet:
                 break
 
         # Convert field meta to dict and validate
-        field_meta = dict(((rw[0], rw[1:]) for rw in field_meta))
-        self.validate_field_meta(field_meta)
+        field_meta_dict = dict(((rw[0], rw[1:]) for rw in field_meta))
+        self.validate_field_meta(field_meta_dict)
 
         if self.fields_loaded:
             # Get an iterator on the data rows
             data_rows = worksheet.iter_rows(
-                min_row=len(field_meta) + 1, values_only=True
+                min_row=len(field_meta_dict) + 1, values_only=True
             )
 
             # Load and validate chunks of data
@@ -873,16 +881,26 @@ class DataWorksheet:
     def to_dict(self) -> dict:
         """Return a dictionary representation of a DataWorksheet instance."""
 
+        # Update the fields to account for EmptyFields that have been validated: they
+        # have no field metadata and there is no content in the rows below. EmptyFields
+        # are always trailing empty fields.
+
+        fields = [
+            field_to_dict(fld, idx + 1)
+            for idx, fld in enumerate(self.fields)
+            if not isinstance(fld, EmptyField)
+        ]
+
         output = dict(
             taxa_fields=self.taxa_fields,
             max_row=self.n_row + self.n_descriptors,
-            max_col=self.n_fields,
+            max_col=self.n_fields - self.n_trailing_empty_fields,
             name=self.name,
             title=self.title,
             description=self.description,
             descriptors=self.descriptors,
             external=self.external,
-            fields=[field_to_dict(fld, idx + 1) for idx, fld in enumerate(self.fields)],
+            fields=fields,
             field_name_row=self.n_descriptors,
             n_data_row=self.n_row,
         )
@@ -915,8 +933,8 @@ class BaseField:
     The base class also has a much more complex signature than the base
     functionality requires. Various subclasses need access to:
 
-        * Dataset level information - extents, taxa and locations.
-        * Dataworksheet level information - taxon fields
+    * Dataset level information - extents, taxa and locations.
+    * Dataworksheet level information - taxon fields
 
     Rather than having complex inheritance with changing subclass signatures
     and kwargs, the BaseField class makes all information available to all
@@ -960,13 +978,16 @@ class BaseField:
     # required descriptors for those field_types. The no_validation attributes is used
     # to suppress data validation for use on e.g. comments fields.
 
-    field_types = None
+    field_types: Optional[tuple[str, ...]] = None
     required_descriptors = MANDATORY_DESCRIPTORS
     check_taxon_meta = False
     check_interaction_meta = False
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
         self.meta = meta
         self.dwsh = dwsh
@@ -983,13 +1004,13 @@ class BaseField:
             self.summary = getattr(self.dataset, "summary")
 
         # Attributes
-        self.log_stack = []
+        self.log_stack: list = []
         self.n_rows = 0
         self.n_na = 0
         self.n_blank = 0
         self.n_excel_error = 0
-        self.bad_values = []
-        self.bad_rows = []  # TODO check on implementation of this
+        self.bad_values: list = []
+        self.bad_rows: list = []  # TODO check on implementation of this
 
         # Get a field name - either from the field_meta, or a column letter
         # from col_idx or 'Unknown'
@@ -1026,7 +1047,7 @@ class BaseField:
         if self.check_interaction_meta:
             self._check_interaction_meta()
 
-    def _log(self, msg: str, level: int = ERROR, extra: dict = None) -> None:
+    def _log(self, msg: str, level: int = ERROR, extra: Optional[dict] = None) -> None:
         """Adds messages to the field log stack.
 
         Rather than directly emitting a log message, field processing accumulates a
@@ -1096,28 +1117,34 @@ class BaseField:
         elif not tx_nm_prov and not tx_fd_prov:
             self._log("One of taxon name or taxon field must be provided")
             return False
-        elif tx_nm_prov and self.taxa is None:
-            self._log("Taxon name provided but no Taxa instance available", CRITICAL)
-            return False
-        elif tx_nm_prov and self.taxa.is_empty:
-            self._log("Taxon name provided but no taxa loaded")
-            return False
-        elif tx_nm_prov and tx_nm not in self.taxa.taxon_names:
-            self._log("Taxon name not found in the Taxa worksheet")
-            return False
         elif tx_nm_prov:
-            self.taxa.taxon_names_used.add(tx_nm)
-            return True
-        elif tx_fd_prov and self.dwsh is None:
-            self._log(
-                f"Taxon field provided but no dataworksheet provided for this "
-                f"field: {tx_fd}",
-                CRITICAL,
-            )
-            return False
-        elif tx_fd_prov and tx_fd not in self.dwsh.taxa_fields:
-            self._log(f"Taxon field not found in this worksheet: {tx_fd}")
-            return False
+            if self.taxa is None:
+                self._log(
+                    "Taxon name provided but no Taxa instance available", CRITICAL
+                )
+                return False
+            elif self.taxa.is_empty:
+                self._log("Taxon name provided but no taxa loaded")
+                return False
+            elif tx_nm not in self.taxa.taxon_names:
+                self._log("Taxon name not found in the Taxa worksheet")
+                return False
+            else:
+                self.taxa.taxon_names_used.add(tx_nm)
+                return True
+        elif tx_fd_prov:
+            if self.dwsh is None:
+                self._log(
+                    f"Taxon field provided but no dataworksheet provided for this "
+                    f"field: {tx_fd}",
+                    CRITICAL,
+                )
+                return False
+            elif tx_fd not in self.dwsh.taxa_fields:
+                self._log(f"Taxon field not found in this worksheet: {tx_fd}")
+                return False
+            else:
+                return True
         else:
             return True
 
@@ -1146,62 +1173,65 @@ class BaseField:
                 "At least one of interaction name or interaction field must be provided"
             )
             return False
-        elif iact_nm_prov and self.taxa is None:
-            self._log(
-                "Interaction name provided but no Taxa instance available", CRITICAL
-            )
-            return False
-        elif iact_nm_prov and self.taxa.is_empty:
-            self._log("Interaction name provided but no taxa loaded")
-            return False
-        elif iact_fd_prov and self.dwsh is None:
-            self._log(
-                f"Interaction field provided but no dataworksheet provided for this "
-                f"field: {iact_fd}",
-                CRITICAL,
-            )
-            return False
 
         if iact_nm_prov:
+            # Check that self.taxa has actually been populated
+            if self.taxa is None:
+                self._log(
+                    "Interaction name provided but no Taxa instance available", CRITICAL
+                )
+                return False
+            elif self.taxa.is_empty:
+                self._log("Interaction name provided but no taxa loaded")
+                return False
+
             # get the taxon names and descriptions from interaction name providers
-            iact_nm_lab, iact_nm_desc = self._parse_levels(iact_nm)
+            iact_nm_lab, iact_nm_desc = self._parse_levels(str(iact_nm))
 
             # add names to used taxa
             self.taxa.taxon_names_used.update(iact_nm_lab)
 
             # check they are found
-            iact_nm_lab = IsInSet(iact_nm_lab, self.taxa.taxon_names)
+            iact_nm_lab_in_set = IsInSet(iact_nm_lab, tuple(self.taxa.taxon_names))
 
-            if not iact_nm_lab:
+            if not iact_nm_lab_in_set:
                 self._log(
                     "Unknown taxa in interaction_name descriptor",
-                    extra={"join": iact_nm_lab.failed},
+                    extra={"join": iact_nm_lab_in_set.failed},
                 )
                 nm_check = False
             else:
                 nm_check = True
 
-            iact_nm_lab = iact_nm_lab.values
+            iact_nm_lab = iact_nm_lab_in_set.values
         else:
             iact_nm_lab = []
             iact_nm_desc = ()
             nm_check = True
 
         if iact_fd_prov:
+            # Check that self.dwsh has been populated properly
+            if self.dwsh is None:
+                self._log(
+                    f"Interaction field provided but no dataworksheet provided for this"
+                    f" field: {iact_fd}",
+                    CRITICAL,
+                )
+                return False
             # check any field labels match to known taxon fields
-            iact_fd_lab, iact_fd_desc = self._parse_levels(iact_fd)
+            iact_fd_lab, iact_fd_desc = self._parse_levels(str(iact_fd))
 
-            iact_fd_lab = IsInSet(iact_fd_lab, self.dwsh.taxa_fields)
-            if not iact_fd_lab:
+            iact_fd_lab_in_set = IsInSet(iact_fd_lab, tuple(self.dwsh.taxa_fields))
+            if not iact_fd_lab_in_set:
                 self._log(
                     "Unknown taxon fields in interaction_field descriptor",
-                    extra={"join": iact_fd_lab.failed},
+                    extra={"join": iact_fd_lab_in_set.failed},
                 )
                 fd_check = False
             else:
                 fd_check = True
 
-            iact_fd_lab = iact_fd_lab.values
+            iact_fd_lab = iact_fd_lab_in_set.values
         else:
             iact_fd_lab = []
             iact_fd_desc = ()
@@ -1226,11 +1256,11 @@ class BaseField:
         else:
             return False
 
-    def _parse_levels(self, txt: str) -> list[tuple[str, Union[str, None]]]:
+    def _parse_levels(self, txt: str) -> tuple[list[str], tuple[Optional[str], ...]]:
         """Parse categorical variable level descriptions.
 
-        Splits up category information formatted as label:desc;label:desc, which
-        is used in both levels for categorical data and interaction descriptors.
+        Splits up category information formatted as label:desc;label:desc, which is used
+        in both levels for categorical data and interaction descriptors.
 
         Args:
             txt: The text string to parse
@@ -1238,49 +1268,54 @@ class BaseField:
         Returns:
             A list of tuples containing pair of level labels and descriptions.
         """
-
         # remove terminal semi-colon, if used.
         if txt.endswith(";"):
             txt = txt[:-1]
 
         # - split the text up by semi-colon
-        parts = txt.split(";")
+        levels = txt.split(";")
 
-        # - split descriptions
-        parts = [pt.split(":") for pt in parts]
-        n_parts = [len(pt) for pt in parts]
+        # - split descriptions and standardize
+        parsed_n_parts: set[int] = set()
+        levels_parsed: list[list] = []
+
+        for each_level in levels:
+            # Split off any description
+            level_parts = each_level.split(":")
+
+            # Check for descriptions and build levels_parsed
+            level_n_parts = len(level_parts)
+            if level_n_parts == 1:
+                levels_parsed.append([level_parts[0], None])
+            else:
+                levels_parsed.append(level_parts[0:2])
+
+            parsed_n_parts.add(level_n_parts)
 
         # simple formatting checks
-        if any([pt > 2 for pt in n_parts]):
+        if any([np > 2 for np in parsed_n_parts]):
             self._log("Extra colons in level description.")
 
-        # standardise descriptions
-        if all([pt == 1 for pt in n_parts]):
-            parts = [[pt[0], None] for pt in parts]
-        elif all([pt > 1 for pt in n_parts]):
-            # truncate extra colons
-            parts = [pt[0:2] for pt in parts]
-        else:
+        if len(parsed_n_parts) > 1:
             self._log("Provide descriptions for either all or none of the categories")
-            parts = [pt[0:2] if len(pt) >= 2 else [pt[0], None] for pt in parts]
 
-        level_labels, level_desc = zip(*parts)
+        level_labels, level_desc = zip(*levels_parsed)
 
         # - repeated labels?
         if len(set(level_labels)) < len(level_labels):
             self._log("Repeated level labels")
 
         # - check for numeric level names: integers would be more common
-        #   but don't let floats sneak through either!
-        level_labels = IsNotNumericString(level_labels)
-        if not level_labels:
+        # but don't let floats sneak through either!
+        level_labels_not_numeric = IsNotNumericString(level_labels)
+        if not level_labels_not_numeric:
             self._log("Numeric level names not permitted")
 
         # Remove white space around the labels: simple spacing in the text
         # makes it easier to read and insisting on no space is unnecessary
-        level_labels = [vl.strip() for vl in level_labels]
+        level_labels_clean = [vl.strip() for vl in level_labels_not_numeric]
 
-        return level_labels, level_desc
+        return level_labels_clean, level_desc
 
     @classmethod
     def field_type_map(cls):
@@ -1311,7 +1346,16 @@ class BaseField:
 
         return field_type_map
 
-    def validate_data(self, data: list) -> list:
+    def validate_data(self, data: list) -> None:
+        """Standard method to validate data.
+
+        Most classes that inherit from BaseField will overwrite this to include more
+        specific validation rules.
+        """
+
+        data = self.run_common_validation(data)
+
+    def run_common_validation(self, data: list) -> list:
         """Validates a list of data provided for a field.
 
         This base class method runs the common shared validation steps for input data
@@ -1321,11 +1365,11 @@ class BaseField:
         * Empty cells, which is an error.
         * Excel cell error codes (such as `#VALUE!`)
 
-        The method can be overloaded by subclasses to provide field specific testing. To
-        ensure that only the data that passes the common checks is subjected to extra
-        testing, overloaded subclasses should use:
+        Subclasses should also carry out field specific testing. To ensure that only the
+        data that passes the common checks is subjected to extra testing, within their
+        data validation methods subclasses should use:
 
-            data = super().validate_data(data)
+            data = self.run_common_validation(data)
 
         Args:
             data: a set of values from a data table for the field.
@@ -1340,14 +1384,14 @@ class BaseField:
         self.n_rows += len(data)
 
         # Look for NAs
-        data = IsNotNA(data, keep_failed=False)
-        if not data:
-            self.n_na += len(data.failed)
+        data_no_na = IsNotNA(data, keep_failed=False)
+        if not data_no_na:
+            self.n_na += len(data_no_na.failed)
 
         # Look for blank data
-        data = IsNotBlank(data, keep_failed=False)
-        if not data:
-            self.n_blank += len(data.failed)
+        data_no_blanks = IsNotBlank(data_no_na, keep_failed=False)
+        if not data_no_blanks:
+            self.n_blank += len(data_no_blanks.failed)
 
         # Look for formula errors:
 
@@ -1360,12 +1404,12 @@ class BaseField:
         #
         # https://groups.google.com/g/openpyxl-users/c/iNi1MKSP-Bc/m/2q_7cHavBQAJ
 
-        data = IsNotExcelError(data, keep_failed=False)
-        if not data:
-            self.n_excel_error += len(data.failed)
+        data_no_excel_errors = IsNotExcelError(data_no_blanks, keep_failed=False)
+        if not data_no_excel_errors:
+            self.n_excel_error += len(data_no_excel_errors.failed)
 
         # Return cleaned data for use in further checking.
-        return data.values
+        return data_no_excel_errors.values
 
     def report(self) -> None:
         """Report on field creation and data validation.
@@ -1401,7 +1445,7 @@ class BaseField:
         FORMATTER.pop()
 
 
-def field_to_dict(fld: Type[BaseField], col_idx: int) -> dict:
+def field_to_dict(fld: Union[EmptyField, BaseField], col_idx: int) -> dict:
     """Convert a object inheriting from BaseField into a dictionary.
 
     A function to return a dictionary representation of a field object. This would more
@@ -1465,7 +1509,7 @@ class CommentField(BaseField):
 
     field_types = ("comments",)
 
-    def validate_data(self, data: list) -> list:
+    def validate_data(self, data: list) -> None:
         """Validate data in comment fields.
 
         This overrides the BaseField
@@ -1473,7 +1517,7 @@ class CommentField(BaseField):
         remove any checking on comments fields.
         """
 
-        return data
+        return
 
 
 class ReplicateField(BaseField):
@@ -1493,17 +1537,17 @@ class NumericField(BaseField):
     fields.
     """
 
-    field_types = ("numeric",)
+    field_types: tuple[str, ...] = ("numeric",)
     required_descriptors = MANDATORY_DESCRIPTORS + ["method", "units"]
 
     def validate_data(self, data: list) -> None:
         """Validate numeric field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        also ensure that data values are numeric.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method and also ensures that data values are numeric.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         numeric = IsNumber(data)
 
@@ -1519,18 +1563,21 @@ class CategoricalField(BaseField):
     validation.
     """
 
-    field_types = ("categorical", "ordered categorical")
+    field_types: tuple[str, ...] = ("categorical", "ordered categorical")
     required_descriptors = MANDATORY_DESCRIPTORS + ["levels"]
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         # Additional code to validate the levels metadata and store a set of
         # values
         self.level_labels = set()
-        self.reported_levels = set()
+        self.reported_levels: set[str] = set()
         levels = meta.get("levels")
 
         if levels is not None and isinstance(levels, str) and not levels.isspace():
@@ -1540,21 +1587,22 @@ class CategoricalField(BaseField):
     def validate_data(self, data: list) -> None:
         """Validate categorical field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        check that string values are provided and populate the set of reported levels.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method and also checks that string values are provided and populates the set of
+        reported levels.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         # Now look for consistency: get the unique values reported in the
         # data, convert to unicode to handle checking of numeric labels and
         # then check the reported levels are a subset of the descriptors.
         # XLRD reads all numbers as floats, so coerce floats back to int
-        data = IsString(data, keep_failed=False)
-        if not data:
+        data_as_string = IsString(data, keep_failed=False)
+        if not data_as_string:
             self._log("Cells contain non-text values")
 
-        self.reported_levels.update(data)
+        self.reported_levels.update(data_as_string)
 
     def report(self) -> None:
         """Report on field creation and data validation for categorical fields.
@@ -1563,6 +1611,7 @@ class CategoricalField(BaseField):
         to handle undeclared or unused level labels.
         """
         super().report()
+        FORMATTER.push()
 
         extra = self.reported_levels.difference(self.level_labels)
         unused = self.level_labels.difference(self.reported_levels)
@@ -1578,6 +1627,8 @@ class CategoricalField(BaseField):
                 extra={"join": unused},
             )
 
+        FORMATTER.pop()
+
 
 class TaxaField(BaseField):
     """A BaseField subclass for taxa fields.
@@ -1589,32 +1640,36 @@ class TaxaField(BaseField):
     field_types = ("taxa",)
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.taxa is None:
             self._log("No taxon details provided for dataset")
 
-        self.taxa_found = set()
+        self.taxa_found: set[str] = set()
 
     def validate_data(self, data: list) -> None:
         """Validate taxa field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        look for non-string values and track unused or unknown taxon names.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method and also looks for non-string values and tracks unused or unknown taxon
+        names.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
-        data = IsString(data, keep_failed=False)
+        data_as_string = IsString(data, keep_failed=False)
 
-        if not data:
+        if not data_as_string:
             self._log("Cells contain non-string values")
 
         if self.taxa is not None:
-            self.taxa_found.update(data)
-            self.taxa.taxon_names_used.update(data)
+            self.taxa_found.update(data_as_string)
+            self.taxa.taxon_names_used.update(data_as_string)
 
     def report(self) -> None:
         """Report on field creation and data validation for taxa fields.
@@ -1623,6 +1678,7 @@ class TaxaField(BaseField):
         to emit unused or unknown taxon names
         """
         super().report()
+        FORMATTER.push()
 
         # TODO - not sure about this - no other fields test for emptiness?
         if self.taxa_found == set():
@@ -1638,6 +1694,8 @@ class TaxaField(BaseField):
             # add the found taxa to the list of taxa used
             self.taxa.taxon_names_used.update(self.taxa_found)
 
+        FORMATTER.pop()
+
 
 class LocationsField(BaseField):
     """A BaseField subclass for location fields.
@@ -1650,32 +1708,35 @@ class LocationsField(BaseField):
     field_types = ("locations", "location")
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         if self.locations is None:
             self._log("No location details provided for dataset")
 
-        self.locations_found = set()
+        self.locations_found: set[str] = set()
 
     def validate_data(self, data: list) -> None:
         """Validate location field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        check that location names are all known.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method and also checks that location names are all known.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
-        data = IsLocName(data, keep_failed=False)
+        data_locs = IsLocName(data, keep_failed=False)
 
-        if not data:
+        if not data_locs:
             self._log("Cells contain invalid location values")
 
         # Now should be strings and integer codes - convert to string
         # representations as used in the locations
-        data = [str(v) for v in data]
+        data = [str(v) for v in data_locs]
 
         if self.locations is not None:
             self.locations_found.update(data)
@@ -1688,6 +1749,7 @@ class LocationsField(BaseField):
         to emit undeclared location names.
         """
         super().report()
+        FORMATTER.push()
 
         # TODO - not sure about this - no other fields test for emptiness?
         if self.locations_found == set():
@@ -1705,6 +1767,8 @@ class LocationsField(BaseField):
             # add the found taxa to the list of taxa used
             self.locations.locations_used.update(self.locations_found)
 
+        FORMATTER.pop()
+
 
 class GeoField(BaseField):
     """A BaseField subclass for latitude and longitude fields.
@@ -1716,7 +1780,10 @@ class GeoField(BaseField):
     field_types = ("latitude", "longitude")
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -1729,27 +1796,36 @@ class GeoField(BaseField):
     def validate_data(self, data: list) -> None:
         """Validate latitude and longitude data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        check for non-decimal formatting (e.g. 12°24'32"W) and collate the data range.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method, and also checks for non-decimal formatting (e.g. 12°24'32"W) and
+        collates the data range.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
-        data = IsNumber(data, keep_failed=False)
+        data_as_number = IsNumber(data, keep_failed=False)
 
-        if not data:
+        if not data_as_number:
             self._log("Field contains non-numeric data")
 
-            if any([RE_DMS.search(str(dt)) for dt in data.failed]):
+            if any([RE_DMS.search(str(dt)) for dt in data_as_number.failed]):
                 self._log(
                     "Possible degrees minutes and seconds formatting? Use decimal "
                     "degrees",
                     WARNING,
                 )
 
-        if data.values:
-            self.min = min(data.values + [self.min]) if self.min else min(data.values)
-            self.max = max(data.values + [self.max]) if self.max else max(data.values)
+        if data_as_number.values:
+            self.min = (
+                min(data_as_number.values + [self.min])
+                if self.min
+                else min(data_as_number.values)
+            )
+            self.max = (
+                max(data_as_number.values + [self.max])
+                if self.max
+                else max(data_as_number.values)
+            )
 
     def report(self) -> None:
         """Report on field creation and data validation for latitude and longitude data.
@@ -1758,15 +1834,20 @@ class GeoField(BaseField):
         to check the coordinate range against the dataset geographic extents.
         """
         super().report()
+        FORMATTER.push()
 
         if self.min is None or self.max is None:
-            return ()
+            return
 
+        # Note that self.min and self.max can be None here if all data is invalid, but
+        # the update process handles None.
         if self.dataset is not None:
             if self.meta["field_type"] == "latitude":
                 self.dataset.latitudinal_extent.update([self.min, self.max])
             elif self.meta["field_type"] == "longitude":
                 self.dataset.longitudinal_extent.update([self.min, self.max])
+
+        FORMATTER.pop()
 
 
 class NumericTaxonField(NumericField):
@@ -1839,27 +1920,31 @@ class TimeField(BaseField):
     field_types = ("time",)
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         # Defaults
-        self.first_data_class_set = None
+        self.first_data_class_set: Optional[set] = None
         self.consistent_class = True
         self.expected_class = True
 
-        self.bad_strings = []
+        self.bad_strings: list[str] = []
         self.min = None
         self.max = None
 
-    def validate_data(self, data: list):
+    def validate_data(self, data: list) -> None:
         """Validate time field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        check that time data has consistent formatting and are valid time values.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        methoda nd also checks that time data has consistent formatting and are valid
+        time values.
         """
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         # TODO: report row number of issues - problem of mismatch between
         # self.n_rows (_all_ rows) and index in data (non-NA rows)
@@ -1877,7 +1962,10 @@ class TimeField(BaseField):
 
             # Are the values internally consistent and consistent with
             # previously loaded data
-            if len(cell_type_set) > 1:
+            if len(cell_type_set) == 0:
+                # If data is empty skip consistency checking
+                return
+            elif len(cell_type_set) > 1:
                 self.consistent_class = False
                 return
             elif self.first_data_class_set is None:
@@ -1905,6 +1993,7 @@ class TimeField(BaseField):
         to flag inconsistent time formatting and invalid data.
         """
         super().report()
+        FORMATTER.push()
 
         if not self.expected_class:
             LOGGER.error(
@@ -1921,6 +2010,8 @@ class TimeField(BaseField):
                 "ISO time strings contain badly formatted values: e.g.",
                 extra={"join": self.bad_strings[:5]},
             )
+
+        FORMATTER.pop()
 
 
 class DatetimeField(BaseField):
@@ -1942,7 +2033,10 @@ class DatetimeField(BaseField):
     field_types = ("datetime", "date")
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -1950,25 +2044,25 @@ class DatetimeField(BaseField):
             self._log("No dataset object provided - cannot update extents")
 
         # Defaults
-        self.first_data_class_set = None
+        self.first_data_class_set: Optional[set] = None
         self.consistent_class = True
         self.expected_class = True
         self.all_midnight = True
 
-        self.bad_strings = []
+        self.bad_strings: list[str] = []
         self.min = None
         self.max = None
 
     def validate_data(self, data: list) -> None:
         """Validate date and datetime field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        check that time data has consistent formatting and are valid date or datetime
-        values.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method and also checks that time data has consistent formatting and are valid
+        date or datetime values.
         """
 
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         # TODO: report row number of issues - problem of mismatch between
         # self.n_rows (_all_ rows) and index in data (non-NA rows)
@@ -1986,7 +2080,10 @@ class DatetimeField(BaseField):
 
             # Are the values internally consistent and consistent with
             # previously loaded data
-            if len(cell_type_set) > 1:
+            if len(cell_type_set) == 0:
+                # If data is empty skip consistency checking
+                return
+            elif len(cell_type_set) > 1:
                 self.consistent_class = False
                 return
             elif self.first_data_class_set is None:
@@ -2021,16 +2118,18 @@ class DatetimeField(BaseField):
                 if val.time() != midnight:
                     self.all_midnight = False
 
-        # Update range for extents
-        if self.min is None:
-            self.min = min(data)
-        else:
-            self.min = min([self.min] + data)
+        # Check that data isn't empty
+        if data:
+            # Update range for extents
+            if self.min is None:
+                self.min = min(data)
+            else:
+                self.min = min([self.min] + data)
 
-        if self.max is None:
-            self.max = min(data)
-        else:
-            self.max = max([self.max] + data)
+            if self.max is None:
+                self.max = min(data)
+            else:
+                self.max = max([self.max] + data)
 
     def report(self):
         """Report on field creation and data validation for date and datetime fields.
@@ -2039,6 +2138,7 @@ class DatetimeField(BaseField):
         to flag inconsistent  date and datetime formatting and invalid data.
         """
         super().report()
+        FORMATTER.push()
 
         # INconsistent and bad data classes
         if not self.expected_class:
@@ -2071,8 +2171,10 @@ class DatetimeField(BaseField):
         # Update extent if possible - note that inheritance means that isinstance
         # in extent.Extent is not successfully testing for datetime.datetime rather
         # than set datatype of datetime.date
-        if self.dataset is not None:
+        if not (self.dataset is None or self.min is None or self.max is None):
             self.dataset.temporal_extent.update([self.min.date(), self.max.date()])
+
+        FORMATTER.pop()
 
 
 class FileField(BaseField):
@@ -2086,11 +2188,14 @@ class FileField(BaseField):
     field_types = ("file",)
 
     def __init__(
-        self, meta: dict, dwsh: DataWorksheet = None, dataset: Dataset = None
+        self,
+        meta: dict,
+        dwsh: Optional[DataWorksheet] = None,
+        dataset: Optional[Dataset] = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
-        self.unknown_file_names = set()
+        self.unknown_file_names: set[str] = set()
 
         # Check whether filename testing is possible
         if self.summary is None:
@@ -2119,12 +2224,12 @@ class FileField(BaseField):
     def validate_data(self, data: list):
         """Validate file field data.
 
-        Extends the BaseField
-        [validate_data][safedata_validator.field.BaseField.validate_data] method to
-        track unknown files given in a file field.
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method, and also checks for unknown files given in a file field.
         """
 
-        data = super().validate_data(data)
+        data = self.run_common_validation(data)
 
         # If the files are listed in external and not provided in a file
         # container then check they are all present
@@ -2140,12 +2245,15 @@ class FileField(BaseField):
         to flag unknown files.
         """
         super().report()
+        FORMATTER.push()
 
         if self.unknown_file_names:
             LOGGER.error(
                 "Field contains external files not provided in Summary: ",
                 extra={"join": self.unknown_file_names},
             )
+
+        FORMATTER.pop()
 
 
 class EmptyField:

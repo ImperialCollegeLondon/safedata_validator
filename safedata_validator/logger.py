@@ -1,6 +1,4 @@
-"""Logging setup for safedata_validator.
-
-This submodule extends the standard logging setup to provide extra functionality
+"""This submodule extends the standard logging setup to provide extra functionality
 and to expose some global logging objects for use throughout the code.
 
 The LogRecordFactory is updated so that new records include a custom ``levelcode``
@@ -137,19 +135,19 @@ class IndentFormatter(logging.Formatter):
         self.indent = indent
 
     def pop(self, n: int = 1) -> None:
-        """A convenience method to increase the indentation of the formatter.
+        """A convenience method to decrease the indentation of the formatter.
 
         Args:
-            n: Increase the indentation depth by n.
+            n: Decreease the indentation depth by n.
         """
 
         self.depth = max(0, self.depth - n)
 
     def push(self, n: int = 1) -> None:
-        """A convenience method to decrease the indentation of the formatter.
+        """A convenience method to increase the indentation of the formatter.
 
         Args:
-            n: Decrease the indentation depth by n.
+            n: Increase the indentation depth by n.
         """
         self.depth = self.depth + n
 

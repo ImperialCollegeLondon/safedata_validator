@@ -590,7 +590,7 @@ def test_BaseField_init(caplog, field_meta, expected_log):
         ),
     ],
 )
-def test_BaseField_validate_data(caplog, data, expected_log):
+def test_BaseField_run_common_validation(caplog, data, expected_log):
     """Testing behaviour of the BaseField class in using _validate_data."""
 
     fld = BaseField(
@@ -602,7 +602,7 @@ def test_BaseField_validate_data(caplog, data, expected_log):
         None,
     )
 
-    fld.validate_data(data)
+    fld.run_common_validation(data)
     fld.report()
 
     assert len(expected_log) == len(caplog.records)
@@ -1627,7 +1627,8 @@ def test_GeoField_init(caplog, fixture_dataset, provide_ds_instance, expected_lo
             [111, 112, 113, 114, 115, 116],
             ((INFO, "Checking field geocoords"),),
         ),
-        # Bad inputs
+        # Bad inputs - non numeric, outside extents and no valid data at all to check
+        # updating of dataset extents.
         (
             "latitude",
             [1, "2", 3, 4, 5, 6],
@@ -1682,6 +1683,14 @@ def test_GeoField_init(caplog, fixture_dataset, provide_ds_instance, expected_lo
             [111, 112, 113, 114, 115, 160],
             ((INFO, "Checking field geocoords"), (WARNING, "exceeds soft bounds")),
         ),
+        (
+            "longitude",
+            ["111", "112", "113", "114", "115", "116"],
+            (
+                (INFO, "Checking field geocoords"),
+                (ERROR, "Field contains non-numeric data"),
+            ),
+        ),
     ],
 )
 def test_GeoField_validate_data(caplog, fixture_dataset, which, data, expected_log):
@@ -1725,6 +1734,19 @@ def test_GeoField_validate_data(caplog, fixture_dataset, which, data, expected_l
                 ["111213", "1112", "111213.2", "11:12:13", "11:12:13"],
             ],  # Different ISO8601 string formats
             ((INFO, "Checking field time"),),
+        ),
+        (
+            [
+                ["11:12:13", "NA", "NA", "11:12:13", "11:12:13"],
+            ],
+            ((INFO, "Checking field time"), (WARNING, "2 / 5 values missing")),
+        ),
+        (
+            [
+                ["NA", "NA", "NA", "NA", "NA"],
+                ["11:12:13", "11:12:13", "11:12:13", "11:12:13", "11:12:13"],
+            ],
+            ((INFO, "Checking field time"), (WARNING, "5 / 10 values missing")),
         ),
         # Bad inputs
         (
@@ -1830,6 +1852,33 @@ def test_TimeField_validate_data(caplog, data, expected_log):
                 ],
             ],
             ((INFO, "Checking field datetimetest"),),
+        ),
+        (
+            "date",
+            [
+                [
+                    datetime(2022, 1, 6),
+                    datetime(2022, 1, 6),
+                    "NA",
+                    "NA",
+                    datetime(2022, 1, 6),
+                ],
+            ],
+            ((INFO, "Checking field datetimetest"), (WARNING, "2 / 5 values missing")),
+        ),
+        (
+            "date",
+            [
+                ["NA", "NA", "NA", "NA", "NA"],
+                [
+                    datetime(2022, 1, 6),
+                    datetime(2022, 1, 6),
+                    datetime(2022, 1, 6),
+                    datetime(2022, 1, 6),
+                    datetime(2022, 1, 6),
+                ],
+            ],
+            ((INFO, "Checking field datetimetest"), (WARNING, "5 / 10 values missing")),
         ),
         (
             "datetime",

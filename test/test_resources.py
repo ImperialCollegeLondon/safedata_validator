@@ -23,6 +23,7 @@ def config_file_list():
         f"location_aliases = {FIXTURE_FILES.rf.localias_file}",
         f"gbif_database = {FIXTURE_FILES.rf.gbif_file}",
         f"ncbi_database = {FIXTURE_FILES.rf.ncbi_file}",
+        "use_project_ids = False",
         "[extents]",
         "temporal_soft_extent = 2002-02-01, 2030-02-01",
         "temporal_hard_extent = 2002-02-01, 2030-02-01",
@@ -48,6 +49,7 @@ def config_file_dict():
         "location_aliases": FIXTURE_FILES.rf.localias_file,
         "gbif_database": FIXTURE_FILES.rf.gbif_file,
         "ncbi_database": FIXTURE_FILES.rf.ncbi_file,
+        "use_project_ids": True,
         "extents": {
             "temporal_soft_extent": ["2002-02-01", "2030-02-01"],
             "temporal_hard_extent": ["2002-02-01", "2030-02-01"],
@@ -175,7 +177,11 @@ def nested_set(dic, keys, value):
                 (INFO, "Configuring resources from init "),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
-                (CRITICAL, "Location aliases file not readable as CSV"),
+                (
+                    CRITICAL,
+                    "Location aliases file not readable as a CSV file with valid "
+                    "headers",
+                ),
             ),
             id="Loc aliases not text",
         ),
@@ -188,9 +194,26 @@ def nested_set(dic, keys, value):
                 (INFO, "Configuring resources from init "),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
-                (CRITICAL, "Location aliases has bad headers"),
+                (
+                    CRITICAL,
+                    "Location aliases file not readable as a CSV file with valid "
+                    "headers",
+                ),
             ),
             id="Loc text not correct CSV",
+        ),
+        pytest.param(
+            ((["location_aliases"], FIXTURE_FILES.rf.empty_localias_file),),
+            ((1, f"location_aliases = {FIXTURE_FILES.rf.empty_localias_file}"),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (CRITICAL, "Location aliases file is empty"),
+            ),
+            id="Loc alias file empty",
         ),
         pytest.param(
             ((["gbif_database"], ""),),
@@ -309,8 +332,20 @@ def nested_set(dic, keys, value):
             id="NCBI wrong SQLite",
         ),
         pytest.param(
+            ((["use_project_ids"], ["nonsense"]),),
+            ((4, "use_project_ids = nonsense"),),
+            RuntimeError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (CRITICAL, "Configuration issues"),
+                (CRITICAL, "In config 'use_project_ids':"),
+            ),
+            id="Testing use_project_ids not bool",
+        ),
+        pytest.param(
             ((["extents", "latitudinal_hard_extent"], ["-90deg", "90deg"]),),
-            ((7, "latitudinal_hard_extent = -90deg, 90deg"),),
+            ((8, "latitudinal_hard_extent = -90deg, 90deg"),),
             RuntimeError,
             (
                 (INFO, "Configuring Resources"),

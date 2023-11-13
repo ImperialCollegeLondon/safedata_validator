@@ -5,6 +5,9 @@ theme:
 markdown_extensions:
   - admonition
   - markdown_include.include
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true 
 plugins:
   - search
   - mkdocstrings
@@ -43,7 +46,7 @@ nav:
       - 'Fields and dataworksheets': 'api/field.md'
       - 'Taxa': 'api/taxa.md'
       - 'Zenodo': 'api/zenodo.md'
-    - 'Build notes': build_notes.md
+    - 'Package development': package_development.md
   - 'Installation and configuration':
     - 'Installation': 'install/install.md'
     - 'Configuration': 'install/configuration.md'
@@ -51,3 +54,6 @@ nav:
     - 'GBIF validation notes': 'install/gbif_validation.md'
     - 'Building local NCBI': 'install/build_local_ncbi.md'
     - 'NCBI validation notes': 'install/ncbi_validation.md'
+  - 'Using the safedata system':
+    - 'Overview': 'using_safedata/overview.md'
+

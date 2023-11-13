@@ -1,6 +1,4 @@
-"""The taxa submodule.
-
-This module describes classes and methods used to compile taxonomic data from datasets
+"""This module describes classes and methods used to compile taxonomic data from datasets
 and to validate taxonomy against the GBIF backbone database and/or the NCBI taxonomy
 database.
 
@@ -25,7 +23,7 @@ When validating against the NCBI database supplied taxa of any rank (i.e. strain
 clade) which can be successfully validated will be recorded. However, associated higher
 taxa will only be recorded if their ranks are either a GBIF backbone rank or
 superkingdom.
-"""
+"""  # noqa D415
 
 import dataclasses
 import sqlite3
@@ -65,6 +63,45 @@ BACKBONE_RANKS = [
 
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ["superkingdom"] + BACKBONE_RANKS
+
+# These are the extra ranks defined by NCBI, they may have to be updated in future
+EXTRA_NCBI_RANKS = [
+    "biotype",
+    "clade",
+    "cohort",
+    "forma",
+    "forma specialis",
+    "genotype",
+    "infraclass",
+    "infraorder",
+    "isolate",
+    "morph",
+    "no rank",
+    "parvorder",
+    "pathogroup",
+    "section",
+    "series",
+    "serogroup",
+    "serotype",
+    "species group",
+    "species subgroup",
+    "strain",
+    "subclass",
+    "subcohort",
+    "subfamily",
+    "subgenus",
+    "subkingdom",
+    "suborder",
+    "subphylum",
+    "subsection",
+    "subtribe",
+    "superclass",
+    "superfamily",
+    "superorder",
+    "superphylum",
+    "tribe",
+    "varietas",
+]
 
 
 class GBIFError(Exception):
@@ -296,7 +333,6 @@ class GBIFValidator:
     """
 
     def __init__(self, resources: Resources) -> None:
-
         conn = sqlite3.connect(resources.gbif_database)
         conn.row_factory = sqlite3.Row
         self.gbif_conn = conn
@@ -323,7 +359,6 @@ class GBIFValidator:
             raise ValueError("Cannot validate non-backbone taxa")
 
         if taxon.gbif_id is not None:
-
             # get the record associated with the provided ID
             try:
                 id_taxon = self.id_lookup(taxon.gbif_id)
@@ -448,11 +483,16 @@ class GBIFValidator:
             return taxon
 
         # Add the taxonomic hierarchy, using a mapping of backbone ranks (except
-        # subspecies) to backbone table fields.
+        # subspecies) to backbone table fields. This needs to omit missing keys and
+        # more nested taxon levels: so for example a genus will have 'species_key' but
+        # it will be None (or possibly an empty string in older backbone versions that
+        # use that rather than explicit \\N in conversion)
         taxon.hierarchy = [
             (rk, taxon_row[ky])
             for rk, ky in [(r, r + "_key") for r in BACKBONE_RANKS[:-1]]
-            if ky in taxon_row.keys() and taxon_row[ky] is not None
+            if ky in taxon_row.keys()
+            and taxon_row[ky] is not None
+            and not taxon_row[ky] == ""
         ]
 
         # parent key in the local database has the odd property that the parent
@@ -483,7 +523,6 @@ class NCBIValidator:
     """
 
     def __init__(self, resources: Resources) -> None:
-
         conn = sqlite3.connect(resources.ncbi_database)
         conn.row_factory = sqlite3.Row
         self.ncbi_conn = conn
@@ -965,7 +1004,6 @@ class GBIFTaxa:
     """
 
     def __init__(self, resources: Resources) -> None:
-
         self.taxon_index: list[list] = []
         self.taxon_names: set[str] = set()
         self.parents: dict[tuple, GBIFTaxon] = dict()
@@ -997,11 +1035,13 @@ class GBIFTaxa:
 
         if not dframe.data_columns:
             LOGGER.error("No data or only headers in GBIFTaxa worksheet")
+            FORMATTER.pop()
             return
 
         # Dupe headers likely cause serious issues, so stop
         if "duplicated" in dframe.bad_headers:
             LOGGER.error("Cannot parse taxa with duplicated headers")
+            FORMATTER.pop()
             return
 
         # Get the headers
@@ -1014,6 +1054,33 @@ class GBIFTaxa:
         if missing_core:
             # core names are not found so can't continue
             LOGGER.error("Missing core fields: ", extra={"join": missing_core})
+            FORMATTER.pop()
+            return
+
+        # TODO - Test this new behaviour
+        # Fields used to describe taxa (not including comments)
+        tx_fields = [
+            "name",
+            "taxon name",
+            "taxon type",
+            "taxon id",
+            "ignore id",
+            "parent name",
+            "parent type",
+            "parent id",
+        ]
+        all_fields = set(tx_fields + ["comments"])
+
+        # Now check that there are no unexpected (i.e. likely misspelled) fields
+        unexpected_headers = set(headers).difference(all_fields)
+
+        if unexpected_headers:
+            # An unexpected header (which might well be misspelled) was found
+            LOGGER.error(
+                "Unexpected (or misspelled) headers found:",
+                extra={"join": unexpected_headers},
+            )
+            FORMATTER.pop()
             return
 
         # Any duplication in names
@@ -1035,16 +1102,6 @@ class GBIFTaxa:
 
         # Standardise to the expected fields, filling in None for any
         # completely missing fields (parent fields could be missing).
-        tx_fields = [
-            "name",
-            "taxon name",
-            "taxon type",
-            "taxon id",
-            "ignore id",
-            "parent name",
-            "parent type",
-            "parent id",
-        ]
         taxa = [{fld: tx.get(fld) for fld in tx_fields} for tx in taxa]
 
         # Standardize the taxon representation into lists of taxon and parent data
@@ -1054,7 +1111,6 @@ class GBIFTaxa:
         #       [parent name, parent type, parent id]]
 
         for idx, row in enumerate(taxa):
-
             # Standardise blank values to None
             row = {ky: None if blank_value(vl) else vl for ky, vl in row.items()}
             taxon_info = [
@@ -1350,7 +1406,6 @@ class GBIFTaxa:
                 )
 
         elif not m_taxon.is_backbone:
-
             # Now handle non-backbone cases - just needs a valid parent.
             if p_taxon is None:
                 LOGGER.error(
@@ -1376,7 +1431,6 @@ class GBIFTaxa:
             m_taxon = self.validator.search(m_taxon)
 
             if m_taxon.found and p_taxon is None:
-
                 # Add the index entry and update hierarchy
                 self.taxon_index.append(
                     [
@@ -1424,9 +1478,7 @@ class GBIFTaxa:
                     )
 
             elif m_taxon.found and p_taxon is not None:
-
                 if p_taxon.found:
-
                     # Good backbone with good parent - are they compatible? Check if all
                     # entries in the parent hierarchy appear in the taxon hierarchy
                     if not set(p_taxon.hierarchy).issubset(m_taxon.hierarchy):
@@ -1463,7 +1515,6 @@ class GBIFTaxa:
                 )
 
             elif not m_taxon.found:
-
                 if p_taxon is None:
                     # Taxon is a backbone type but is not found in GBIF and has no
                     # parent info
@@ -1579,7 +1630,6 @@ class NCBITaxa:
     """
 
     def __init__(self, resources: Resources) -> None:
-
         self.taxon_index: list[list] = []
         self.taxon_names: set[str] = set()
         self.hierarchy: set[tuple] = set()
@@ -1609,11 +1659,13 @@ class NCBITaxa:
 
         if not dframe.data_columns:
             LOGGER.error("No data or only headers in Taxa worksheet")
+            FORMATTER.pop()
             return
 
         # Dupe headers likely cause serious issues, so stop
         if "duplicated" in dframe.bad_headers:
             LOGGER.error("Cannot parse taxa with duplicated headers")
+            FORMATTER.pop()
             return
 
         # Get the headers
@@ -1626,6 +1678,25 @@ class NCBITaxa:
         if missing_core:
             # core names are not found so can't continue
             LOGGER.error("Missing core fields: ", extra={"join": missing_core})
+            FORMATTER.pop()
+            return
+
+        # Possible fields in this case are the two core fields + comments + all
+        # taxonomic ranks defined in NCBI
+        all_fields = set(
+            list(core_fields) + BACKBONE_RANKS_EX + EXTRA_NCBI_RANKS + ["comments"]
+        )
+
+        # Now check that there are no unexpected (i.e. likely misspelled) fields
+        unexpected_headers = set(headers).difference(all_fields)
+
+        if unexpected_headers:
+            # An unexpected header (which might well be misspelled) was found
+            LOGGER.error(
+                "Unexpected (or misspelled) headers found:",
+                extra={"join": unexpected_headers},
+            )
+            FORMATTER.pop()
             return
 
         # Check that at least two backbone taxa have been provided
@@ -1634,6 +1705,7 @@ class NCBITaxa:
         if len(fnd_rnks) < 2:
             # can't continue if less than two backbone ranks are provided
             LOGGER.error("Less than two backbone taxonomic ranks are provided")
+            FORMATTER.pop()
             return
 
         # Find core field indices and use to isolate non core (i.e. taxonomic) headers
@@ -1647,6 +1719,7 @@ class NCBITaxa:
                 LOGGER.error(
                     "If 'Comments' is provided as a field it must be the last column"
                 )
+                FORMATTER.pop()
                 return
             else:
                 # If it's the last header go ahead and delete it
@@ -1663,12 +1736,14 @@ class NCBITaxa:
         if "subspecies" in headers:
             if "species" not in headers:
                 LOGGER.error("If subspecies is provided so must species")
+                FORMATTER.pop()
                 return
 
         # Same check
         if "species" in headers:
             if "genus" not in headers:
                 LOGGER.error("If species is provided so must genus")
+                FORMATTER.pop()
                 return
 
         # Any duplication in names
@@ -1694,7 +1769,6 @@ class NCBITaxa:
         # dictionary.
 
         for idx, row in enumerate(taxa):
-
             # Strip k__ notation so that the text is appropriate for the search
             for rnk in non_core:
                 row[rnk], match = taxa_strip(row[rnk], rnk)
@@ -2105,14 +2179,12 @@ def taxon_index_to_text(
     """
 
     def _indent(n: int, use_html: bool = html):
-
         if use_html:
             return raw("&ensp;-&ensp;" * n)
         else:
             return " " * indent_width * (n - 1)
 
     def _format_name(tx: dict, use_html: bool = html, auth: str = "GBIF"):
-
         if auth == "GBIF":
             # format the canonical name
             if tx["taxon_rank"] in ["genus", "species", "subspecies"]:
@@ -2200,7 +2272,6 @@ def taxon_index_to_text(
     stack = [({"current": grouped[None][0]}, {"next": grouped[None][1:]})]
 
     while stack:
-
         # Handle the current top of the stack: format the canonical name
         current = stack[-1][0]["current"]
         canon_name = _format_name(current)

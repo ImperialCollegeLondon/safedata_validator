@@ -32,9 +32,10 @@ def test_logger(caplog, level, message, extra, depth, expected):
     # Capture _all_ logging events, not just WARNING and above
     caplog.set_level(DEBUG)
 
-    # Truncate any existing log messages
+    # Truncate any existing log messages and reset the depth
     LOG.seek(0)
     LOG.truncate()
+    FORMATTER.depth = 0
 
     # Emit the message
     FORMATTER.push(depth)
