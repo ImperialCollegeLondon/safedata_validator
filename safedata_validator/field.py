@@ -20,11 +20,9 @@ from openpyxl.utils import get_column_letter
 from safedata_validator.extent import Extent
 from safedata_validator.locations import Locations
 from safedata_validator.logger import (
-    CONSOLE_HANDLER,
-    COUNTER_HANDLER,
     FORMATTER,
-    LOG,
     LOGGER,
+    get_handler,
     loggerinfo_push_pop,
 )
 from safedata_validator.resources import Resources
@@ -145,14 +143,13 @@ class Dataset:
         """
 
         # Handle logging details - flush and reset from previous runs.
-        LOG.seek(0)
-        LOG.truncate(0)
-        COUNTER_HANDLER.reset()
+        handler = get_handler()
+        handler.reset()
 
         if console_log:
-            CONSOLE_HANDLER.setLevel("DEBUG")
+            handler.setLevel("DEBUG")
         else:
-            CONSOLE_HANDLER.setLevel("CRITICAL")
+            handler.setLevel("CRITICAL")
 
         # Open the workbook with:
         #  - read_only to use the memory optimised read_only implementation.
@@ -321,25 +318,24 @@ class Dataset:
 
         # Dedent for final result
         FORMATTER.pop(n=2)
+        handler = get_handler()
 
-        if COUNTER_HANDLER.counters["ERROR"] > 0:
-            self.n_errors = COUNTER_HANDLER.counters["ERROR"]
-            if COUNTER_HANDLER.counters["WARNING"] > 0:
+        if handler.counters["ERROR"] > 0:
+            self.n_errors = handler.counters["ERROR"]
+            if handler.counters["WARNING"] > 0:
                 LOGGER.info(
-                    f"FAIL: file contained {COUNTER_HANDLER.counters['ERROR']} errors "
-                    f"and {COUNTER_HANDLER.counters['WARNING']} warnings"
+                    f"FAIL: file contained {handler.counters['ERROR']} errors "
+                    f"and {handler.counters['WARNING']} warnings"
                 )
             else:
-                LOGGER.info(
-                    f"FAIL: file contained {COUNTER_HANDLER.counters['ERROR']} errors"
-                )
+                LOGGER.info(f"FAIL: file contained {handler.counters['ERROR']} errors")
         else:
             self.passed = True
 
-            if COUNTER_HANDLER.counters["WARNING"] > 0:
+            if handler.counters["WARNING"] > 0:
                 LOGGER.info(
                     "PASS: file formatted correctly but with "
-                    f"{COUNTER_HANDLER.counters['WARNING']} warnings"
+                    f"{handler.counters['WARNING']} warnings"
                 )
             else:
                 LOGGER.info("PASS: file formatted correctly with no warnings")
@@ -506,7 +502,7 @@ class DataWorksheet:
         self.row_numbers_noninteger = False
         self.blank_rows = False
         self.trailing_blank_rows = False
-        self.start_errors = COUNTER_HANDLER.counters["ERROR"]
+        self.start_errors = get_handler().counters["ERROR"]
         self.n_errors = 0
 
     @loggerinfo_push_pop("Validating field metadata")
@@ -802,7 +798,7 @@ class DataWorksheet:
         )
 
         # reporting
-        self.n_errors = COUNTER_HANDLER.counters["ERROR"] - self.start_errors
+        self.n_errors = get_handler().counters["ERROR"] - self.start_errors
         if self.n_errors > 0:
             LOGGER.info(f"Dataframe contains {self.n_errors} errors")
         else:

@@ -95,7 +95,8 @@ If this is the first version of a dataset to be published, an administrator will
 do the following:
 
 * When the Excel metadata file passes checks, log in to Zenodo using our Zenodo curation
-  account (`the_safe_project`, tied to info@safeproject.net).
+  account (`the_safe_project`, tied to
+  [info@safeproject.net](mailto:info@safeproject.net)).
 * Navigate to the [Zenodo deposit page](https://zenodo.org/deposit) and click on 'New
   upload'.
 * On the 'New upload' page, upload the external files and fill in the following fields:
@@ -116,7 +117,8 @@ do the following:
 If this is an update to an existing dataset, then the process is broadly similar:
 
 * When the Excel metadata file passes checks, log in to Zenodo using our Zenodo curation
-  account (`the_safe_project`, tied to info@safeproject.net).
+  account (`the_safe_project`, tied to
+  [info@safeproject.net](mailto:info@safeproject.net)).
 * Do not create a new upload. Instead find the published dataset and click on the 'New
   version' button.
 * Upload any new or changed files and delete any outdated files. You **must** delete the

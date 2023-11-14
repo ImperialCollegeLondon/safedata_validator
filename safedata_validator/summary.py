@@ -12,7 +12,7 @@ import requests  # type: ignore
 from openpyxl.worksheet.worksheet import Worksheet
 
 from safedata_validator.extent import Extent
-from safedata_validator.logger import COUNTER_HANDLER, LOGGER, loggerinfo_push_pop
+from safedata_validator.logger import LOGGER, get_handler, loggerinfo_push_pop
 from safedata_validator.resources import Resources
 from safedata_validator.validators import (
     IsNotSpace,
@@ -242,8 +242,8 @@ class Summary:
                 more if a published dataset is associated with multiple projects and any
                 of those ids would be valid).
         """
-
-        start_errors = COUNTER_HANDLER.counters["ERROR"]
+        handler = get_handler()
+        start_errors = handler.counters["ERROR"]
 
         # validate project_id is one of None, an integer or a list of integers
         if valid_pid is None:
@@ -336,7 +336,7 @@ class Summary:
         self._load_data_worksheets(sheetnames)
 
         # summary of processing
-        self.n_errors = COUNTER_HANDLER.counters["ERROR"] - start_errors
+        self.n_errors = handler.counters["ERROR"] - start_errors
         if self.n_errors > 0:
             LOGGER.info("Summary contains {} errors".format(self.n_errors))
         else:
