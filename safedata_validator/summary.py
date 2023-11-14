@@ -292,7 +292,7 @@ class Summary:
                     extra={"join": non_none_failed_headers},
                 )
 
-        # Now we have warned about bad values, explicitly cast row keys to None to
+        # Now we have warned about bad values, explicitly cast row keys to string to
         # continue processing.
         self._rows = {str(rw[0]).lower(): rw[1:] for rw in rows}
 
