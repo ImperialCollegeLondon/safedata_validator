@@ -1,12 +1,13 @@
 # This script echoes the command line usage for script tools to files in this
-# directory that can then be transcluded into markdown files using the python
-# markdown extension markdown-include. The syntax is:
+# directory that can then be transcluded into markdown files using the 
+# mkdocs plugin include-markdown. The syntax is:
 #
-# {!path/to/file!}
+# {%
+# include "path/to/file.txt"
+# %}
 #
-# Note that the path is from the root directory running the mkdocs build/serve
-# process, not relative to the markdown file in which the included file is 
-# referenced.
+# Note that the path can be relative to the docs directory or relative to the markdown
+# file in which the included file is referenced.
 
 
 echo "cl_prompt $ safedata_validate -h" > safedata_validate.txt

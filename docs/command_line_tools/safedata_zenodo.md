@@ -43,7 +43,9 @@ The top level command line help for the tool, showing the available subcommands
 is shown below:
 
 ```bash
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_top.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_top.txt"
+%}
 ```
 
 ### Simple publication process
@@ -80,77 +82,103 @@ The command line help for each of the various subcommands is shown below:
 #### The `create_deposit` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_create_deposit.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_create_deposit.txt"
+%}
 ```
 
 #### The `discard_deposit` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_discard_deposit.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_discard_deposit.txt"
+%}
 ```
 
 #### The `get_deposit` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_get_deposit.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_get_deposit.txt"
+%}
 ```
 
 #### The `publish_deposit` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_publish_deposit.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_publish_deposit.txt"
+%}
 ```
 
 #### The `upload_file` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_upload_file.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_upload_file.txt"
+%}
 ```
 
 #### The `delete_file` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_delete_file.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_delete_file.txt"
+%}
 ```
 
 #### The `upload_metadata` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_upload_metadata.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_upload_metadata.txt"
+%}
 ```
 
 #### The `amend_metadata` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_amend_metadata.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_amend_metadata.txt"
+%}
 ```
 
 #### The `sync_local_dir` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_sync_local_dir.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_sync_local_dir.txt"
+%}
 ```
 
 #### The `maintain_ris` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_maintain_ris.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_maintain_ris.txt"
+%}
 ```
 
 #### The `generate_html` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_generate_html.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_generate_html.txt"
+%}
 ```
 
 #### The `generate_xml` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_generate_xml.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_generate_xml.txt"
+%}
 ```
 
 #### The `show_config` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_zenodo_show_config.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_zenodo_show_config.txt"
+%}
 ```

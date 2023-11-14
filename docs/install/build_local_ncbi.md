@@ -21,7 +21,9 @@ build the required file. The command line help is shown below - note that a part
 version can be selected by supplying the version date timestamp from the page above.
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_build_local_ncbi.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_build_local_ncbi.txt"
+%}
 ```
 
 Once you have an SQLite3 backbone database, you will then need to edit the

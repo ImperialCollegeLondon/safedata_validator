@@ -13,7 +13,9 @@ The top level command line help for the tool, showing the available subcommands
 is shown below:
 
 ```bash
-{!docs/command_line_tools/command_line_usage/safedata_server_top.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_server_top.txt"
+%}
 ```
 
 ## The `safedata_server` subcommands
@@ -23,11 +25,15 @@ The command line help for each of the various subcommands is shown below:
 ### The `post_metadata` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_server_post_metadata.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_server_post_metadata.txt"
+%}
 ```
 
 ### The `update_gazetteer` subcommand
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_server_update_gazetteer.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_server_update_gazetteer.txt"
+%}
 ```

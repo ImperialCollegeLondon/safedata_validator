@@ -1,5 +1,7 @@
 # Using the `safedata` system
 
+<!-- markdownlint-disable MD046 -->
+
 The `safedata_validator` package is one component of the wider `safedata` system for
 data management and discovery. This system comprises:
 
@@ -31,12 +33,6 @@ or [Windows subsystem for Linux](https://learn.microsoft.com/en-us/windows/wsl/i
 but the examples also show how to use the programmatic API for `safedata_validator` from
 within Python.
 
-<!--- 
-The include extension does not seem to work when including content within tabbed blocks
-in the use case recipes below so for the moment keeping the code in sections not tabs
-and including the code from source files that can be validated by pre-commit
--->
-
 ### Validating and publishing a dataset
 
 TODO - David add details of upload of additional (i.e. Non-Excel data) files here
@@ -44,17 +40,21 @@ TODO - David add details of upload of additional (i.e. Non-Excel data) files her
 These examples show the typical workflow for publishing a dataset and accompanying
 metadata using `safedata_validator`.
 
-#### Shell
+=== "bash"
 
-```sh
-{!docs/using_safedata/publish_script.sh!}
-```
+    ```sh
+    {%
+    include "using_safedata/publish_script.sh"
+    %}
+    ```
 
-#### Python
+=== "python"
 
-```sh
-{!docs/using_safedata/publish_script.py!}
-```
+    ```python
+    {%
+    include "using_safedata/publish_script.py"
+    %}
+    ```
 
 ### Updating a published a dataset
 

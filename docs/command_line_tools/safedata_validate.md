@@ -54,7 +54,9 @@ Once you have setup and configured `safedata_validator`, the usage instructions 
 below:
 
 ```sh
-{!docs/command_line_tools/command_line_usage/safedata_validate.txt!}
+{%
+include "command_line_tools/command_line_usage/safedata_validate.txt"
+%}
 ```
 
 Essentially, you should now be able to do:

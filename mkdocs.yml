@@ -4,13 +4,13 @@ theme:
   name: material
 markdown_extensions:
   - admonition
-  - markdown_include.include
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true 
 plugins:
   - search
   - mkdocstrings
+  - include-markdown
 extra_css:
   - custom.css
 use_directory_urls: false
