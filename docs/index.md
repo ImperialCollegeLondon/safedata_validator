@@ -19,7 +19,7 @@ term ecological projects.
 : These pages provide an introduction to the command line tools used to validate and
 publish datasets.
 
-[Developers](api/overview.md)
+[Developers](developers/api/overview.md)
 : These pages provide the API for the package classes and methods.
 
 ## Package components

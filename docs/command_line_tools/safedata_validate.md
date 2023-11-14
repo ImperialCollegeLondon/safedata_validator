@@ -4,11 +4,10 @@ The  `safedata_validator` package contains Python code to validate files
 containing data using `safedata` formatting  and report on any problems. The code
 validates:
 
-  1. The data submission formatting of the file.
-  1. All taxonomic names against either the [GBIF taxonomy
-     database](../install/gbif_validation.md) or the [NCBI taxonomy
-     database](../install/ncbi_validation.md).
-  1. All location names against a locations gazetteer.
+1. The data submission formatting of the file.
+1. All taxonomic names against either the [GBIF or NCBI taxonomy
+   databases](../install/taxonomic_validation.md).
+1. All location names against a locations gazetteer.
 
 The package can be imported in Python for use within other frameworks. However, the
 package also provides a command line tool, that allows it to be  installed and run as a

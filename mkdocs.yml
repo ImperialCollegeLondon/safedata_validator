@@ -32,8 +32,8 @@ nav:
   - 'Data managers':
     - 'Installation and configuration':
       - 'Installation': 'install/install.md'
-      - 'Building GBIF database': 'install/build_local_gbif.md'
-      - 'Building NCBI database': 'install/build_local_ncbi.md'
+      - 'Building the GBIF database': 'install/build_local_gbif.md'
+      - 'Building the NCBI database': 'install/build_local_ncbi.md'
       - 'Taxonomic validation details': 'install/taxonomic_validation.md'
       - 'Configuration': 'install/configuration.md'
     - 'Using the safedata system':
@@ -45,16 +45,16 @@ nav:
       - 'safedata_server': 'command_line_tools/safedata_server.md'
   - 'Developers':
     - 'API Reference':
-      - 'Overview': 'api/overview.md'
-      - 'Resources': 'api/resources.md'
-      - 'Taxon database': 'api/taxondb.md'
-      - 'Logger': 'api/logger.md'
-      - 'Extents': 'api/extent.md'
-      - 'Summary': 'api/summary.md'
-      - 'Locations': 'api/locations.md'
-      - 'Fields and dataworksheets': 'api/field.md'
-      - 'Taxa': 'api/taxa.md'
-      - 'Zenodo': 'api/zenodo.md'
-    - 'Package development': package_development.md
+      - 'Overview': 'developers/api//overview.md'
+      - 'Resources': 'developers/api/resources.md'
+      - 'Taxon database': 'developers/api/taxondb.md'
+      - 'Logger': 'developers/api/logger.md'
+      - 'Extents': 'developers/api/extent.md'
+      - 'Summary': 'developers/api/summary.md'
+      - 'Locations': 'developers/api/locations.md'
+      - 'Fields and dataworksheets': 'developers/api/field.md'
+      - 'Taxa': 'developers/api/taxa.md'
+      - 'Zenodo': 'developers/api/zenodo.md'
+    - 'Package development': developers/package_development.md
   - 'safedata at the SAFE project': 'safedata_at_SAFE.md'
 

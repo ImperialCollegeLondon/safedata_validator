@@ -196,24 +196,26 @@ with data resources for all users. If both are present, the user configuration
 is used. The configuration file must be called `safedata_validator.cfg` and the
 user and site config folders are:
 
-### Mac OS X
+<!-- markdownlint-disable MD046 -->
 
-```sh
-/Users/username/Library/Application Support/safedata_validator/safedata_validator.cfg
-/Library/Application Support/safedata_validator/safedata_validator.cfg
-```
+=== "Mac OS X"
 
-### Windows
+    ```
+    /Users/username/Library/Application Support/safedata_validator/safedata_validator.cfg
+    /Library/Application Support/safedata_validator/safedata_validator.cfg
+    ```
 
-The repeated directory name is not an error:
+=== "Windows"
 
-```sh
-C:\Users\username\AppData\Local\safedata_validator\safedata_validator\safedata_validator.cfg
-```
+    ```
+    C:\Users\username\AppData\Local\safedata_validator\safedata_validator\safedata_validator.cfg
+    ```
 
-### Linux
+    The repeated directory name is not an error!
 
-```sh
-/home/username/.config/safedata_validator/safedata_validator.cfg
-/etc/xdg/safedata_validator/safedata_validator.cfg
-```
+=== "Linux"
+
+    ```
+    /home/username/.config/safedata_validator/safedata_validator.cfg
+    /etc/xdg/safedata_validator/safedata_validator.cfg
+    ```
