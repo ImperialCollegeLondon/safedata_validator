@@ -1,22 +1,29 @@
 """This submodule extends the standard logging setup to provide extra functionality
 and to expose some global logging objects for use throughout the code.
 
-The LogRecordFactory is updated so that new records include a custom ``levelcode``
-attribute to visually indicate log record severity in validation reports. The
-IndentFormatter class then extends logging.Formatter to provide compact messages with
-variable indentation to show nested sections of the validation process using the level
-codes as visual cues for problems.
+1. The :class:`logging.LogRecordFactory` is updated so that new records include a custom
+   ``levelcode`` attribute to visually indicate log record severity in validation
+   reports. 
 
-The submodule then defines two CounterHandler classes which subclass
-logging.StreamHandler and logging.FileHandler. Both extend the basic handlers to add
-attributes that keep track of counts of different classes of records emitted through the
-handler. 
+2. The :func:`~safedata_validator.logging.IndentFormatter` class then extends
+   :class:`logging.Formatter` to provide compact messages with variable indentation to
+   show nested sections of the validation process using the level codes as visual cues
+   for problems.
 
-The submodule provides the :func:`~safedata_validator.logging.use_file_logging` and
-:func:`~safedata_validator.logging.use_stream_logging` to assign handlers to be used in
-the validation process. The :func:`~safedata_validator.logging.get_handler` function is
-then used as a convenience function to retrieve the current handler to access counts of
-the various emitted records.
+3. The submodule then defines two ``CounterHandler`` classes which subclass
+   :class:`logging.StreamHandler` and :class:`logging.FileHandler`. Both extend the
+   basic handlers to add attributes that keep track of counts of different classes of
+   records emitted through the handler.
+
+4. The submodule provides the :func:`~safedata_validator.logging.use_file_logging` and
+   :func:`~safedata_validator.logging.use_stream_logging` to assign handlers to be used
+   in the validation process. The :func:`~safedata_validator.logging.get_handler`
+   function is then used as a convenience function to retrieve the current handler to
+   access counts of the various emitted records.
+
+5. The :func:`~safedata_validator.logging.log_and_raise` functions and
+   :func:`~safedata_validator.logging.loggerinfo_push_pop` are convenience functions to
+   minimise logging boilerplate code within the package.
 """  # noqa D415
 
 import logging
@@ -191,11 +198,11 @@ def use_file_logging(filename: Path, level: int = logging.DEBUG) -> None:
     """Switch to file logging to a provided file path.
 
     This function adds a FileCounterHandler to :data:`~safedata_validator.logger.LOGGER`
-    using the provided ``logfile`` path. It will remove any other existing handlers
+    using the provided ``filename`` path. It will remove any other existing handlers
     first.
 
     Args:
-        logfile: The path to a file to use for logging.
+        filename: The path to a file to use for logging.
 
     Raises:
         RuntimeError: If the file handler already exists. If the logging is to move to a
