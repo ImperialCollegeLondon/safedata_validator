@@ -32,8 +32,8 @@ nav:
   - 'Data managers':
     - 'Installation and configuration':
       - 'Installation': 'install/install.md'
-      - 'Building local GBIF': 'install/build_local_gbif.md'
-      - 'Building local NCBI': 'install/build_local_ncbi.md'
+      - 'Building GBIF database': 'install/build_local_gbif.md'
+      - 'Building NCBI database': 'install/build_local_ncbi.md'
       - 'Taxonomic validation details': 'install/taxonomic_validation.md'
       - 'Configuration': 'install/configuration.md'
     - 'Using the safedata system':
