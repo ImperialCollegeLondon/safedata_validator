@@ -44,7 +44,7 @@ is shown below:
 
 ```bash
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_top.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_top.txt"
 %}
 ```
 
@@ -83,7 +83,7 @@ The command line help for each of the various subcommands is shown below:
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_create_deposit.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_create_deposit.txt"
 %}
 ```
 
@@ -91,7 +91,7 @@ include "command_line_tools/command_line_usage/safedata_zenodo_create_deposit.tx
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_discard_deposit.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_discard_deposit.txt"
 %}
 ```
 
@@ -99,7 +99,7 @@ include "command_line_tools/command_line_usage/safedata_zenodo_discard_deposit.t
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_get_deposit.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_get_deposit.txt"
 %}
 ```
 
@@ -107,7 +107,7 @@ include "command_line_tools/command_line_usage/safedata_zenodo_get_deposit.txt"
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_publish_deposit.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_publish_deposit.txt"
 %}
 ```
 
@@ -115,7 +115,7 @@ include "command_line_tools/command_line_usage/safedata_zenodo_publish_deposit.t
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_upload_file.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_upload_file.txt"
 %}
 ```
 
@@ -123,7 +123,7 @@ include "command_line_tools/command_line_usage/safedata_zenodo_upload_file.txt"
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_delete_file.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_delete_file.txt"
 %}
 ```
 
@@ -131,7 +131,7 @@ include "command_line_tools/command_line_usage/safedata_zenodo_delete_file.txt"
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_upload_metadata.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_upload_metadata.txt"
 %}
 ```
 
@@ -139,7 +139,7 @@ include "command_line_tools/command_line_usage/safedata_zenodo_upload_metadata.t
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_amend_metadata.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_amend_metadata.txt"
 %}
 ```
 
@@ -147,7 +147,7 @@ include "command_line_tools/command_line_usage/safedata_zenodo_amend_metadata.tx
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_sync_local_dir.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_sync_local_dir.txt"
 %}
 ```
 
@@ -155,7 +155,7 @@ include "command_line_tools/command_line_usage/safedata_zenodo_sync_local_dir.tx
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_maintain_ris.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_maintain_ris.txt"
 %}
 ```
 
@@ -163,7 +163,7 @@ include "command_line_tools/command_line_usage/safedata_zenodo_maintain_ris.txt"
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_generate_html.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_generate_html.txt"
 %}
 ```
 
@@ -171,7 +171,7 @@ include "command_line_tools/command_line_usage/safedata_zenodo_generate_html.txt
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_generate_xml.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_generate_xml.txt"
 %}
 ```
 
@@ -179,6 +179,6 @@ include "command_line_tools/command_line_usage/safedata_zenodo_generate_xml.txt"
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_zenodo_show_config.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_show_config.txt"
 %}
 ```

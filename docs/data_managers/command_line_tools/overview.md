@@ -8,7 +8,7 @@ taxonomic databases.
 ## `safedata_validate`
 
 This tool is simply used to validate a dataset that is in [the `safedata`
-format](../data_providers/data_format/overview.md). The tool needs some simple
+format](../../data_providers/data_format/overview.md). The tool needs some simple
 configuration, but is intended to be fairly easy to set up and use.
 
 For more details, see [here](safedata_validate.md).

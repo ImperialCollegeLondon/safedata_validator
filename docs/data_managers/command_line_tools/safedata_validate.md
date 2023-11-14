@@ -54,7 +54,7 @@ below:
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_validate.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_validate.txt"
 %}
 ```
 

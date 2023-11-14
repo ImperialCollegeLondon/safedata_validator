@@ -16,9 +16,9 @@ components of the validation process.
   data worksheets, along with the main Dataset class used to load and validate entire
   dataset files.
 * The [`resources` module](./resources.md) is used to load and validate the
-  [configuration file](../../install/configuration.md).
+  [configuration file](../../data_managers/install/configuration.md).
 * The [`extent` module](./extent.md) is used to configure and track the [temporal and
-  spatial extents](../../install/configuration.md#extents) of a dataset.
+  spatial extents](../../data_managers/install/configuration.md#extents) of a dataset.
 * The [`logger` module](./logger.md) is used to set up logging of the validation
   process. Logging is a core component of the system, because the validation process is
   written to work through the whole file, logging issues as it goes, rather than exiting

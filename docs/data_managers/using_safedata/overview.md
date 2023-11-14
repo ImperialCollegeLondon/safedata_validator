@@ -46,7 +46,7 @@ metadata as a completely new dataset using `safedata_validator`.
 
     ```sh
     {%
-    include "using_safedata/publish_script.sh"
+    include "data_managers/using_safedata/publish_script.sh"
     %}
     ```
 
@@ -54,7 +54,7 @@ metadata as a completely new dataset using `safedata_validator`.
 
     ```python
     {%
-    include "using_safedata/publish_script.py"
+    include "data_managers/using_safedata/publish_script.py"
     %}
     ```
 
@@ -72,7 +72,7 @@ deposit using an existing concept ID.
 
     ```sh
     {%
-    include "using_safedata/update_script.sh"
+    include "data_managers/using_safedata/update_script.sh"
     %}
     ```
 
@@ -80,6 +80,6 @@ deposit using an existing concept ID.
 
     ```python
     {%
-    include "using_safedata/update_script.py"
+    include "data_managers/using_safedata/update_script.py"
     %}
     ```
