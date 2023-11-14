@@ -138,7 +138,7 @@ class IndentFormatter(logging.Formatter):
         """A convenience method to decrease the indentation of the formatter.
 
         Args:
-            n: Decreease the indentation depth by n.
+            n: Decrease the indentation depth by n.
         """
 
         self.depth = max(0, self.depth - n)
