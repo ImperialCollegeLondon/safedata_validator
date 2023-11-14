@@ -20,11 +20,9 @@ from openpyxl.utils import get_column_letter
 from safedata_validator.extent import Extent
 from safedata_validator.locations import Locations
 from safedata_validator.logger import (
-    CONSOLE_HANDLER,
-    COUNTER_HANDLER,
     FORMATTER,
-    LOG,
     LOGGER,
+    get_handler,
     loggerinfo_push_pop,
 )
 from safedata_validator.resources import Resources
@@ -145,14 +143,13 @@ class Dataset:
         """
 
         # Handle logging details - flush and reset from previous runs.
-        LOG.seek(0)
-        LOG.truncate(0)
-        COUNTER_HANDLER.reset()
+        handler = get_handler()
+        handler.reset()
 
         if console_log:
-            CONSOLE_HANDLER.setLevel("DEBUG")
+            handler.setLevel("DEBUG")
         else:
-            CONSOLE_HANDLER.setLevel("CRITICAL")
+            handler.setLevel("CRITICAL")
 
         # Open the workbook with:
         #  - read_only to use the memory optimised read_only implementation.
@@ -321,25 +318,24 @@ class Dataset:
 
         # Dedent for final result
         FORMATTER.pop(n=2)
+        handler = get_handler()
 
-        if COUNTER_HANDLER.counters["ERROR"] > 0:
-            self.n_errors = COUNTER_HANDLER.counters["ERROR"]
-            if COUNTER_HANDLER.counters["WARNING"] > 0:
+        if handler.counters["ERROR"] > 0:
+            self.n_errors = handler.counters["ERROR"]
+            if handler.counters["WARNING"] > 0:
                 LOGGER.info(
-                    f"FAIL: file contained {COUNTER_HANDLER.counters['ERROR']} errors "
-                    f"and {COUNTER_HANDLER.counters['WARNING']} warnings"
+                    f"FAIL: file contained {handler.counters['ERROR']} errors "
+                    f"and {handler.counters['WARNING']} warnings"
                 )
             else:
-                LOGGER.info(
-                    f"FAIL: file contained {COUNTER_HANDLER.counters['ERROR']} errors"
-                )
+                LOGGER.info(f"FAIL: file contained {handler.counters['ERROR']} errors")
         else:
             self.passed = True
 
-            if COUNTER_HANDLER.counters["WARNING"] > 0:
+            if handler.counters["WARNING"] > 0:
                 LOGGER.info(
                     "PASS: file formatted correctly but with "
-                    f"{COUNTER_HANDLER.counters['WARNING']} warnings"
+                    f"{handler.counters['WARNING']} warnings"
                 )
             else:
                 LOGGER.info("PASS: file formatted correctly with no warnings")
@@ -506,7 +502,7 @@ class DataWorksheet:
         self.row_numbers_noninteger = False
         self.blank_rows = False
         self.trailing_blank_rows = False
-        self.start_errors = COUNTER_HANDLER.counters["ERROR"]
+        self.start_errors = get_handler().counters["ERROR"]
         self.n_errors = 0
 
     @loggerinfo_push_pop("Validating field metadata")
@@ -802,7 +798,7 @@ class DataWorksheet:
         )
 
         # reporting
-        self.n_errors = COUNTER_HANDLER.counters["ERROR"] - self.start_errors
+        self.n_errors = get_handler().counters["ERROR"] - self.start_errors
         if self.n_errors > 0:
             LOGGER.info(f"Dataframe contains {self.n_errors} errors")
         else:
@@ -1615,6 +1611,7 @@ class CategoricalField(BaseField):
         to handle undeclared or unused level labels.
         """
         super().report()
+        FORMATTER.push()
 
         extra = self.reported_levels.difference(self.level_labels)
         unused = self.level_labels.difference(self.reported_levels)
@@ -1629,6 +1626,8 @@ class CategoricalField(BaseField):
                 "Categories found in levels descriptor not used in data: ",
                 extra={"join": unused},
             )
+
+        FORMATTER.pop()
 
 
 class TaxaField(BaseField):
@@ -1679,6 +1678,7 @@ class TaxaField(BaseField):
         to emit unused or unknown taxon names
         """
         super().report()
+        FORMATTER.push()
 
         # TODO - not sure about this - no other fields test for emptiness?
         if self.taxa_found == set():
@@ -1693,6 +1693,8 @@ class TaxaField(BaseField):
 
             # add the found taxa to the list of taxa used
             self.taxa.taxon_names_used.update(self.taxa_found)
+
+        FORMATTER.pop()
 
 
 class LocationsField(BaseField):
@@ -1747,6 +1749,7 @@ class LocationsField(BaseField):
         to emit undeclared location names.
         """
         super().report()
+        FORMATTER.push()
 
         # TODO - not sure about this - no other fields test for emptiness?
         if self.locations_found == set():
@@ -1763,6 +1766,8 @@ class LocationsField(BaseField):
 
             # add the found taxa to the list of taxa used
             self.locations.locations_used.update(self.locations_found)
+
+        FORMATTER.pop()
 
 
 class GeoField(BaseField):
@@ -1829,15 +1834,20 @@ class GeoField(BaseField):
         to check the coordinate range against the dataset geographic extents.
         """
         super().report()
+        FORMATTER.push()
 
         if self.min is None or self.max is None:
             return
 
+        # Note that self.min and self.max can be None here if all data is invalid, but
+        # the update process handles None.
         if self.dataset is not None:
             if self.meta["field_type"] == "latitude":
                 self.dataset.latitudinal_extent.update([self.min, self.max])
             elif self.meta["field_type"] == "longitude":
                 self.dataset.longitudinal_extent.update([self.min, self.max])
+
+        FORMATTER.pop()
 
 
 class NumericTaxonField(NumericField):
@@ -1952,7 +1962,10 @@ class TimeField(BaseField):
 
             # Are the values internally consistent and consistent with
             # previously loaded data
-            if len(cell_type_set) > 1:
+            if len(cell_type_set) == 0:
+                # If data is empty skip consistency checking
+                return
+            elif len(cell_type_set) > 1:
                 self.consistent_class = False
                 return
             elif self.first_data_class_set is None:
@@ -1980,6 +1993,7 @@ class TimeField(BaseField):
         to flag inconsistent time formatting and invalid data.
         """
         super().report()
+        FORMATTER.push()
 
         if not self.expected_class:
             LOGGER.error(
@@ -1996,6 +2010,8 @@ class TimeField(BaseField):
                 "ISO time strings contain badly formatted values: e.g.",
                 extra={"join": self.bad_strings[:5]},
             )
+
+        FORMATTER.pop()
 
 
 class DatetimeField(BaseField):
@@ -2064,7 +2080,10 @@ class DatetimeField(BaseField):
 
             # Are the values internally consistent and consistent with
             # previously loaded data
-            if len(cell_type_set) > 1:
+            if len(cell_type_set) == 0:
+                # If data is empty skip consistency checking
+                return
+            elif len(cell_type_set) > 1:
                 self.consistent_class = False
                 return
             elif self.first_data_class_set is None:
@@ -2099,16 +2118,18 @@ class DatetimeField(BaseField):
                 if val.time() != midnight:
                     self.all_midnight = False
 
-        # Update range for extents
-        if self.min is None:
-            self.min = min(data)
-        else:
-            self.min = min([self.min] + data)
+        # Check that data isn't empty
+        if data:
+            # Update range for extents
+            if self.min is None:
+                self.min = min(data)
+            else:
+                self.min = min([self.min] + data)
 
-        if self.max is None:
-            self.max = min(data)
-        else:
-            self.max = max([self.max] + data)
+            if self.max is None:
+                self.max = min(data)
+            else:
+                self.max = max([self.max] + data)
 
     def report(self):
         """Report on field creation and data validation for date and datetime fields.
@@ -2117,6 +2138,7 @@ class DatetimeField(BaseField):
         to flag inconsistent  date and datetime formatting and invalid data.
         """
         super().report()
+        FORMATTER.push()
 
         # INconsistent and bad data classes
         if not self.expected_class:
@@ -2149,8 +2171,10 @@ class DatetimeField(BaseField):
         # Update extent if possible - note that inheritance means that isinstance
         # in extent.Extent is not successfully testing for datetime.datetime rather
         # than set datatype of datetime.date
-        if self.dataset is not None:
+        if not (self.dataset is None or self.min is None or self.max is None):
             self.dataset.temporal_extent.update([self.min.date(), self.max.date()])
+
+        FORMATTER.pop()
 
 
 class FileField(BaseField):
@@ -2221,12 +2245,15 @@ class FileField(BaseField):
         to flag unknown files.
         """
         super().report()
+        FORMATTER.push()
 
         if self.unknown_file_names:
             LOGGER.error(
                 "Field contains external files not provided in Summary: ",
                 extra={"join": self.unknown_file_names},
             )
+
+        FORMATTER.pop()
 
 
 class EmptyField:

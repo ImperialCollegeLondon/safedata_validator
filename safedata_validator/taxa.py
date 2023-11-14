@@ -37,9 +37,9 @@ from dominate.util import raw
 from openpyxl import worksheet
 
 from safedata_validator.logger import (
-    COUNTER_HANDLER,
     FORMATTER,
     LOGGER,
+    get_handler,
     loggerinfo_push_pop,
 )
 from safedata_validator.resources import Resources
@@ -1025,8 +1025,8 @@ class GBIFTaxa:
         Args:
             worksheet: An openpyxl worksheet instance using the GBIFTaxa formatting
         """
-
-        start_errors = COUNTER_HANDLER.counters["ERROR"]
+        handler = get_handler()
+        start_errors = handler.counters["ERROR"]
 
         # Get the data read in.
         LOGGER.info("Reading taxa data")
@@ -1139,7 +1139,7 @@ class GBIFTaxa:
         self.index_higher_taxa()
 
         # summary of processing
-        self.n_errors = COUNTER_HANDLER.counters["ERROR"] - start_errors
+        self.n_errors = handler.counters["ERROR"] - start_errors
         if self.n_errors is None:
             LOGGER.critical("GBIFTaxa error logging has broken!")
         elif self.n_errors > 0:
@@ -1649,8 +1649,8 @@ class NCBITaxa:
         Args:
             worksheet: An openpyxl worksheet instance using the GBIFTaxa formatting
         """
-
-        start_errors = COUNTER_HANDLER.counters["ERROR"]
+        handler = get_handler()
+        start_errors = handler.counters["ERROR"]
 
         # Get the data read in.
         LOGGER.info("Reading NCBI taxa data")
@@ -1810,7 +1810,7 @@ class NCBITaxa:
         self.index_higher_taxa()
 
         # summary of processing
-        self.n_errors = COUNTER_HANDLER.counters["ERROR"] - start_errors
+        self.n_errors = handler.counters["ERROR"] - start_errors
         if self.n_errors is None:
             LOGGER.critical("NCBITaxa error logging has broken!")
         elif self.n_errors > 0:
