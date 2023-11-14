@@ -18,8 +18,8 @@ config_path = "path/to/config.cfg"
 dataset = "SAFE_dataset.xlsx"
 extra_file = "Supplementary_files.zip"
 
-# Create a Resources object from the config file and then create a dataset instance
-# using those validation resources
+# Create a Resources object from the config file and then create a dataset
+# instance using those validation resources
 resources = Resources(config_path)
 ds = Dataset(resources)
 
@@ -29,8 +29,11 @@ ds.load_from_workbook(dataset)
 # Extract the validated dataset metadata
 data_metadata = simplejson.loads(ds.to_json())
 
-# Create the new deposit to publish the dataset
-zenodo_metadata, error = create_deposit(resources=resources)
+# Create a new version of an existing dataset, using the concept ID.
+zenodo_metadata, error = create_deposit(
+    concept_id=1143713,
+    resources=resources,
+)
 
 # Monitor the success of individual steps
 all_good = error is not None
