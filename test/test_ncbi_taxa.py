@@ -219,7 +219,7 @@ def test_taxa_strip(test_input, expected):
     ],
 )
 def test_construct_bi_or_tri(test_input, expected):
-    """Checks the function that constructs species binomials from species and genus names.
+    """Test function that constructs species binomials from species and genus names.
 
     We test that it can catch when the species name is already a binomial, and that it
     catches Candidatus names and handles them properly.
@@ -289,6 +289,7 @@ def test_validate_construct_bi_or_tri(caplog, test_input, expected_log_entries):
 # ------------------------------------------
 # Testing taxon validators
 # ------------------------------------------
+
 
 # First test the search function
 @pytest.mark.parametrize(
@@ -678,6 +679,7 @@ def test_taxa_search_errors(fixture_ncbi_validator, test_input, expected_excepti
 # ------------------------------------------
 
 # Start with the validate_and_add_taxon function
+
 
 # First check that expected output is recovered
 @pytest.mark.parametrize(
@@ -1255,6 +1257,7 @@ def test_validate_and_add_taxon_errors(
 
 
 # Then do tests on the index_higher_taxa function
+
 
 # First test whether sensible output is produced
 @pytest.mark.parametrize(

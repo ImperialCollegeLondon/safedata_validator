@@ -1,10 +1,11 @@
 """Test the basic logging formatting."""
 
-from logging import CRITICAL, DEBUG, ERROR, INFO, WARNING
+from io import StringIO
+from logging import CRITICAL, DEBUG, ERROR, INFO, WARNING, StreamHandler
 
 import pytest
 
-from safedata_validator.logger import FORMATTER, LOG, LOGGER
+from safedata_validator.logger import FORMATTER, LOGGER
 
 
 @pytest.mark.parametrize(
@@ -32,11 +33,16 @@ def test_logger(caplog, level, message, extra, depth, expected):
     # Capture _all_ logging events, not just WARNING and above
     caplog.set_level(DEBUG)
 
-    # Truncate any existing log messages
-    LOG.seek(0)
-    LOG.truncate()
+    # Truncate any existing log messages and reset the depth
+    FORMATTER.depth = 0
+
+    # Capture the formatted output as text
+    log = StringIO()
+    handler = StreamHandler(log)
+    handler.setFormatter(FORMATTER)
 
     # Emit the message
+    LOGGER.addHandler(handler)
     FORMATTER.push(depth)
     LOGGER.log(level, message, extra=extra)
     FORMATTER.pop(depth)
@@ -45,8 +51,7 @@ def test_logger(caplog, level, message, extra, depth, expected):
     # used by the CONSOLE_HANDLER. In theory, the capfd/capsys fixtures should be able
     # to recover the formatted text written to the command line, but they do not:
     # https://github.com/pytest-dev/pytest/issues/5997
-    log = LOG.getvalue()
-    LOG.seek(0)
-    LOG.truncate()
 
-    assert log == expected
+    assert log.getvalue() == (expected + "\n")
+
+    LOGGER.removeHandler(handler)
