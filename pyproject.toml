@@ -42,6 +42,7 @@ lxml = "^4.9.0"
 rispy = "^0.7.1"
 dominate = "^2.6.0"
 tqdm = "^4.64.0"
+typing-extensions = "^4.8.0"
 
 [tool.poetry.group.test.dependencies]
 pyfakefs = "^4.5.6"
