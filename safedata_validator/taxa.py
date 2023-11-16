@@ -1018,7 +1018,7 @@ class GBIFTaxa:
     def load(self, worksheet: worksheet) -> None:
         """Populate a GBIFTaxa instance from an Excel worksheet.
 
-        This method loads a set of taxa from the rows of a SAFE formatted GBIFTaxa
+        This method loads a set of taxa from the rows of a `safedata` formatted GBIFTaxa
         worksheet and populates the taxonomic hierarchy for those rows. The GBIFTaxa
         instance is updated.
 
@@ -1642,7 +1642,7 @@ class NCBITaxa:
     def load(self, worksheet: worksheet) -> None:
         """Populate an NCBITaxa instance from an Excel worksheet.
 
-        This method loads a set of taxa from the rows of a SAFE formatted NCBITaxa
+        This method loads a set of taxa from the rows of a `safedata` formatted NCBITaxa
         worksheet and populates the taxonomic hierarchy for those rows. The GBIFTaxa
         instance is updated.
 

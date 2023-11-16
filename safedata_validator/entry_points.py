@@ -53,21 +53,22 @@ from safedata_validator.zenodo import (
 def _safedata_validator_cli():
     """Validate a dataset using a command line interface.
 
-    This program validates an Excel file formatted as a SAFE dataset. As it
-    runs, it outputs a report that highlights any problems with the formatting.
-    Much of the validation is to check that the data meets our metadata
-    standards and is internally consistent.
+    This program validates an Excel file formatted as a `safedata` dataset.
+    As it runs, it outputs a report that highlights any problems with the
+    formatting. Much of the validation is to check that the data meets our
+    metadata standards and is internally consistent.
 
-    However, the package uses external resources to perform validation of taxa
-    and sampling locations and to provide other information. For this reason,
-    using this program requires you to provide a configuration file for these
-    resources or to have installed a configuration file in a standard location.
-    If you run `safedata_validate` without a configuration file, the output will
-    report the standard locations for your operating system.
+    However, the package uses external resources to perform validation of
+    taxa and sampling locations and to provide other information. For
+    this reason, using this program requires you to provide a configuration
+    file for these resources or to have installed a configuration file in a
+    standard location. If you run `safedata_validate` without a
+    configuration file, the output will report the standard locations for
+    your operating system.
 
-    If validation is successful, then a JSON format file containing key metadata
-    will be saved to the same location as the validated file. The JSON metadata
-    is used in the dataset publication process.
+    If validation is successful, then a JSON format file containing key
+    metadata will be saved to the same location as the validated file.
+    The JSON metadata is used in the dataset publication process.
     """
 
     desc = textwrap.dedent(_safedata_validator_cli.__doc__)
@@ -162,22 +163,26 @@ def _desc_formatter(prog):
 def _safedata_zenodo_cli():
     """Publish validated datasets to Zenodo using a command line interface.
 
-    This is a the command line interface for publishing safedata validated datasets to
-    Zenodo, downloading information and maintaining a local copy of the datasets in the
-    file structure required by the R safedata package.
+    This is a the command line interface for publishing safedata validated
+    datasets to Zenodo, downloading information and maintaining a local
+    copy of the datasets in the file structure required by the R safedata
+    package.
 
-    The safedata_zenodo command is used by providing subcommands for the different
-    actions required to publish a validated dataset. The list of subcommands (with
-    aliases) is shown below and ndividual help is available for each of the subcommands:
+    The safedata_zenodo command is used by providing subcommands for the
+    different actions required to publish a validated dataset. The list of
+    subcommands (with aliases) is shown below and individual help is
+    available for each of the subcommands:
 
         safedata_zenodo subcommand -h
 
-    The subcommands for this tool use two different JSON format metadata files:
+    The subcommands for this tool use two different JSON format metadata
+    files:
 
-    * A dataset metadata file (`dataset_json`). This is the output from using
-        the `safedata_validate` tool. Some of the information in this file is used
-        to create the Zenodo dataset description, and all of the data is used to
-        describe a dataset on the separate metadata server.
+    * A dataset metadata file (`dataset_json`). This is the output from
+        using the `safedata_validate` tool. Some of the information in this
+        file is used to create the Zenodo dataset description, and all of
+        the data is used to describe a dataset on the separate metadata
+        server.
 
     * A Zenodo metadata file (`zenodo_json`), that describes the metadata
         associated with a Zenodo deposit or published record.
@@ -210,12 +215,12 @@ def _safedata_zenodo_cli():
         help="Suppress normal information messages. ",
     )
 
-    subparsers = parser.add_subparsers(dest="subcommand")
+    subparsers = parser.add_subparsers(dest="subcommand", metavar="")
 
     # CREATE DEPOSIT subcommand
     create_deposit_desc = """
-    Create a new deposit draft. The concept_id option uses a provided Zenodo concept ID
-    to creates a draft as a new version of an existing data set.
+    Create a new deposit draft. The concept_id option uses a provided Zenodo
+    concept ID to creates a draft as a new version of an existing data set.
 
     When successful, the function downloads and saves a JSON file containing the
     resulting Zenodo deposit metadata. This file is used as an input to other
@@ -226,7 +231,6 @@ def _safedata_zenodo_cli():
         description=textwrap.dedent(create_deposit_desc),
         help="Create a new Zenodo draft deposit",
         formatter_class=fmt,
-        aliases=["cdep"],
     )
 
     create_deposit_parser.add_argument(
@@ -239,8 +243,8 @@ def _safedata_zenodo_cli():
 
     # DISCARD DEPOSIT subcommand
     discard_deposit_desc = """
-    Discard an unpublished deposit. The deposit and all uploaded files will be removed
-    from Zenodo.
+    Discard an unpublished deposit. The deposit and all uploaded files will be
+    removed from Zenodo.
     """
 
     discard_deposit_parser = subparsers.add_parser(
@@ -248,7 +252,6 @@ def _safedata_zenodo_cli():
         description=textwrap.dedent(discard_deposit_desc),
         help="Discard an unpublished deposit",
         formatter_class=fmt,
-        aliases=["ddep"],
     )
 
     discard_deposit_parser.add_argument(
@@ -267,7 +270,6 @@ def _safedata_zenodo_cli():
         "get_deposit",
         description=textwrap.dedent(get_deposit_desc),
         help="Download and display deposit metadata",
-        aliases=["gdep"],
     )
     get_deposit_parser.add_argument(
         "zenodo_id",
@@ -278,9 +280,9 @@ def _safedata_zenodo_cli():
 
     # PUBLISH DEPOSIT subcommand
     publish_deposit_desc = """
-    Publishes a Zenodo deposit. This is the final step in publishing a dataset and is
-    not reversible. Once a dataset is published, the DOI associated with the record is
-    published to Datacite.
+    Publishes a Zenodo deposit. This is the final step in publishing a dataset and
+    is not reversible. Once a dataset is published, the DOI associated with the
+    record is published to Datacite.
 
     It may be worth reviewing the deposit webpage (https://zenodo.org/deposit/###)
     before finally publishing.
@@ -291,7 +293,6 @@ def _safedata_zenodo_cli():
         description=textwrap.dedent(publish_deposit_desc),
         help="Publish a draft deposit",
         formatter_class=fmt,
-        aliases=["pdep"],
     )
 
     publish_deposit_parser.add_argument(
@@ -310,7 +311,6 @@ def _safedata_zenodo_cli():
         description=textwrap.dedent(upload_file_desc),
         help="Upload a file to an unpublished deposit",
         formatter_class=fmt,
-        aliases=["ufile"],
     )
 
     upload_file_parser.add_argument(
@@ -331,8 +331,8 @@ def _safedata_zenodo_cli():
 
     # DELETE FILE subcommand
     delete_file_desc = """
-    Delete an uploaded file from an unpublished deposit. The deposit metadata will be
-    re-downloaded to ensure an up to date list of files in the deposit.
+    Delete an uploaded file from an unpublished deposit. The deposit metadata will
+    be re-downloaded to ensure an up to date list of files in the deposit.
     """
 
     delete_file_parser = subparsers.add_parser(
@@ -340,7 +340,6 @@ def _safedata_zenodo_cli():
         description=textwrap.dedent(delete_file_desc),
         help="Delete a file from an unpublished deposit",
         formatter_class=fmt,
-        aliases=["dfile"],
     )
 
     delete_file_parser.add_argument(
@@ -355,8 +354,8 @@ def _safedata_zenodo_cli():
 
     # UPLOAD METADATA subcommand
     upload_metadata_desc = """
-    Uses the dataset metadata created using `safedata_validate` to populate the required
-    Zenodo metadata for an unpublished deposit.
+    Uses the dataset metadata created using `safedata_validate` to populate the
+    required Zenodo metadata for an unpublished deposit.
     """
 
     upload_metadata_parser = subparsers.add_parser(
@@ -364,7 +363,6 @@ def _safedata_zenodo_cli():
         description=textwrap.dedent(upload_metadata_desc),
         help="Populate the Zenodo metadata",
         formatter_class=fmt,
-        aliases=["umeta"],
     )
 
     upload_metadata_parser.add_argument(
@@ -376,12 +374,13 @@ def _safedata_zenodo_cli():
 
     # AMEND METADATA subcommand
     amend_metadata_desc = """
-    Updates the Zenodo metadata for an published deposit. To use this, make sure you
-    have the most recent Zenodo metadata for the deposit and then edit the JSON file to
-    the new values. You can only edit the contents of the `metadata` section.
+    Updates the Zenodo metadata for an published deposit. To use this, make sure
+    you have the most recent Zenodo metadata for the deposit and then edit the
+    JSON file to the new values. You can only edit the contents of the
+    `metadata` section.
 
-    Caution: this command should only be used to make urgent changes - such as access
-    restrictions. It is also easy to submit invalid metadata!
+    Caution: this command should only be used to make urgent changes - such as
+    access restrictions. It is also easy to submit invalid metadata!
     """
 
     amend_metadata_parser = subparsers.add_parser(
@@ -389,7 +388,6 @@ def _safedata_zenodo_cli():
         description=textwrap.dedent(amend_metadata_desc),
         help="Update published Zenodo metadata",
         formatter_class=fmt,
-        aliases=["ameta"],
     )
 
     amend_metadata_parser.add_argument(
@@ -401,19 +399,20 @@ def _safedata_zenodo_cli():
     sync_local_dir_desc = """
     Synchronize a local data directory
 
-    This subcommand allows a safedata developer or community maintainer to create or
-    update such a directory with _all_ of the resources in the Zenodo community,
-    regardless of their public access status. This forms a backup (although Zenodo is
-    heavily backed up) but also provides local copies of the files for testing and
-    development of the code packages.
+    This subcommand allows a safedata developer or community maintainer to
+    create or update such a directory with _all_ of the resources in the Zenodo
+    community, regardless of their public access status. This forms a backup
+    (although Zenodo is heavily backed up) but also provides local copies of the
+    files for testing and development of the code packages.
 
-    The file structure of the directory follows that used by the safedata R package,
-    used to store metadata and files downloaded from a safedata community on Zenodo and
-    from a safedata metadata server. The `safedata_validator` configuration file will
-    need to include the metadata API.
+    The file structure of the directory follows that used by the safedata R
+    package, used to store metadata and files downloaded from a safedata
+    community on Zenodo and from a safedata metadata server. The
+    `safedata_validator` configuration file will need to include the metadata
+    API.
 
-    By default, only the XLSX files containing metadata and data tables are downloaded,
-    ignoring any additional files, which are often large.
+    By default, only the XLSX files containing metadata and data tables are
+    downloaded, ignoring any additional files, which are often large.
     """
 
     sync_local_dir_parser = subparsers.add_parser(
@@ -421,7 +420,6 @@ def _safedata_zenodo_cli():
         description=textwrap.dedent(sync_local_dir_desc),
         help="Create or update a local safedata directory",
         formatter_class=fmt,
-        aliases=["sync"],
     )
 
     sync_local_dir_parser.add_argument(
@@ -460,7 +458,6 @@ def _safedata_zenodo_cli():
         description=textwrap.dedent(maintain_ris_desc),
         help="Maintain a RIS bibliography file for datasets",
         formatter_class=fmt,
-        aliases=["ris"],
     )
 
     # positional argument inputs
@@ -484,7 +481,6 @@ def _safedata_zenodo_cli():
         "generate_html",
         description=textwrap.dedent(generate_html_desc),
         help="Generate an HTML dataset description",
-        aliases=["html"],
     )
 
     generate_html_parser.add_argument(
@@ -496,8 +492,9 @@ def _safedata_zenodo_cli():
 
     # GENERATE XML subcommand
     generate_xml_desc = """
-    Creates an INSPIRE compliant XML metadata file for a published dataset, optionally
-    including a user provided lineage statement (such as project details).
+    Creates an INSPIRE compliant XML metadata file for a published dataset,
+    optionally including a user provided lineage statement (such as project
+    details).
     """
 
     generate_xml_parser = subparsers.add_parser(
@@ -505,7 +502,6 @@ def _safedata_zenodo_cli():
         description=textwrap.dedent(generate_xml_desc),
         help="Create INSPIRE compliant metadata XML",
         formatter_class=fmt,
-        aliases=["xml"],
     )
 
     generate_xml_parser.add_argument(
@@ -523,8 +519,8 @@ def _safedata_zenodo_cli():
 
     # SHOW CONFIG subcommand
     show_config_desc = """
-    Loads the safedata_validator configuration file, displays the config setup being
-    used for safedata_zenodo and then exits.
+    Loads the safedata_validator configuration file, displays the config setup
+    being used for safedata_zenodo and then exits.
     """
 
     # This has no arguments, so subparser object not needed
@@ -533,7 +529,6 @@ def _safedata_zenodo_cli():
         description=textwrap.dedent(show_config_desc),
         help="Report the config being used and exit",
         formatter_class=fmt,
-        aliases=["conf"],
     )
 
     # ------------------------------------------------------
@@ -790,12 +785,12 @@ def _safedata_zenodo_cli():
 def _safedata_server_cli():
     """Post updated information to a safedata server instance.
 
-    This command line tool provides functions to update a web server running the
-    safedata server API. This includes updating the gazetteer data used for the instance
-    and updating the database of published datasets.
+    This command line tool provides functions to update a web server running
+    the safedata server API. This includes updating the gazetteer data used
+    for the instance and updating the database of published datasets.
 
-    To use these tools, the safedata_validator Resources configuration must contain the
-    URL for the server and an access token.
+    To use these tools, the safedata_validator Resources configuration must
+    contain the URL for the server and an access token.
     """
 
     # create the top-level parser and configure to take subparsers
@@ -818,15 +813,15 @@ def _safedata_server_cli():
         help="Suppress normal information messages. ",
     )
 
-    subparsers = parser.add_subparsers(dest="subcommand")
+    subparsers = parser.add_subparsers(dest="subcommand", metavar="")
 
     # POST METADATA subcommand
 
     post_metadata_desc = """
     This function posts dataset and Zenodo metadata for a validated and published
     dataset to an server providing the API for accessing and searching safedata
-    metadata. The metadata server then handles populating a database with the metadata
-    and exposing that data via the server API.
+    metadata. The metadata server then handles populating a database with the
+    metadata and exposing that data via the server API.
     """
 
     post_metadata_parser = subparsers.add_parser(
@@ -848,8 +843,8 @@ def _safedata_server_cli():
 
     update_gazetteer_desc = """
     This function updates the gazetteer resources being used by a safedata server
-    instance. It uploads both the gazetteer geojson file and location aliases file and
-    the server then validates the file contents.
+    instance. It uploads both the gazetteer geojson file and location aliases
+    file and the server then validates the file contents.
     """
 
     update_gazetteer_parser = subparsers.add_parser(
@@ -950,14 +945,14 @@ def _safedata_server_cli():
 def _build_local_gbif_cli():
     """Build a local GBIF database.
 
-    This tool builds an SQLite database of the GBIF backbone taxonomy to use in
-    validation by safedata_validate. There are multiple versions of the dataset, and the
-    available versions can be seen here:
+    This tool builds an SQLite database of the GBIF backbone taxonomy to use
+    in validation by safedata_validate. There are multiple versions of the
+    dataset, and the available versions can be seen here:
 
         https://hosted-datasets.gbif.org/datasets/backbone/
 
-    The tool will optionally take a timestamp - using the format '2021-11-26' -  to
-    build a particular version, but defaults to the most recent version.
+    The tool will optionally take a timestamp - using the format '2021-11-26'
+    - to build a particular version, but defaults to the most recent version.
     """
 
     desc = textwrap.dedent(_build_local_gbif_cli.__doc__)
@@ -987,14 +982,14 @@ def _build_local_gbif_cli():
 def _build_local_ncbi_cli():
     """Build a local NCBI database.
 
-    This tool builds an SQLite database of the NCBI  taxonomy to use in validation
-    by safedata_validate. There are multiple archived versions of the dataset, and the
-    available versions can be seen here:
+    This tool builds an SQLite database of the NCBI  taxonomy to use in
+    validation by safedata_validate. There are multiple archived versions
+    of the dataset, and the available versions can be seen here:
 
         https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/
 
-    The tool will optionally take a timestamp - using the format '2021-11-26' -  to
-    build a particular version, but defaults to the most recent version.
+    The tool will optionally take a timestamp - using the format '2021-11-26'
+    - to build a particular version, but defaults to the most recent version.
     """
 
     desc = textwrap.dedent(_build_local_ncbi_cli.__doc__)

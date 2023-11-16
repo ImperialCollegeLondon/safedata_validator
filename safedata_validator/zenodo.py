@@ -628,7 +628,7 @@ def dataset_description(
     tags, so this is quite simple HTML.
 
     The available tags are: a, p, br, blockquote, strong, b, u, i, em, ul, ol,
-    li, sub, sup, div, strike. Note that <a> is currently only available on
+    li, sub, sup, div, strike. Note that `<a>` is currently only available on
     Zenodo when descriptions are uploaded programmatically as a bug in their
     web interface strips links.
 
@@ -1136,7 +1136,7 @@ def generate_inspire_xml(
 def download_ris_data(
     resources: Optional[Resources] = None, ris_file: Optional[str] = None
 ) -> None:
-    """Downloads SAFE records into a RIS format bibliography file.
+    """Downloads Zenodo records into a RIS format bibliography file.
 
     This function is used to maintain a bibliography file of the records
     uploaded to a safedata community on Zenodo. It accesses the Zenodo community

@@ -27,14 +27,14 @@ table {
   table-layout: fixed;
 }
 
-tbody tr td {
+tbody td {
   width: 14em;
   min-width: 14em;
   max-width: 14em;
   border: 1px solid lightgrey;
 }
 
-tbody tr td:first-child {
+tbody td:first-child {
   width: 12em;
   min-width: 12em;
   max-width: 12em;
@@ -53,10 +53,9 @@ This block provides a set of core details for the dataset. You can only provide
 a single value for each field.
 
 * **Project ID**: This is only used if the organisation you are uploading to uses
-  projects to group datasets. If they are then you should obtain relevant project IDs
-  from the organisation's data manager and add them in your Summary worksheet.
-  The legacy name for this field is `SAFE Project ID`: using this name will still work
-  but is not the preferred option.
+  projects to group datasets. If they are, then you should obtain relevant project IDs
+  from the organisation's data manager and add them in your Summary worksheet. Older
+  datasets may use the field name as `SAFE Project ID` but this is deprecated.
 * **Title**: This should be a short informative title for the dataset: it will
   be used as the public title for the dataset so make sure it is clear and
   grammatical!
@@ -68,15 +67,15 @@ a single value for each field.
 |                 |                                   |  |  |
 |-----------------|-----------------------------------|--|--|
 | Project ID      | 1                                 |  |  |
-| Title           | Example data for the SAFE Project |  |  |
+| Title           | Example data for the safedata system |  |  |
 | Description     | This is an example dataset.       |  |  |
 
 ## The access block
 
 !!! Warning "Mandatory block"
-    **Embargo date** is only required if the **Access status** value is 'Embargo'.
-    **Access conditions** is only required if the **Access status** value is
-     'Restricted'.
+    **Access status** is required for all datasets. **Embargo date** is only required if
+    the **Access status** value is 'Embargo'. **Access conditions** is only required if
+    the **Access status** value is 'Restricted'.
 
 This block provides the access details for the dataset. You can only provide a
 single value for each field.
@@ -84,7 +83,7 @@ single value for each field.
 <!-- markdownlint-disable-next-line MD033 -->
 * **Access status**<a name="access-status"></a>: You must enter an Access Status
   of  `Open`, `Embargo` or `Restricted`. We prefer as much data as possible to
-  be open access: see the [statement on data availability](../availability.md).
+  be open access: see the [discussion of data availability](../availability.md).
 * **Embargo date**: If you choose embargoed access status then you must also
   enter the date when the embargo will end. This must be an Excel date formatted
   value and you cannot embargo data for more than two years. Do not provide
@@ -98,7 +97,7 @@ single value for each field.
 |-------------------|-------------|--|--|
 | Access status     | Embargo     |  |  |
 | Embargo date      | 03/09/18    |  |  |
-| Access conditions | (see above) |  |  |
+| Access conditions |             |  |  |
 
 ## The author block
 
@@ -116,9 +115,9 @@ we realise that sometimes this isn't possible: if you're uploading data
 collected by past students who you've lost contact with, then you might not have
 these details for **any** author.
 
-Author names **must be** formatted as "last name, first name": "Orme, C David L"
-not "C David L Orme". Please provide just the numeric part of the ORCIDs, as
-shown below, not the full URL [](http://orcid.org/0000-0002-7005-1394).
+Author names **must be** formatted as "last name, first name": "Orme, David" not "David
+Orme". Please provide just the numeric part of the ORCIDs, as shown below, not the full
+URL `http://orcid.org/0000-0002-7005-1394`.
 
 |                    |                         |  |  |
 |--------------------|-------------------------|--|--|
@@ -128,7 +127,7 @@ shown below, not the full URL [](http://orcid.org/0000-0002-7005-1394).
 | Author ORCID       | 0000-0002-7005-1394     |  |  |
 
 !!! Important
-    The authors provided here will form part of the permanent citation for the
+    The **authors provided here will form part of the permanent citation** for the
     published dataset. Authorship on published datasets should be treated in the
     same way as you would consider authorship on papers: you should include not
     only the people responsible for physically collecting the data but also other
@@ -182,7 +181,7 @@ worksheet.
 
 !!! Note "Optional block"
     You only need to provide this information if you are also providing data in
-    other file formats, If you do provide this block, all rows are mandatory,
+    other file formats. If you do provide this block, all rows are mandatory.
 
 You can include files in other file formats in your data submission as described
 [here](other_formats.md). If you do so, then these files must be listed in this
@@ -195,7 +194,7 @@ spaces, and a description of the file.
 <!-- markdownlint-disable MD013 -->
 |                           |                                                         |                                                              |  |
 |---------------------------|---------------------------------------------------------|--------------------------------------------------------------|--|
-| External file             | BaitTrapImages.zip                                      | BaitTrapTransects.geojson                                    |  |
+| External file             | bait_trap_images.zip                                      | BaitTrapTransects.geojson                                    |  |
 | External file description | Zip file containing 5000 JPEG images of bait trap cards | GeoJSON file containing polylines of the bait trap transects |  |
 <!-- markdownlint-enable MD013 -->
 
@@ -212,7 +211,7 @@ the root of the URL.
 
 |                 |                                            |  |  |
 |-----------------|--------------------------------------------|--|--|
-| Publication DOI | [](https://doi.org/10.1098/rstb.2011.0049) |  |  |
+| Publication DOI | `https://doi.org/10.1098/rstb.2011.0049` |  |  |
 
 ## Funders block
 
@@ -221,12 +220,16 @@ the root of the URL.
     you must provide details of any funding that lead to the collection of the
     data.
 
-    This is particularly important for RCUK funded research, who have agreed to
-    let us host all of the SAFE data under a common portal on the condition that
-    Research Council funding is clearly acknowledged.
+    The inclusion of this information can be a condition for funders to allow data to be
+    hosted under a common portal. Your data manager should inform you of funding
+    organisations that require this.
 
     **Funding body** and **Funding type** are mandatory, but please do provide a
     reference number and a link if possible.
+
+!!! Note "`safedata` at the SAFE Project"
+    For funder specific details for the SAFE project see
+    [here](../../safedata_at_SAFE.md).
 
 Funding details are provided by completing a block as follows and,  as with
 Authors and Worksheets, you can use multiple columns to acknowledge more than
@@ -237,17 +240,16 @@ one funder.
 | Funding body      | NERC                                                   |  |  |
 | Funding type      | Standard grant                                         |  |  |
 | Funding reference | NE/K006339/1                                           |  |  |
-| Funding link      | [](https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1) |  |  |
+| Funding link      | `https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1` |  |  |
 
 ## Permits block
 
 !!! Note "Optional block"
     If you provide permit details, all the fields are required.
 
-Permits are required for nearly all research conducted at SAFE. Use this block
-to record the permits used to collect this data. The permit type value must be
-one of `research`, `export` or `ethics`. Again, you can use multiple columns to
-record multiple permits.
+Permits are very often required for ecological research. Use this block to record the
+permits used to collect this data. The permit type value must be one of `research`,
+`export` or `ethics`. Again, you can use multiple columns to record multiple permits.
 
 |                  |                           |  |  |
 |------------------|---------------------------|--|--|
@@ -257,10 +259,11 @@ record multiple permits.
 
 ## Gemini metadata
 
-We provide XML metadata for all datasets that is compliant with the UK
-[GEMINI](https://www.agi.org.uk/agi-groups/standards-committee/uk-gemini)
-standard. This standard includes mandatory **temporal** and **geographic**
-extents.
+It is important to publish dataset metadata using a recognised standard, as this aids
+dataset discovery. The `safedata` system uses the UK
+[GEMINI](https://www.agi.org.uk/agi-groups/standards-committee/uk-gemini) standard, and
+produces XML metadata compliant with this standard for all datasets. In the UK GEMINI
+standard, **temporal** and **geographic** extents are **mandatory**.
 
 Ordinarily, the dataset checking process will calculate these extents
 automatically from the reported locations for the geographic extent and from any
@@ -279,9 +282,9 @@ in your Summary worksheet that provide extent metadata as described below.
 
 ### Temporal extents
 
-!!! Warning "Possibly mandatory block"
-    If you do need to provide this block (see [above](#gemini-metadata)) then all
-    rows are required.
+!!! Warning "Potentially mandatory block"
+    If temporal extents cannot be inferred from your dataset (see
+    [above](#gemini-metadata)) then **all** rows in this block are required.
 
 The start and end date values must be provided as an Excel date formatted cell.
 
@@ -292,9 +295,9 @@ The start and end date values must be provided as an Excel date formatted cell.
 
 ### Geographic extents
 
-!!! Warning "Possibly mandatory block"
-    If you do need to provide this block (see [above](#gemini-metadata)) then all
-    rows are required.
+!!! Warning "Potentially mandatory block"
+    If geographic extents cannot be inferred from your dataset (see
+    [above](#gemini-metadata)) then **all** rows in this block are required.
 
 The geographic extents must be provided as decimal degrees (16.75) not degrees,
 minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
@@ -306,10 +309,8 @@ minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
 | South | 4.50   |  |  |
 | North | 5.07   |  |  |
 
-The geographic bounds in the example cover Maliau, Danum and the SAFE Project
-experimental site and surrounding area. While we would prefer something a bit
-more precise, these are sufficient to provide a geographic extent for most work
-at SAFE.
+!!! Note "`safedata` at the SAFE Project"
+    For geographic bounds of the SAFE project see [here](../../safedata_at_SAFE.md).
 
 ## Complete example summary table
 
@@ -317,10 +318,11 @@ at SAFE.
 |                           |                                                             |                                                              |                                  |
 |---------------------------|-------------------------------------------------------------|--------------------------------------------------------------|----------------------------------|
 | Project ID                | 1                                                           |                                                              |                                  |
-| Title                     | Example data for the SAFE Project                           |                                                              |                                  |
+| Title                     | Example data for the safedata system                          |                                                              |                                  |
 | Description               | This is an example dataset.                                 |                                                              |                                  |
 | Access status             | Embargo                                                     |                                                              |                                  |
 | Embargo date              | 03/09/18                                                    |                                                              |                                  |
+| Access conditions         |                  |               |
 | Author name               | Orme, David                                                 |                                                              |                                  |
 | Author email              | <d.orme@imperial.ac.uk>                                       |                                                              |                                  |
 | Author affiliation        | Imperial College London                                     |                                                              |                                  |
@@ -330,13 +332,13 @@ at SAFE.
 | Worksheet description     | This is a test dataset                                      | A test dataset too                                           | Attribute table for transect GIS |
 | Worksheet external file   |                                                             |                                                              | BaitTrapTransects.geojson        |
 | Keywords                  | Keyword 1                                                   | Keyword 2                                                    |                                  |
-| External file             | BaitTrapImages.zip                                          | BaitTrapTransects.geojson                                    |                                  |
+| External file             | bait_trap_images.zip                                          | BaitTrapTransects.geojson                                    |                                  |
 | External file description | Zip file containing 5000 JPEG images of bait trap cards     | GeoJSON file containing polylines of the bait trap transects |                                  |
-| Publication DOI           | [](https://doi.org/10.1098/rstb.2011.0049)                  |                                                              |                                  |
+| Publication DOI           | `https://doi.org/10.1098/rstb.2011.0049`                  |                                                              |                                  |
 | Funding body              | NERC                                                        |                                                              |                                  |
 | Funding type              | Standard grant                                              |                                                              |                                  |
 | Funding reference         | NE/K006339/1                                                |                                                              |                                  |
-| Funding link              | [](https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1)      |                                                              |                                  |
+| Funding link              | `https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1`      |                                                              |                                  |
 | Permit type               | Research                                                    |                                                              |                                  |
 | Permit authority          | Sabah Biodiversity Centre                                   |                                                              |                                  |
 | Permit number             | ABC-123-456                                                 |                                                              |                                  |

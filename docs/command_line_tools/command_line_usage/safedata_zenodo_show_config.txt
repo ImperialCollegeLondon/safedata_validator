@@ -1,9 +1,0 @@
-cl_prompt $ safedata_zenodo show_config -h
-usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ... show_config
-       [-h]
-
-Loads the safedata_validator configuration file, displays the config setup being
-used for safedata_zenodo and then exits.
-
-options:
-  -h, --help  show this help message and exit

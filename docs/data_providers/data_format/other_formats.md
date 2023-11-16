@@ -8,15 +8,16 @@ We understand that Excel may not be everyone's preferred option but:
 * it is well-suited to storing tabular data frames, as long as the data is well
   structured and validated.
 
-However, you can include files in any format in a dataset published through SAFE. These
-could include zipped archives containing raw data that has been used to construct the
-analysis data, GIS files, or really anything that is included in the dataset.
+However, you can include files in any format in a dataset published through the
+`safedata` system. These could include zipped archives containing raw data that has been
+used to construct the analysis data, GIS files, or really anything that is included in
+the dataset.
 
 Even if all of your actual data is in other file formats, you will still need to fill in
 an Excel template containing the key metadata for your dataset:
 
-* Fill in a standard Excel template, using the Summary, Taxa and Locations worksheets to
-  provide basic metadata and spatial and taxonomic indexing.
+* Fill in a standard Excel template, using the Summary, Taxa (GBIFTaxa and/or NCBITaxa)
+  and Locations worksheets to provide basic metadata and spatial and taxonomic indexing.
 * In the Summary sheet, use the **External file** and **External file description** rows
   to provide a name and description for **every** external file you want to upload.
 * Use the standard data worksheets to provide field descriptions for any tabular data
@@ -65,65 +66,27 @@ actual data but it will allow us to index the available fields. Briefly:
 
 Zenodo are pretty generous with their filespace but there are limits. An obvious example
 of very large supporting datasets are bulk media files like audio and camera trap
-images. These will need long-term bulk storage outside of Zenodo and we are currently
+images. These may need long-term bulk storage outside of Zenodo and we are currently
 exploring options to host such data.
 
 ## Submitting data in other file formats
 
-The data submission process through the SAFE project is only set up to validate and
+The data submission process through the `safedata` system is only set up to validate and
 publish correctly formatted Excel files and we use the contents of these files to index
 the datasets and provide dataset descriptions. As files in other formats are described
 within the formatted Excel files, they can be uploaded directly to Zenodo - this is
-likely to be much faster and much kinder to our web server.
+likely to be much faster and much kinder to the metadata server.
 
 However, as we discuss [here](../availability.md#data-administration), all data
-submitted to the SAFE Zenodo community must be published using our central
+submitted to your project's Zenodo community must be published using its central
 administrative account. The process to include other file formats in a dataset is
 therefore:
 
 1. The data provider submits their Excel file and provides access to the other data files.
-2. A SAFE dataset administrator then creates a new Zenodo deposit using the
+2. The project's data administrator then creates a new Zenodo deposit using the
    administrative account, uploads the other data files and then publishes the dataset
-   through the SAFE website to link the information in the submitted Excel file to the
+   through the metadata server to link the information in the submitted Excel file to the
    Zenodo deposit.
 
-The details for administrators are as follows:
-
-### New datasets
-
-If this is the first version of a dataset to be published, an administrator will need to
-do the following:
-
-* When the Excel metadata file passes checks, log in to Zenodo using our Zenodo curation
-  account (`the_safe_project`, tied to
-  [info@safeproject.net](mailto:info@safeproject.net)).
-* Navigate to the [Zenodo deposit page](https://zenodo.org/deposit) and click on 'New
-  upload'.
-* On the 'New upload' page, upload the external files and fill in the following fields:
-  * Upload type: set to dataset.
-  * Title, orders and description: these will be overwritten when the dataset is
-    published, so these field just need to be non-blank so that the draft can be saved.
-    It is fine to type `test` in all three!
-* Click 'Save' (**NOT** 'Publish') and then note down the deposit number for the new
-  draft that appears in the URL.
-* Go to the [dataset administration
-  page](https://safeproject.net/datasets/administer_datasets) at the SAFE project
-  website, click the ‘Adopt’ button and then paste the deposit ID number in.
-* The website will then check the filenames match up, fills in the Zenodo description
-  and publishes the dataset.
-
-### Updates
-
-If this is an update to an existing dataset, then the process is broadly similar:
-
-* When the Excel metadata file passes checks, log in to Zenodo using our Zenodo curation
-  account (`the_safe_project`, tied to
-  [info@safeproject.net](mailto:info@safeproject.net)).
-* Do not create a new upload. Instead find the published dataset and click on the 'New
-  version' button.
-* Upload any new or changed files and delete any outdated files. You **must** delete the
-  existing Excel file, which will be replaced automatically by the new one.
-* You do not need to set any of the other fields - they will have been filled in when
-  the first version was published and will be refreshed from the new metadata version.
-* Again, click 'Save' and note down the new version deposit ID.
-* Adopt the deposit from the SAFE website as for a new dataset.
+Recipes for administrators to create new datasets and to update existing data can be
+found [here](../../data_managers/using_safedata/overview.md).

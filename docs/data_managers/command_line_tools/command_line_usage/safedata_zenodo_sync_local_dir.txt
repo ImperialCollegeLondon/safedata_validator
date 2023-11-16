@@ -1,0 +1,32 @@
+cl_prompt $ safedata_zenodo sync_local_dir -h
+usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ... sync_local_dir
+       [-h] [--not-just-xlsx] [--replace-modified] datadir
+
+Synchronize a local data directory
+
+This subcommand allows a safedata developer or community maintainer to
+create or update such a directory with _all_ of the resources in the Zenodo
+community, regardless of their public access status. This forms a backup
+(although Zenodo is heavily backed up) but also provides local copies of the
+files for testing and development of the code packages.
+
+The file structure of the directory follows that used by the safedata R
+package, used to store metadata and files downloaded from a safedata
+community on Zenodo and from a safedata metadata server. The
+`safedata_validator` configuration file will need to include the metadata
+API.
+
+By default, only the XLSX files containing metadata and data tables are
+downloaded, ignoring any additional files, which are often large.
+
+positional arguments:
+  datadir       The path to a local directory containing an existing safedata
+                directory or an empty folder in which to create one
+
+options:
+  -h, --help    show this help message and exit
+  --not-just-xlsx
+                Should large non-xlsx files also be downloaded.
+  --replace-modified
+                Should locally modified files be overwritten with the archive
+                version

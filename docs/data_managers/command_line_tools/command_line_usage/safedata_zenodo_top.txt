@@ -1,0 +1,65 @@
+cl_prompt $ safedata_zenodo -h
+usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ...
+
+Publish validated datasets to Zenodo using a command line interface.
+
+    This is a the command line interface for publishing safedata validated
+    datasets to Zenodo, downloading information and maintaining a local
+    copy of the datasets in the file structure required by the R safedata
+    package.
+
+    The safedata_zenodo command is used by providing subcommands for the
+    different actions required to publish a validated dataset. The list of
+    subcommands (with aliases) is shown below and individual help is
+    available for each of the subcommands:
+
+        safedata_zenodo subcommand -h
+
+    The subcommands for this tool use two different JSON format metadata
+    files:
+
+    * A dataset metadata file (`dataset_json`). This is the output from
+        using the `safedata_validate` tool. Some of the information in this
+        file is used to create the Zenodo dataset description, and all of
+        the data is used to describe a dataset on the separate metadata
+        server.
+
+    * A Zenodo metadata file (`zenodo_json`), that describes the metadata
+        associated with a Zenodo deposit or published record.
+
+    Note that most of these actions are also available via the Zenodo website.
+
+positional arguments:
+  
+    create_deposit
+                Create a new Zenodo draft deposit
+    discard_deposit
+                Discard an unpublished deposit
+    get_deposit
+                Download and display deposit metadata
+    publish_deposit
+                Publish a draft deposit
+    upload_file
+                Upload a file to an unpublished deposit
+    delete_file
+                Delete a file from an unpublished deposit
+    upload_metadata
+                Populate the Zenodo metadata
+    amend_metadata
+                Update published Zenodo metadata
+    sync_local_dir
+                Create or update a local safedata directory
+    maintain_ris
+                Maintain a RIS bibliography file for datasets
+    generate_html
+                Generate an HTML dataset description
+    generate_xml
+                Create INSPIRE compliant metadata XML
+    show_config
+                Report the config being used and exit
+
+options:
+  -h, --help    show this help message and exit
+  -r RESOURCES, --resources RESOURCES
+                Path to a safedata_validator resource configuration file
+  -q, --quiet   Suppress normal information messages.
