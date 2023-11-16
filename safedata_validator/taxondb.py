@@ -244,7 +244,7 @@ def build_local_gbif(
 
     LOGGER.info("Adding core backbone taxa")
 
-    with gzip.open(simple, "rt") as bbn:
+    with gzip.open(simple, "rt", encoding="utf-8") as bbn:
         # The files are tab delimited but the quoting is sometimes unclosed,
         # so turning off quoting - includes quotes in the fields where present
         bb_reader = csv.reader(bbn, delimiter="\t", quoting=csv.QUOTE_NONE)
@@ -270,7 +270,7 @@ def build_local_gbif(
     if deleted is not None:
         LOGGER.info("Adding deleted taxa")
 
-        with gzip.open(deleted, "rt") as dlt:
+        with gzip.open(deleted, "rt", encoding="utf-8") as dlt:
             # The files are tab delimited but the quoting is sometimes unclosed,
             # so turning off quoting - includes quotes in the fields where present
             dl_reader = csv.reader(dlt, delimiter="\t", quoting=csv.QUOTE_NONE)
