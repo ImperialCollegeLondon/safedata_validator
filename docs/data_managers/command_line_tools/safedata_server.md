@@ -14,7 +14,7 @@ is shown below:
 
 ```bash
 {%
-include "command_line_tools/command_line_usage/safedata_server_top.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_server_top.txt"
 %}
 ```
 
@@ -26,7 +26,7 @@ The command line help for each of the various subcommands is shown below:
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_server_post_metadata.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_server_post_metadata.txt"
 %}
 ```
 
@@ -34,6 +34,6 @@ include "command_line_tools/command_line_usage/safedata_server_post_metadata.txt
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_server_update_gazetteer.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_server_update_gazetteer.txt"
 %}
 ```

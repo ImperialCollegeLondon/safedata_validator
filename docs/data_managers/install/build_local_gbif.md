@@ -22,7 +22,7 @@ version can be selected by supplying the version date timestamp from the page ab
 
 ```sh
 {%
-include "command_line_tools/command_line_usage/safedata_build_local_gbif.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_build_local_gbif.txt"
 %}
 ```
 

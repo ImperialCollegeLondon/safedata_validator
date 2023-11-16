@@ -89,4 +89,4 @@ therefore:
    Zenodo deposit.
 
 Recipes for administrators to create new datasets and to update existing data can be
-found [here](../../using_safedata/overview.md).
+found [here](../../data_managers/using_safedata/overview.md).

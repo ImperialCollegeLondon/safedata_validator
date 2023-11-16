@@ -2,9 +2,21 @@
 
 ## Installing the development version
 
-This package makes use of the `python` dependency manager
-[`poetry`](https://python-poetry.org). This means that the package and all required
-dependencies can be installed with a single command.
+First, clone the GitHub repository to download the latest development code:
+
+```bash
+git clone https://github.com/ImperialCollegeLondon/safedata_validator.git
+```
+
+The package makes use of the `python` dependency manager
+[`poetry`](https://python-poetry.org), so you will also need to install poetry:
+
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+Once those two steps are complete, you can run a single command from the package root to
+install the package and all dependencies:
 
 ```bash
 poetry install

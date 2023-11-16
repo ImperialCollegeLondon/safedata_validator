@@ -15,11 +15,11 @@ term ecological projects.
 [Data providers](data_providers/overview.md)
 : These pages provide an overview of the data preparation and submission process.
 
-[Data managers](command_line_tools/overview.md)
+[Data managers](data_managers/command_line_tools/overview.md)
 : These pages provide an introduction to the command line tools used to validate and
 publish datasets.
 
-[Developers](api/overview.md)
+[Developers](developers/api/overview.md)
 : These pages provide the API for the package classes and methods.
 
 ## Package components
@@ -54,4 +54,4 @@ The wider `safedata` system then also uses:
 The `safedata_validator` package is open source Python and  is maintained on
 [GitHub](https://github.com/ImperialCollegeLondon/safedata_validator). It can
 be installed using  [PyPI](https://pypi.org/project/safedata-validator).
-See the [installation notes](install/install.md) for setup instructions.
+See the [installation notes](data_managers/install/install.md) for setup instructions.
