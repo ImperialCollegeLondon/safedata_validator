@@ -4,9 +4,13 @@ theme:
   name: material
 markdown_extensions:
   - admonition
+  - def_list
   - pymdownx.superfences
   - pymdownx.tabbed:
-      alternate_style: true 
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
 plugins:
   - search
   - mkdocstrings
@@ -30,12 +34,14 @@ nav:
       - 'Other file formats': 'data_providers/data_format/other_formats.md'
       - 'Data format FAQs': 'data_providers/data_format/faqs.md'
   - 'Data managers':
+    - 'Overview': 'data_managers/overview.md'
     - 'Installation and configuration':
       - 'Installation': 'data_managers/install/install.md'
+      - 'Configuration': 'data_managers/install/configuration.md'
       - 'Building the GBIF database': 'data_managers/install/build_local_gbif.md'
       - 'Building the NCBI database': 'data_managers/install/build_local_ncbi.md'
+      - 'Creating a Gazetteer': 'data_managers/install/gazetteer.md'
       - 'Taxonomic validation details': 'data_managers/install/taxonomic_validation.md'
-      - 'Configuration': 'data_managers/install/configuration.md'
     - 'Using the safedata system':
       - 'Overview': 'data_managers/using_safedata/overview.md'
     - 'Command line tools': 

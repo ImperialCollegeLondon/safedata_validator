@@ -2,49 +2,43 @@
 
 The following steps should allow you to install `safedata_validator`:
 
-1. If you're using a Mac or Linux, then it is almost certain that you already
-   have Python installed. You may also do if you are using Windows. To find out,
-   open a command line window (run Terminal on a Mac, or `cmd` on Windows) and
-   then type `python` (on Mac or Unix) or `python.exe` on Windows).
+* Download and install [Python](https://www.python.org/downloads/). On Windows, make
+  sure to check the option to "Add `python.exe` to PATH" when running the installer, as
+  this allows you to run Python from the command line.
 
-2. If some text and a prompt (`>>>`) appears then you have Python. Check the
-   version number in the first line: the package requires at least Python 3.9.
+* For the following commands, you will need to open a command line terminal. On Windows,
+  that is the 'Command Prompt' application, which you can find from the search bar. On
+  macOS and Linux machines, this will be the 'Terminal' application.
 
-   If you get a line that says the command is not found, then it could be one of two
-   things:
+* Once you have a command line terminal, check that you can access the Python program
+  using the command `python --version`. You should see something like this:
 
-   * You need to install Python. Download a copy from here:
+    ```term
+    $ python --version
+    Python 3.9.12
+    ```
 
-     [https://www.python.org/downloads/](https://www.python.org/downloads/)
+    If that did not work, you may still need to add `python` to your path - look for
+    help online for your operating system.
 
-     If you do see a Python prompt, but the version is less than 3.9, then you will
-     need to update it.
+* Install the `safedata_validator` package using the Python `pip` package installer.
+  This will also install all of the other Python packages that `safedata_validator`
+  needs to run.
 
-   * Python has been installed but your computer has not been set up to find it: search
-     online for instructions to add python to the `PATH` environment variable. On
-     Windows, you will want to add (using the typical install location)
-     `C:\Python39` and `C:\Python39\scripts`.
+    ```term
+    pip install safedata_validator
+    ```
 
-3. You can now install `safedata_validator` and the other packages it depends on using
-   the `pip` package installer. At the command
-   line, type:
+* Once that has completed, you should now be able to run the following command, to
+  verify that the command line tools have been installed correctly. See the
+  [usage
+  instructions](../command_line_tools/safedata_validate.md#using-safedatavalidate) for
+  more information on `safedata_validate`.
 
-        pip install --user safedata_validator
+    ```term
+    $ safedata_validate --version
+    safedata_validate 3.0.0a2
+    ```
 
-   If you want to install `safedata_validator` for all users on a computer, you will
-   need to remove `--user`.
-
-4. The package will have created  a system command `safedata_validate` that you
-   can use to validate a file from the command line. Open a command line
-   terminal,  and run the following:
-
-        safedata_validate -h
-
-    You should now see the [usage instructions](../command_line_tools/safedata_validate.md#using-safedatavalidate).
-
-5. In addition to the command line option, you should now be able to `import
-   safedata_validator` within Python, which will allow you to use the class and methods
-   defined in the package within your own code.
-
-6. You will now need to [configure](configuration.md) the `safedata_validator` package
-   to point to some data validation resources before further use.
+* You will now need to provide a [configuration](configuration.md) for the
+  `safedata_validator` tools and install some required resources.
