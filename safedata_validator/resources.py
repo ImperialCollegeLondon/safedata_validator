@@ -230,7 +230,6 @@ class Resources:
         self.location_aliases: dict[str, str] = dict()
         # Projects are a dictionary keying project ID to a title.
         self.projects: dict[int, str] = dict()
-        self.use_project_ids = False  # TODO delete this.
 
         # Validate the resources
         self._validate_gazetteer()

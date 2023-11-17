@@ -6,6 +6,7 @@ methods for loading the summary data from file.
 
 import datetime
 import re
+from dataclasses import dataclass
 from typing import Optional, Union
 
 import requests  # type: ignore
@@ -27,6 +28,55 @@ RE_ORCID = re.compile(r"[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]")
 RE_EMAIL = re.compile(r"\S+@\S+\.\S+")
 RE_NAME = re.compile(r"[^,]+,[ ]?[^,]+")
 RE_CONTAINS_WSPACE = re.compile(r"\s")
+
+# Class attribute to define the metadata that may be present.
+# These are defined in blocks of related rows described in 4-tuples:
+#  0: a list of tuples giving the rows in the block:
+#     * row header key
+#     * mandatory within the block
+#     * 'internal' name - also maps to Zenodo fields
+#     * accepted types
+#     * list of aliases for the fieldname (this generally will be blank)
+#  1: is the block mandatory (bool)
+#  2: the title of the block for the logger
+#  3: should there be only one record (bool)
+#
+
+
+@dataclass
+class SummaryField:
+    """Summary field details.
+
+    This dataclass records details of summary fields within a block:
+
+    * the expected key in the first column of the summary table,
+    * whether a field is mandatory within the block,
+    * an optional internal name to be used for the key,
+    * the acceptable types that values in the field can have.
+    """
+
+    key: str
+    mandatory: bool
+    internal: Optional[str]
+    types: Union[type, tuple[type, ...]]
+
+
+@dataclass
+class SummaryBlock:
+    """Summary block details.
+
+    This dataclass records details of a block of related summary fields:
+
+    * The list of fields in the block
+    * Whether the block is mandatory
+    * The title for the block, used in reporting
+    * If the block should only accept a single record.
+    """
+
+    fields: list[SummaryField]
+    mandatory: bool
+    title: str
+    singular: bool
 
 
 class Summary:
@@ -96,130 +146,122 @@ class Summary:
         )
         self.external_files = None
         self.data_worksheets: list[Worksheet] = []
-        self.use_project_ids = resources.use_project_ids
 
         self._rows: dict = {}
         self._ncols: int
         self.n_errors: int = 0
-        self.valid_pid: Optional[list[int]] = None
+        self.projects: dict[int, str] = resources.projects
         self.validate_doi = False
 
-        # Class attribute to define the metadata that may be present.
-        # These are defined in blocks of related rows described in 4-tuples:
-        #  0: a list of tuples giving the rows in the block:
-        #     * row header key
-        #     * mandatory within the block
-        #     * 'internal' name - also maps to Zenodo fields
-        #     * accepted types
-        #     * list of aliases for the fieldname (this generally will be blank)
-        #  1: is the block mandatory (bool)
-        #  2: the title of the block for the logger
-        #  3: should there be only one record (bool)
-        #
-        # Each entry in the list of rows provides the row header that appears
-        # in the summary sheet, if that field is mandatory within the set and
-        # an internal field name, if needed in the code or by Zenodo.
+        # Define the blocks and fields in the summary
 
-        self.fields: dict[str, tuple[list, bool, str, bool]] = dict(
-            core=(
-                [
-                    (
-                        "project id",
-                        self.use_project_ids,
-                        "pid",
-                        int,
-                        ["safe project id"],
+        self.fields: dict[str, SummaryBlock] = dict(
+            core=SummaryBlock(
+                fields=[
+                    SummaryField("safe project id", False, None, int),
+                    SummaryField("project id", False, None, int),
+                    SummaryField("title", True, None, str),
+                    SummaryField("description", True, None, str),
+                ],
+                mandatory=True,
+                title="Core fields",
+                singular=True,
+            ),
+            access=SummaryBlock(
+                fields=[
+                    SummaryField("access status", True, "access", str),
+                    SummaryField(
+                        "embargo date", False, "embargo_date", datetime.datetime
                     ),
-                    ("title", True, None, str, []),
-                    ("description", True, None, str, []),
+                    SummaryField("access conditions", False, "access_conditions", str),
                 ],
-                True,
-                "Core fields",
-                True,
+                mandatory=True,
+                title="Access details",
+                singular=True,
             ),
-            access=(
-                [
-                    ("access status", True, "access", str, []),
-                    ("embargo date", False, "embargo_date", datetime.datetime, []),
-                    ("access conditions", False, "access_conditions", str, []),
-                ],
-                True,
-                "Access details",
-                True,
+            keywords=SummaryBlock(
+                fields=[SummaryField("keywords", True, None, str)],
+                mandatory=True,
+                title="Keywords",
+                singular=False,
             ),
-            keywords=([("keywords", True, None, str, [])], True, "Keywords", False),
-            doi=([("publication doi", True, None, str, [])], False, "DOI", False),
-            date=(
-                [
-                    ("start date", True, None, datetime.datetime, []),
-                    ("end date", True, None, datetime.datetime, []),
-                ],
-                False,
-                "Date Extents",
-                True,
+            doi=SummaryBlock(
+                fields=[SummaryField("publication doi", True, None, str)],
+                mandatory=False,
+                title="DOI",
+                singular=False,
             ),
-            geo=(
-                [
-                    ("west", True, None, float, []),
-                    ("east", True, None, float, []),
-                    ("south", True, None, float, []),
-                    ("north", True, None, float, []),
+            date=SummaryBlock(
+                fields=[
+                    SummaryField("start date", True, None, datetime.datetime),
+                    SummaryField("end date", True, None, datetime.datetime),
                 ],
-                False,
-                "Geographic Extents",
-                True,
+                mandatory=False,
+                title="Date Extents",
+                singular=True,
             ),
-            authors=(
-                [
-                    ("author name", True, "name", str, []),
-                    ("author affiliation", False, "affiliation", str, []),
-                    ("author email", False, "email", str, []),
-                    ("author orcid", False, "orcid", str, []),
+            geo=SummaryBlock(
+                fields=[
+                    SummaryField("west", True, None, float),
+                    SummaryField("east", True, None, float),
+                    SummaryField("south", True, None, float),
+                    SummaryField("north", True, None, float),
                 ],
-                True,
-                "Authors",
-                False,
+                mandatory=False,
+                title="Geographic Extents",
+                singular=True,
             ),
-            funding=(
-                [
-                    ("funding body", True, "body", str, []),
-                    ("funding type", True, "type", str, []),
-                    ("funding reference", False, "ref", (str, int, float), []),
-                    ("funding link", False, "url", str, []),
+            authors=SummaryBlock(
+                fields=[
+                    SummaryField("author name", True, "name", str),
+                    SummaryField("author affiliation", False, "affiliation", str),
+                    SummaryField("author email", False, "email", str),
+                    SummaryField("author orcid", False, "orcid", str),
                 ],
-                False,
-                "Funding Bodies",
-                False,
+                mandatory=True,
+                title="Authors",
+                singular=False,
             ),
-            external=(
-                [
-                    ("external file", True, "file", str, []),
-                    ("external file description", True, "description", str, []),
+            funding=SummaryBlock(
+                fields=[
+                    SummaryField("funding body", True, "body", str),
+                    SummaryField("funding type", True, "type", str),
+                    SummaryField("funding reference", False, "ref", (str, int, float)),
+                    SummaryField("funding link", False, "url", str),
                 ],
-                False,
-                "External Files",
-                False,
+                mandatory=False,
+                title="Funding Bodies",
+                singular=False,
             ),
-            worksheet=(
-                [
-                    ("worksheet name", True, "name", str, []),
-                    ("worksheet title", True, "title", str, []),
-                    ("worksheet description", True, "description", str, []),
-                    ("worksheet external file", False, "external", str, []),
+            external=SummaryBlock(
+                fields=[
+                    SummaryField("external file", True, "file", str),
+                    SummaryField("external file description", True, "description", str),
                 ],
-                False,
-                "Worksheets",
-                False,
+                mandatory=False,
+                title="External Files",
+                singular=False,
             ),
-            permits=(
-                [
-                    ("permit type", True, "type", str, []),
-                    ("permit authority", True, "authority", str, []),
-                    ("permit number", True, "number", (str, int, float), []),
+            worksheet=SummaryBlock(
+                fields=[
+                    SummaryField("worksheet name", True, "name", str),
+                    SummaryField("worksheet title", True, "title", str),
+                    SummaryField("worksheet description", True, "description", str),
+                    SummaryField("worksheet external file", False, "external", str),
                 ],
-                False,
-                "Permits",
-                False,
+                mandatory=False,
+                title="Worksheets",
+                singular=False,
+            ),
+            permits=SummaryBlock(
+                fields=[
+                    SummaryField("permit type", True, "type", str),
+                    SummaryField("permit authority", True, "authority", str),
+                    SummaryField("permit number", True, "number", (str, int, float)),
+                ],
+                mandatory=False,
+                title="Permits",
+                singular=False,
             ),
         )
 
@@ -229,7 +271,6 @@ class Summary:
         worksheet: Worksheet,
         sheetnames: set,
         validate_doi: bool = False,
-        valid_pid: Union[None, int, list[int]] = None,
     ):
         """Populate a Summary instance from an Excel Worksheet.
 
@@ -237,34 +278,9 @@ class Summary:
             worksheet: An openpyxl worksheet instance.
             sheetnames: A set of sheet names found in the workbook.
             validate_doi: Should publication DOIs be validated (needs web connection).
-            valid_pid: If provided, an integer or list of integer values that are
-                permitted in the Project ID field (usually one for a new dataset but
-                more if a published dataset is associated with multiple projects and any
-                of those ids would be valid).
         """
         handler = get_handler()
         start_errors = handler.counters["ERROR"]
-
-        # validate project_id is one of None, an integer or a list of integers
-        if valid_pid is None:
-            pass
-        elif not self.use_project_ids:
-            LOGGER.error(
-                "Project IDs should not be provided, as your data manager does not use "
-                "them!"
-            )
-            self.valid_pid = None
-        elif isinstance(valid_pid, int):
-            self.valid_pid = [valid_pid]
-        elif isinstance(valid_pid, list):
-            if not all([isinstance(pid, int) for pid in valid_pid]):
-                LOGGER.error("Invalid value in list of project_ids.")
-                self.valid_pid = None
-            else:
-                self.valid_pid = valid_pid
-        else:
-            LOGGER.error("Provided project id must be an integer or list of integers")
-            self.valid_pid = None
 
         self.validate_doi = validate_doi
 
@@ -296,31 +312,9 @@ class Summary:
         # continue processing.
         self._rows = {str(rw[0]).lower(): rw[1:] for rw in rows}
 
-        # Check the minimal keys are expected - mandatory fields in mandatory blocks
-        found, aliases = self._check_for_mandatory_fields()
-
-        # Check only valid keys are found
-        valid_blocks = (blk[0] for blk in list(self.fields.values()))
-        valid_fields = {fld[0] for blk in valid_blocks for fld in blk}
-
-        # Add all aliases as valid fields
-        valid_fields.update(aliases)
-
-        if found - valid_fields:
-            LOGGER.error(
-                "Unknown metadata fields: ", extra={"join": found - valid_fields}
-            )
-
-        # TODO - the check below could probably be generalised for all aliases, but that
-        # doesn't seem a sensible use of time until we have more than one set
-
-        # Finally check that project ID field isn't included if project IDs are not used
-        if not self.use_project_ids:
-            if "project id" in found or "safe project id" in found:
-                LOGGER.error(
-                    "Project ID field should not be included, as your data manager "
-                    "does not use projects!"
-                )
+        # Validate the keys found in the summary table
+        found: set[str] = set(self._rows.keys())
+        self._validate_keys(found=found)
 
         # Now process the field blocks
         self._load_core(found)
@@ -342,59 +336,36 @@ class Summary:
         else:
             LOGGER.info("Summary formatted correctly")
 
-    def _check_for_mandatory_fields(self) -> tuple[set[str], set[str]]:
-        """Check that all mandatory fields are present.
+    def _validate_keys(self, found: set[str]) -> None:
+        """Validate the summary keys recovered.
 
-        This function also checks that if a field has an alias only one out of the alias
-        and the original name is provided.
-
-        Returns:
-            A tuple of sets, the first tuple element contains all the field headers
-            which were found, and the second tuple element contains all aliases.
+        This function checks that the keys in a summary table include the minimum set of
+        mandatory fields in mandatory blocks and that all found keys are known.
         """
 
-        # Find all required blocks
-        required_blocks = (blk[0] for blk in list(self.fields.values()) if blk[1])
+        # Find all required fields and known fields
+        required: set[str] = set()
+        known: set[str] = set()
 
-        required = set()
-        aliases = []
-
-        # Add all required headers to either required set or aliases set
-        for required_block in required_blocks:
-            for header in required_block:
-                # Required field with an alias
-                if header[1] and header[4]:
-                    alias_list = [header[0]] + header[4]
-                    aliases.append(set(alias_list))
-                elif header[1]:  # Required field without an alias
-                    required.add(header[0])
-
-        found = set(self._rows.keys())
-
-        if not found.issuperset(required):
-            LOGGER.error(
-                "Missing mandatory metadata fields: ", extra={"join": required - found}
-            )
-
-        # Check that one of each required alias is included
-        for alias_set in aliases:
-            present = found.intersection(alias_set)
-            if len(present) == 0:
-                LOGGER.error(
-                    "One of the following fields must be included: ",
-                    extra={"join": alias_set},
+        for block in self.fields.values():
+            # Required keys
+            if block.mandatory:
+                required = required.union(
+                    fld.key for fld in block.fields if fld.mandatory
                 )
-            elif len(present) > 1:
-                LOGGER.error(
-                    "Only one of the following fields should be included: ",
-                    extra={"join": alias_set},
-                )
+            # Known keys
+            known = known.union(fld.key for fld in block.fields)
 
-        return found, set().union(*aliases)
+        # Look for and report on issue
+        missing = required - found
+        unknown = found - known
+        if missing:
+            LOGGER.error("Missing mandatory metadata fields: ", extra={"join": missing})
 
-    def _read_block(
-        self, field_desc: tuple, mandatory: bool, title: str, only_one: bool
-    ) -> Optional[list]:
+        if unknown:
+            LOGGER.error("Unknown metadata fields: ", extra={"join": unknown})
+
+    def _read_block(self, block: SummaryBlock) -> Optional[list]:
         """Read a block of fields from a summary table.
 
         This internal method takes a given block definition from the Summary class
@@ -404,51 +375,51 @@ class Summary:
         specific functions to handle unique tests.
 
         Args:
-            field_desc: A list of tuples describing fields.
-            mandatory: Is the block mandatory?
-            title: The display title for the block
-            only_one: Are multiple records for the field an error?
+            block: A SummaryBlock instance describing the block
         """
 
-        mandatory_fields = [f[0] for f in field_desc if f[1]]
-        optional_fields = [f[0] for f in field_desc if not f[1]]
-        field_map = [(f[0], f[2]) for f in field_desc]
-        field_types = {f[0]: f[3] for f in field_desc}
+        mandatory_fields = [fld.key for fld in block.fields if fld.mandatory]
+        optional_fields = [fld.key for fld in block.fields if not fld.mandatory]
+        field_map = [
+            (fld.key, fld.internal) for fld in block.fields if fld.internal is not None
+        ]
+        field_types = {fld.key: fld.types for fld in block.fields}
 
-        # Get the full set of field names
+        # Get the full list of field names
         all_fields = mandatory_fields + optional_fields
 
         # Get the data, filling in completely missing rows
-        block = {
+        data = {
             k: self._rows[k] if k in self._rows else [None] * (self._ncols - 1)
             for k in all_fields
         }
 
         # Empty cells are already None, but also filter values to catch
         # pure whitespace content and replace with None
-        for ky, vals in block.items():
+        for ky, vals in data.items():
             vals = IsNotSpace(vals)
             if not vals:
                 LOGGER.error(f"Whitespace only cells in field {ky}")
 
-            block[ky] = vals.values
+            data[ky] = vals.values
 
         # Pivot to dictionary of records
-        block_list = [dict(zip(block.keys(), vals)) for vals in zip(*block.values())]
+        block_list = [dict(zip(data.keys(), vals)) for vals in zip(*data.values())]
 
         # Drop empty records
         block_list = [bl for bl in block_list if any(bl.values())]
 
+        # Contine if data are present
         if not block_list:
-            if mandatory:
-                LOGGER.error(f"No {title} metadata found")
+            if block.mandatory:
+                LOGGER.error(f"No {block.title} metadata found")
             else:
-                LOGGER.info(f"No {title} metadata found")
+                LOGGER.info(f"No {block.title} metadata found")
             return None
         else:
-            LOGGER.info(f"Metadata for {title} found: {len(block_list)} records")
+            LOGGER.info(f"Metadata for {block.title} found: {len(block_list)} records")
 
-            if len(block_list) > 1 and only_one:
+            if len(block_list) > 1 and block.singular:
                 LOGGER.error("Only a single record should be present")
 
             # report on block fields
@@ -473,8 +444,7 @@ class Summary:
                     )
 
             # remap names if provided
-            to_rename = (mp for mp in field_map if mp[1] is not None)
-            for old, new in to_rename:
+            for old, new in field_map:
                 for rec in block_list:
                     rec[new] = rec[old]
                     rec.pop(old)
@@ -483,7 +453,11 @@ class Summary:
 
     @loggerinfo_push_pop("Loading author metadata")
     def _load_authors(self):
-        authors = self._read_block(*self.fields["authors"])
+        """Load the author block.
+
+        Provides summary validation specific to the author block.
+        """
+        authors = self._read_block(self.fields["authors"])
 
         # Author specific validation
         if authors is not None:
@@ -525,7 +499,11 @@ class Summary:
 
     @loggerinfo_push_pop("Loading keywords metadata")
     def _load_keywords(self):
-        keywords = self._read_block(*self.fields["keywords"])
+        """Load the keywords block.
+
+        Provides summary validation specific to the keywords block.
+        """
+        keywords = self._read_block(self.fields["keywords"])
 
         # extra data validation for keywords
         if keywords:
@@ -541,10 +519,13 @@ class Summary:
 
     @loggerinfo_push_pop("Loading permit metadata")
     def _load_permits(self):
-        # LOOK FOR PERMIT DETAILS - users provide a permit authority, number and permit
-        # type
+        """Load the permits block.
 
-        permits = self._read_block(*self.fields["permits"])
+        Provides summary validation specific to the permits block - users provide a
+        permit authority, number and permit type.
+        """
+
+        permits = self._read_block(self.fields["permits"])
 
         # Permit specific checking for allowed permit types
         if permits:
@@ -562,8 +543,12 @@ class Summary:
 
     @loggerinfo_push_pop("Loading DOI metadata")
     def _load_doi(self):
+        """Load the DOI block.
+
+        Provides summary validation specific to the DOI block.
+        """
         # CHECK FOR PUBLICATION DOIs
-        pub_doi = self._read_block(*self.fields["doi"])
+        pub_doi = self._read_block(self.fields["doi"])
 
         # Extra data validation for DOIs
         if pub_doi is not None:
@@ -591,10 +576,16 @@ class Summary:
 
     @loggerinfo_push_pop("Loading funding metadata")
     def _load_funders(self):
+        """Load the funders block.
+
+        Provides summary validation specific to the permits block - users provide a
+        permit authority, number and permit type.
+        """
+
         # LOOK FOR FUNDING DETAILS - users provide a funding body and a description
         # of the funding type and then optionally a reference number and a URL
 
-        funders = self._read_block(*self.fields["funding"])
+        funders = self._read_block(self.fields["funding"])
 
         # TODO - currently no check beyond _read_block but maybe actually check
         #        the URL is a URL and maybe even opens? Could use urllib.parse
@@ -603,7 +594,11 @@ class Summary:
 
     @loggerinfo_push_pop("Loading temporal extent metadata")
     def _load_temporal_extent(self):
-        temp_extent = self._read_block(*self.fields["date"])
+        """Load the temporal extent block.
+
+        Provides summary validation specific to temporal extents.
+        """
+        temp_extent = self._read_block(self.fields["date"])
 
         # temporal extent validation and updating
         if temp_extent is not None:
@@ -632,8 +627,11 @@ class Summary:
 
     @loggerinfo_push_pop("Loading geographic extent metadata")
     def _load_geographic_extent(self):
-        # Geographic extents
-        geo_extent = self._read_block(*self.fields["geo"])
+        """Load the geographic extents block.
+
+        Provides summary validation specific to geographic extents block.
+        """
+        geo_extent = self._read_block(self.fields["geo"])
 
         if geo_extent is not None:
             bbox = geo_extent[0]
@@ -651,12 +649,15 @@ class Summary:
 
     @loggerinfo_push_pop("Loading external file metadata")
     def _load_external_files(self):
-        # LOAD EXTERNAL FILES - small datasets will usually be contained
-        # entirely in a single Excel file, but where formatting or size issues
-        # require external files, then names and descriptions are included in
-        # the summary information
+        """Load the external files block.
 
-        external_files = self._read_block(*self.fields["external"])
+        Provides summary validation specific to the external files block. Small datasets
+        will usually be contained entirely in a single Excel file, but where formatting
+        or size issues require external files, then names and descriptions are included
+        in the summary information.
+        """
+
+        external_files = self._read_block(self.fields["external"])
 
         # external file specific validation - no internal spaces.
         if external_files is not None:
@@ -676,8 +677,11 @@ class Summary:
 
     @loggerinfo_push_pop("Loading data worksheet metadata")
     def _load_data_worksheets(self, sheetnames):
-        # Load the WORKSHEETS block
-        data_worksheets = self._read_block(*self.fields["worksheet"])
+        """Load the worksheets block.
+
+        Provides summary validation specific to the worksheets block.
+        """
+        data_worksheets = self._read_block(self.fields["worksheet"])
 
         # Strip out faulty inclusion of Taxa and Location worksheets in
         # data worksheets before considering combinations of WS and external files
@@ -753,8 +757,12 @@ class Summary:
 
     @loggerinfo_push_pop("Loading access metadata")
     def _load_access_details(self):
-        # Load the ACCESS DETAILS block
-        access = self._read_block(*self.fields["access"])
+        """Load the access block.
+
+        Provides summary validation specific to the access block.
+        """
+
+        access = self._read_block(self.fields["access"])
         access = access[0]
 
         # Access specific validation - bad types handled by _read_block
@@ -807,34 +815,51 @@ class Summary:
 
     @loggerinfo_push_pop("Loading core metadata")
     def _load_core(self, found):
-        # Extract all core fields
-        core_fields = self.fields["core"]
+        """Load the core block.
 
-        # Make list of all core aliases
-        aliases = [core_field[4] for core_field in core_fields[0]]
-        # Then replace core field names with an alias where appropriate
-        for idx, alias_set in enumerate(aliases):
-            for alias in alias_set:
-                if alias in found:
-                    core_fields[0][idx] = (alias,) + core_fields[0][idx][1:4]
+        Provides summary validation specific to the core block.
+        """
 
-        core = self._read_block(*core_fields)
-        core = core[0]
-
+        core = self._read_block(self.fields["core"])
         self.title = core["title"]
         self.description = core["description"]
 
         # Project ID specific validation
-        pid = core["pid"]
+        # - Bail early if no validation should be done, warning if data provided.
+        if not self.projects:
+            if "project id" in core or "safe project id" in core:
+                LOGGER.error(
+                    "Projects are not configured but project ids are provided."
+                )
 
-        # Check the value is in the provided list
-        if pid is not None and self.valid_pid is not None and pid not in self.valid_pid:
+            return
+
+        # Now try and validate what is found.
+        if "project id" in core and "safe project id" in core:
             LOGGER.error(
-                f"Project ID in file ({pid}) does not match any provided project ids: ",
-                extra={"join": self.valid_pid},
+                "Use only project id not both project id and safe project id fields."
+            )
+            proj_ids = core["safe project id"] + core["project id"]
+        elif "project id" in core:
+            proj_ids = core["project id"]
+        elif "safe project id" in core:
+            LOGGER.warning(
+                "The 'project id' key is preferred over the "
+                "legacy 'safe project id' key."
+            )
+            proj_ids = core["safe project id"]
+        else:
+            LOGGER.error("Projects are configured and no project id field .")
+            return
+
+        # Check any provided values are valid
+        invalid_proj_ids = (p for p in proj_ids if p not in self.projects)
+        if invalid_proj_ids:
+            LOGGER.error(
+                "Invalid project ids provided: ", extra={"join": self.valid_pid}
             )
         else:
-            self.project_id = pid
+            self.project_ids = proj_ids
 
 
 def load_rows_from_worksheet(worksheet: Worksheet) -> list[tuple]:
