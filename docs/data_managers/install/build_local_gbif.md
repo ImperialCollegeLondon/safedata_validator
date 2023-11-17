@@ -26,6 +26,32 @@ include "data_managers/command_line_tools/command_line_usage/safedata_build_loca
 %}
 ```
 
+You will need to provide an output directory for the database and then use the command:
+
+```sh
+safedata_build_local_gbif outdir
+```
+
+This should result in the following output:
+
+```txt
+- Downloading GBIF data to: /path/to/tempdir
+    - Checking for version with timestamp 2023-08-28
+    - Downloading simple.txt.gz
+100%|████████████████████████████████████████████| 466M/466M [00:05<00:00, 92.2MB/s]
+    - Downloading simple-deleted.txt.gz
+100%|████████████████████████████████████████████| 90.8M/90.8M [00:00<00:00, 96.2MB/s]
+- Building GBIF backbone database in: /path/to/outdir/gbif_backbone_2023-08-28.sqlite
+    - Timestamp table created
+    - Backbone table created
+    - Adding core backbone taxa
+7746724it [03:31, 36688.61it/s]
+    - Adding deleted taxa
+1711901it [00:42, 40470.91it/s]
+    - Creating database indexes
+    - Removing downloaded files
+```
+
 Once you have an SQLite3 backbone database, you will then need to edit the
 `gbif_database` entry in your [configuration file](configuration.md) to provide
 the path to your new SQLite file.

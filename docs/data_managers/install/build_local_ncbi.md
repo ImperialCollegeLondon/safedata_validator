@@ -26,6 +26,35 @@ include "data_managers/command_line_tools/command_line_usage/safedata_build_loca
 %}
 ```
 
+You will need to provide an output directory for the database and then use the command:
+
+```sh
+safedata_build_local_ncbi outdir
+```
+
+This should result in the following output:
+
+```txt
+- Downloading NCBI data to: /path/to/tempdir
+    - Connecting to FTP server
+    - Using most recent archive: 2023-11-01
+    - Downloading taxonomy to: /path/to/tempdir/taxdmp_2023-11-01.zip
+100%|███████████████████████████████████████████| 60.5M/60.5M [00:03<00:00, 16.9MB/s]
+- Building GBIF backbone database in: /path/to/outdir/ncbi_taxonomy_2023-11-01.sqlite
+    - Timestamp table created
+    - Creating nodes table
+    - Populating nodes table from nodes.dmp
+2535034it [00:27, 93695.95it/s]
+    - Creating names table
+    - Populating names table from names.dmp
+3914203it [00:31, 123281.67it/s]
+    - Creating merge table
+    - Populating merge table from merged.dmp
+74501it [00:00, 155486.74it/s]
+    - Creating database indexes
+    - Removing downloaded archive
+```
+
 Once you have an SQLite3 backbone database, you will then need to edit the
 `gbif_database` entry in your [configuration file](configuration.md) to provide
 the path to your new SQLite file.
