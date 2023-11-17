@@ -15,7 +15,7 @@ positional arguments:
     post_metadata       Post dataset metadata to a safedata server
     update_gazetteer    Update the gazetteer data on safedata server
 
-options:
+optional arguments:
   -h, --help            show this help message and exit
   -r RESOURCES, --resources RESOURCES
                         Path to a safedata_validator resource configuration

@@ -5,5 +5,5 @@ usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ... show_config
 Loads the safedata_validator configuration file, displays the config setup
 being used for safedata_zenodo and then exits.
 
-options:
+optional arguments:
   -h, --help  show this help message and exit

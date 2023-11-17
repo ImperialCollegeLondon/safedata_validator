@@ -9,5 +9,5 @@ positional arguments:
   zenodo_json   Path to a Zenodo metadata file
   dataset_json  Path to a dataset metadata file
 
-options:
+optional arguments:
   -h, --help    show this help message and exit
