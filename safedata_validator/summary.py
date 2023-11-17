@@ -313,11 +313,10 @@ class Summary:
         self._rows = {str(rw[0]).lower(): rw[1:] for rw in rows}
 
         # Validate the keys found in the summary table
-        found: set[str] = set(self._rows.keys())
-        self._validate_keys(found=found)
+        self._validate_keys()
 
         # Now process the field blocks
-        self._load_core(found)
+        self._load_core()
         self._load_access_details()
         self._load_authors()
         self._load_keywords()
@@ -336,14 +335,15 @@ class Summary:
         else:
             LOGGER.info("Summary formatted correctly")
 
-    def _validate_keys(self, found: set[str]) -> None:
+    def _validate_keys(self) -> None:
         """Validate the summary keys recovered.
 
         This function checks that the keys in a summary table include the minimum set of
         mandatory fields in mandatory blocks and that all found keys are known.
         """
 
-        # Find all required fields and known fields
+        # Populate found, required and known field keys
+        found: set[str] = set(self._rows.keys())
         required: set[str] = set()
         known: set[str] = set()
 
@@ -814,7 +814,7 @@ class Summary:
         self.access = access
 
     @loggerinfo_push_pop("Loading core metadata")
-    def _load_core(self, found):
+    def _load_core(self):
         """Load the core block.
 
         Provides summary validation specific to the core block.
