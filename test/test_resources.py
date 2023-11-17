@@ -17,13 +17,12 @@ def does_not_raise():
 
 @pytest.fixture()
 def config_file_list():
-
     return [
         f"gazetteer = {FIXTURE_FILES.rf.gaz_file}",
         f"location_aliases = {FIXTURE_FILES.rf.localias_file}",
         f"gbif_database = {FIXTURE_FILES.rf.gbif_file}",
         f"ncbi_database = {FIXTURE_FILES.rf.ncbi_file}",
-        "use_project_ids = False",
+        f"project_database = {FIXTURE_FILES.rf.project_database_file}",
         "[extents]",
         "temporal_soft_extent = 2002-02-01, 2030-02-01",
         "temporal_hard_extent = 2002-02-01, 2030-02-01",
@@ -43,13 +42,12 @@ def config_file_list():
 
 @pytest.fixture()
 def config_file_dict():
-
     return {
         "gazetteer": FIXTURE_FILES.rf.gaz_file,
         "location_aliases": FIXTURE_FILES.rf.localias_file,
         "gbif_database": FIXTURE_FILES.rf.gbif_file,
         "ncbi_database": FIXTURE_FILES.rf.ncbi_file,
-        "use_project_ids": True,
+        "project_database": FIXTURE_FILES.rf.project_database_file,
         "extents": {
             "temporal_soft_extent": ["2002-02-01", "2030-02-01"],
             "temporal_hard_extent": ["2002-02-01", "2030-02-01"],
@@ -93,6 +91,7 @@ def nested_set(dic, keys, value):
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
                 (INFO, "Validating NCBI database: "),
+                (INFO, "Validating project database: "),
             ),
             id="All correct",
         ),
@@ -332,16 +331,110 @@ def nested_set(dic, keys, value):
             id="NCBI wrong SQLite",
         ),
         pytest.param(
-            ((["use_project_ids"], ["nonsense"]),),
-            ((4, "use_project_ids = nonsense"),),
-            RuntimeError,
+            ((["project_database"], ""),),
+            ((4, "project_database = "),),
+            None,
             (
                 (INFO, "Configuring Resources"),
                 (INFO, "Configuring resources from init "),
-                (CRITICAL, "Configuration issues"),
-                (CRITICAL, "In config 'use_project_ids':"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
+                (INFO, "No project database configured"),
             ),
-            id="Testing use_project_ids not bool",
+            id="Project_database provided",
+        ),
+        pytest.param(
+            ((["project_database"], FIXTURE_FILES.mf),),
+            ((4, f"project_database = {FIXTURE_FILES.mf}"),),
+            OSError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
+                (INFO, "Validating project database: "),
+                (CRITICAL, "Project database file not found"),
+            ),
+            id="Project_database path missing",
+        ),
+        pytest.param(
+            ((["project_database"], FIXTURE_FILES.rf.gbif_file),),
+            ((4, f"project_database = {FIXTURE_FILES.rf.gbif_file}"),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
+                (INFO, "Validating project database: "),
+                (
+                    CRITICAL,
+                    "Project database file not readable as a CSV file with valid "
+                    "headers",
+                ),
+            ),
+            id="Project database not text",
+        ),
+        pytest.param(
+            ((["project_database"], FIXTURE_FILES.rf.gaz_file),),
+            ((4, f"project_database = {FIXTURE_FILES.rf.gaz_file}"),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
+                (INFO, "Validating project database: "),
+                (
+                    CRITICAL,
+                    "Project database file does not contain project_id "
+                    "and title headers",
+                ),
+            ),
+            id="Project database not CSV text",
+        ),
+        pytest.param(
+            ((["project_database"], FIXTURE_FILES.rf.empty_localias_file),),
+            ((4, f"project_database = {FIXTURE_FILES.rf.empty_localias_file}"),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
+                (INFO, "Validating project database: "),
+                (CRITICAL, "Project database file is empty"),
+            ),
+            id="Project database file empty",
+        ),
+        pytest.param(
+            ((["project_database"], FIXTURE_FILES.rf.project_database_file_bad),),
+            ((4, f"project_database = {FIXTURE_FILES.rf.project_database_file_bad}"),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init "),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating NCBI database: "),
+                (INFO, "Validating project database: "),
+                (
+                    CRITICAL,
+                    "Project database file values not integer IDs and text titles.",
+                ),
+            ),
+            id="Project database bad values",
         ),
         pytest.param(
             ((["extents", "latitudinal_hard_extent"], ["-90deg", "90deg"]),),
@@ -382,7 +475,6 @@ def test_load_resources_by_arg(
         ctxt_manager = pytest.raises(expected_exception)
 
     with ctxt_manager:
-
         # Update the config, depending on whether the config is a list or a dict.
         if isinstance(config, list):
             for row, mod in list_mod:
@@ -408,6 +500,7 @@ def test_load_resources_by_arg(
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
                 (INFO, "Validating NCBI database: "),
+                (INFO, "Validating project database: "),
             ),
         ),
     ],
@@ -439,7 +532,6 @@ def test_load_resources_from_missing_config(config_filesystem, caplog, expected_
     """This test checks failure modes when no config is provided."""
 
     with pytest.raises(RuntimeError):
-
         Resources()
 
         log_check(caplog, expected_log)
@@ -455,6 +547,7 @@ def test_load_resources_from_missing_config(config_filesystem, caplog, expected_
             (INFO, "Validating location aliases: "),
             (INFO, "Validating GBIF database: "),
             (INFO, "Validating NCBI database: "),
+            (INFO, "Validating project database: "),
         ),
     ],
 )
@@ -476,6 +569,7 @@ def test_load_resources_from_user_config(user_config_file, caplog, expected_log)
             (INFO, "Validating location aliases: "),
             (INFO, "Validating GBIF database: "),
             (INFO, "Validating NCBI database: "),
+            (INFO, "Validating project database: "),
         ),
     ],
 )

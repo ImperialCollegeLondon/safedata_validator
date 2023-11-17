@@ -35,6 +35,8 @@ def fixture_files():
         ("gaz_file", "gazetteer_simple.geojson"),
         ("localias_file", "location_aliases_simple.csv"),
         ("empty_localias_file", "location_aliases_empty.csv"),
+        ("project_database_file", "project_database_simple.csv"),
+        ("project_database_file_bad", "project_database_bad.csv"),
         ("gbif_file", "gbif_backbone_truncated.sqlite"),
         ("ncbi_file", "ncbi_database_truncated.sqlite"),
         ("json_not_locations", "notalocationsjson.json"),
@@ -115,7 +117,7 @@ def config_filesystem(fs):
         "location_aliases = ",
         "gbif_database = ",
         "ncbi_database = ",
-        "use_project_ids = True",
+        "project_database = ",
         "[extents]",
         "temporal_soft_extent = 2002-02-02, 2030-01-31",
         "temporal_hard_extent = 2002-02-01, 2030-02-01",
@@ -137,6 +139,7 @@ def config_filesystem(fs):
     config_contents[1] += FIXTURE_FILES.rf.localias_file
     config_contents[2] += FIXTURE_FILES.rf.gbif_file
     config_contents[3] += FIXTURE_FILES.rf.ncbi_file
+    config_contents[4] += FIXTURE_FILES.rf.project_database_file
     fs.create_file(FIXTURE_FILES.vf.fix_config, contents="\n".join(config_contents))
 
     yield fs
