@@ -52,10 +52,6 @@ tbody td:first-child {
 This block provides a set of core details for the dataset. You can only provide
 a single value for each field.
 
-* **Project ID**: This is only used if the organisation you are uploading to uses
-  projects to group datasets. If they are, then you should obtain relevant project IDs
-  from the organisation's data manager and add them in your Summary worksheet. Older
-  datasets may use the field name as `SAFE Project ID` but this is deprecated.
 * **Title**: This should be a short informative title for the dataset: it will
   be used as the public title for the dataset so make sure it is clear and
   grammatical!
@@ -66,9 +62,25 @@ a single value for each field.
 
 |                 |                                   |  |  |
 |-----------------|-----------------------------------|--|--|
-| Project ID      | 1                                 |  |  |
 | Title           | Example data for the safedata system |  |  |
 | Description     | This is an example dataset.       |  |  |
+
+## The Project ID block
+
+!!! Warning "Possibly mandatory block"
+    This block will be mandatory if the data collection you are publishing to uses
+    projects to group datasets. If they are, then you should obtain relevant project IDs
+    from the organisation's data manager and add them in this block.
+
+This simple block provides project ID codes for the dataset.
+
+* **Project ID**: Provide the integer project id codes for the research project that
+  this dataset is associated with. Older datasets may use the field name as `SAFE
+  Project ID` but this is deprecated.
+
+|                 |                                   |  |  |
+|-----------------|-----------------------------------|--|--|
+| Project ID      | 1                                 |  |  |
 
 ## The access block
 
