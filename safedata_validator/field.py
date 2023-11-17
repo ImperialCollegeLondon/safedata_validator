@@ -117,7 +117,6 @@ class Dataset:
         self,
         filename: str,
         validate_doi: bool = False,
-        valid_pid: Optional[List[int]] = None,
         chunk_size: int = 1000,
         console_log: bool = True,
     ) -> None:
@@ -135,8 +134,6 @@ class Dataset:
         Args:
             filename: A path to the workbook containing the dataset
             validate_doi: Should DOIs in the dataset summary be validated
-            valid_pid: An optional list of valid values for the project ID
-                field in the dataset summary.
             chunk_size: Data is read from worksheets in chunks of rows - this
                 argument sets the size of that chunk.
             console_log: Suppress command line logging.
@@ -165,7 +162,6 @@ class Dataset:
                 wb["Summary"],
                 wb.sheetnames,
                 validate_doi=validate_doi,
-                valid_pid=valid_pid,
             )
         else:
             # No summary is impossible - so an error and no dataworksheets
