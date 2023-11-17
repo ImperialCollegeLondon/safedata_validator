@@ -110,13 +110,12 @@ class Summary:
         longitudinal_extent: Extent instance for the longitudinal extent of the Dataset.
         external_files: A list of dictionaries of external file metadata.
         data_worksheets: A list of dictionaries of data tables in the Dataset.
-        use_project_ids: Does this deployment uses project IDs
         n_errors: A count of the number of errors from loading a summary table.
         valid_pid: A list of valid project ID values.
         validate_doi: A boolean flag indicating whether DOI values should be validated.
     """
 
-    def __init__(self, resources: Resources):
+    def __init__(self, resources: Resources) -> None:
         self.project_id = None
         self.title = None
         self.description = None
@@ -153,19 +152,26 @@ class Summary:
         self.projects: dict[int, str] = resources.projects
         self.validate_doi = False
 
-        # Define the blocks and fields in the summary
-
+        # Define the blocks and fields in the summary - note that the project ids block
+        # is mandatory if a project database has been populated.
         self.fields: dict[str, SummaryBlock] = dict(
             core=SummaryBlock(
                 fields=[
-                    SummaryField("safe project id", False, None, int),
-                    SummaryField("project id", False, None, int),
                     SummaryField("title", True, None, str),
                     SummaryField("description", True, None, str),
                 ],
                 mandatory=True,
                 title="Core fields",
                 singular=True,
+            ),
+            project_ids=SummaryBlock(
+                fields=[
+                    SummaryField("safe project id", False, None, int),
+                    SummaryField("project id", False, None, int),
+                ],
+                mandatory=True if self.projects else False,
+                title="Project IDs",
+                singular=False,
             ),
             access=SummaryBlock(
                 fields=[
@@ -271,7 +277,7 @@ class Summary:
         worksheet: Worksheet,
         sheetnames: set,
         validate_doi: bool = False,
-    ):
+    ) -> None:
         """Populate a Summary instance from an Excel Worksheet.
 
         Args:
@@ -317,6 +323,7 @@ class Summary:
 
         # Now process the field blocks
         self._load_core()
+        self._load_project_ids()
         self._load_access_details()
         self._load_authors()
         self._load_keywords()
@@ -821,45 +828,70 @@ class Summary:
         """
 
         core = self._read_block(self.fields["core"])
-        self.title = core["title"]
-        self.description = core["description"]
 
-        # Project ID specific validation
-        # - Bail early if no validation should be done, warning if data provided.
-        if not self.projects:
-            if "project id" in core or "safe project id" in core:
-                LOGGER.error(
-                    "Projects are not configured but project ids are provided."
-                )
-
+        # Guard against all rows being absent.
+        if core is None:
             return
 
-        # Now try and validate what is found.
-        if "project id" in core and "safe project id" in core:
+        self.title = core[0]["title"]
+        self.description = core[0]["description"]
+
+    @loggerinfo_push_pop("Loading project id metadata")
+    def _load_project_ids(self):
+        """Load the project ids block.
+
+        Provides summary validation specific to the project ids block.
+        """
+
+        project_data = self._read_block(self.fields["project_ids"])
+
+        if not self.projects and project_data is None:
+            LOGGER.info("No project id data required or provided.")
+            return
+
+        # Bail if no validation should be done, warning if data provided.
+        if not self.projects and project_data is not None:
+            LOGGER.error("Project ids are not required but are provided.")
+            return
+
+        # Bail if validation should be done but no data provided
+        if self.projects and project_data is None:
+            LOGGER.error("Project ids are required but not provided.")
+            return
+
+        # Now try and validate what is found in the data
+        bare_pids = [
+            p["project id"] for p in project_data if p["project id"] is not None
+        ]
+        safe_pids = [
+            p["safe project id"]
+            for p in project_data
+            if p["safe project id"] is not None
+        ]
+
+        if bare_pids and safe_pids:
             LOGGER.error(
-                "Use only project id not both project id and safe project id fields."
+                "Both 'project id' and 'safe project id' provided: "
+                "use only 'project id'."
             )
-            proj_ids = core["safe project id"] + core["project id"]
-        elif "project id" in core:
-            proj_ids = core["project id"]
-        elif "safe project id" in core:
+            proj_ids = bare_pids + safe_pids
+        elif safe_pids:
             LOGGER.warning(
-                "The 'project id' key is preferred over the "
-                "legacy 'safe project id' key."
+                "Use 'project id' rather than the legacy 'safe project id' key."
             )
-            proj_ids = core["safe project id"]
-        else:
-            LOGGER.error("Projects are configured and no project id field .")
-            return
+            proj_ids = safe_pids
+        elif bare_pids:
+            proj_ids = bare_pids
 
         # Check any provided values are valid
-        invalid_proj_ids = (p for p in proj_ids if p not in self.projects)
+        invalid_proj_ids = [p for p in proj_ids if p not in self.projects]
+        valid_proj_ids = [p for p in proj_ids if p in self.projects]
         if invalid_proj_ids:
             LOGGER.error(
-                "Invalid project ids provided: ", extra={"join": self.valid_pid}
+                "Unknown project ids provided: ", extra={"join": invalid_proj_ids}
             )
-        else:
-            self.project_ids = proj_ids
+
+        self.project_id = valid_proj_ids
 
 
 def load_rows_from_worksheet(worksheet: Worksheet) -> list[tuple]:

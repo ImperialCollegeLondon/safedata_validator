@@ -61,6 +61,9 @@ def fixture_files():
             appdirs.site_config_dir(), "safedata_validator", "safedata_validator.cfg"
         ),
         "fix_config": os.path.join(fixture_dir, "safedata_validator.cfg"),
+        "fix_config_no_projects": os.path.join(
+            fixture_dir, "safedata_validator_no_proj.cfg"
+        ),
     }
 
     return DotMap(
@@ -139,6 +142,10 @@ def config_filesystem(fs):
     config_contents[1] += FIXTURE_FILES.rf.localias_file
     config_contents[2] += FIXTURE_FILES.rf.gbif_file
     config_contents[3] += FIXTURE_FILES.rf.ncbi_file
+    fs.create_file(
+        FIXTURE_FILES.vf.fix_config_no_projects, contents="\n".join(config_contents)
+    )
+
     config_contents[4] += FIXTURE_FILES.rf.project_database_file
     fs.create_file(FIXTURE_FILES.vf.fix_config, contents="\n".join(config_contents))
 
