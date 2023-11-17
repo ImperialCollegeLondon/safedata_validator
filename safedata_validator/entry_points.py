@@ -76,17 +76,7 @@ def _safedata_validator_cli():
     parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
 
     parser.add_argument("filename", help="Path to the Excel file to be validated.")
-    parser.add_argument(
-        "-p",
-        "--project_id",
-        default=None,
-        type=int,
-        action="append",
-        help="If provided, check that the project ID within the file matches this "
-        "integer. Multiple values can be provided to generate a set of valid IDs. This "
-        "option only makes sense to use if your organisation uses project IDs.",
-        dest="valid_pid",
-    )
+
     parser.add_argument(
         "-r",
         "--resources",
@@ -138,7 +128,6 @@ def _safedata_validator_cli():
     ds = Dataset(resources=Resources(args.resources))
     ds.load_from_workbook(
         filename=args.filename,
-        valid_pid=args.valid_pid,
         validate_doi=args.validate_doi,
         chunk_size=args.chunk_size,
     )

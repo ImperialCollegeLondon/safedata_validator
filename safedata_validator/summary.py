@@ -111,7 +111,6 @@ class Summary:
         external_files: A list of dictionaries of external file metadata.
         data_worksheets: A list of dictionaries of data tables in the Dataset.
         n_errors: A count of the number of errors from loading a summary table.
-        valid_pid: A list of valid project ID values.
         validate_doi: A boolean flag indicating whether DOI values should be validated.
     """
 
