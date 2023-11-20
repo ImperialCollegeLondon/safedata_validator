@@ -1174,6 +1174,7 @@ def test_summary_load(fixture_summary, example_excel_files, n_errors):
                     "Both 'project id' and 'safe project id' provided: "
                     "use only 'project id'",
                 ),
+                (INFO, "Valid project ids provided:"),
             ),
             id="both project id keys provided",
         ),
@@ -1194,6 +1195,7 @@ def test_summary_load(fixture_summary, example_excel_files, n_errors):
                     WARNING,
                     "Use 'project id' rather than the legacy 'safe project id' key.",
                 ),
+                (INFO, "Valid project ids provided:"),
             ),
             id="using legacy safe project id",
         ),
@@ -1211,6 +1213,7 @@ def test_summary_load(fixture_summary, example_excel_files, n_errors):
                 (INFO, "Loading project id metadata"),
                 (INFO, "Metadata for Project IDs found:"),
                 (ERROR, "Unknown project ids provided"),
+                (INFO, "Valid project ids provided:"),
             ),
             id="unknown ids",
         ),
@@ -1227,6 +1230,7 @@ def test_summary_load(fixture_summary, example_excel_files, n_errors):
             (
                 (INFO, "Loading project id metadata"),
                 (INFO, "Metadata for Project IDs found:"),
+                (INFO, "Valid project ids provided:"),
             ),
             id="all good",
         ),

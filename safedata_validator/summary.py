@@ -93,63 +93,64 @@ class Summary:
     Args:
         resources: An instance of Resources providing the safedata_validator
             configuration.
-
-    Attributes:
-        fields: A dictionary setting the expected metadata fields for summary tables.
-        project_id: An integer project ID code
-        title: A string giving the dataset title.
-        description: A string giving a description of the dataset
-        access: A dictionary giving access metadata.
-        authors: A list of dictionaries of author metadata.
-        permits: A list of dictionaries of research permit metadata.
-        publication_doi: A list of DOIs associated with the dataset.
-        funders: A list of dictionaries of funder metadata.
-        keywords: A list of keyword strings.
-        temporal_extent: Extent instance for the temporal extent of the Dataset.
-        latitudinal_extent: Extent instance for the latitudinal extent of the Dataset.
-        longitudinal_extent: Extent instance for the longitudinal extent of the Dataset.
-        external_files: A list of dictionaries of external file metadata.
-        data_worksheets: A list of dictionaries of data tables in the Dataset.
-        n_errors: A count of the number of errors from loading a summary table.
-        validate_doi: A boolean flag indicating whether DOI values should be validated.
     """
 
     def __init__(self, resources: Resources) -> None:
-        self.project_id = None
-        self.title = None
-        self.description = None
-        self.access = None
-        self.authors = None
-        self.permits = None
+        self.title: str
+        """A string giving the dataset title."""
+        self.description: str
+        """A string giving a description of the dataset."""
+        self.access: dict
+        """A dictionary giving access metadata."""
+        self.authors: list[dict]
+        "A list of dictionaries of author metadata."
+        self.permits: list[dict]
+        """A list of dictionaries of research permit metadata."""
         self.publication_doi = None
+        """A list of DOIs associated with the dataset."""
         self.funders = None
-        self.keywords = None
-        self.temporal_extent = Extent(
+        """A list of dictionaries of funder metadata."""
+        self.keywords: list[str]
+        """A list of keyword strings."""
+        self.temporal_extent: Extent = Extent(
             "temporal extent",
             (datetime.date,),
             hard_bounds=resources.extents.temporal_hard_extent,
             soft_bounds=resources.extents.temporal_soft_extent,
         )
-        self.latitudinal_extent = Extent(
+        """Extent instance for the temporal extent of the Dataset."""
+        self.latitudinal_extent: Extent = Extent(
             "latitudinal extent",
             (float, int),
             hard_bounds=resources.extents.latitudinal_hard_extent,
             soft_bounds=resources.extents.latitudinal_soft_extent,
         )
-        self.longitudinal_extent = Extent(
+        """Extent instance for the latitudinal extent of the Dataset."""
+        self.longitudinal_extent: Extent = Extent(
             "longitudinal extent",
             (float, int),
             hard_bounds=resources.extents.longitudinal_hard_extent,
             soft_bounds=resources.extents.longitudinal_soft_extent,
         )
-        self.external_files = None
+        """Extent instance for the longitudinal extent of the Dataset."""
+        self.external_files: Optional[list[dict]] = None
+        """A list of dictionaries of external file metadata."""
         self.data_worksheets: list[Worksheet] = []
+        """A list of dictionaries of data tables in the Dataset."""
 
         self._rows: dict = {}
+        """A private attribute holding the row data for the summary."""
         self._ncols: int
+        """A private attribute holding the total number of columns in the summary."""
         self.n_errors: int = 0
+        """The number of validation errors found in the summary."""
         self.projects: dict[int, str] = resources.projects
+        """A dictionary of valid project data."""
+        self.project_id: Optional[list[int]] = None
+        """A list of project ID codes, if project IDs are configured."""
+
         self.validate_doi = False
+        """A boolean flag indicating whether DOI values should be validated."""
 
         # Define the blocks and fields in the summary - note that the project ids block
         # is mandatory if a project database has been populated.
@@ -269,6 +270,7 @@ class Summary:
                 singular=False,
             ),
         )
+        """A dictionary setting the summary blocks that can be present."""
 
     @loggerinfo_push_pop("Checking Summary worksheet")
     def load(
@@ -891,6 +893,7 @@ class Summary:
             )
 
         self.project_id = valid_proj_ids
+        LOGGER.info("Valid project ids provided: ", extra={"join": valid_proj_ids})
 
 
 def load_rows_from_worksheet(worksheet: Worksheet) -> list[tuple]:
