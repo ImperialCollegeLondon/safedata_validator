@@ -11,7 +11,7 @@ reproducible version of the underlying data. The available versions can be seen 
 [](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/)
 
 To use the NCBI taxonomy as a local data resource for taxon validation, the
-`safedata_validator` package requires a version of the database  to be built into a
+`safedata_validator` package requires a version of the database to be built into a
 SQLite3 database.
 
 ## Building a local copy
@@ -51,6 +51,7 @@ This should result in the following output:
     - Creating merge table
     - Populating merge table from merged.dmp
 74501it [00:00, 155486.74it/s]
+    - Creating unique ranks table
     - Creating database indexes
     - Removing downloaded archive
 ```
@@ -76,6 +77,8 @@ the path to your new SQLite file.
   believe this is a useful field for our purpose. It is therefore dropped.
 * A single database is then generated with three tables: `nodes`, `names`, `merged`.
 * A `timestamp` table is created to hold the version timestamp.
+* A `unique_ncbi_ranks` table is created to hold the names of all ranks used in the NCBI
+  database.
 * The speed of the package is much improved by building covering indices to
    speed up the four kinds of searches used by `safedata_validator`:
 

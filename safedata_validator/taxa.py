@@ -493,7 +493,7 @@ class NCBIValidator:
         self.ncbi_conn = conn
 
         # Populate the extra taxa in the configured DB
-        ranks = {rw[0] for rw in conn.execute("SELECT rank FROM unique_ncbi_rank;")}
+        ranks = {rw[0] for rw in conn.execute("SELECT rank FROM unique_ncbi_ranks;")}
         self.ncbi_extra_taxa = list(ranks.difference(BACKBONE_RANKS_EX))
 
     def __del__(self) -> None:
