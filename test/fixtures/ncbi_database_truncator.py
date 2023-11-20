@@ -89,7 +89,7 @@ dest_db.commit()
 # unique ranks table
 cur = source_db.execute("SELECT * FROM unique_ncbi_ranks")
 ranks = cur.fetchall()
-ins = dest_db.executemany("insert into unique_ncbi_ranks values (?)", ranks)
+ins = dest_db.executemany("insert into unique_ncbi_ranks values (?, ?)", ranks)
 
 dest_db.commit()
 
