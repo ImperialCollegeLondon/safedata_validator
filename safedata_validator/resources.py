@@ -404,7 +404,7 @@ class Resources:
 
         # Now check to see whether the project database behaves as expected
         try:
-            dictr = DictReader(open(self.project_database, mode="r"))
+            dictr = DictReader(open(self.project_database, mode="r", encoding="UTF-8"))
         except FileNotFoundError:
             log_and_raise("Project database file not found", FileNotFoundError)
         except IsADirectoryError:
@@ -417,11 +417,11 @@ class Resources:
                 log_and_raise("Project database file is empty", ValueError)
             else:
                 fieldnames = set(dictr.fieldnames)
-        except (UnicodeDecodeError, csvError):
-            log_and_raise(
-                "Project database file not readable as a CSV file with valid headers",
-                ValueError,
+        except (UnicodeDecodeError, csvError) as excep:
+            LOGGER.critical(
+                "Project database file not readable as a CSV file with valid headers"
             )
+            raise excep
 
         required_names = set(["project_id", "title"])
         if required_names.intersection(fieldnames) != required_names:
