@@ -1057,31 +1057,24 @@ class GBIFTaxa:
             FORMATTER.pop()
             return
 
-        # TODO - Test this new behaviour
-        # Fields used to describe taxa (not including comments)
-        tx_fields = [
-            "name",
-            "taxon name",
-            "taxon type",
-            "taxon id",
-            "ignore id",
-            "parent name",
-            "parent type",
-            "parent id",
-        ]
-        all_fields = set(tx_fields + ["comments"])
+        # Fields used to describe taxa
+        tx_fields = set(
+            [
+                "name",
+                "taxon name",
+                "taxon type",
+                "taxon id",
+                "ignore id",
+                "parent name",
+                "parent type",
+                "parent id",
+            ]
+        )
 
-        # Now check that there are no unexpected (i.e. likely misspelled) fields
-        unexpected_headers = set(headers).difference(all_fields)
-
-        if unexpected_headers:
-            # An unexpected header (which might well be misspelled) was found
-            LOGGER.error(
-                "Unexpected (or misspelled) headers found:",
-                extra={"join": unexpected_headers},
-            )
-            FORMATTER.pop()
-            return
+        # Now check for extra fields and report them to the user
+        extra_fields = set(headers).difference(tx_fields)
+        if extra_fields:
+            LOGGER.info("Additional fields provided: ", extra={"join": extra_fields})
 
         # Any duplication in names
         dupl_taxon_names = HasDuplicates([dframe.data_columns[headers.index("name")]])
@@ -1093,7 +1086,6 @@ class GBIFTaxa:
 
         # get dictionaries of the taxa
         taxa = [dict(zip(headers, rw)) for rw in zip(*dframe.data_columns)]
-        FORMATTER.pop()
 
         # check number of taxa found
         if len(taxa) == 0:
