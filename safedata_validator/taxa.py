@@ -26,6 +26,7 @@ superkingdom.
 """  # noqa D415
 
 import dataclasses
+import re
 import sqlite3
 from collections import Counter
 from io import StringIO
@@ -63,6 +64,9 @@ BACKBONE_RANKS = [
 
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ["superkingdom"] + BACKBONE_RANKS
+
+# NBCI name regex
+NCBI_prefix_re = re.compile("^[a-z]__")
 
 
 class GBIFError(Exception):
@@ -2318,15 +2322,17 @@ def taxa_strip(name: str, rank: str) -> tuple[str, bool]:
     """
     if name is None:
         return (None, True)
-    elif "__" in name:
+
+    prefix_match = NCBI_prefix_re.match(name)
+
+    if prefix_match is not None:
         # Strip name down
-        ind = name.rfind("_")
-        s_name = name[ind + 1 :]
+        s_name = name[prefix_match.end() :]
         # Check if ranks match
         match = name[0].lower() == rank[0].lower()
         return (s_name, match)
-    else:
-        return (name, True)
+
+    return (name, True)
 
 
 def construct_bi_or_tri(higher_nm: str, lower_nm: str, tri: bool) -> Optional[str]:
