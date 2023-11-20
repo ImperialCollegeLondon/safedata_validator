@@ -133,13 +133,14 @@ provided to validate datasets.
 
 **The `project_database` element**
 
-: The project database element is an optional configuration option, that allows datasets
+: The project database element is an optional configuration setting that allows datasets
   to be grouped into projects. If you want to use projects then you will need to create
   a CSV file containing at least `project_id` and `title` fields, although you can add
   other fields if you want.
 
     The project database can be updated to add new projects and change titles and other 
-    details but the project ID values themselves must be persistent
+    details but you must not change or delete existing Project IDs once they have been
+    created - a given project ID must always refer to the same project.
 
     !!! Warning
         Each deployment of the `safedata` system will have to make a **binding choice** 

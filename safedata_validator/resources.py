@@ -397,7 +397,7 @@ class Resources:
         """
 
         if self.project_database is None:
-            LOGGER.info("No project database configured")
+            LOGGER.info("Configuration does not use project IDs.")
             return
 
         LOGGER.info(f"Validating project database: {self.project_database}")

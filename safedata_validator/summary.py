@@ -29,19 +29,6 @@ RE_EMAIL = re.compile(r"\S+@\S+\.\S+")
 RE_NAME = re.compile(r"[^,]+,[ ]?[^,]+")
 RE_CONTAINS_WSPACE = re.compile(r"\s")
 
-# Class attribute to define the metadata that may be present.
-# These are defined in blocks of related rows described in 4-tuples:
-#  0: a list of tuples giving the rows in the block:
-#     * row header key
-#     * mandatory within the block
-#     * 'internal' name - also maps to Zenodo fields
-#     * accepted types
-#     * list of aliases for the fieldname (this generally will be blank)
-#  1: is the block mandatory (bool)
-#  2: the title of the block for the logger
-#  3: should there be only one record (bool)
-#
-
 
 @dataclass
 class SummaryField:

@@ -341,7 +341,7 @@ def nested_set(dic, keys, value):
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
                 (INFO, "Validating NCBI database: "),
-                (INFO, "No project database configured"),
+                (INFO, "Configuration does not use project IDs."),
             ),
             id="Project_database provided",
         ),
