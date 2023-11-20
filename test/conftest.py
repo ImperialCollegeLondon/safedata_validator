@@ -1,5 +1,6 @@
 """Collection of fixtures to assist the testing scripts."""
 import os
+import sys
 from collections import OrderedDict
 
 import appdirs
@@ -195,12 +196,35 @@ def log_check(caplog, expected_log):
 
     assert len(expected_log) == len(caplog.records)
 
-    assert all(
-        [exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)]
-    )
-    assert all(
-        [exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)]
-    )
+    level_correct = [
+        exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)
+    ]
+
+    message_correct = [
+        exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)
+    ]
+
+    if not all(level_correct):
+        failed_records = (
+            (exp, obs)
+            for passed, exp, obs in zip(level_correct, expected_log, caplog.records)
+            if not passed
+        )
+        for obs, exp in failed_records:
+            sys.stderr.write(f"Log level mismatch: {obs}, {exp.levelno, exp.message}")
+
+        assert False
+
+    if not all(message_correct):
+        failed_records = (
+            (exp, obs)
+            for passed, exp, obs in zip(message_correct, expected_log, caplog.records)
+            if not passed
+        )
+        for obs, exp in failed_records:
+            sys.stderr.write(f"Log message mismatch: {obs}, {exp.levelno, exp.message}")
+
+        assert False
 
 
 # ------------------------------------------
