@@ -58,7 +58,7 @@ positional arguments:
     show_config
                 Report the config being used and exit
 
-options:
+optional arguments:
   -h, --help    show this help message and exit
   -r RESOURCES, --resources RESOURCES
                 Path to a safedata_validator resource configuration file

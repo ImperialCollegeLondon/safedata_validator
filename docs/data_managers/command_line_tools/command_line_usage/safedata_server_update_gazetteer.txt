@@ -9,5 +9,5 @@ positional arguments:
   gazetteer_json    Path to a gazetteer geojson file
   location_aliases  Path to a CSV of location aliases
 
-options:
+optional arguments:
   -h, --help        show this help message and exit

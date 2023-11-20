@@ -10,7 +10,7 @@ positional arguments:
   zenodo_json   Path to a Zenodo metadata file
   dataset_json  Path to a dataset metadata file
 
-options:
+optional arguments:
   -h, --help    show this help message and exit
   -l LINEAGE_STATEMENT, --lineage-statement LINEAGE_STATEMENT
                 Path to a text file containing a lineage statement

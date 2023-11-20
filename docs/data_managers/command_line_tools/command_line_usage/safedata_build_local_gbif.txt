@@ -15,7 +15,7 @@ Build a local GBIF database.
 positional arguments:
   outdir                Location to create database file.
 
-options:
+optional arguments:
   -h, --help            show this help message and exit
   -t TIMESTAMP, --timestamp TIMESTAMP
                         The time stamp of a database archive version to use.

@@ -1,15 +1,17 @@
 """The `safedata_validator` package needs access to some local resources and
 configuration to work. The core resources for file validation are:
 
--   gazetteer: A path to a GeoJSON formatted gazetteer of known locations and their
+- gazetteer: A path to a GeoJSON formatted gazetteer of known locations and their
     details.
 
--   location_aliases: A path to a CSV file containing known aliases of the location
+- location_aliases: A path to a CSV file containing known aliases of the location
     names provided in the gazetteer.
 
--   gbif_database: The path to a local SQLite copy of the GBIF backbone database.
+- gbif_database: The path to a local SQLite copy of the GBIF backbone database.
 
--   ncbi_database: The path to a local SQLite copy of the NCBI database files.
+- ncbi_database: The path to a local SQLite copy of the NCBI database files.
+
+- project_database: Optionally, a path to a CSV file providing valid project IDs.
 
 The [Resources][safedata_validator.resources.Resources] class is used to locate and
 validate these resources, and then provide those validated resources to other components
@@ -29,7 +31,7 @@ import sqlite3
 from csv import DictReader
 from csv import Error as csvError
 from datetime import date
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import appdirs
 import simplejson
@@ -52,7 +54,7 @@ CONFIGSPEC = {
     "location_aliases": "string()",
     "gbif_database": "string()",
     "ncbi_database": "string()",
-    "use_project_ids": "boolean(default=True)",
+    "project_database": "string(default=None)",
     "extents": {
         "temporal_soft_extent": "date_list(min=2, max=2, default=None)",
         "temporal_hard_extent": "date_list(min=2, max=2, default=None)",
@@ -148,7 +150,7 @@ class Resources:
         location_aliases: The path to the location_aliases file
         gbif_database: The path to the GBIF database file
         ncbi_database: The path to the NCBI database file
-        use_project_ids: Whether this organisation uses project IDs or not
+        project_database: An optional path to a database of valid project IDs
         valid_locations: The locations defined in the locations file
         location_aliases: Location aliases defined in the locations file
         extents: A DotMap of extent data
@@ -206,9 +208,13 @@ class Resources:
         self.localias_path = config_loaded.location_aliases
         self.gbif_database = config_loaded.gbif_database
         self.ncbi_database = config_loaded.ncbi_database
+        self.project_database = (
+            None
+            if config_loaded.project_database == ""
+            else config_loaded.project_database
+        )
         self.config_type = config_loaded.config_type
         self.config_source = config_loaded.config_source
-        self.use_project_ids = config_loaded.use_project_ids
 
         self.extents = config_loaded.extents
         self.zenodo = config_loaded.zenodo
@@ -222,12 +228,15 @@ class Resources:
         self.valid_location: dict[str, list[float]] = dict()
         # Location aliases is a dictionary keying a string to a key in valid locations
         self.location_aliases: dict[str, str] = dict()
+        # Projects are a dictionary keying project ID to a title.
+        self.projects: dict[int, str] = dict()
 
         # Validate the resources
         self._validate_gazetteer()
         self._validate_location_aliases()
         self._validate_gbif()
         self._validate_ncbi()
+        self._validate_projects()
 
     @staticmethod
     def _load_config(config: Union[str, list, dict], cfg_type: str) -> DotMap:
@@ -378,6 +387,57 @@ class Resources:
         self.ncbi_timestamp = validate_taxon_db(
             self.ncbi_database, "NCBI", ["nodes", "merge", "names"]
         )
+
+    def _validate_projects(self) -> None:
+        """Validate and load a project database.
+
+        This private function checks whether a project_database path: exists, is a CSV
+        file, and contains project data. It populates the instance ``project_id``
+        attribute.
+        """
+
+        if self.project_database is None:
+            LOGGER.info("Configuration does not use project IDs.")
+            return
+
+        LOGGER.info(f"Validating project database: {self.project_database}")
+
+        # Now check to see whether the project database behaves as expected
+        try:
+            dictr = DictReader(open(self.project_database, mode="r", encoding="UTF-8"))
+        except FileNotFoundError:
+            log_and_raise("Project database file not found", FileNotFoundError)
+        except IsADirectoryError:
+            log_and_raise("Project database path is a directory", IsADirectoryError)
+
+        # Simple test for structure - field names only parsed when called, and this can
+        # throw errors with bad file formats.
+        try:
+            if not dictr.fieldnames:
+                log_and_raise("Project database file is empty", ValueError)
+            else:
+                fieldnames = set(dictr.fieldnames)
+        except (UnicodeDecodeError, csvError) as excep:
+            LOGGER.critical(
+                "Project database file not readable as a CSV file with valid headers"
+            )
+            raise excep
+
+        required_names = set(["project_id", "title"])
+        if required_names.intersection(fieldnames) != required_names:
+            log_and_raise(
+                "Project database file does not contain project_id and title headers.",
+                ValueError,
+            )
+
+        # Load the valid project ids
+        try:
+            self.projects = {int(prj["project_id"]): str(prj["title"]) for prj in dictr}
+        except ValueError:
+            log_and_raise(
+                "Project database file values not integer IDs and text titles.",
+                ValueError,
+            )
 
 
 def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:

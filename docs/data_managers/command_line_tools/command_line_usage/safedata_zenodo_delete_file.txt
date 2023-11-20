@@ -9,5 +9,5 @@ positional arguments:
   zenodo_json  Path to a Zenodo metadata file for the deposit to discard
   filename     The name of the file to delete
 
-options:
+optional arguments:
   -h, --help   show this help message and exit

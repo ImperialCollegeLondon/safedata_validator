@@ -9,7 +9,7 @@ When successful, the function downloads and saves a JSON file containing the
 resulting Zenodo deposit metadata. This file is used as an input to other
 subcommands that work with an existing deposit.
 
-options:
+optional arguments:
   -h, --help    show this help message and exit
   -c CONCEPT_ID, --concept_id CONCEPT_ID
                 A Zenodo concept ID

@@ -7,5 +7,5 @@ Download the Zenodo metadata for a deposit and print out summary information.
 positional arguments:
   zenodo_id   An ID for an existing Zenodo deposit
 
-options:
+optional arguments:
   -h, --help  show this help message and exit

@@ -14,7 +14,7 @@ gbif_database = /path/to/local/backbone.sqlite3
 ncbi_database = /path/to/local/ncbi_database.sqlite3
 gazetteer = /path/to/gazeteer.geojson
 location_aliases = /path/to/location_aliases.csv
-use_project_ids = True
+project_database = /path/to/project_database.csv
 
 [extents]
 temporal_soft_extent = 2002-02-02, 2030-01-31
@@ -131,21 +131,22 @@ provided to validate datasets.
 : These elements provide the paths to the [location database](gazetteer.md) for the
   project.
 
-**The `use_project_ids` element**
+**The `project_database` element**
 
-: The `safedata` system was initially developed as part of the SAFE project, which
-  organises datasets into projects. Each project is identified using a unique
-  identification number, and each dataset is associated with one or more projects using
-  these project ID numbers. We anticipate that other deployments of the `safedata`
-  system may not wish to organise datasets in this manner. If so, the checking of
-  project IDs can be turned off by setting the `use_project_ids` option  to `False`.
-  With this option off, datasets will **fail validation** if they contain project IDs.
+: The project database element is an optional configuration setting that allows datasets
+  to be grouped into projects. If you want to use projects then you will need to create
+  a CSV file containing at least `project_id` and `title` fields, although you can add
+  other fields if you want.
+
+    The project database can be updated to add new projects and change titles and other 
+    details but you must not change or delete existing Project IDs once they have been
+    created - a given project ID must always refer to the same project.
 
     !!! Warning
-        Each deployment of the `safedata` system will have to make a choice of whether
-        or not to organise datasets into project. Once this choice has been made it will
-        be binding. As such, this option should only be changed by the relevant data 
-        manager during the initial setup of the data system.
+        Each deployment of the `safedata` system will have to make a **binding choice** 
+        of whether or not to organise datasets into project. The data manager for a
+        project will need to make this decision during the initial configuration of a
+        data system.
 
 **The `extents` element**
 
