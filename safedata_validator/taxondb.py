@@ -524,6 +524,11 @@ def build_local_ncbi(
 
     archive.close()
 
+    # Populate a unique ranks table for this database
+    con.execute("CREATE TABLE unique_ncbi_ranks (rank str);")
+    con.execute("INSERT INTO unique_ncbi_ranks SELECT distinct rank from nodes;")
+    con.commit()
+
     # Create the indices
     LOGGER.info("Creating database indexes")
     con.execute("CREATE INDEX node_id ON nodes (tax_id);")

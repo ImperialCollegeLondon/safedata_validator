@@ -64,45 +64,6 @@ BACKBONE_RANKS = [
 # Extended version of backbone ranks to capture superkingdoms
 BACKBONE_RANKS_EX = ["superkingdom"] + BACKBONE_RANKS
 
-# These are the extra ranks defined by NCBI, they may have to be updated in future
-EXTRA_NCBI_RANKS = [
-    "biotype",
-    "clade",
-    "cohort",
-    "forma",
-    "forma specialis",
-    "genotype",
-    "infraclass",
-    "infraorder",
-    "isolate",
-    "morph",
-    "no rank",
-    "parvorder",
-    "pathogroup",
-    "section",
-    "series",
-    "serogroup",
-    "serotype",
-    "species group",
-    "species subgroup",
-    "strain",
-    "subclass",
-    "subcohort",
-    "subfamily",
-    "subgenus",
-    "subkingdom",
-    "suborder",
-    "subphylum",
-    "subsection",
-    "subtribe",
-    "superclass",
-    "superfamily",
-    "superorder",
-    "superphylum",
-    "tribe",
-    "varietas",
-]
-
 
 class GBIFError(Exception):
     """Exception class for GBIF errors.
@@ -526,6 +487,10 @@ class NCBIValidator:
         conn = sqlite3.connect(resources.ncbi_database)
         conn.row_factory = sqlite3.Row
         self.ncbi_conn = conn
+
+        # Populate the extra taxa in the configured DB
+        ranks = {rw[0] for rw in conn.execute("SELECT rank FROM unique_ncbi_rank;")}
+        self.ncbi_extra_taxa = list(ranks.difference(BACKBONE_RANKS_EX))
 
     def __del__(self) -> None:
         """Delete a LocalNCBIValidator instance.
@@ -1676,7 +1641,10 @@ class NCBITaxa:
         # Possible fields in this case are the two core fields + comments + all
         # taxonomic ranks defined in NCBI
         all_fields = set(
-            list(core_fields) + BACKBONE_RANKS_EX + EXTRA_NCBI_RANKS + ["comments"]
+            list(core_fields)
+            + BACKBONE_RANKS_EX
+            + self.validator.ncbi_extra_taxa
+            + ["comments"]
         )
 
         # Now check that there are no unexpected (i.e. likely misspelled) fields
