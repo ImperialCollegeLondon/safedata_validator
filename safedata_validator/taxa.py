@@ -51,7 +51,7 @@ from safedata_validator.validators import (
     blank_value,
 )
 
-BACKBONE_RANKS = [
+GBIF_BACKBONE_RANKS = [
     "kingdom",
     "phylum",
     "class",
@@ -63,7 +63,7 @@ BACKBONE_RANKS = [
 ]
 
 # Extended version of backbone ranks to capture superkingdoms
-BACKBONE_RANKS_EX = ["superkingdom"] + BACKBONE_RANKS
+NCBI_BACKBONE_RANKS = ["superkingdom"] + GBIF_BACKBONE_RANKS
 
 # NBCI name regex
 NCBI_prefix_re = re.compile("^[a-z]__")
@@ -149,7 +149,7 @@ class GBIFTaxon:
             self.gbif_id = int(self.gbif_id)
 
         self.rank = self.rank.lower()
-        self.is_backbone = self.rank in BACKBONE_RANKS
+        self.is_backbone = self.rank in GBIF_BACKBONE_RANKS
         self.is_canon = False
         self.canon_usage = None
         self.parent_id = None
@@ -340,13 +340,10 @@ class GBIFValidator:
 
         else:
             # get the set of records associated with the taxon and rank
-
-            sql = (
+            taxon_rows = self.gbif_conn.execute(
                 f"select * from backbone where canonical_name ='{taxon.name}' "
                 f"and rank= '{taxon.rank.upper()}';"
-            )
-
-            taxon_rows = self.gbif_conn.execute(sql).fetchall()
+            ).fetchall()
             selected_row = None
 
             if len(taxon_rows) == 0:
@@ -422,8 +419,9 @@ class GBIFValidator:
             raise ValueError("Negative GBIF code")
 
         # get the record associated with the provided ID
-        sql = f"select * from backbone where id = {gbif_id}"
-        taxon_row = self.gbif_conn.execute(sql).fetchone()
+        taxon_row = self.gbif_conn.execute(
+            f"select * from backbone where id = {gbif_id}"
+        ).fetchone()
 
         # check there is a result and that it is congruent with any
         # provided taxon or rank information
@@ -454,7 +452,7 @@ class GBIFValidator:
         # use that rather than explicit \\N in conversion)
         taxon.hierarchy = [
             (rk, taxon_row[ky])
-            for rk, ky in [(r, r + "_key") for r in BACKBONE_RANKS[:-1]]
+            for rk, ky in [(r, r + "_key") for r in GBIF_BACKBONE_RANKS[:-1]]
             if ky in taxon_row.keys()
             and taxon_row[ky] is not None
             and not taxon_row[ky] == ""
@@ -490,11 +488,18 @@ class NCBIValidator:
     def __init__(self, resources: Resources) -> None:
         conn = sqlite3.connect(resources.ncbi_database)
         conn.row_factory = sqlite3.Row
-        self.ncbi_conn = conn
+        self.ncbi_conn: sqlite3.Connection = conn
 
-        # Populate the extra taxa in the configured DB
-        ranks = {rw[0] for rw in conn.execute("SELECT rank FROM unique_ncbi_ranks;")}
-        self.ncbi_extra_taxa = list(ranks.difference(BACKBONE_RANKS_EX))
+        # Retrieve the taxon ranking and extra taxa from the DB
+        self.ncbi_ranks: list[str] = [
+            rw["rank"]
+            for rw in self.ncbi_conn.execute(
+                "select rank from unique_ncbi_ranks order by rank_index desc;"
+            )
+        ]
+        self.ncbi_extra_ranks: list[str] = list(
+            set(self.ncbi_ranks).difference(NCBI_BACKBONE_RANKS)
+        )
 
     def __del__(self) -> None:
         """Delete a LocalNCBIValidator instance.
