@@ -535,147 +535,104 @@ class NCBIValidator:
         superseed = False
 
         # Look for record associated with the provided ID
-        sql = f"select * from nodes where tax_id = {ncbi_id}"
-        taxon_row = self.ncbi_conn.execute(sql).fetchone()
+        taxon_row = self.ncbi_conn.execute(
+            f"select * from nodes where tax_id = {ncbi_id}"
+        ).fetchone()
 
-        # If nothing found check if this ID has been merged
         if taxon_row is None:
-            sql = f"select * from merge where old_tax_id = {ncbi_id}"
-            taxon_row = self.ncbi_conn.execute(sql).fetchone()
-            # If it's not found then give bad ID error
-            if taxon_row is None:
+            # If nothing found check if this ID has been merged
+            merge_row = self.ncbi_conn.execute(
+                f"select new_tax_id, old_tax_id from merge where old_tax_id = {ncbi_id}"
+            ).fetchone()
+
+            if merge_row is None:
+                # If it's not a merged ID then raise a bad ID error
                 raise NCBIError()
             else:
-                sql = f"select * from nodes where tax_id = {taxon_row['new_tax_id']}"
-                taxon_row = self.ncbi_conn.execute(sql).fetchone()
                 superseed = True
                 # Warn user that they've given a superseded taxa ID
                 LOGGER.warning(
                     f"NCBI ID {ncbi_id} has been superseded by ID "
-                    f"{taxon_row['tax_id']}"
+                    f"{merge_row['new_tax_id']}"
                 )
+                # Subsititute the found row
+                ncbi_id = merge_row["new_tax_id"]
 
-        # Extract relevant info from the taxon row
-        t_rank = taxon_row["rank"]
-        good_id = taxon_row["tax_id"]
-        # Then use to find and store name
-        sql = f"select * from names where tax_id = {good_id} and "
-        sql += "name_class = 'scientific name'"
-        name_row = self.ncbi_conn.execute(sql).fetchone()
-        t_name = name_row["name_txt"]
+        # Get complete information on the resolved taxon
+        name_row = self.ncbi_conn.execute(
+            "select nm.tax_id, name_txt, parent_tax_id, rank "
+            "from names nm join nodes nd on nm.tax_id = nd.tax_id "
+            f"where nm.tax_id = {ncbi_id} "
+            "and nm.name_class = 'scientific name';"
+        ).fetchone()
 
-        # Then setup loop to find the whole lineage
-        lin_fnd = False
-        linx = []
+        #  Extract rank and id from the resolved row
+        taxon_rank = name_row["rank"]
+        taxon_id = name_row["tax_id"]
+        taxon_name = name_row["name_txt"]
+        taxon_parent_id = name_row["parent_tax_id"]
 
-        while lin_fnd is False:
-            tmp_dic = {}
+        # Now build the taxonomic hierarchy - this will yield a list of dictionaries of
+        # taxa in taxonomic order from leaf to root.
+        hierarchy = [dict(name_row)]
+
+        while name_row["parent_tax_id"] != 1:
             # Find node and name of the parent taxon
-            sql = f"select * from nodes where tax_id = {taxon_row['parent_tax_id']}"
-            taxon_row = self.ncbi_conn.execute(sql).fetchone()
-            sql = f"select * from names where tax_id = {taxon_row['tax_id']} and "
-            sql += "name_class = 'scientific name'"
-            name_row = self.ncbi_conn.execute(sql).fetchone()
-            # Store all relevant info
-            tmp_dic["TaxID"] = taxon_row["tax_id"]
-            tmp_dic["ScientificName"] = name_row["name_txt"]
-            tmp_dic["Rank"] = taxon_row["rank"]
-            # And add all of it to the Lineage
-            linx.append(tmp_dic)
-            # End this when the parent taxon is root (ID=1)
-            if taxon_row["parent_tax_id"] == 1:
-                lin_fnd = True
+            name_row = self.ncbi_conn.execute(
+                "select nm.tax_id, name_txt, parent_tax_id, rank "
+                "from names nm join nodes nd on nm.tax_id = nd.tax_id "
+                f"where nm.tax_id = {name_row['parent_tax_id']} "
+                "and nm.name_class = 'scientific name';"
+            ).fetchone()
 
-        # Reverse the order of the lineage
-        linx = list(reversed(linx))
-        # Find number of taxonomic ranks
-        tx_len = len(linx)
-        # Extract parent taxa ranks
-        rnks = [linx[i]["Rank"] for i in range(tx_len)]
+            hierarchy.append(dict(name_row))
 
-        # Check that the taxon rank provided is a backbone rank
-        if t_rank in BACKBONE_RANKS_EX:
-            # In this case use provided rank
-            rnk = BACKBONE_RANKS_EX.index(t_rank)
+        # Find the backbone taxonomic level in the hierarchy closest to the leaf
+        try:
+            backbone_idx, backbone_rank = next(
+                (idx, hr["rank"])
+                for idx, hr in enumerate(hierarchy)
+                if hr["rank"] in NCBI_BACKBONE_RANKS
+            )
+        except StopIteration:
+            LOGGER.error(f"Taxon hierarchy for {nnme} contains no backbone ranks")
+            return gen_invalid_NCBITaxon()
 
-        # Filter out ID's with non-backbone ranks (e.g. strains)
-        else:
-            # Set as not a valid taxa
-            vld_tax = False
-            # Find lowest index
-            r_ID = len(BACKBONE_RANKS_EX) - 1
+        # Warn user if the leaf rank is not a match to a backbone rank
+        is_not_backbone = backbone_idx != 0
+        if is_not_backbone:
+            LOGGER.warning(f"{nnme} of non-backbone rank: {taxon_rank}")
 
-            # While loop that runs until valid taxa is found
-            while vld_tax is False:
-                # Check if taxa id is found
-                if any(
-                    [rnks[i] == f"{BACKBONE_RANKS_EX[r_ID]}" for i in range(tx_len)]
-                ):
-                    # Close loop and store rank number
-                    vld_tax = True
-                    # Add 1 to the rank as only including lineage in this case
-                    rnk = r_ID + 1
-                    # Warn user that non-backbone rank has been supplied
-                    LOGGER.warning(f"{nnme} of non-backbone rank: {t_rank}")
-                # Raise error once backbone ranks have been exhausted
-                elif r_ID < 1:
-                    LOGGER.error(
-                        f"Taxon hierarchy for {nnme} contains no backbone ranks"
-                    )
-                    return gen_invalid_NCBITaxon()
-                else:
-                    r_ID -= 1
+        # Reduce to a list of backbone hierarchy - some might be missing and these will
+        # just be skipped over in compiling the backbone elements of the hierarchy.
+        bb_hierarchy = [
+            hr
+            for hr in hierarchy
+            if hr["rank"]
+            in NCBI_BACKBONE_RANKS[: NCBI_BACKBONE_RANKS.index(backbone_rank) + 1]
+        ]
 
-        # Make list of backbone ranks we are looking for
-        actual_bb_rnks = BACKBONE_RANKS_EX[0:rnk]
+        # Set the last parent index to None to mark the root of the hierarchy
+        bb_hierarchy[-1]["parent_tax_id"] = None
 
-        # Number of missing ranks initialised to zero
-        m_rnk = 0
-
-        # Check that all desired backbone ranks appear in the lineage
-        if all(item in rnks for item in actual_bb_rnks) is False:
-            # Find all missing ranks
-            miss = list(set(actual_bb_rnks).difference(rnks))
-            # Count missing ranks
-            m_rnk = len(miss)
-            # Remove missing ranks from our list of desired ranks
-            for i in range(0, m_rnk):
-                actual_bb_rnks.remove(miss[i])
-
-        # Find valid indices (e.g. those corresponding to backbone ranks)
-        vinds = [idx for idx, element in enumerate(rnks) if element in actual_bb_rnks]
-
-        # Create dictionary of valid taxa lineage using a list
-        if len(actual_bb_rnks) != 0:
-            red_taxa: dict[str, tuple] = {
-                f"{actual_bb_rnks[0]}": (
-                    str(linx[vinds[0]]["ScientificName"]),
-                    int(linx[vinds[0]]["TaxID"]),
-                    None,
-                )
+        # Format the backbone hierachy
+        if bb_hierarchy:
+            # Convert the reversed backbone if it is not empty
+            bb_dict = {
+                hr["rank"]: (hr["name_txt"], hr["tax_id"], hr["parent_tax_id"])
+                for hr in reversed(bb_hierarchy)
             }
 
-            # Recursively add all the hierarchy data in
-            for i in range(1, rnk - m_rnk):
-                red_taxa[f"{actual_bb_rnks[i]}"] = (
-                    str(linx[vinds[i]]["ScientificName"]),
-                    int(linx[vinds[i]]["TaxID"]),
-                    int(linx[vinds[i - 1]]["TaxID"]),
-                )
-
-            # Then add taxa information as a final entry
-            red_taxa[f"{t_rank}"] = (
-                str(t_name),
-                int(good_id),
-                int(linx[vinds[-1]]["TaxID"]),
-            )
+            # If the leaf is not a backbone, add it to the dictionary
+            if is_not_backbone:
+                bb_dict[taxon_rank] = (taxon_name, taxon_id, taxon_parent_id)
         else:
-            # Just make taxa with individual rank if no valid lineage provided
-            red_taxa = {f"{t_rank}": ((t_name), int(good_id), None)}
+            # Otherwise, provide the basic information
+            bb_dict = {taxon_rank: (taxon_name, taxon_id, None)}
 
         # Create and populate microbial taxon
         mtaxon = NCBITaxon(
-            name=t_name, rank=t_rank, ncbi_id=int(good_id), taxa_hier=red_taxa
+            name=taxon_name, rank=taxon_rank, ncbi_id=taxon_id, taxa_hier=bb_dict
         )
 
         # Record whether a superseded NCBI ID has been provided
@@ -1523,7 +1480,7 @@ class GBIFTaxa:
 
         known = [tx[1] for tx in self.taxon_index if tx[1] != -1]
         to_add = [tx for tx in self.hierarchy if tx[1] not in known]
-        to_add.sort(key=lambda val: BACKBONE_RANKS.index(val[0]))
+        to_add.sort(key=lambda val: GBIF_BACKBONE_RANKS.index(val[0]))
 
         # Look up the taxonomic hierarchy
         for tx_lev, tx_id in to_add:
@@ -2169,7 +2126,7 @@ def taxon_index_to_text(
         elif auth == "NCBI":
             # format the canonical name
             if tx["taxon_status"] == "user":
-                if tx["taxon_rank"] in BACKBONE_RANKS_EX:
+                if tx["taxon_rank"] in NCBI_BACKBONE_RANKS:
                     return f"[{tx['taxon_name']}]"
                 else:
                     return (
@@ -2181,7 +2138,7 @@ def taxon_index_to_text(
                         return tags.i(tx["taxon_name"])
                     else:
                         return f"_{tx['taxon_name']}_"
-                elif tx["taxon_rank"] not in BACKBONE_RANKS_EX:
+                elif tx["taxon_rank"] not in NCBI_BACKBONE_RANKS:
                     return f"{tx['taxon_name']} (non-backbone rank: {tx['taxon_rank']})"
                 else:
                     return tx["taxon_name"]
