@@ -505,6 +505,24 @@ class NCBIValidator:
             set(self.ncbi_ranks_root_to_leaf).difference(NCBI_BACKBONE_RANKS)
         )
 
+        self.superkingdoms = [
+            rw["name_txt"]
+            for rw in self.ncbi_conn.execute(
+                "select name_txt "
+                "from names join nodes using (tax_id) "
+                "where rank='superkingdom'"
+            ).fetchall()
+        ]
+
+        self.kingdoms = [
+            rw["name_txt"]
+            for rw in self.ncbi_conn.execute(
+                "select name_txt "
+                "from names join nodes using (tax_id) "
+                "where rank='kingdom'"
+            ).fetchall()
+        ]
+
     def __del__(self) -> None:
         """Delete a LocalNCBIValidator instance.
 
@@ -784,8 +802,9 @@ class NCBIValidator:
                     "Not all taxa hierachy entries are 2 tuples of strings"
                 )
 
-        # Now get the leaf from the end of the hierarchy and look for that name and
-        # rank combination in the database.
+        # Now ensure the taxon hierarchy is in root to leaf order and then get the leaf
+        # and look for that name and rank combination in the database.
+        taxon_hier.sort(key=lambda x: self.ncbi_ranks_root_to_leaf.index(x[0]))
         leaf_rank, leaf_name = taxon_hier.pop()
         taxon_rows = self._get_name_and_rank_matches(leaf_name, leaf_rank)
 
@@ -1750,6 +1769,18 @@ class NCBITaxa:
                 value = taxa_strip(value, rnk)
                 if value is not None:
                     taxon_dict[rnk] = value
+
+            # Now standardise kingdoms to superkingdoms if required
+            if (
+                "kingdom" in taxon_dict
+                and taxon_dict["kingdom"] not in self.validator.kingdoms
+                and taxon_dict["kingdom"] in self.validator.superkingdoms
+            ):
+                taxon_dict["superkingdom"] = taxon_dict.pop("kingdom")
+                LOGGER.warning(
+                    f"NCBI records {taxon_dict['superkingdom']} as "
+                    f"a superkingdom rather than a kingdom"
+                )
 
             # Now convert species and subspecies ranks to binomial, trinomial where
             # possible. Abandon validation for taxa where construct_bi_or_tri fails.

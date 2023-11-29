@@ -19,7 +19,7 @@ fp.close()
 
 # Copy truncated database from local non-git copy.
 source_db = sqlite3.connect(
-    "../../local/ncbi_databases/ncbi_taxonomy_2022-09-01.sqlite"
+    "../../local/ncbi_databases/ncbi_taxonomy_2023-11-01.sqlite"
 )
 dest_db = sqlite3.connect("ncbi_database_truncated.sqlite")
 
