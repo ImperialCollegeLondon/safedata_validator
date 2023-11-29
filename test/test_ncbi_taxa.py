@@ -1,7 +1,7 @@
 """Tests checking that the NCBI specific classes work as intended."""
 import copy
-import os
-from logging import ERROR, INFO, WARNING
+from contextlib import nullcontext as does_not_raise
+from logging import CRITICAL, ERROR, INFO, WARNING
 
 import pytest
 from dotmap import DotMap
@@ -16,115 +16,191 @@ from .conftest import log_check
 
 
 @pytest.mark.parametrize(
-    "test_input,expected_exception",
+    "test_input,raises,message",
     [
-        (dict(), TypeError),  # no parameters
-        # non string name
-        (
+        pytest.param(
             dict(
                 name=1,
                 rank="genus",
                 ncbi_id=37577,
-                taxa_hier={"genus": ("Morus", 37577)},
+                parent_ncbi_id=30446,
+                taxa_hier=["genus", "Morus", 37577, 30446],
             ),
-            TypeError,
+            pytest.raises(TypeError),
+            "Provided taxon name not a string",
+            id="non string name",
         ),
-        # non-numeric ncbi_id
-        (
+        pytest.param(
             dict(
                 name="Morus",
                 rank="genus",
                 ncbi_id="error",
-                taxa_hier={"genus": ("Morus", 37577)},
+                parent_ncbi_id=30446,
+                taxa_hier=[("genus", "Morus", 37577, 30446)],
             ),
-            TypeError,
+            pytest.raises(TypeError),
+            "NCBI ID is not an integer",
+            id="string ncbi_id",
         ),
-        # non-integer ncbi_id
-        (
+        pytest.param(
             dict(
                 name="Morus",
                 rank="genus",
                 ncbi_id=3.141,
-                taxa_hier={"genus": ("Morus", 37577)},
+                parent_ncbi_id=30446,
+                taxa_hier=[("genus", "Morus", 37577, 30446)],
             ),
-            TypeError,
+            pytest.raises(TypeError),
+            "NCBI ID is not an integer",
+            id="non-integer ncbi_id",
         ),
-        # string instead of dictionary
-        (dict(name="Morus", rank="genus", ncbi_id=37577, taxa_hier="test"), TypeError),
-        # empty dictionary
-        (dict(name="Morus", rank="genus", ncbi_id=37577, taxa_hier={}), ValueError),
-        # non-string key
-        (
+        pytest.param(
             dict(
                 name="Morus",
                 rank="genus",
                 ncbi_id=37577,
-                taxa_hier={1: ("Morus", 37577)},
+                parent_ncbi_id=30446,
+                taxa_hier="test",
             ),
-            ValueError,
+            pytest.raises(TypeError),
+            "Taxonomic hierarchy not a list",
+            id="string instead of dictionary",
         ),
-        (
-            dict(
-                name="Morus", rank="genus", ncbi_id=37577, taxa_hier={"genus": 27}
-            ),  # non-tuple value
-            ValueError,
-        ),
-        # non-tuple value
-        (
+        pytest.param(
             dict(
                 name="Morus",
                 rank="genus",
                 ncbi_id=37577,
-                taxa_hier={"genus": (37577, "Morus")},
+                parent_ncbi_id=30446,
+                taxa_hier=[],
             ),
-            ValueError,
+            pytest.raises(ValueError),
+            "Taxon hierarchy empty",
+            id="empty dictionary",
         ),
-        # 3 elements in tuple
-        (
+        pytest.param(
             dict(
                 name="Morus",
                 rank="genus",
                 ncbi_id=37577,
-                taxa_hier={"genus": ("Morus", 37577, "extra")},
+                parent_ncbi_id=30446,
+                taxa_hier=[27],
             ),
-            ValueError,
+            pytest.raises(ValueError),
+            "Taxon hierarchy values not all tuples",
+            id="non-tuple value",
         ),
-        # supplied rank doesn't match
-        (
+        pytest.param(
+            dict(
+                name="Morus",
+                rank="genus",
+                ncbi_id=37577,
+                parent_ncbi_id=30446,
+                taxa_hier=[("genus", 37577, "Morus")],
+            ),
+            pytest.raises(ValueError),
+            "Taxon hierarchy tuples malformed",
+            id="Bad tuple length",
+        ),
+        pytest.param(
+            dict(
+                name="Morus",
+                rank="genus",
+                ncbi_id=37577,
+                parent_ncbi_id=30446,
+                taxa_hier=[("genus", "Morus", 37577, "extra")],
+            ),
+            pytest.raises(ValueError),
+            "Taxon hierarchy tuples malformed",
+            id="Bad tuple types",
+        ),
+        pytest.param(
             dict(
                 name="Morus",
                 rank="species",
                 ncbi_id=37577,
-                taxa_hier={"genus": ("Morus", 37577)},
+                parent_ncbi_id=30446,
+                taxa_hier=[("genus", "Morus", 37577, 30446)],
             ),
-            ValueError,
+            pytest.raises(ValueError),
+            "Provided rank (species) not in hierarchy",
+            id="rank missing",
         ),
-        # supplied name doesn't match
-        (
+        pytest.param(
+            dict(
+                name="Morus",
+                rank="species",
+                ncbi_id=37577,
+                parent_ncbi_id=30446,
+                taxa_hier=[
+                    ("genus", "Morus", 37577, 30446),
+                    ("species", "Morus bassanus", 1, 37578),
+                ],
+            ),
+            pytest.raises(ValueError),
+            "Provided rank (species) does not match first rank in hierarchy (genus)",
+            id="rank not first",
+        ),
+        pytest.param(
             dict(
                 name="Bombus bombus",
                 rank="genus",
                 ncbi_id=37577,
-                taxa_hier={"genus": ("Morus", 37577)},
+                parent_ncbi_id=30446,
+                taxa_hier=[("genus", "Morus", 37577, 30446)],
             ),
-            ValueError,
+            pytest.raises(ValueError),
+            "Provided taxon name (Bombus bombus) does not match "
+            "first name in hierarchy (Morus)",
+            id="name mismatch",
         ),
-        # supplied NCBI ID doesn't match
-        (
+        pytest.param(
             dict(
                 name="Morus",
                 rank="genus",
                 ncbi_id=27,
-                taxa_hier={"genus": ("Morus", 37577)},
+                parent_ncbi_id=30446,
+                taxa_hier=[("genus", "Morus", 37577, 30446)],
             ),
-            ValueError,
+            pytest.raises(ValueError),
+            "Provided NCBI ID (27) does not match first ID in hierarchy (37577)",
+            id="taxid mismatch",
+        ),
+        pytest.param(
+            dict(
+                name="Morus",
+                rank="genus",
+                ncbi_id=27,
+                parent_ncbi_id=666,
+                taxa_hier=[("genus", "Morus", 37577, 30446)],
+            ),
+            pytest.raises(ValueError),
+            "Provided parent NCBI ID (666) does not match "
+            "first parent ID in hierarchy (30446)",
+            id="parent taxid mismatch",
+        ),
+        pytest.param(
+            dict(
+                name="Morus",
+                rank="genus",
+                ncbi_id=37577,
+                parent_ncbi_id=30446,
+                taxa_hier=[("genus", "Morus", 37577, 30446)],
+            ),
+            does_not_raise(),
+            None,
+            id="passes",
         ),
     ],
 )
-def test_taxon_init_errors(test_input, expected_exception):
+def test_taxon_init_errors(test_input, raises, message):
     """This test checks NCBI taxon inputs expected errors."""
-    with pytest.raises(expected_exception):
+
+    with raises as excep:
         _ = taxa.NCBITaxon(**test_input)
+
+        if not isinstance(raises, does_not_raise):
+            assert excep.value == message
 
 
 # ------------------------------------------
@@ -132,58 +208,81 @@ def test_taxon_init_errors(test_input, expected_exception):
 # ------------------------------------------
 # Only need to test that output is sensible here
 @pytest.mark.parametrize(
-    "test_input,expected",
+    "test_input,exp_name,exp_log",
     [
-        (dict(name="Bacteria", rank="Kingdom"), ("Bacteria", True)),
-        (dict(name="k__Bacteria", rank="Kingdom"), ("Bacteria", True)),
-        (dict(name="k__Bacteria", rank="Phylum"), ("Bacteria", False)),
-        (dict(name="p__Acidobacteria", rank="Phylum"), ("Acidobacteria", True)),
-        (dict(name="s__", rank="Species"), ("", True)),
-        (dict(name="s__", rank="Species"), ("", True)),
-        (dict(name=None, rank="Order"), (None, True)),
+        (dict(name="Bacteria", rank="Kingdom"), "Bacteria", ()),
+        (dict(name="k__Bacteria", rank="Kingdom"), "Bacteria", ()),
+        (
+            dict(name="k__Bacteria", rank="Phylum"),
+            "Bacteria",
+            ((ERROR, "Prefix of taxon k__Bacteria inconsistent with rank Phylum"),),
+        ),
+        (dict(name="p__Acidobacteria", rank="Phylum"), "Acidobacteria", ()),
+        (dict(name="s__", rank="Species"), None, ()),
     ],
 )
-def test_taxa_strip(test_input, expected):
+def test_taxa_strip(caplog, test_input, exp_name, exp_log):
     """Checks that the function to remove k__ type notation is functioning properly.
 
     This function also checks that the supplied rank matches the rank implied by the
     notation.
     """
 
-    s_taxa, match = taxa.taxa_strip(**test_input)
+    s_taxa = taxa.taxa_strip(**test_input)
 
-    assert s_taxa == expected[0]
-    assert match == expected[1]
+    assert s_taxa == exp_name
+
+    log_check(caplog, exp_log)
 
 
 # ------------------------------------------
 # Testing construct_bi_or_tri
 # ------------------------------------------
 @pytest.mark.parametrize(
-    "test_input,expected",
+    "test_input,raises,expected",
     [
-        (dict(higher_nm="Escherichia", lower_nm="coli", tri=False), "Escherichia coli"),
         (
-            dict(higher_nm="Escherichia", lower_nm="Escherichia coli", tri=False),
+            dict(higher_nm="Escherichia", lower_nm="coli", tri=False),
+            does_not_raise(),
             "Escherichia coli",
         ),
-        (dict(higher_nm="Gorilla", lower_nm="gorilla", tri=False), "Gorilla gorilla"),
+        (
+            dict(higher_nm="Escherichia", lower_nm="Escherichia coli", tri=False),
+            does_not_raise(),
+            "Escherichia coli",
+        ),
+        (
+            dict(higher_nm="Gorilla", lower_nm="gorilla", tri=False),
+            does_not_raise(),
+            "Gorilla gorilla",
+        ),
         (
             dict(
                 higher_nm="Candidatus Koribacter",
                 lower_nm="Candidatus versatilis",
                 tri=False,
             ),
+            does_not_raise(),
             "Candidatus Koribacter versatilis",
         ),
         (
             dict(higher_nm="Candidatus Koribacter", lower_nm="versatilis", tri=False),
+            does_not_raise(),
             "Candidatus Koribacter versatilis",
         ),
-        (dict(higher_nm="Over long genus name", lower_nm="vulpes", tri=False), None),
-        (dict(higher_nm="Canis", lower_nm="Vulpes vulpes", tri=False), None),
+        (
+            dict(higher_nm="Over long genus name", lower_nm="vulpes", tri=False),
+            pytest.raises(ValueError),
+            None,
+        ),
+        (
+            dict(higher_nm="Canis", lower_nm="Vulpes vulpes", tri=False),
+            pytest.raises(ValueError),
+            None,
+        ),
         (
             dict(higher_nm="Vulpes vulpes", lower_nm="japonica", tri=True),
+            does_not_raise(),
             "Vulpes vulpes japonica",
         ),
         (
@@ -192,6 +291,7 @@ def test_taxa_strip(test_input, expected):
                 lower_nm="Ellin345",
                 tri=True,
             ),
+            does_not_raise(),
             "Candidatus Koribacter versatilis Ellin345",
         ),
         (
@@ -200,34 +300,46 @@ def test_taxa_strip(test_input, expected):
                 lower_nm="Candidatus Ellin345",
                 tri=True,
             ),
+            does_not_raise(),
             "Candidatus Koribacter versatilis Ellin345",
         ),
         (
             dict(
                 higher_nm="Vulpes vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True
             ),
+            does_not_raise(),
             "Vulpes vulpes schrenckii",
         ),
         (
             dict(
                 higher_nm="Canis vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True
             ),
+            pytest.raises(ValueError),
             None,
         ),
-        (dict(higher_nm="Over long name", lower_nm="schrenckii", tri=True), None),
-        (dict(higher_nm="Vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True), None),
+        (
+            dict(higher_nm="Over long name", lower_nm="schrenckii", tri=True),
+            pytest.raises(ValueError),
+            None,
+        ),
+        (
+            dict(higher_nm="Vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True),
+            pytest.raises(ValueError),
+            None,
+        ),
     ],
 )
-def test_construct_bi_or_tri(test_input, expected):
+def test_construct_bi_or_tri(test_input, raises, expected):
     """Test function that constructs species binomials from species and genus names.
 
     We test that it can catch when the species name is already a binomial, and that it
     catches Candidatus names and handles them properly.
     """
+    with raises:
+        s_nm = taxa.construct_bi_or_tri(**test_input)
 
-    s_nm = taxa.construct_bi_or_tri(**test_input)
-
-    assert s_nm == expected
+        if isinstance(raises, does_not_raise):
+            assert s_nm == expected
 
 
 # Now test that the function logs errors correctly
@@ -289,31 +401,280 @@ def test_validate_construct_bi_or_tri(caplog, test_input, expected_log_entries):
 # ------------------------------------------
 # Testing taxon validators
 # ------------------------------------------
+@pytest.mark.parametrize(
+    "tax_id,raises, leaf,n_tax",
+    [
+        pytest.param(
+            562,
+            does_not_raise(),
+            ("Escherichia coli", "species", 562, 561),
+            8,
+            id="Backbone leaf",
+        ),
+        pytest.param(
+            562,
+            does_not_raise(),
+            ("Escherichia coli 1-110-08_S1_C1", "strain", 1444049, 562),
+            9,
+            id="Non backbone leaf",
+        ),
+        pytest.param(
+            131567,
+            does_not_raise(),
+            ("cellular organisms", "no rank", 131567, 1),
+            1,
+            id="No backbone ranks",
+        ),
+        pytest.param(1000, pytest.raises(taxa.NCBIError), None, None, id="Merged taxa"),
+        pytest.param(-1000, pytest.raises(taxa.NCBIError), None, None, id="Bad id"),
+    ],
+)
+def test_get_canon_hierarchy(fixture_ncbi_validator, raises, tax_id, leaf, n_tax):
+    """Test structure and failure modes of _get_hierarchy."""
+
+    with raises as err:
+        hier = fixture_ncbi_validator._get_canon_hierarchy(tax_id)
+
+        if isinstance(err, does_not_raise):
+            assert hier[0] == leaf
+            assert len(hier) == n_tax
+
+
+@pytest.mark.parametrize(
+    "tax_id,expected_hier,",
+    [
+        pytest.param(
+            562,
+            [
+                ("species", "Escherichia coli", 562, 561),
+                ("genus", "Escherichia", 561, 543),
+                ("family", "Enterobacteriaceae", 543, 91347),
+                ("order", "Enterobacterales", 91347, 1236),
+                ("class", "Gammaproteobacteria", 1236, 1224),
+                ("phylum", "Proteobacteria", 1224, 2),
+                ("superkingdom", "Bacteria", 2, None),
+            ],
+            id="Backbone leaf",
+        ),
+        pytest.param(
+            9627,
+            [
+                ("species", "Vulpes vulpes", 9627, 9625),
+                ("genus", "Vulpes", 9625, 9608),
+                ("family", "Canidae", 9608, 33554),
+                ("order", "Carnivora", 33554, 40674),
+                ("class", "Mammalia", 40674, 7711),
+                ("phylum", "Chordata", 7711, 33208),
+                ("kingdom", "Metazoa", 33208, 2759),
+                ("superkingdom", "Eukaryota", 2759, None),
+            ],
+            id="Backbone leaf with more complexity",
+        ),
+        pytest.param(
+            1444049,
+            [
+                ("strain", "Escherichia coli 1-110-08_S1_C1", 1444049, 562),
+                ("species", "Escherichia coli", 562, 561),
+                ("genus", "Escherichia", 561, 543),
+                ("family", "Enterobacteriaceae", 543, 91347),
+                ("order", "Enterobacterales", 91347, 1236),
+                ("class", "Gammaproteobacteria", 1236, 1224),
+                ("phylum", "Proteobacteria", 1224, 2),
+                ("superkingdom", "Bacteria", 2, None),
+            ],
+            id="Non backbone leaf",
+        ),
+        pytest.param(
+            2,
+            [
+                ("superkingdom", "Bacteria", 2, None),
+            ],
+            id="Only one backbone rank",
+        ),
+        pytest.param(
+            131567,
+            [
+                ("no rank", "cellular organisms", 131567, None),
+            ],
+            id="No backbone ranks",
+        ),
+    ],
+)
+def test_canon_to_backbone_hierarchy(fixture_ncbi_validator, tax_id, expected_hier):
+    """Test structure and failure modes of _get_hierarchy."""
+
+    canon_hier = fixture_ncbi_validator._get_canon_hierarchy(tax_id)
+
+    bb_hier = fixture_ncbi_validator._canon_to_backbone_hierarchy(canon_hier)
+
+    assert bb_hier == expected_hier
+
+
+@pytest.mark.parametrize(
+    "provided, report, exp_congruent, exp_log",
+    [
+        pytest.param(
+            (
+                ("family", "Enterobacteriaceae"),
+                ("genus", "Escherichia"),
+                ("species", "Escherichia coli"),
+            ),
+            False,
+            True,
+            (),
+            id="good no reporting",
+        ),
+        pytest.param(
+            (
+                ("family", "Enterobacteriaceae"),
+                ("genus", "Escherichia"),
+                ("species", "Escherichia coli"),
+            ),
+            True,
+            True,
+            (),
+            id="good with reporting",
+        ),
+        pytest.param(
+            (),
+            False,
+            True,
+            (),
+            id="provided is empty",
+        ),
+        pytest.param(
+            (
+                ("family", "Enterobacteriaceae"),
+                ("genus", "Escherichia"),
+                ("species", "Escherichia coli"),
+                ("strain", "Escherichia coli 1-110-08_S1_C1"),
+            ),
+            False,
+            False,
+            (),
+            id="bad rank no reporting",
+        ),
+        pytest.param(
+            (
+                ("family", "Enterobacteriaceae"),
+                ("genus", "Escherichia"),
+                ("species", "Escherichia coli"),
+                ("strain", "Escherichia coli 1-110-08_S1_C1"),
+            ),
+            True,
+            False,
+            (
+                (
+                    ERROR,
+                    "Taxonomy mismatch for Escherichia coli 1-110-08_S1_C1 at rank "
+                    "strain: rank not found in expected hierarchy",
+                ),
+            ),
+            id="bad rank with reporting",
+        ),
+        pytest.param(
+            (
+                ("family", "Enterobacterales"),
+                ("genus", "Escherichia"),
+                ("species", "Escherichia coli"),
+            ),
+            False,
+            False,
+            (),
+            id="bad no reporting",
+        ),
+        pytest.param(
+            (
+                ("family", "Enterobacterales"),
+                ("genus", "Escherichia"),
+                ("species", "Escherichia coli"),
+            ),
+            True,
+            False,
+            (
+                (
+                    ERROR,
+                    "Taxonomy mismatch for Enterobacterales at rank family: "
+                    "expecting Enterobacteriaceae",
+                ),
+            ),
+            id="bad with reporting",
+        ),
+        pytest.param(
+            (
+                ("family", "Enterobacteraceae"),
+                ("genus", "Escherichia"),
+                ("species", "Enterococcus coli"),
+            ),
+            False,
+            True,
+            (),
+            id="synonyms no reporting",
+        ),
+        pytest.param(
+            (
+                ("family", "Enterobacteraceae"),
+                ("genus", "Escherichia"),
+                ("species", "Enterococcus coli"),
+            ),
+            True,
+            True,
+            (
+                (
+                    WARNING,
+                    "Non-canon name Enterobacteraceae at rank family: "
+                    "synonym for Enterobacteriaceae",
+                ),
+                (
+                    WARNING,
+                    "Non-canon name Enterococcus coli at rank species: "
+                    "synonym for Escherichia coli",
+                ),
+            ),
+            id="synonyms with reporting",
+        ),
+    ],
+)
+def test_check_congruent_hierarchies(
+    fixture_ncbi_validator, caplog, provided, report, exp_congruent, exp_log
+):
+    """Test  _check_congruent_hierarchies."""
+
+    expected = fixture_ncbi_validator._get_canon_hierarchy(562)
+
+    congruent = fixture_ncbi_validator._check_congruent_hierarchies(
+        expected_hier=expected,
+        provided_hier=provided,
+        report=report,
+    )
+    assert congruent == exp_congruent
+
+    log_check(caplog, exp_log)
 
 
 # First test the search function
 @pytest.mark.parametrize(
     "test_input,expected",
     [
-        (
+        pytest.param(
             dict(nnme="E coli", ncbi_id=562),
-            ("Escherichia coli", "species", 562, False, None, 561),
+            ("species", "Escherichia coli", 562, 561),
+            id="species",
         ),
-        (
+        pytest.param(
             dict(nnme="E coli strain", ncbi_id=1444049),
-            ("Escherichia coli 1-110-08_S1_C1", "strain", 1444049, False, None, 562),
+            ("strain", "Escherichia coli 1-110-08_S1_C1", 1444049, 562),
+            id="strain",
         ),
-        (
+        pytest.param(
             dict(nnme="Streptophytina", ncbi_id=131221),
-            ("Streptophytina", "subphylum", 131221, False, None, 35493),
+            ("subphylum", "Streptophytina", 131221, 35493),
+            id="subphylum",
         ),
-        (
+        pytest.param(
             dict(nnme="Opisthokonta", ncbi_id=33154),
-            ("Opisthokonta", "clade", 33154, False, None, 2759),
-        ),
-        (
-            dict(nnme="Cytophaga marina", ncbi_id=1000),
-            ("Tenacibaculum maritimum", "species", 107401, True, None, 104267),
+            ("clade", "Opisthokonta", 33154, 2759),
+            id="clade",
         ),
     ],
 )
@@ -322,47 +683,9 @@ def test_id_lookup(fixture_ncbi_validator, test_input, expected):
 
     fnd_tx = fixture_ncbi_validator.id_lookup(**test_input)
 
-    assert fnd_tx.name == expected[0]
-    assert fnd_tx.rank == expected[1]
-    assert fnd_tx.ncbi_id == expected[2]
-    assert fnd_tx.superseed == expected[3]
-
-    # Find last dictionary key
-    f_key = list(fnd_tx.taxa_hier.keys())[-1]
-
-    assert f_key == expected[1]
-
-    assert fnd_tx.taxa_hier[f_key] == (expected[0], expected[2], expected[5])
-    assert fnd_tx.orig == expected[4]
-
-
-# Now test that the search function logs errors correctly
-@pytest.mark.parametrize(
-    "test_input,expected_log_entries",
-    [
-        (dict(nnme="E coli", ncbi_id=562), ()),  # Fine so empty
-        (
-            dict(nnme="Streptophytina", ncbi_id=131221),  # Non-backbone rank
-            ((WARNING, "Streptophytina of non-backbone rank: subphylum"),),
-        ),
-        (
-            dict(nnme="C marina", ncbi_id=1000),  # Non-backbone rank
-            ((WARNING, "NCBI ID 1000 has been superseded by ID 107401"),),
-        ),
-        (
-            dict(nnme="Cells", ncbi_id=131567),  # No backbone ranks whatsoever
-            ((ERROR, "Taxon hierarchy for Cells contains no backbone ranks"),),
-        ),
-    ],
-)
-def test_validate_id_lookup(
-    caplog, test_input, expected_log_entries, fixture_ncbi_validator
-):
-    """Checks the logging of a NCBI taxon ID search."""
-
-    fixture_ncbi_validator.id_lookup(**test_input)
-
-    log_check(caplog, expected_log_entries)
+    # Check the properties and that the leaf of the hierarchy match
+    assert (fnd_tx.rank, fnd_tx.name, fnd_tx.ncbi_id) == expected[:-1]
+    assert fnd_tx.taxa_hier[0] == expected
 
 
 # Third function that checks that id_lookup throws the appropriate errors
@@ -386,284 +709,315 @@ def test_id_lookup_errors(fixture_ncbi_validator, test_input, expected_exception
 
 # Then do the same for the taxa search function
 @pytest.mark.parametrize(
-    "test_input,expected",
+    "test_input,leaf,raises,non_canon,exp_log",
     [
-        (
+        pytest.param(
+            dict(
+                nnme="nope",
+                taxon_hier=[("species", "Not a species")],
+            ),
+            None,
+            pytest.raises(taxa.NCBIError),
+            None,
+            ((ERROR, "Taxa nope not found with name Not a species and rank species"),),
+            id="Nothing found",
+        ),
+        pytest.param(
             dict(
                 nnme="E coli",
-                taxah={"genus": "Escherichia", "species": "Escherichia coli"},
+                taxon_hier=[("genus", "Escherichia"), ("species", "Escherichia coli")],
             ),
-            ("Escherichia coli", "species", 562, False, None, 561),
+            ("species", "Escherichia coli", 562, 561),
+            does_not_raise(),
+            (None, None),
+            ((INFO, "Match found for E coli"),),
+            id="Simple species",
         ),
-        (
+        pytest.param(
             dict(
                 nnme="Entero",
-                taxah={"order": "Enterobacterales", "family": "Enterobacteriaceae"},
+                taxon_hier=[
+                    ("order", "Enterobacterales"),
+                    ("family", "Enterobacteriaceae"),
+                ],
             ),
-            ("Enterobacteriaceae", "family", 543, False, None, 91347),
+            ("family", "Enterobacteriaceae", 543, 91347),
+            does_not_raise(),
+            (None, None),
+            ((INFO, "Match found for Entero"),),
+            id="Simple family",
         ),
-        (
+        pytest.param(
             dict(
                 nnme="E coli strain",
-                taxah={
-                    "species": "Escherichia coli",
-                    "strain": "Escherichia coli 1-110-08_S1_C1",
-                },
+                taxon_hier=[
+                    ("species", "Escherichia coli"),
+                    ("strain", "Escherichia coli 1-110-08_S1_C1"),
+                ],
             ),
-            ("Escherichia coli 1-110-08_S1_C1", "strain", 1444049, False, None, 562),
+            ("strain", "Escherichia coli 1-110-08_S1_C1", 1444049, 562),
+            does_not_raise(),
+            (None, None),
+            ((INFO, "Match found for E coli strain"),),
+            id="Simple strain",
         ),
-        (
+        pytest.param(
             dict(
                 nnme="Strepto",
-                taxah={"phylum": "Streptophyta", "subphylum": "Streptophytina"},
+                taxon_hier=[
+                    ("phylum", "Streptophyta"),
+                    ("subphylum", "Streptophytina"),
+                ],
             ),
-            ("Streptophytina", "subphylum", 131221, False, None, 35493),
+            ("subphylum", "Streptophytina", 131221, 35493),
+            does_not_raise(),
+            (None, None),
+            ((INFO, "Match found for Strepto"),),
+            id="Simple phylum",
         ),
-        (
+        pytest.param(
             dict(
                 nnme="Opistho",
-                taxah={"superkingdom": "Eukaryota", "clade": "Opisthokonta"},
+                taxon_hier=[("superkingdom", "Eukaryota"), ("clade", "Opisthokonta")],
             ),
-            ("Opisthokonta", "clade", 33154, False, None, 2759),
+            ("clade", "Opisthokonta", 33154, 2759),
+            does_not_raise(),
+            (None, None),
+            ((INFO, "Match found for Opistho"),),
+            id="Clade anchored by superkingdom",
         ),
-        (
+        pytest.param(
             dict(
-                nnme="Vulpes vulpes",
-                taxah={"genus": "Vulpes", "species": "Vulpes vulpes"},
+                nnme="fox",
+                taxon_hier=[("genus", "Vulpes"), ("species", "Canis vulpes")],
             ),
-            ("Vulpes vulpes", "species", 9627, False, None, 9625),
+            ("species", "Vulpes vulpes", 9627, 9625),
+            does_not_raise(),
+            ("Canis vulpes", "synonym"),
+            (
+                (WARNING, "Non-canon usage: Canis vulpes is synonym for Vulpes vulpes"),
+                (INFO, "Match found for fox"),
+            ),
+            id="Synonym with congruent taxonomy",
         ),
-        (
-            dict(nnme="M morus", taxah={"family": "Moraceae", "genus": "Morus"}),
-            ("Morus", "genus", 3497, False, None, 3487),
+        pytest.param(
+            dict(
+                nnme="fox",
+                taxon_hier=[("genus", "Canis"), ("species", "Canis vulpes")],
+            ),
+            None,
+            pytest.raises(taxa.NCBIError),
+            None,
+            (
+                (WARNING, "Non-canon usage: Canis vulpes is synonym for Vulpes vulpes"),
+                (ERROR, "Taxonomy mismatch for Canis at rank genus: expecting Vulpes"),
+                (ERROR, "Match found for fox with incongruent taxonomy"),
+            ),
+            id="Synonym with incongruent taxonomy",
         ),
-        (
-            dict(nnme="S morus", taxah={"family": "Sulidae", "genus": "Morus"}),
-            ("Morus", "genus", 37577, False, None, 30446),
-        ),
-        (
-            dict(nnme="C morus", taxah={"phylum": "Chordata", "genus": "Morus"}),
-            ("Morus", "genus", 37577, False, None, 30446),
-        ),
-        (
+        pytest.param(
             dict(
                 nnme="T maritimum",
-                taxah={"genus": "Tenacibaculum", "species": "Tenacibaculum maritimum"},
+                taxon_hier=[
+                    ("genus", "Tenacibaculum"),
+                    ("species", "Tenacibaculum maritimum"),
+                ],
             ),
-            ("Tenacibaculum maritimum", "species", 107401, False, None, 104267),
+            ("species", "Tenacibaculum maritimum", 107401, 104267),
+            does_not_raise(),
+            (None, None),
+            ((INFO, "Match found for T maritimum"),),
+            id="T maritimum simple",
         ),
-        (
+        pytest.param(
             dict(
                 nnme="C marina",
-                taxah={"genus": "Cytophaga", "species": "Cytophaga marina"},
+                taxon_hier=[
+                    ("genus", "Tenacibaculum"),
+                    ("species", "Cytophaga marina"),
+                ],
             ),
-            ("Tenacibaculum maritimum", "species", 107401, True, None, 104267),
+            ("species", "Tenacibaculum maritimum", 107401, 104267),
+            does_not_raise(),
+            ("Cytophaga marina", "synonym"),
+            (
+                (
+                    WARNING,
+                    "Non-canon usage: Cytophaga marina is synonym for "
+                    "Tenacibaculum maritimum",
+                ),
+                (INFO, "Match found for C marina"),
+            ),
+            id="T maritimum from C marina",
         ),
-        (
-            dict(nnme="Bacteria", taxah={"superkingdom": "Bacteria"}),
-            ("Bacteria", "superkingdom", 2, False, None, None),
-        ),
-        (
+        pytest.param(
             dict(
-                nnme="Unknown strain",
-                taxah={"species": "Escherichia coli", "strain": "Nonsense strain"},
+                nnme="C marina",
+                taxon_hier=[("genus", "Cytophaga"), ("species", "Cytophaga marina")],
             ),
-            ("Escherichia coli", "species", 562, False, "strain", 561),
+            None,
+            pytest.raises(taxa.NCBIError),
+            None,
+            (
+                (
+                    WARNING,
+                    "Non-canon usage: Cytophaga marina is synonym for "
+                    "Tenacibaculum maritimum",
+                ),
+                (
+                    ERROR,
+                    "Taxonomy mismatch for Cytophaga at rank genus: expecting "
+                    "Tenacibaculum",
+                ),
+                (ERROR, "Match found for C marina with incongruent taxonomy"),
+            ),
+            id="T maritimum from C marina with incongruent taxonomy",
+        ),
+        pytest.param(
+            dict(nnme="Morus", taxon_hier=[("family", "Moraceae"), ("genus", "Morus")]),
+            ("genus", "Morus", 3497, 3487),
+            does_not_raise(),
+            (None, None),
+            ((INFO, "Match found for Morus"),),
+            id="Plant Morus resolved by family",
+        ),
+        pytest.param(
+            dict(nnme="Morus", taxon_hier=[("family", "Sulidae"), ("genus", "Morus")]),
+            ("genus", "Morus", 37577, 30446),
+            does_not_raise(),
+            (None, None),
+            ((INFO, "Match found for Morus"),),
+            id="Bird morus resolved by family",
+        ),
+        pytest.param(
+            dict(nnme="Morus", taxon_hier=[("phylum", "Chordata"), ("genus", "Morus")]),
+            ("genus", "Morus", 37577, 30446),
+            does_not_raise(),
+            (None, None),
+            ((INFO, "Match found for Morus"),),
+            id="Bird Morus resolved by phylum",
+        ),
+        pytest.param(
+            dict(
+                nnme="Morus",
+                taxon_hier=[("superkingdom", "Eukaryota"), ("genus", "Morus")],
+            ),
+            None,
+            pytest.raises(taxa.NCBIError),
+            None,
+            (
+                (
+                    ERROR,
+                    "Multiple matches for taxon Morus: "
+                    "provided taxonomy does not resolve candidates",
+                ),
+            ),
+            id="Morus not resolved by taxonomy",
+        ),
+        pytest.param(
+            dict(
+                nnme="Morus",
+                taxon_hier=[("family", "Canidae"), ("genus", "Morus")],
+            ),
+            None,
+            pytest.raises(taxa.NCBIError),
+            None,
+            (
+                (
+                    ERROR,
+                    "Multiple matches for taxon Morus: "
+                    "provided taxonomy not congruent with candidates",
+                ),
+            ),
+            id="Morus no candidates match taxonomy",
+        ),
+        pytest.param(
+            dict(
+                nnme="Morus",
+                taxon_hier=[("family", "Moraceae"), ("genus", "mulberries")],
+            ),
+            ("genus", "Morus", 3497, 3487),
+            does_not_raise(),
+            ("mulberries", "genbank common name"),
+            (
+                (
+                    WARNING,
+                    "Non-canon usage: mulberries is genbank common name for Morus",
+                ),
+                (INFO, "Match found for Morus"),
+            ),
+            id="Plant Morus resolved by family with non-canon name",
+        ),
+        pytest.param(
+            dict(
+                nnme="Bacteria",
+                taxon_hier=[
+                    ("superkingdom", "Bacteria"),
+                ],
+            ),
+            ("superkingdom", "Bacteria", 2, None),
+            does_not_raise(),
+            (None, None),
+            ((INFO, "Match found for Bacteria"),),
+            id="Bacteria superkingdom",
+        ),
+        pytest.param(
+            dict(
+                nnme="Bacteria",
+                taxon_hier=[
+                    ("kingdom", "Bacteria"),
+                ],
+            ),
+            ("superkingdom", "Bacteria", 2, None),
+            does_not_raise(),
+            (None, None),
+            (
+                (
+                    WARNING,
+                    "NCBI records Bacteria as a superkingdom rather than a kingdom",
+                ),
+                (INFO, "Match found for Bacteria"),
+            ),
+            id="Bacteria kingdom",
         ),
     ],
 )
-def test_taxa_search(fixture_ncbi_validator, test_input, expected):
+def test_taxa_search(
+    caplog, fixture_ncbi_validator, test_input, leaf, raises, non_canon, exp_log
+):
     """This test checks the results of searching for a specific taxon."""
 
-    fnd_tx = fixture_ncbi_validator.taxa_search(**test_input)
+    with raises:
+        fnd_tx = fixture_ncbi_validator.taxa_search(**test_input)
 
-    assert fnd_tx.name == expected[0]
-    assert fnd_tx.rank == expected[1]
-    assert fnd_tx.ncbi_id == expected[2]
-    assert fnd_tx.superseed == expected[3]
+        if isinstance(raises, does_not_raise):
+            # Check the properties and first taxon in hierarchy matches
+            assert (fnd_tx.rank, fnd_tx.name, fnd_tx.ncbi_id) == leaf[:3]
+            assert fnd_tx.taxa_hier[0] == leaf
+            assert (fnd_tx.non_canon_name, fnd_tx.non_canon_name_class) == non_canon
 
-    # Find last dictionary key
-    f_key = list(fnd_tx.taxa_hier.keys())[-1]
-
-    assert f_key == expected[1]
-
-    assert fnd_tx.taxa_hier[f_key] == (expected[0], expected[2], expected[5])
-    assert fnd_tx.orig == expected[4]
-
-
-# Now test that the search function logs errors correctly
-@pytest.mark.parametrize(
-    "test_input,expected_log_entries",
-    # Fine so empty
-    [
-        (
-            dict(
-                nnme="E coli",
-                taxah={"genus": "Escherichia", "species": "Escherichia coli"},
-            ),
-            (),
-        ),
-        (
-            dict(nnme="Nonsense", taxah={"species": "Nonsense garbage"}),  # Nonsense
-            ((ERROR, "Taxa Nonsense cannot be found"),),
-        ),
-        (
-            dict(nnme="Morus", taxah={"genus": "Morus"}),  # ambiguous Morus
-            (
-                (
-                    ERROR,
-                    "Taxa Morus cannot be found using only one taxonomic level,"
-                    " more should be provided",
-                ),
-            ),
-        ),
-        # Nonsense Morus
-        (
-            dict(nnme="N Morus", taxah={"family": "Nonsense", "genus": "Morus"}),
-            ((ERROR, "Provided parent taxa for N Morus not found"),),
-        ),
-        # Aegle Morus
-        (
-            dict(nnme="A Morus", taxah={"family": "Aegle", "genus": "Morus"}),
-            ((ERROR, "More than one possible parent taxa for A Morus found"),),
-        ),
-        # Eukaryote Morus
-        (
-            dict(nnme="E Morus", taxah={"superkingdom": "Eukaryota", "genus": "Morus"}),
-            (
-                (
-                    ERROR,
-                    "Parent taxa for E Morus refers to multiple possible child taxa",
-                ),
-            ),
-        ),
-        # Carnivora Morus
-        (
-            dict(nnme="C Morus", taxah={"superkingdom": "Carnivora", "genus": "Morus"}),
-            ((ERROR, "Parent taxa not actually a valid parent of C Morus"),),
-        ),
-        # Cytophaga marina
-        (
-            dict(
-                nnme="C marina",
-                taxah={"genus": "Cytophaga", "species": "Cytophaga marina"},
-            ),
-            (
-                (
-                    WARNING,
-                    "Cytophaga marina not accepted usage should be Tenacibaculum"
-                    " maritimum instead",
-                ),
-            ),
-        ),
-        # E coli strain
-        (
-            dict(
-                nnme="E coli strain",
-                taxah={"strain": "Escherichia coli 1-110-08_S1_C1"},
-            ),
-            (
-                (
-                    WARNING,
-                    "No backbone ranks provided in E coli strain's taxa hierarchy",
-                ),
-                (WARNING, "E coli strain of non-backbone rank: strain"),
-            ),
-        ),
-        # Unknown E coli strain
-        (
-            dict(
-                nnme="Unknown strain",
-                taxah={"species": "Escherichia coli", "strain": "Nonsense strain"},
-            ),
-            (
-                (
-                    WARNING,
-                    "Nonsense strain not registered with NCBI, but higher level taxon "
-                    "Escherichia coli is",
-                ),
-            ),
-        ),
-        # Ambiguous species
-        (
-            dict(
-                nnme="Ambiguous taxa",
-                taxah={"genus": "Morus", "species": "Unknown species"},
-            ),
-            (
-                (
-                    ERROR,
-                    "Taxa Ambiguous taxa cannot be found and its higher taxonomic "
-                    "hierarchy is ambiguous",
-                ),
-            ),
-        ),
-        # Nonsense taxonomy
-        (
-            dict(
-                nnme="Utter nonsense",
-                taxah={"species": "Nonsense species", "strain": "Nonsense strain"},
-            ),
-            (
-                (
-                    ERROR,
-                    "Taxa Utter nonsense cannot be found and neither can its higher "
-                    "taxonomic hierarchy",
-                ),
-            ),
-        ),
-        # No higher taxonomy provided
-        (
-            dict(nnme="Nonsense", taxah={"species": "Nonsense species"}),
-            (
-                (
-                    ERROR,
-                    "Taxa Nonsense cannot be found and its higher taxonomic hierarchy "
-                    "is absent",
-                ),
-            ),
-        ),
-        # No higher taxonomy provided
-        (
-            dict(nnme="Cellular", taxah={"no rank": "cellular organisms"}),
-            (
-                (WARNING, "No backbone ranks provided in Cellular's taxa hierarchy"),
-                (ERROR, "Taxon hierarchy for Cellular contains no backbone ranks"),
-            ),
-        ),
-    ],
-)
-def test_validate_taxa_search(
-    caplog, test_input, expected_log_entries, fixture_ncbi_validator
-):
-    """Checks the error logging of a taxon name search."""
-
-    fixture_ncbi_validator.taxa_search(**test_input)
-
-    log_check(caplog, expected_log_entries)
+        log_check(caplog, exp_log)
 
 
 # Third function that checks that taxa_search throws the appropriate errors
 @pytest.mark.parametrize(
     "test_input,expected_exception",
     [
-        (None, TypeError),  # no parameters
-        (dict(nnme="E coli", taxah=27), TypeError),  # integer instead of dictionary
-        (
-            dict(
-                nnme=27, taxah={"species": "Escherichia coli"}
-            ),  # named using a number
-            TypeError,
+        pytest.param(
+            dict(nnme="E coli", taxon_hier=27), ValueError, id="hier not a list"
         ),
-        (
-            dict(
-                nnme="E coli", taxah={27: "Escherichia coli"}
-            ),  # dictionary key integer
+        pytest.param(
+            dict(nnme=27, taxon_hier=[("species", "Escherichia coli")]),
             ValueError,
+            id="nnme not a string",
         ),
-        (
-            dict(nnme="E coli", taxah={"species": 27}),  # dictionary value not string
+        pytest.param(
+            dict(nnme="E coli", taxon_hier=[]), ValueError, id="empty taxon hierarchy"
+        ),
+        pytest.param(
+            dict(nnme="E coli", taxon_hier=[("species", 27)]),
             ValueError,
+            id="non string hierarchy entry",
         ),
     ],
 )
@@ -683,752 +1037,397 @@ def test_taxa_search_errors(fixture_ncbi_validator, test_input, expected_excepti
 
 # First check that expected output is recovered
 @pytest.mark.parametrize(
-    "test_input,expected",
+    "test_input,counts,tx_index",
     # Basic case to begin with
     [
-        (
-            ["E coli", {"genus": "Escherichia", "species": "Escherichia coli"}, 562],
-            (
-                1,
-                1,
-                7,
-                "E coli",
-                ["E coli"],
-                [562],
-                [561],
-                ["Escherichia coli"],
-                ["species"],
-                ["accepted"],
+        pytest.param(
+            dict(
+                m_name="E coli",
+                taxon_hier=[("genus", "Escherichia"), ("species", "Escherichia coli")],
             ),
+            (dict(ntax=1, nnms=1, nhier=7)),
+            [("E coli", 562, 561, "Escherichia coli", "species", "accepted")],
+            id="simple species",
         ),
-        # Incorrect genus but should be found fine
-        (
-            ["E coli", {"genus": "Escheria", "species": "Escherichia coli"}, 562],
-            (
-                1,
-                1,
-                7,
-                "E coli",
-                ["E coli"],
-                [562],
-                [561],
-                ["Escherichia coli"],
-                ["species"],
-                ["accepted"],
+        pytest.param(
+            dict(
+                m_name="E coli",
+                taxon_hier=[("genus", "Escheria"), ("species", "Escherichia coli")],
             ),
+            dict(ntax=0, nnms=0, nhier=0),
+            [],
+            id="simple species incongruent hier",
         ),
-        # Superseded species name
-        (
-            ["C vulpes", {"genus": "Canis", "species": "Canis vulpes"}, None],
-            (
-                2,
-                1,
-                8,
-                "C vulpes",
-                ["C vulpes", "C vulpes"],
-                [9627, 9627],
-                [9625, 9625],
-                ["Canis vulpes", "Vulpes vulpes"],
-                ["species", "species"],
-                ["merged", "accepted"],
+        pytest.param(
+            dict(
+                m_name="C vulpes",
+                taxon_hier=[("genus", "Vulpes"), ("species", "Canis vulpes")],
             ),
-        ),
-        # Superseded species name + ID
-        (
-            ["C marina", {"species": "Cytophaga marina"}, 1000],
-            (
-                2,
-                1,
-                7,
-                "C marina",
-                ["C marina", "C marina"],
-                [1000, 107401],
-                [104267, 104267],
-                ["Cytophaga marina", "Tenacibaculum maritimum"],
-                ["species", "species"],
-                ["merged", "accepted"],
-            ),
-        ),
-        # Superseded ID
-        (
-            ["T maritimum", {"species": "Tenacibaculum maritimum"}, 1000],
-            (
-                2,
-                1,
-                7,
-                "T maritimum",
-                ["T maritimum", "T maritimum"],
-                [1000, 107401],
-                [104267, 104267],
-                ["Tenacibaculum maritimum", "Tenacibaculum maritimum"],
-                ["species", "species"],
-                ["merged", "accepted"],
-            ),
-        ),
-        # Superseded name + correct ID
-        (
-            ["C marina", {"species": "Cytophaga marina"}, 107401],
-            (
-                2,
-                1,
-                7,
-                "C marina",
-                ["C marina", "C marina"],
-                [107401, 107401],
-                [104267, 104267],
-                ["Cytophaga marina", "Tenacibaculum maritimum"],
-                ["species", "species"],
-                ["merged", "accepted"],
-            ),
-        ),
-        # Bacteria
-        (
-            ["Bacteria", {"kingdom": "Bacteria"}, 2],
-            (
-                1,
-                1,
-                1,
-                "Bacteria",
-                ["Bacteria"],
-                [2],
-                [None],
-                ["Bacteria"],
-                ["superkingdom"],
-                ["accepted"],
-            ),
-        ),
-        # Eukaryota
-        (
-            ["Eukaryotes", {"superkingdom": "Eukaryota"}, 2759],
-            (
-                1,
-                1,
-                1,
-                "Eukaryotes",
-                ["Eukaryotes"],
-                [2759],
-                [None],
-                ["Eukaryota"],
-                ["superkingdom"],
-                ["accepted"],
-            ),
-        ),
-        # Fungi
-        (
-            ["Fungi", {"superkingdom": "Eukaryota", "kingdom": "Fungi"}, 4751],
-            (
-                1,
-                1,
-                2,
-                "Fungi",
-                ["Fungi"],
-                [4751],
-                [2759],
-                ["Fungi"],
-                ["kingdom"],
-                ["accepted"],
-            ),
-        ),
-        # Unknown strain
-        (
+            dict(ntax=2, nnms=1, nhier=8),
             [
-                "Unknown strain",
-                {"species": "Escherichia coli", "strain": "NBAvgdft"},
-                None,
+                ("C vulpes", 9627, 9625, "Canis vulpes", "species", "synonym"),
+                ("C vulpes", 9627, 9625, "Vulpes vulpes", "species", "accepted"),
             ],
-            (
-                1,
-                1,
-                7,
-                "Unknown strain",
-                ["Unknown strain"],
-                [-1],
-                [562],
-                ["NBAvgdft"],
-                ["strain"],
-                ["user"],
+            id="synonym with congruent hierarchy",
+        ),
+        pytest.param(
+            dict(
+                m_name="C vulpes",
+                taxon_hier=[("genus", "Cani"), ("species", "Canis vulpes")],
             ),
+            dict(ntax=0, nnms=0, nhier=0),
+            [],
+            id="synonym with incongruent hierarchy",
+        ),
+        pytest.param(
+            dict(
+                m_name="C marina",
+                taxon_hier=[("species", "Cytophaga marina")],
+            ),
+            dict(ntax=2, nnms=1, nhier=7),
+            [
+                ("C marina", 107401, 104267, "Cytophaga marina", "species", "synonym"),
+                (
+                    "C marina",
+                    107401,
+                    104267,
+                    "Tenacibaculum maritimum",
+                    "species",
+                    "accepted",
+                ),
+            ],
+            id="synonym with no hierarchy",
+        ),
+        pytest.param(
+            dict(
+                m_name="Bacteria",
+                taxon_hier=[("kingdom", "Bacteria")],
+            ),
+            dict(ntax=1, nnms=1, nhier=1),
+            [("Bacteria", 2, None, "Bacteria", "superkingdom", "accepted")],
+            id="Bacteria as kingdom",
+        ),
+        pytest.param(
+            dict(
+                m_name="Bacteria",
+                taxon_hier=[("superkingdom", "Bacteria")],
+            ),
+            dict(ntax=1, nnms=1, nhier=1),
+            [("Bacteria", 2, None, "Bacteria", "superkingdom", "accepted")],
+            id="Bacteria as superkingdom",
+        ),
+        pytest.param(
+            dict(
+                m_name="Eukaryotes",
+                taxon_hier=[("superkingdom", "Eukaryota")],
+            ),
+            dict(ntax=1, nnms=1, nhier=1),
+            [("Eukaryotes", 2759, None, "Eukaryota", "superkingdom", "accepted")],
+            id="Eukaryota",
+        ),
+        pytest.param(
+            dict(
+                m_name="Fungi",
+                taxon_hier=[("superkingdom", "Eukaryota"), ("kingdom", "Fungi")],
+            ),
+            dict(ntax=1, nnms=1, nhier=2),
+            [("Fungi", 4751, 2759, "Fungi", "kingdom", "accepted")],
+            id="Fungi",
+        ),
+        pytest.param(
+            dict(
+                m_name="Fungi",
+                taxon_hier=[("kingdom", "Fungi"), ("superkingdom", "Eukaryota")],
+            ),
+            dict(ntax=0, nnms=0, nhier=0),
+            [],
+            id="Fungi bad order",
+        ),
+        pytest.param(
+            dict(
+                m_name="New Fungi",
+                taxon_hier=[
+                    ("superkingdom", "Eukaryota"),
+                    ("kingdom", "Fungi"),
+                    ("phylum", "new fungal phylum"),
+                ],
+                new=True,
+            ),
+            dict(ntax=1, nnms=1, nhier=2),
+            [("New Fungi", -1, 4751, "new fungal phylum", "phylum", "user")],
+            id="Fungi new phylum",
         ),
     ],
 )
-def test_validate_and_add_taxon(fixture_resources, test_input, expected):
+def test_validate_and_add_taxon(fixture_resources, test_input, counts, tx_index):
     """Checks that NCBI taxon validation stores the expected information."""
 
     ncbi_instance = taxa.NCBITaxa(fixture_resources)
-    ncbi_instance.validate_and_add_taxon(test_input)
+    ncbi_instance.validate_and_add_taxon(**test_input)
 
-    assert len(ncbi_instance.taxon_index) == expected[0]  # Number of taxa added
-    assert len(ncbi_instance.taxon_names) == expected[1]  # Number of taxon names
-    assert len(ncbi_instance.hierarchy) == expected[2]  # Size of hierarchy
+    assert len(ncbi_instance.taxon_index) == counts["ntax"]
+    assert len(ncbi_instance.taxon_names) == counts["nnms"]
+    assert len(ncbi_instance.hierarchy) == counts["nhier"]
 
-    # Check that provided taxon name is used
-    assert list(ncbi_instance.taxon_names)[0] == expected[3]
     # Check that taxon info recorded is as expected
-    assert [item[0] for item in ncbi_instance.taxon_index] == expected[4]
-    assert [item[1] for item in ncbi_instance.taxon_index] == expected[5]
-    assert [item[2] for item in ncbi_instance.taxon_index] == expected[6]
-    assert [item[3] for item in ncbi_instance.taxon_index] == expected[7]
-    assert [item[4] for item in ncbi_instance.taxon_index] == expected[8]
-    assert [item[5] for item in ncbi_instance.taxon_index] == expected[9]
+    for idx_entry in tx_index:
+        # Check that provided taxon name is used
+        assert idx_entry[0] in ncbi_instance.taxon_names
+        assert idx_entry in ncbi_instance.taxon_index
 
 
-# Now test that the search function logs errors correctly
 @pytest.mark.parametrize(
-    "test_input,expected_log_entries",
+    "test_input,raises,expected_log_entries",
     # Fine so empty
     [
-        (
-            ["E coli", {"species": "Escherichia coli"}, None],
-            ((INFO, "Taxon (E coli) found in NCBI database"),),
+        pytest.param(
+            ["E coli", [("species", "Escherichia coli")]],
+            does_not_raise(),
+            ((INFO, "Match found for E coli"),),
+            id="good species",
         ),
-        # Same but with valid code provided
-        (
-            ["E coli", {"species": "Escherichia coli"}, 562],
-            ((INFO, "Taxon (E coli) found in NCBI database"),),
+        pytest.param(
+            ["Eukaryota", [("superkingdom", "Eukaryota")]],
+            does_not_raise(),
+            ((INFO, "Match found for Eukaryota"),),
+            id="good superkingdom",
         ),
-        # whitespace padding error
-        (
-            [" E coli", {"species": "Escherichia coli"}, None],
+        pytest.param(
+            ["Bacteria", [("superkingdom", "Bacteria")]],
+            does_not_raise(),
+            ((INFO, "Match found for Bacteria"),),
+            id="bacteria as superkingdom",
+        ),
+        pytest.param(
+            ["Bacteria", [("kingdom", "Bacteria")]],
+            does_not_raise(),
+            (
+                (
+                    WARNING,
+                    "NCBI records Bacteria as a superkingdom rather than a kingdom",
+                ),
+                (INFO, "Match found for Bacteria"),
+            ),
+            id="bacteria as kingdom",
+        ),
+        pytest.param(
+            [" E coli", [("species", "Escherichia coli")]],
+            does_not_raise(),
             (
                 (ERROR, "Worksheet name has whitespace padding: ' E coli'"),
-                (INFO, "Taxon (E coli) found in NCBI database"),
+                (INFO, "Match found for E coli"),
             ),
+            id="whitespace padding error",
         ),
-        # String of just whitespace provided as name
-        (
-            [" ", {"species": "Escherichia coli"}, None],
+        pytest.param(
+            ["    ", [("species", "Escherichia coli")]],
+            does_not_raise(),
             ((ERROR, "Worksheet name missing, whitespace only or not text"),),
+            id="whitespace only name",
         ),
-        # No name error
-        (
-            [None, {"species": "Escherichia coli"}, None],
+        pytest.param(
+            [None, [("species", "Escherichia coli")]],
+            does_not_raise(),
             ((ERROR, "Worksheet name missing, whitespace only or not text"),),
+            id="no name empty cell",
         ),
-        # Blank string provided as name
-        (
-            ["", {"species": "Escherichia coli"}, None],
-            ((ERROR, "Worksheet name missing, whitespace only or not text"),),
+        pytest.param(
+            ["E coli", "Escherichia coli"],
+            pytest.raises(ValueError),
+            ((CRITICAL, "Taxon hierarchy should be a list"),),
+            id="non list hierarchy",
         ),
-        # Floats that can be converted to integers are allowed
-        (
-            ["E coli", {"species": "Escherichia coli"}, 562.0],
-            ((INFO, "Taxon (E coli) found in NCBI database"),),
+        pytest.param(
+            ["E coli", []],
+            does_not_raise(),
+            ((ERROR, "No taxonomy provided"),),
+            id="empty list hierarchy",
         ),
-        # A true float results in multiple errors
-        (
-            ["E coli", {"species": "Escherichia coli"}, 562.5],
-            (
-                (ERROR, "NCBI ID contains value that is not an integer"),
-                (ERROR, "Improper NCBI ID provided, cannot be validated"),
-            ),
-        ),
-        # As does a string
-        (
-            ["E coli", {"species": "Escherichia coli"}, "ID"],
-            (
-                (ERROR, "NCBI ID contains value that is not an integer"),
-                (ERROR, "Improper NCBI ID provided, cannot be validated"),
-            ),
-        ),
-        # This checks that multiple errors can fire at once
-        (
-            ["E coli", {}, 562.5],
-            (
-                (ERROR, "NCBI ID contains value that is not an integer"),
-                (ERROR, "Taxa hierarchy should be a (not empty) dictionary"),
-                (ERROR, "Improper NCBI ID provided, cannot be validated"),
-                (ERROR, "Taxon details not properly formatted, cannot validate"),
-            ),
-        ),
-        # Taxa hierarchy provided as a string
-        (
-            ["E coli", "Escherichia coli", None],
-            (
-                (ERROR, "Taxa hierarchy should be a (not empty) dictionary"),
-                (ERROR, "Taxon details not properly formatted, cannot validate"),
-            ),
-        ),
-        # Taxa hierarchy dictionary empty
-        (
-            ["E coli", {}, None],
-            (
-                (ERROR, "Taxa hierarchy should be a (not empty) dictionary"),
-                (ERROR, "Taxon details not properly formatted, cannot validate"),
-            ),
-        ),
-        # Example of multiple errors
-        (
-            [" E coli", {}, None],
+        pytest.param(
+            [" E coli", []],
+            does_not_raise(),
             (
                 (ERROR, "Worksheet name has whitespace padding: ' E coli'"),
-                (ERROR, "Taxa hierarchy should be a (not empty) dictionary"),
-                (ERROR, "Taxon details not properly formatted, cannot validate"),
+                (ERROR, "No taxonomy provided"),
             ),
+            id="multiple errors",
         ),
-        # Missing dictionary key
-        (
-            ["E coli", {" ": "Escherichia coli"}, None],
+        pytest.param(
+            ["E coli", ["notatuple"], None],
+            pytest.raises(ValueError),
             (
-                (ERROR, "Empty dictionary key used"),
-                (ERROR, "Taxon details not properly formatted, cannot validate"),
+                (
+                    CRITICAL,
+                    "Not all taxa hierachy entries are 2 tuples of non-empty strings",
+                ),
             ),
+            id="non tuple hierarchy element",
         ),
-        # Non-string dictionary key
-        (
-            ["E coli", {26: "Escherichia coli"}, None],
+        pytest.param(
+            ["E coli", [("  ", "Escherichia coli")]],
+            pytest.raises(ValueError),
             (
-                (ERROR, "Non-string dictionary key used: 26"),
-                (ERROR, "Taxon details not properly formatted, cannot validate"),
+                (
+                    CRITICAL,
+                    "Not all taxa hierachy entries are 2 tuples of non-empty strings",
+                ),
             ),
+            id="only whitespace in hierarchy tuple element",
         ),
-        # Padded dictionary key
-        (
-            ["E coli", {" species": "Escherichia coli"}, None],
+        pytest.param(
+            ["E coli", [(26, "Escherichia coli")]],
+            pytest.raises(ValueError),
             (
-                (ERROR, "Dictionary key has whitespace padding: ' species'"),
-                (INFO, "Taxon (E coli) found in NCBI database"),
+                (
+                    CRITICAL,
+                    "Not all taxa hierachy entries are 2 tuples of non-empty strings",
+                ),
             ),
+            id="non string hierarchy tuple element",
         ),
-        # Missing dictionary value
-        (
-            ["E coli", {"species": ""}, None],
-            (
-                (ERROR, "Empty dictionary value used"),
-                (ERROR, "Taxon details not properly formatted, cannot validate"),
-            ),
-        ),
-        # Non-string dictionary value
-        (
-            ["E coli", {"species": 26}, None],
-            (
-                (ERROR, "Non-string dictionary value used: 26"),
-                (ERROR, "Taxon details not properly formatted, cannot validate"),
-            ),
-        ),
-        # Padding on dictionary value
-        (
-            ["E coli", {"species": " Escherichia coli"}, None],
-            (
-                (ERROR, "Dictionary value has whitespace padding: ' Escherichia coli'"),
-                (INFO, "Taxon (E coli) found in NCBI database"),
-            ),
-        ),
-        # Taxon hierarchy in wrong order
-        (
-            ["E coli", {"species": "Escherichia coli", "genus": "Escherichia"}, None],
-            ((ERROR, "Taxon hierarchy not in correct order"),),
-        ),
-        # Right order but non-backbone rank
-        (
-            [
-                "Strepto",
-                {"phylum": "Streptophyta", "subphylum": "Streptophytina"},
-                None,
-            ],
-            (
-                (WARNING, "Strepto of non-backbone rank: subphylum"),
-                (INFO, "Taxon (Strepto) found in NCBI database"),
-            ),
-        ),
-        # Nonsense taxon provided
-        (
-            ["N garbage", {"species": "Nonsense garbage"}, None],
-            (
-                (ERROR, "Taxa N garbage cannot be found"),
-                (ERROR, "Search based on taxon hierarchy failed"),
-            ),
-        ),
-        # Ambiguous taxon provided
-        (
-            ["Morus", {"genus": "Morus"}, None],
+        pytest.param(
+            ["E coli", [(" species", "Escherichia coli")]],
+            does_not_raise(),
             (
                 (
                     ERROR,
-                    "Taxa Morus cannot be found using only one taxonomic level, more "
-                    "should be provided",
+                    "Hierarchy contains whitespace: "
+                    "rank ' species', name 'Escherichia coli'",
                 ),
-                (ERROR, "Search based on taxon hierarchy failed"),
+                (INFO, "Match found for E coli"),
             ),
+            id="whitespace padding in hierarchy",
         ),
-        # Ambiguous taxon resolved
-        (
-            ["M Morus", {"family": "Moraceae", "genus": "Morus"}, None],
-            ((INFO, "Taxon (M Morus) found in NCBI database"),),
-        ),
-        # E coli with incorrect NCBI ID
-        (
-            ["E coli", {"species": "Escherichia coli"}, 333],
+        # # Taxon hierarchy in wrong order
+        # (
+        #     ["E coli", {"species": "Escherichia coli", "genus": "Escherichia"}, None],
+        #     does_not_raise(),
+        #     ((ERROR, "Taxon hierarchy not in correct order"),),
+        # ),
+        pytest.param(
+            ["Morus", [("genus", "Morus")]],
+            does_not_raise(),
             (
                 (
                     ERROR,
-                    "The NCBI ID supplied for E coli does not match hierarchy: expected"
-                    " 562 got 333",
+                    "Multiple matches for taxon Morus: "
+                    "no additional taxonomy provided.",
                 ),
+                (ERROR, "Search based on taxon hierarchy failed"),
             ),
+            id="ambiguous taxon",
         ),
-        # Non-backbone case with code
-        (
+        pytest.param(
+            ["Morus", [("family", "Moraceae"), ("genus", "Morus")]],
+            does_not_raise(),
+            ((INFO, "Match found for Morus"),),
+            id="ambiguous taxon resolved",
+        ),
+        pytest.param(
             [
                 "E coli strain",
-                {
-                    "species": "Escherichia coli",
-                    "strain": "Escherichia coli 1-110-08_S1_C1",
-                },
-                1444049,
+                [
+                    ("species", "Escherichia coli"),
+                    ("strain", "Escherichia coli 1-110-08_S1_C1"),
+                ],
             ],
-            (
-                (WARNING, "E coli strain of non-backbone rank: strain"),
-                (WARNING, "E coli strain of non-backbone rank: strain"),
-                (INFO, "Taxon (E coli strain) found in NCBI database"),
-            ),
+            does_not_raise(),
+            ((INFO, "Match found for E coli strain"),),
+            id="non backbone",
         ),
-        # Superseded taxa ID and name
-        (
-            ["C marina", {"species": "Cytophaga marina"}, 1000],
+        pytest.param(
+            ["C marina", [("species", "Cytophaga marina")]],
+            does_not_raise(),
             (
                 (
                     WARNING,
-                    "Cytophaga marina not accepted usage should be Tenacibaculum "
-                    "maritimum instead",
+                    "Non-canon usage: Cytophaga marina is synonym for "
+                    "Tenacibaculum maritimum",
                 ),
-                (WARNING, "NCBI ID 1000 has been superseded by ID 107401"),
-                (
-                    WARNING,
-                    "Taxonomic classification superseded for C marina, using new "
-                    "taxonomic classification",
-                ),
+                (INFO, "Match found for C marina"),
             ),
+            id="synonym",
         ),
-        # Just superseded taxa ID
-        (
-            ["T maritimum", {"species": "Tenacibaculum maritimum"}, 1000],
-            (
-                (WARNING, "NCBI ID 1000 has been superseded by ID 107401"),
-                (
-                    WARNING,
-                    "NCBI taxa ID superseded for T maritimum, using new taxa ID",
-                ),
-            ),
-        ),
-        # Just superseded name
-        (
-            ["C marina", {"species": "Cytophaga marina"}, 107401],
-            (
-                (
-                    WARNING,
-                    "Cytophaga marina not accepted usage should be Tenacibaculum "
-                    "maritimum instead",
-                ),
-                (
-                    WARNING,
-                    "Taxonomic classification superseded for C marina, using new "
-                    "taxonomic classification",
-                ),
-            ),
-        ),
-        # E coli recorded as a family rather than a species
-        (
-            ["E coli", {"family": "Escherichia coli"}, None],
-            (
-                (ERROR, "Escherichia coli is a species not a family"),
-                (ERROR, "Search based on taxon hierarchy failed"),
-            ),
-        ),
-        # E coli recorded as a subspecies rather than a species
-        (
-            ["E coli", {"subspecies": "Escherichia coli"}, None],
-            (
-                (ERROR, "Escherichia coli is a species not a subspecies"),
-                (ERROR, "Search based on taxon hierarchy failed"),
-            ),
-        ),
-        # Same idea for a non-backbone case
-        (
-            ["Streptophytina", {"phylum": "Streptophytina"}, None],
-            (
-                (WARNING, "Streptophytina of non-backbone rank: subphylum"),
-                (ERROR, "Streptophytina is a subphylum not a phylum"),
-                (ERROR, "Search based on taxon hierarchy failed"),
-            ),
-        ),
-        # Superkingdom not included in GBIF case
-        (
-            ["Eukaryota", {"superkingdom": "Eukaryota"}, 2759],
-            ((INFO, "Taxon (Eukaryota) found in NCBI database"),),
-        ),
-        # Can actually deal with the bacterial case
-        (
-            ["Bacteria", {"superkingdom": "Bacteria"}, 2],
-            ((INFO, "Taxon (Bacteria) found in NCBI database"),),
-        ),
-        # Unknown E coli strain
-        (
+        pytest.param(
             [
-                "Unknown strain",
-                {"species": "Escherichia coli", "strain": "Nonsense strain"},
-                None,
+                "E coli",
+                [
+                    ("family", "Escherichia coli"),
+                ],
             ],
-            (
-                (
-                    WARNING,
-                    "Nonsense strain not registered with NCBI, but higher level taxon "
-                    "Escherichia coli is",
-                ),
-                (INFO, "Higher taxon for (Unknown strain) resolved in NCBI"),
-            ),
-        ),
-        # Nonsense taxonomy
-        (
-            [
-                "Utter nonsense",
-                {"species": "Nonsense species", "strain": "Nonsense strain"},
-                None,
-            ],
+            does_not_raise(),
             (
                 (
                     ERROR,
-                    "Taxa Utter nonsense cannot be found and neither can its higher "
-                    "taxonomic hierarchy",
+                    "Taxa E coli not found with name Escherichia coli and rank family",
                 ),
                 (ERROR, "Search based on taxon hierarchy failed"),
             ),
+            id="incorrect rank assignment",
         ),
-        # Valid species name, but incorrect genus
-        (
-            ["E coli", {"genus": "Escheria", "species": "Escherichia coli"}, None],
+        pytest.param(
+            [
+                "Utter nonsense",
+                [("species", "Nonsense species")],
+            ],
+            does_not_raise(),
             (
                 (
-                    WARNING,
-                    "Hierarchy mismatch for E coli its genus should be Escherichia not"
-                    " Escheria",
+                    ERROR,
+                    "Taxa Utter nonsense not found with name "
+                    "Nonsense species and rank species",
                 ),
-                (INFO, "Taxon (E coli) found in NCBI database"),
+                (ERROR, "Search based on taxon hierarchy failed"),
             ),
+            id="invalid taxon",
         ),
-        # Valid non-backbone rank but higher taxa wrong
-        (
-            ["Strepto", {"phylum": "Strephyta", "subphylum": "Streptophytina"}, None],
+        pytest.param(
+            ["E coli", [("genus", "Escheria"), ("species", "Escherichia coli")]],
+            does_not_raise(),
             (
-                (WARNING, "Strepto of non-backbone rank: subphylum"),
                 (
-                    WARNING,
-                    "Hierarchy mismatch for Strepto its phylum should be Streptophyta "
-                    "not Strephyta",
+                    ERROR,
+                    "Taxonomy mismatch for Escheria at rank genus: expecting "
+                    "Escherichia",
                 ),
-                (INFO, "Taxon (Strepto) found in NCBI database"),
+                (ERROR, "Match found for E coli with incongruent taxonomy"),
+                (ERROR, "Search based on taxon hierarchy failed"),
             ),
+            id="invalid higher taxa",
         ),
     ],
 )
-def test_validate_and_add_taxon_validate(
-    caplog, test_input, expected_log_entries, fixture_resources
+def test_validate_and_add_taxon_logging(
+    caplog, fixture_resources, test_input, raises, expected_log_entries
 ):
     """Checks the logging of NCBI taxon validation."""
 
-    test_input = copy.deepcopy(test_input)
     ncbi_instance = taxa.NCBITaxa(fixture_resources)
-    ncbi_instance.validate_and_add_taxon(test_input)
+
+    with raises:
+        ncbi_instance.validate_and_add_taxon(*test_input)
 
     log_check(caplog, expected_log_entries)
 
 
-# Third function that checks that validate_and_add_taxon throws the appropriate errors
-@pytest.mark.parametrize(
-    "test_input,expected_exception",
-    [
-        (None, TypeError),  # no parameters
-        ([], ValueError),  # empty list
-        (["taxon name", 252], ValueError),  # too few elements
-        # Bad code
-        (["E coli", {"species": "Escherichia coli"}, -1], ValueError),
-        # Bad code
-        (["E coli", {"species": "Escherichia coli"}, 100000000000000], taxa.NCBIError),
-    ],
-)
-def test_validate_and_add_taxon_errors(
-    fixture_resources, test_input, expected_exception
-):
-    """This test checks exception handling of validator.validate_and_add_taxon."""
-
-    ncbi_instance = taxa.NCBITaxa(fixture_resources)
-
-    with pytest.raises(expected_exception):
-        _ = ncbi_instance.validate_and_add_taxon(test_input)
-
-
-# Then do tests on the index_higher_taxa function
-
-
 # First test whether sensible output is produced
 @pytest.mark.parametrize(
-    "test_input,expected",
-    # Basic case to begin with
+    "test_input,n_ind,exp_index,exp_log",
     [
-        (
-            ["E coli", {"genus": "Escherichia", "species": "Escherichia coli"}, 562],
+        pytest.param(
+            ["E coli", [("genus", "Escherichia"), ("species", "Escherichia coli")]],
+            7,
+            [
+                ("E coli", 562, 561, "Escherichia coli", "species", "accepted"),
+                (None, 2, None, "Bacteria", "superkingdom", "accepted"),
+                (None, 1224, 2, "Proteobacteria", "phylum", "accepted"),
+                (None, 1236, 1224, "Gammaproteobacteria", "class", "accepted"),
+                (None, 91347, 1236, "Enterobacterales", "order", "accepted"),
+                (None, 543, 91347, "Enterobacteriaceae", "family", "accepted"),
+                (None, 561, 543, "Escherichia", "genus", "accepted"),
+            ],
             (
-                7,
-                1,
-                7,
-                "E coli",
-                ["E coli", None, None, None, None, None, None],
-                [562, 2, 1224, 1236, 91347, 543, 561],
-                [561, None, 2, 1224, 1236, 91347, 543],
-                [
-                    "Escherichia coli",
-                    "Bacteria",
-                    "Proteobacteria",
-                    "Gammaproteobacteria",
-                    "Enterobacterales",
-                    "Enterobacteriaceae",
-                    "Escherichia",
-                ],
-                [
-                    "species",
-                    "superkingdom",
-                    "phylum",
-                    "class",
-                    "order",
-                    "family",
-                    "genus",
-                ],
-                [
-                    "accepted",
-                    "accepted",
-                    "accepted",
-                    "accepted",
-                    "accepted",
-                    "accepted",
-                    "accepted",
-                ],
-            ),
-        ),
-        # Superseded ID
-        (
-            ["T maritimum", {"species": "Tenacibaculum maritimum"}, 1000],
-            (
-                8,
-                1,
-                7,
-                "T maritimum",
-                ["T maritimum", "T maritimum", None, None, None, None, None, None],
-                [1000, 107401, 2, 976, 117743, 200644, 49546, 104267],
-                [104267, 104267, None, 2, 976, 117743, 200644, 49546],
-                [
-                    "Tenacibaculum maritimum",
-                    "Tenacibaculum maritimum",
-                    "Bacteria",
-                    "Bacteroidetes",
-                    "Flavobacteriia",
-                    "Flavobacteriales",
-                    "Flavobacteriaceae",
-                    "Tenacibaculum",
-                ],
-                [
-                    "species",
-                    "species",
-                    "superkingdom",
-                    "phylum",
-                    "class",
-                    "order",
-                    "family",
-                    "genus",
-                ],
-                [
-                    "merged",
-                    "accepted",
-                    "accepted",
-                    "accepted",
-                    "accepted",
-                    "accepted",
-                    "accepted",
-                    "accepted",
-                ],
-            ),
-        ),
-        # Bacteria
-        (
-            ["Bacteria", {"kingdom": "Bacteria"}, 2],
-            (
-                1,
-                1,
-                1,
-                "Bacteria",
-                ["Bacteria"],
-                [2],
-                [None],
-                ["Bacteria"],
-                ["superkingdom"],
-                ["accepted"],
-            ),
-        ),
-        # Eukaryota
-        (
-            ["Eukaryotes", {"superkingdom": "Eukaryota"}, 2759],
-            (
-                1,
-                1,
-                1,
-                "Eukaryotes",
-                ["Eukaryotes"],
-                [2759],
-                [None],
-                ["Eukaryota"],
-                ["superkingdom"],
-                ["accepted"],
-            ),
-        ),
-        # Fungi
-        (
-            ["Fungi", {"superkingdom": "Eukaryota", "kingdom": "Fungi"}, 4751],
-            (
-                2,
-                1,
-                2,
-                "Fungi",
-                ["Fungi", None],
-                [4751, 2759],
-                [2759, None],
-                ["Fungi", "Eukaryota"],
-                ["kingdom", "superkingdom"],
-                ["accepted", "accepted"],
-            ),
-        ),
-    ],
-)
-def test_index_higher_taxa(fixture_resources, test_input, expected):
-    """Checks that higher taxonomic ranks for a taxon are stored correctly."""
-
-    ncbi_instance = taxa.NCBITaxa(fixture_resources)
-    ncbi_instance.validate_and_add_taxon(test_input)
-
-    # Then index higher taxa
-    ncbi_instance.index_higher_taxa()
-
-    assert len(ncbi_instance.taxon_index) == expected[0]  # Number of taxa added
-    assert len(ncbi_instance.taxon_names) == expected[1]  # Number of taxon names
-    assert len(ncbi_instance.hierarchy) == expected[2]  # Size of hierarchy
-
-    # Check that provided taxon name is used
-    assert list(ncbi_instance.taxon_names)[0] == expected[3]
-    # Check that taxon info recorded is as expected
-    assert [item[0] for item in ncbi_instance.taxon_index] == expected[4]
-    assert [item[1] for item in ncbi_instance.taxon_index] == expected[5]
-    assert [item[2] for item in ncbi_instance.taxon_index] == expected[6]
-    assert [item[3] for item in ncbi_instance.taxon_index] == expected[7]
-    assert [item[4] for item in ncbi_instance.taxon_index] == expected[8]
-    assert [item[5] for item in ncbi_instance.taxon_index] == expected[9]
-
-
-# Now test that the index hierarchy function logs correctly
-@pytest.mark.parametrize(
-    "test_input,expected_log_entries",
-    # Test that E coli works fine
-    [
-        (
-            ["E coli", {"species": "Escherichia coli"}, 562],
-            (
-                (INFO, "Taxon (E coli) found in NCBI database"),
+                (INFO, "Match found for E coli"),
                 (INFO, "Indexing taxonomic hierarchy"),
                 (INFO, "Added superkingdom Bacteria"),
                 (INFO, "Added phylum Proteobacteria"),
@@ -1437,21 +1436,35 @@ def test_index_higher_taxa(fixture_resources, test_input, expected):
                 (INFO, "Added family Enterobacteriaceae"),
                 (INFO, "Added genus Escherichia"),
             ),
+            id="index one accepted species",
         ),
-        # Superseded taxon name used
-        (
-            ["C marina", {"species": "Cytophaga marina"}, None],
+        pytest.param(
+            ["C marina", [("species", "Cytophaga marina")]],
+            8,
+            [
+                ("C marina", 107401, 104267, "Cytophaga marina", "species", "synonym"),
+                (
+                    "C marina",
+                    107401,
+                    104267,
+                    "Tenacibaculum maritimum",
+                    "species",
+                    "accepted",
+                ),
+                (None, 2, None, "Bacteria", "superkingdom", "accepted"),
+                (None, 976, 2, "Bacteroidetes", "phylum", "accepted"),
+                (None, 117743, 976, "Flavobacteriia", "class", "accepted"),
+                (None, 200644, 117743, "Flavobacteriales", "order", "accepted"),
+                (None, 49546, 200644, "Flavobacteriaceae", "family", "accepted"),
+                (None, 104267, 49546, "Tenacibaculum", "genus", "accepted"),
+            ],
             (
                 (
                     WARNING,
-                    "Cytophaga marina not accepted usage should be Tenacibaculum "
-                    "maritimum instead",
+                    "Non-canon usage: Cytophaga marina is synonym for "
+                    "Tenacibaculum maritimum",
                 ),
-                (
-                    WARNING,
-                    "Taxonomic classification superseded for C marina, using new "
-                    "taxonomic classification",
-                ),
+                (INFO, "Match found for C marina"),
                 (INFO, "Indexing taxonomic hierarchy"),
                 (INFO, "Added superkingdom Bacteria"),
                 (INFO, "Added phylum Bacteroidetes"),
@@ -1460,59 +1473,65 @@ def test_index_higher_taxa(fixture_resources, test_input, expected):
                 (INFO, "Added family Flavobacteriaceae"),
                 (INFO, "Added genus Tenacibaculum"),
             ),
+            id="index one synonym",
         ),
-        # Ambiguous taxon resolved
-        (
-            ["M Morus", {"family": "Moraceae", "genus": "Morus"}, None],
+        pytest.param(
+            ["Bacteria", [("superkingdom", "Bacteria")]],
+            1,
+            [("Bacteria", 2, None, "Bacteria", "superkingdom", "accepted")],
             (
-                (INFO, "Taxon (M Morus) found in NCBI database"),
+                (INFO, "Match found for Bacteria"),
                 (INFO, "Indexing taxonomic hierarchy"),
-                (INFO, "Added superkingdom Eukaryota"),
-                (INFO, "Added kingdom Viridiplantae"),
-                (INFO, "Added phylum Streptophyta"),
-                (INFO, "Added class Magnoliopsida"),
-                (INFO, "Added order Rosales"),
-                (INFO, "Added family Moraceae"),
             ),
+            id="bacteria as superkingdom",
         ),
-        # Non-backbone case with code
-        (
+        pytest.param(
+            ["Bacteria", [("kingdom", "Bacteria")]],
+            1,
+            [("Bacteria", 2, None, "Bacteria", "superkingdom", "accepted")],
+            (
+                (
+                    WARNING,
+                    "NCBI records Bacteria as a superkingdom rather than a kingdom",
+                ),
+                (INFO, "Match found for Bacteria"),
+                (INFO, "Indexing taxonomic hierarchy"),
+            ),
+            id="bacteria as kingdom",
+        ),
+        pytest.param(
+            ["Fungi", [("superkingdom", "Eukaryota"), ("kingdom", "Fungi")]],
+            2,
             [
-                "E coli strain",
-                {
-                    "species": "Escherichia coli",
-                    "strain": "Escherichia coli 1-110-08_S1_C1",
-                },
-                1444049,
+                ("Fungi", 4751, 2759, "Fungi", "kingdom", "accepted"),
+                (None, 2759, None, "Eukaryota", "superkingdom", "accepted"),
             ],
             (
-                (WARNING, "E coli strain of non-backbone rank: strain"),
-                (WARNING, "E coli strain of non-backbone rank: strain"),
-                (INFO, "Taxon (E coli strain) found in NCBI database"),
+                (INFO, "Match found for Fungi"),
                 (INFO, "Indexing taxonomic hierarchy"),
-                (INFO, "Added superkingdom Bacteria"),
-                (INFO, "Added phylum Proteobacteria"),
-                (INFO, "Added class Gammaproteobacteria"),
-                (INFO, "Added order Enterobacterales"),
-                (INFO, "Added family Enterobacteriaceae"),
-                (INFO, "Added genus Escherichia"),
-                (INFO, "Added species Escherichia coli"),
+                (INFO, "Added superkingdom Eukaryota"),
             ),
+            id="fungi",
         ),
     ],
 )
-def test_validate_index_higher_taxa(
-    caplog, fixture_resources, test_input, expected_log_entries
+def test_index_higher_taxa(
+    caplog, fixture_resources, test_input, n_ind, exp_index, exp_log
 ):
-    """Checks the function to store higher taxonomic ranks of a taxon logs correctly."""
+    """Checks that higher taxonomic ranks for a taxon are stored correctly."""
 
     ncbi_instance = taxa.NCBITaxa(fixture_resources)
-    ncbi_instance.validate_and_add_taxon(test_input)
+    ncbi_instance.validate_and_add_taxon(*test_input)
 
     # Then index higher taxa
     ncbi_instance.index_higher_taxa()
 
-    log_check(caplog, expected_log_entries)
+    assert len(ncbi_instance.taxon_index) == n_ind
+
+    for item in exp_index:
+        assert item in ncbi_instance.taxon_index
+
+    log_check(caplog, exp_log)
 
 
 @pytest.mark.parametrize(
@@ -1537,87 +1556,268 @@ def test_validate_index_higher_taxa(
             id="Duplicated headers",
         ),
         pytest.param(
-            DotMap({"data_columns": ["some_columns"], "headers": ["name"]}),
+            DotMap({"data_columns": [tuple()], "headers": ["genus"]}),
             (
                 (INFO, "Loading NCBITaxa worksheet"),
                 (INFO, "Reading NCBI taxa data"),
-                (ERROR, "Missing core fields:"),
+                (ERROR, "NCBI taxa sheet is missing the name field"),
             ),
-            id="Missing core field",
+            id="Missing name field",
         ),
         pytest.param(
             DotMap(
                 {
-                    "data_columns": ["some_columns"],
-                    "headers": ["name", "ncbi id", "non-existent rank"],
+                    "data_columns": [tuple(), tuple(), tuple(), tuple(), tuple()],
+                    "headers": [
+                        "name",
+                        "genus",
+                        "species",
+                        "random extra header",
+                    ],
                 }
             ),
             (
                 (INFO, "Loading NCBITaxa worksheet"),
                 (INFO, "Reading NCBI taxa data"),
-                (ERROR, "Unexpected (or misspelled) headers found:"),
+                (INFO, "Additional fields provided:"),
+                (INFO, "2 NCBI rank fields found:"),
+                (INFO, "No taxon rows found"),
             ),
-            id="Unexpected header",
+            id="Extra header",
         ),
         pytest.param(
             DotMap(
                 {
-                    "data_columns": ["some_columns"],
-                    "headers": ["name", "ncbi id", "gennus"],
+                    "data_columns": [tuple(), tuple(), tuple()],
+                    "headers": ["name", "family", "species"],
                 }
             ),
             (
                 (INFO, "Loading NCBITaxa worksheet"),
                 (INFO, "Reading NCBI taxa data"),
-                (ERROR, "Unexpected (or misspelled) headers found:"),
-            ),
-            id="Misspelled header",
-        ),
-        pytest.param(
-            DotMap(
-                {
-                    "data_columns": ["some_columns"],
-                    "headers": ["name", "ncbi id", "phylum", "subphylum"],
-                }
-            ),
-            (
-                (INFO, "Loading NCBITaxa worksheet"),
-                (INFO, "Reading NCBI taxa data"),
-                (ERROR, "Less than two backbone taxonomic ranks are provided"),
-            ),
-            id="Only one backbone rank",
-        ),
-        pytest.param(
-            DotMap(
-                {
-                    "data_columns": ["some_columns"],
-                    "headers": ["name", "ncbi id", "family", "species"],
-                }
-            ),
-            (
-                (INFO, "Loading NCBITaxa worksheet"),
-                (INFO, "Reading NCBI taxa data"),
-                (ERROR, "If species is provided so must genus"),
+                (INFO, "2 NCBI rank fields found:"),
+                (ERROR, "A genus field is required with species"),
             ),
             id="species without genus",
         ),
         pytest.param(
             DotMap(
                 {
-                    "data_columns": ["some_columns"],
-                    "headers": ["name", "ncbi id", "family", "genus", "subspecies"],
+                    "data_columns": [tuple(), tuple(), tuple(), tuple()],
+                    "headers": ["name", "family", "genus", "subspecies"],
                 }
             ),
             (
                 (INFO, "Loading NCBITaxa worksheet"),
                 (INFO, "Reading NCBI taxa data"),
-                (ERROR, "If subspecies is provided so must species"),
+                (INFO, "3 NCBI rank fields found:"),
+                (ERROR, "A species field is required with subspecies"),
             ),
             id="subspecies without species",
         ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("E coli",),
+                        ("Enterobacteriaceae",),
+                        ("Escherichia",),
+                        ("coli",),
+                    ],
+                    "headers": ["name", "family", "genus", "species"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "3 NCBI rank fields found:"),
+                (INFO, "Validating row 1: E coli"),
+                (INFO, "Match found for E coli"),
+                (INFO, "Indexing taxonomic hierarchy"),
+                (INFO, "Added superkingdom Bacteria"),
+                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added class Gammaproteobacteria"),
+                (INFO, "Added order Enterobacterales"),
+                (INFO, "Added family Enterobacteriaceae"),
+                (INFO, "Added genus Escherichia"),
+                (INFO, "1 taxa loaded correctly"),
+            ),
+            id="good taxon",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("E coli",),
+                        ("f__Enterobacteriaceae",),
+                        ("g__Escherichia",),
+                        ("s__coli",),
+                    ],
+                    "headers": ["name", "family", "genus", "species"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "3 NCBI rank fields found:"),
+                (INFO, "Validating row 1: E coli"),
+                (INFO, "Match found for E coli"),
+                (INFO, "Indexing taxonomic hierarchy"),
+                (INFO, "Added superkingdom Bacteria"),
+                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added class Gammaproteobacteria"),
+                (INFO, "Added order Enterobacterales"),
+                (INFO, "Added family Enterobacteriaceae"),
+                (INFO, "Added genus Escherichia"),
+                (INFO, "1 taxa loaded correctly"),
+            ),
+            id="good taxon with NCBI prefixes",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("E coli",),
+                        ("f__Enterobacteriaceae",),
+                        ("k__Escherichia",),
+                        ("s__coli",),
+                    ],
+                    "headers": ["name", "family", "genus", "species"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "3 NCBI rank fields found:"),
+                (INFO, "Validating row 1: E coli"),
+                (ERROR, "Prefix of taxon k__Escherichia inconsistent with rank genus"),
+                (INFO, "Match found for E coli"),
+                (INFO, "Indexing taxonomic hierarchy"),
+                (INFO, "Added superkingdom Bacteria"),
+                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added class Gammaproteobacteria"),
+                (INFO, "Added order Enterobacterales"),
+                (INFO, "Added family Enterobacteriaceae"),
+                (INFO, "Added genus Escherichia"),
+                (INFO, "NCBITaxa contains 1 errors"),
+            ),
+            id="taxon with bad NCBI prefixes",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        (562,),
+                        ("Enterobacteriaceae",),
+                        ("Escherichia",),
+                        ("coli",),
+                    ],
+                    "headers": ["name", "family", "genus", "species"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "3 NCBI rank fields found:"),
+                (INFO, "Validating row 1: 562"),
+                (ERROR, "Worksheet name is not a string: 562"),
+                (INFO, "Match found for 562"),
+                (INFO, "Indexing taxonomic hierarchy"),
+                (INFO, "Added superkingdom Bacteria"),
+                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added class Gammaproteobacteria"),
+                (INFO, "Added order Enterobacterales"),
+                (INFO, "Added family Enterobacteriaceae"),
+                (INFO, "Added genus Escherichia"),
+                (INFO, "NCBITaxa contains 1 errors"),
+            ),
+            id="numeric name",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("E coli ",),
+                        ("Enterobacteriaceae",),
+                        ("Escherichia",),
+                        ("coli",),
+                    ],
+                    "headers": ["name", "family", "genus", "species"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "3 NCBI rank fields found:"),
+                (INFO, "Validating row 1:"),
+                (ERROR, "Worksheet name has whitespace padding: 'E coli '"),
+                (INFO, "Match found for E coli"),
+                (INFO, "Indexing taxonomic hierarchy"),
+                (INFO, "Added superkingdom Bacteria"),
+                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added class Gammaproteobacteria"),
+                (INFO, "Added order Enterobacterales"),
+                (INFO, "Added family Enterobacteriaceae"),
+                (INFO, "Added genus Escherichia"),
+                (INFO, "NCBITaxa contains 1 errors"),
+            ),
+            id="padded name",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("E coli",),
+                        (123,),
+                        ("Escherichia",),
+                        ("coli",),
+                    ],
+                    "headers": ["name", "family", "genus", "species"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "3 NCBI rank fields found:"),
+                (INFO, "Validating row 1:"),
+                (ERROR, "Rank family has non-string or empty string value: 123"),
+                (INFO, "NCBITaxa contains 1 errors"),
+            ),
+            id="non string taxon",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("E coli",),
+                        ("Enterobacteriaceae",),
+                        ("Escherichia ",),
+                        ("coli",),
+                    ],
+                    "headers": ["name", "family", "genus", "species"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "3 NCBI rank fields found:"),
+                (INFO, "Validating row 1: E coli"),
+                (ERROR, "Rank genus has whitespace padding: 'Escherichia '"),
+                (INFO, "Match found for E coli"),
+                (INFO, "Indexing taxonomic hierarchy"),
+                (INFO, "Added superkingdom Bacteria"),
+                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added class Gammaproteobacteria"),
+                (INFO, "Added order Enterobacterales"),
+                (INFO, "Added family Enterobacteriaceae"),
+                (INFO, "Added genus Escherichia"),
+                (INFO, "NCBITaxa contains 1 errors"),
+            ),
+            id="padded taxon",
+        ),
     ],
 )
-def test_load_worksheet_headers(
+def test_load_worksheet(
     caplog, mocker, fixture_resources, mock_output, expected_log_entries
 ):
     """Test that unexpected header names are caught by load."""
@@ -1640,7 +1840,11 @@ def test_load_worksheet_headers(
 # Finally check load function (starting by doing an error overview)
 @pytest.mark.parametrize(
     "example_ncbi_files, n_errors, n_taxa, t_taxa",
-    [("good", 0, 10, 30), ("weird", 0, 5, 20), ("bad", 12, 5, 0)],
+    [
+        pytest.param("good", 0, 10, 30, id="good"),
+        pytest.param("weird", 0, 5, 20, id="weird"),
+        pytest.param("bad", 8, 5, 0, id="bad"),
+    ],
     indirect=["example_ncbi_files"],  # take actual params from fixture
 )
 def test_taxa_load(fixture_resources, example_ncbi_files, n_errors, n_taxa, t_taxa):
