@@ -239,24 +239,30 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
 # Testing construct_bi_or_tri
 # ------------------------------------------
 @pytest.mark.parametrize(
-    "test_input,raises,expected",
+    "test_input,raises,expected,expected_log",
     [
-        (
+        pytest.param(
             dict(higher_nm="Escherichia", lower_nm="coli", tri=False),
             does_not_raise(),
             "Escherichia coli",
+            (),
+            id="species",
         ),
-        (
+        pytest.param(
             dict(higher_nm="Escherichia", lower_nm="Escherichia coli", tri=False),
             does_not_raise(),
             "Escherichia coli",
+            (),
+            id="species already binomial",
         ),
-        (
+        pytest.param(
             dict(higher_nm="Gorilla", lower_nm="gorilla", tri=False),
             does_not_raise(),
             "Gorilla gorilla",
+            (),
+            id="species 2",
         ),
-        (
+        pytest.param(
             dict(
                 higher_nm="Candidatus Koribacter",
                 lower_nm="Candidatus versatilis",
@@ -264,28 +270,44 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
             ),
             does_not_raise(),
             "Candidatus Koribacter versatilis",
+            (),
+            id="species both candidatus",
         ),
-        (
+        pytest.param(
             dict(higher_nm="Candidatus Koribacter", lower_nm="versatilis", tri=False),
             does_not_raise(),
             "Candidatus Koribacter versatilis",
+            (),
+            id="species genus candidatus",
         ),
-        (
+        pytest.param(
             dict(higher_nm="Over long genus name", lower_nm="vulpes", tri=False),
             pytest.raises(ValueError),
             None,
+            ((ERROR, "Genus name (Over long genus name) appears to be too long"),),
+            id="species bad genus",
         ),
-        (
+        pytest.param(
             dict(higher_nm="Canis", lower_nm="Vulpes vulpes", tri=False),
             pytest.raises(ValueError),
             None,
+            (
+                (
+                    ERROR,
+                    "Species name (Vulpes vulpes) appears to be binomial but does not"
+                    " contain genus name (Canis)",
+                ),
+            ),
+            id="species inconsistent genus",
         ),
-        (
+        pytest.param(
             dict(higher_nm="Vulpes vulpes", lower_nm="japonica", tri=True),
             does_not_raise(),
             "Vulpes vulpes japonica",
+            (),
+            id="subsp",
         ),
-        (
+        pytest.param(
             dict(
                 higher_nm="Candidatus Koribacter versatilis",
                 lower_nm="Ellin345",
@@ -293,8 +315,10 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
             ),
             does_not_raise(),
             "Candidatus Koribacter versatilis Ellin345",
+            (),
+            id="subsp species candidatus",
         ),
-        (
+        pytest.param(
             dict(
                 higher_nm="Candidatus Koribacter versatilis",
                 lower_nm="Candidatus Ellin345",
@@ -302,34 +326,50 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
             ),
             does_not_raise(),
             "Candidatus Koribacter versatilis Ellin345",
+            (),
+            id="subsp both candidatus",
         ),
-        (
+        pytest.param(
             dict(
                 higher_nm="Vulpes vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True
             ),
             does_not_raise(),
             "Vulpes vulpes schrenckii",
+            (),
+            id="subsp already trinomial",
         ),
-        (
+        pytest.param(
             dict(
                 higher_nm="Canis vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True
             ),
             pytest.raises(ValueError),
             None,
+            (
+                (
+                    ERROR,
+                    "Subspecies name (Vulpes vulpes schrenckii) appears to be trinomial"
+                    " but does not contain species name (Canis vulpes)",
+                ),
+            ),
+            id="subsp inconsistent species",
         ),
-        (
+        pytest.param(
             dict(higher_nm="Over long name", lower_nm="schrenckii", tri=True),
             pytest.raises(ValueError),
             None,
+            ((ERROR, "Species name (Over long name) appears to be too long"),),
+            id="subsp long species",
         ),
-        (
+        pytest.param(
             dict(higher_nm="Vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True),
             pytest.raises(ValueError),
             None,
+            ((ERROR, "Species name (Vulpes) too short"),),
+            id="subsp short species",
         ),
     ],
 )
-def test_construct_bi_or_tri(test_input, raises, expected):
+def test_construct_bi_or_tri(caplog, test_input, raises, expected, expected_log):
     """Test function that constructs species binomials from species and genus names.
 
     We test that it can catch when the species name is already a binomial, and that it
@@ -338,64 +378,10 @@ def test_construct_bi_or_tri(test_input, raises, expected):
     with raises:
         s_nm = taxa.construct_bi_or_tri(**test_input)
 
-        if isinstance(raises, does_not_raise):
-            assert s_nm == expected
+    if isinstance(raises, does_not_raise):
+        assert s_nm == expected
 
-
-# Now test that the function logs errors correctly
-@pytest.mark.parametrize(
-    "test_input,expected_log_entries",
-    [  # Fine so empty
-        (dict(higher_nm="Escherichia", lower_nm="coli", tri=False), ()),
-        (  # Over long name
-            dict(higher_nm="Over long genus name", lower_nm="vulpes", tri=False),
-            ((ERROR, "Genus name (Over long genus name) appears to be too long"),),
-        ),
-        (  # Genus name not in binomial
-            dict(higher_nm="Canis", lower_nm="Vulpes vulpes", tri=False),
-            (
-                (
-                    ERROR,
-                    "Species name (Vulpes vulpes) appears to be binomial but does not"
-                    " contain genus name (Canis)",
-                ),
-            ),
-        ),
-        (
-            dict(
-                higher_nm="Vulpes vulpes", lower_nm="Vulpes vulpes japonica", tri=True
-            ),  # Fine so empty
-            (),
-        ),
-        # Species name and genus name don't match
-        (
-            dict(
-                higher_nm="Canis vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True
-            ),
-            (
-                (
-                    ERROR,
-                    "Subspecies name (Vulpes vulpes schrenckii) appears to be trinomial"
-                    " but does not contain species name (Canis vulpes)",
-                ),
-            ),
-        ),
-        (  # Over long name
-            dict(higher_nm="Over long name", lower_nm="schrenckii", tri=True),
-            ((ERROR, "Species name (Over long name) appears to be too long"),),
-        ),
-        (  # Too short
-            dict(higher_nm="Vulpes", lower_nm="Vulpes vulpes schrenckii", tri=True),
-            ((ERROR, "Species name (Vulpes) too short"),),
-        ),
-    ],
-)
-def test_validate_construct_bi_or_tri(caplog, test_input, expected_log_entries):
-    """This test checks logging for the function to construct binomials/trinomials."""
-
-    taxa.construct_bi_or_tri(**test_input)
-
-    log_check(caplog, expected_log_entries)
+    log_check(caplog, expected_log)
 
 
 # ------------------------------------------
@@ -1825,8 +1811,8 @@ def test_load_worksheet(
     "example_ncbi_files, n_errors, n_taxa, t_taxa",
     [
         pytest.param("good", 0, 11, 30, id="good"),
-        pytest.param("weird", 0, 5, 20, id="weird"),
-        pytest.param("bad", 8, 5, 0, id="bad"),
+        pytest.param("weird", 0, 5, 19, id="weird"),
+        pytest.param("bad", 12, 0, 0, id="bad"),
     ],
     indirect=["example_ncbi_files"],  # take actual params from fixture
 )

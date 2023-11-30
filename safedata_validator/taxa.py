@@ -1785,13 +1785,16 @@ class NCBITaxa:
                 except ValueError:
                     validate = False
 
-            # Check new settings
+            # Check new settings - empty cell (new=false) or a yes/no string.
             if "new" in row:
                 isnew = row["new"]
-                if not isinstance(isnew, str) or isnew.lower() not in ["yes", "no"]:
+                if isnew is None:
+                    new = False
+                elif not isinstance(isnew, str) or isnew.lower() not in ["yes", "no"]:
                     LOGGER.error("Values in the 'new' field must be yes or no.")
                     validate = False
-                new = False if isnew.lower() == "no" else True
+                else:
+                    new = False if isnew.lower() == "no" else True
             else:
                 new = False
 
@@ -2286,18 +2289,25 @@ def construct_bi_or_tri(higher_nm: str, lower_nm: str, tri: bool) -> str:
             value = higher_nm.strip() + " " + lower_nm.strip()
     # Catch too short species name case
     elif tri and len(higher_nm.split()) == 1:
-        log_and_raise(f"Species name ({higher_nm}) too short", ValueError)
+        msg = f"Species name ({higher_nm}) too short"
+        LOGGER.error(msg)
+        raise ValueError(msg)
+
     # Then check that lower name is more words than the higher name
     elif len(lower_nm.split()) > len(higher_nm.split()):
         if lower_nm.lower().startswith(higher_nm.lower()):
             value = lower_nm
         else:
-            log_and_raise(
+            msg = (
                 f"{L} name ({lower_nm}) appears to be {type} but "
-                f"does not contain {H.lower()} name ({higher_nm})",
-                ValueError,
+                f"does not contain {H.lower()} name ({higher_nm})"
             )
+            LOGGER.error(msg)
+            raise ValueError(msg)
+
     else:
-        log_and_raise(f"{H} name ({higher_nm}) appears to be too long", ValueError)
+        msg = f"{H} name ({higher_nm}) appears to be too long"
+        LOGGER.error(msg)
+        raise ValueError(msg)
 
     return value

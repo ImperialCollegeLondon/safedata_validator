@@ -52,7 +52,7 @@ The table format looks like this:
 <!-- markdownlint-disable MD013 -->
 | Name             | NCBI ID | Superkingdom | Kingdom     | Phylum           | Class               | Comments |
 | ---------------- | ------- | ------------ | ----------- | ---------------- | ------------------- | -------- |
-| G_proteobacteria | 1236    | Bacteria     |             | Proteobacteria   | Gammaproteobacteria |          |
+| G_proteobacteria | 1236    | Bacteria     |             | Pseudomonadota   | Gammaproteobacteria |          |
 | E_mycetes        | 147545  | Eukaryota    | Fungi       | Ascomycota       | Eurotiomycetes      |          |
 | Dinophyceae      |         | Eukaryota    |             |                  | Dinophyceae         |          |
 | Acidobact        |         |              | k__Bacteria | p__Acidobacteria | c__Acidobacteriia   |          |
