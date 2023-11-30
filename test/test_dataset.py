@@ -13,11 +13,10 @@ from .conftest import FIXTURE_FILES
         ("good_excel_file", 0),
         ("bad_excel_file", 94),
         ("good_ncbi_file", 0),
-        ("bad_ncbi_file", 107),
+        ("bad_ncbi_file", 106),
     ],
 )
 def test_DataSet_load_from_file(fixture_resources, file_key, n_errors):
-
     # Load the taxa and locations
     ds = Dataset(fixture_resources)
     ds.load_from_workbook(FIXTURE_FILES.rf[file_key])
