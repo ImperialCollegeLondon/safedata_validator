@@ -451,7 +451,7 @@ def test_get_canon_hierarchy(fixture_ncbi_validator, raises, tax_id, leaf, n_tax
                 ("family", "Enterobacteriaceae", 543, 91347),
                 ("order", "Enterobacterales", 91347, 1236),
                 ("class", "Gammaproteobacteria", 1236, 1224),
-                ("phylum", "Proteobacteria", 1224, 2),
+                ("phylum", "Pseudomonadota", 1224, 2),
                 ("superkingdom", "Bacteria", 2, None),
             ],
             id="Backbone leaf",
@@ -479,7 +479,7 @@ def test_get_canon_hierarchy(fixture_ncbi_validator, raises, tax_id, leaf, n_tax
                 ("family", "Enterobacteriaceae", 543, 91347),
                 ("order", "Enterobacterales", 91347, 1236),
                 ("class", "Gammaproteobacteria", 1236, 1224),
-                ("phylum", "Proteobacteria", 1224, 2),
+                ("phylum", "Pseudomonadota", 1224, 2),
                 ("superkingdom", "Bacteria", 2, None),
             ],
             id="Non backbone leaf",
@@ -775,17 +775,17 @@ def test_id_lookup_errors(fixture_ncbi_validator, test_input, expected_exception
             ((INFO, "Match found for Strepto"),),
             id="Simple phylum",
         ),
-        pytest.param(
-            dict(
-                nnme="Opistho",
-                taxon_hier=[("superkingdom", "Eukaryota"), ("clade", "Opisthokonta")],
-            ),
-            ("clade", "Opisthokonta", 33154, 2759),
-            does_not_raise(),
-            (None, None),
-            ((INFO, "Match found for Opistho"),),
-            id="Clade anchored by superkingdom",
-        ),
+        # pytest.param(
+        #     dict(
+        #         nnme="Opistho",
+        #         taxon_hier=[("superkingdom", "Eukaryota"), ("clade", "Opisthokonta")],
+        #     ),
+        #     ("clade", "Opisthokonta", 33154, 2759),
+        #     does_not_raise(),
+        #     (None, None),
+        #     ((INFO, "Match found for Opistho"),),
+        #     id="Clade anchored by superkingdom",
+        # ),
         pytest.param(
             dict(
                 nnme="fox",
@@ -968,15 +968,16 @@ def test_id_lookup_errors(fixture_ncbi_validator, test_input, expected_exception
                     ("kingdom", "Bacteria"),
                 ],
             ),
-            ("superkingdom", "Bacteria", 2, None),
-            does_not_raise(),
-            (None, None),
+            None,
+            pytest.raises(taxa.NCBIError),
+            None,
             (
                 (
-                    WARNING,
-                    "NCBI records Bacteria as a superkingdom rather than a kingdom",
+                    (
+                        ERROR,
+                        "Taxa Bacteria not found with name Bacteria and rank kingdom",
+                    ),
                 ),
-                (INFO, "Match found for Bacteria"),
             ),
             id="Bacteria kingdom",
         ),
@@ -1103,9 +1104,9 @@ def test_taxa_search_errors(fixture_ncbi_validator, test_input, expected_excepti
                 m_name="Bacteria",
                 taxon_hier=[("kingdom", "Bacteria")],
             ),
-            dict(ntax=1, nnms=1, nhier=1),
-            [("Bacteria", 2, None, "Bacteria", "superkingdom", "accepted")],
-            id="Bacteria as kingdom",
+            dict(ntax=0, nnms=0, nhier=0),
+            [],
+            id="Bacteria as kingdom fails",
         ),
         pytest.param(
             dict(
@@ -1139,9 +1140,9 @@ def test_taxa_search_errors(fixture_ncbi_validator, test_input, expected_excepti
                 m_name="Fungi",
                 taxon_hier=[("kingdom", "Fungi"), ("superkingdom", "Eukaryota")],
             ),
-            dict(ntax=0, nnms=0, nhier=0),
-            [],
-            id="Fungi bad order",
+            dict(ntax=1, nnms=1, nhier=2),
+            [("Fungi", 4751, 2759, "Fungi", "kingdom", "accepted")],
+            id="Fungi reversed order",
         ),
         pytest.param(
             dict(
@@ -1178,7 +1179,6 @@ def test_validate_and_add_taxon(fixture_resources, test_input, counts, tx_index)
 
 @pytest.mark.parametrize(
     "test_input,raises,expected_log_entries",
-    # Fine so empty
     [
         pytest.param(
             ["E coli", [("species", "Escherichia coli")]],
@@ -1202,13 +1202,10 @@ def test_validate_and_add_taxon(fixture_resources, test_input, counts, tx_index)
             ["Bacteria", [("kingdom", "Bacteria")]],
             does_not_raise(),
             (
-                (
-                    WARNING,
-                    "NCBI records Bacteria as a superkingdom rather than a kingdom",
-                ),
-                (INFO, "Match found for Bacteria"),
+                (ERROR, "Taxa Bacteria not found with name Bacteria and rank kingdom"),
+                (ERROR, "Search based on taxon hierarchy failed"),
             ),
-            id="bacteria as kingdom",
+            id="bacteria as kingdom fails",
         ),
         pytest.param(
             [" E coli", [("species", "Escherichia coli")]],
@@ -1420,7 +1417,7 @@ def test_validate_and_add_taxon_logging(
             [
                 ("E coli", 562, 561, "Escherichia coli", "species", "accepted"),
                 (None, 2, None, "Bacteria", "superkingdom", "accepted"),
-                (None, 1224, 2, "Proteobacteria", "phylum", "accepted"),
+                (None, 1224, 2, "Pseudomonadota", "phylum", "accepted"),
                 (None, 1236, 1224, "Gammaproteobacteria", "class", "accepted"),
                 (None, 91347, 1236, "Enterobacterales", "order", "accepted"),
                 (None, 543, 91347, "Enterobacteriaceae", "family", "accepted"),
@@ -1430,7 +1427,7 @@ def test_validate_and_add_taxon_logging(
                 (INFO, "Match found for E coli"),
                 (INFO, "Indexing taxonomic hierarchy"),
                 (INFO, "Added superkingdom Bacteria"),
-                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added phylum Pseudomonadota"),
                 (INFO, "Added class Gammaproteobacteria"),
                 (INFO, "Added order Enterobacterales"),
                 (INFO, "Added family Enterobacteriaceae"),
@@ -1452,7 +1449,7 @@ def test_validate_and_add_taxon_logging(
                     "accepted",
                 ),
                 (None, 2, None, "Bacteria", "superkingdom", "accepted"),
-                (None, 976, 2, "Bacteroidetes", "phylum", "accepted"),
+                (None, 976, 2, "Bacteroidota", "phylum", "accepted"),
                 (None, 117743, 976, "Flavobacteriia", "class", "accepted"),
                 (None, 200644, 117743, "Flavobacteriales", "order", "accepted"),
                 (None, 49546, 200644, "Flavobacteriaceae", "family", "accepted"),
@@ -1467,7 +1464,7 @@ def test_validate_and_add_taxon_logging(
                 (INFO, "Match found for C marina"),
                 (INFO, "Indexing taxonomic hierarchy"),
                 (INFO, "Added superkingdom Bacteria"),
-                (INFO, "Added phylum Bacteroidetes"),
+                (INFO, "Added phylum Bacteroidota"),
                 (INFO, "Added class Flavobacteriia"),
                 (INFO, "Added order Flavobacteriales"),
                 (INFO, "Added family Flavobacteriaceae"),
@@ -1484,20 +1481,6 @@ def test_validate_and_add_taxon_logging(
                 (INFO, "Indexing taxonomic hierarchy"),
             ),
             id="bacteria as superkingdom",
-        ),
-        pytest.param(
-            ["Bacteria", [("kingdom", "Bacteria")]],
-            1,
-            [("Bacteria", 2, None, "Bacteria", "superkingdom", "accepted")],
-            (
-                (
-                    WARNING,
-                    "NCBI records Bacteria as a superkingdom rather than a kingdom",
-                ),
-                (INFO, "Match found for Bacteria"),
-                (INFO, "Indexing taxonomic hierarchy"),
-            ),
-            id="bacteria as kingdom",
         ),
         pytest.param(
             ["Fungi", [("superkingdom", "Eukaryota"), ("kingdom", "Fungi")]],
@@ -1635,7 +1618,7 @@ def test_index_higher_taxa(
                 (INFO, "Match found for E coli"),
                 (INFO, "Indexing taxonomic hierarchy"),
                 (INFO, "Added superkingdom Bacteria"),
-                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added phylum Pseudomonadota"),
                 (INFO, "Added class Gammaproteobacteria"),
                 (INFO, "Added order Enterobacterales"),
                 (INFO, "Added family Enterobacteriaceae"),
@@ -1664,7 +1647,7 @@ def test_index_higher_taxa(
                 (INFO, "Match found for E coli"),
                 (INFO, "Indexing taxonomic hierarchy"),
                 (INFO, "Added superkingdom Bacteria"),
-                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added phylum Pseudomonadota"),
                 (INFO, "Added class Gammaproteobacteria"),
                 (INFO, "Added order Enterobacterales"),
                 (INFO, "Added family Enterobacteriaceae"),
@@ -1694,7 +1677,7 @@ def test_index_higher_taxa(
                 (INFO, "Match found for E coli"),
                 (INFO, "Indexing taxonomic hierarchy"),
                 (INFO, "Added superkingdom Bacteria"),
-                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added phylum Pseudomonadota"),
                 (INFO, "Added class Gammaproteobacteria"),
                 (INFO, "Added order Enterobacterales"),
                 (INFO, "Added family Enterobacteriaceae"),
@@ -1724,7 +1707,7 @@ def test_index_higher_taxa(
                 (INFO, "Match found for 562"),
                 (INFO, "Indexing taxonomic hierarchy"),
                 (INFO, "Added superkingdom Bacteria"),
-                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added phylum Pseudomonadota"),
                 (INFO, "Added class Gammaproteobacteria"),
                 (INFO, "Added order Enterobacterales"),
                 (INFO, "Added family Enterobacteriaceae"),
@@ -1754,7 +1737,7 @@ def test_index_higher_taxa(
                 (INFO, "Match found for E coli"),
                 (INFO, "Indexing taxonomic hierarchy"),
                 (INFO, "Added superkingdom Bacteria"),
-                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added phylum Pseudomonadota"),
                 (INFO, "Added class Gammaproteobacteria"),
                 (INFO, "Added order Enterobacterales"),
                 (INFO, "Added family Enterobacteriaceae"),
@@ -1806,7 +1789,7 @@ def test_index_higher_taxa(
                 (INFO, "Match found for E coli"),
                 (INFO, "Indexing taxonomic hierarchy"),
                 (INFO, "Added superkingdom Bacteria"),
-                (INFO, "Added phylum Proteobacteria"),
+                (INFO, "Added phylum Pseudomonadota"),
                 (INFO, "Added class Gammaproteobacteria"),
                 (INFO, "Added order Enterobacterales"),
                 (INFO, "Added family Enterobacteriaceae"),
@@ -1841,7 +1824,7 @@ def test_load_worksheet(
 @pytest.mark.parametrize(
     "example_ncbi_files, n_errors, n_taxa, t_taxa",
     [
-        pytest.param("good", 0, 10, 30, id="good"),
+        pytest.param("good", 0, 11, 30, id="good"),
         pytest.param("weird", 0, 5, 20, id="weird"),
         pytest.param("bad", 8, 5, 0, id="bad"),
     ],

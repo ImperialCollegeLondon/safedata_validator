@@ -490,9 +490,10 @@ class NCBIValidator:
 
     def __init__(self, resources: Resources) -> None:
         conn = sqlite3.connect(resources.ncbi_database)
+
         conn.row_factory = sqlite3.Row
         self.ncbi_conn: sqlite3.Connection = conn
-
+        """A connection to the NCBI sqlite3 database."""
         # Retrieve the taxon ranking and extra taxa from the DB, explicitly
         # sorting from root to leaf
         self.ncbi_ranks_root_to_leaf: list[str] = [
@@ -501,11 +502,9 @@ class NCBIValidator:
                 "select rank from unique_ncbi_ranks order by rank_index;"
             )
         ]
-        self.ncbi_extra_ranks: list[str] = list(
-            set(self.ncbi_ranks_root_to_leaf).difference(NCBI_BACKBONE_RANKS)
-        )
+        """A root to leaf list of NCBI taxonomic ranks, excluding clade and no rank."""
 
-        self.superkingdoms = [
+        self.superkingdoms: list[str] = [
             rw["name_txt"]
             for rw in self.ncbi_conn.execute(
                 "select name_txt "
@@ -513,8 +512,9 @@ class NCBIValidator:
                 "where rank='superkingdom'"
             ).fetchall()
         ]
+        """A list of all names assigned superkingdom rank in the NCBI database."""
 
-        self.kingdoms = [
+        self.kingdoms: list[str] = [
             rw["name_txt"]
             for rw in self.ncbi_conn.execute(
                 "select name_txt "
@@ -522,6 +522,7 @@ class NCBIValidator:
                 "where rank='kingdom'"
             ).fetchall()
         ]
+        """A list of all names assigned kingdom rank in the NCBI database."""
 
     def __del__(self) -> None:
         """Delete a LocalNCBIValidator instance.
@@ -760,13 +761,8 @@ class NCBIValidator:
 
         This method takes a provided NCBI taxonomic hierarchy, and attempts to find a
         congruent NCBI ID. This NCBI ID is then used to generate a NCBITaxon object,
-        which is returned.
-
-        * Where possible, his method:
-            * makes use of parent taxa information to distinguish between ambiguous taxa
-              names.
-            * corrects, with a warning, for the common issue of superkingdom taxon names
-              being labelled as kingdom rank.
+        which is returned. Where possible, this method makes use of parent taxa
+        information to distinguish between ambiguous taxa names.
 
         Args:
             nnme: A nickname to identify the taxon
@@ -818,31 +814,11 @@ class NCBIValidator:
         mtaxon = None
 
         if n_records == 0:
-            # No records found - but some tools list superkingdom taxa under kingdom
-            # rank. Look for the specific combination of the name and superkingdom.
-            is_really_superkingdom = False
-
-            if leaf_rank == "kingdom":
-                superkingdom_rows = self._get_name_and_rank_matches(
-                    leaf_name, "superkingdom"
-                )
-
-                if len(superkingdom_rows) > 0:
-                    # If at least one record is found, this is really a superkingdom, so
-                    # pass those new records forward to the next checking steps
-                    n_records = len(superkingdom_rows)
-                    taxon_rows = superkingdom_rows
-                    is_really_superkingdom = True
-                    LOGGER.warning(
-                        f"NCBI records {leaf_name} as "
-                        f"a superkingdom rather than a kingdom"
-                    )
-
-            if not is_really_superkingdom:
-                LOGGER.error(
-                    f"Taxa {nnme} not found with name {leaf_name} and rank {leaf_rank}"
-                )
-                raise NCBIError("Taxon not found")
+            # No records found
+            LOGGER.error(
+                f"Taxa {nnme} not found with name {leaf_name} and rank {leaf_rank}"
+            )
+            raise NCBIError("Taxon not found")
 
         if n_records == 1:
             # Single record found - get the canon hierarchy and check congruence
@@ -1767,20 +1743,22 @@ class NCBITaxa:
                 # levels no taxonomic information is associated with the annotation (s__
                 # etc. entries)
                 value = taxa_strip(value, rnk)
-                if value is not None:
-                    taxon_dict[rnk] = value
+                if value is None:
+                    continue
 
-            # Now standardise kingdoms to superkingdoms if required
-            if (
-                "kingdom" in taxon_dict
-                and taxon_dict["kingdom"] not in self.validator.kingdoms
-                and taxon_dict["kingdom"] in self.validator.superkingdoms
-            ):
-                taxon_dict["superkingdom"] = taxon_dict.pop("kingdom")
-                LOGGER.warning(
-                    f"NCBI records {taxon_dict['superkingdom']} as "
-                    f"a superkingdom rather than a kingdom"
-                )
+                # Finally promote kingdoms to superkingdoms if required
+                if (
+                    rnk == "kingdom"
+                    and value not in self.validator.kingdoms
+                    and value in self.validator.superkingdoms
+                ):
+                    taxon_dict["superkingdom"] = value
+                    LOGGER.warning(
+                        f"NCBI records {taxon_dict['superkingdom']} as "
+                        f"a superkingdom rather than a kingdom"
+                    )
+                else:
+                    taxon_dict[rnk] = value
 
             # Now convert species and subspecies ranks to binomial, trinomial where
             # possible. Abandon validation for taxa where construct_bi_or_tri fails.
