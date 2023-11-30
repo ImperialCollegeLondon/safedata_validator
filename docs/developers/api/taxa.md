@@ -44,11 +44,6 @@
         show_root_heading: True
         header_level: 3
 
-::: safedata_validator.taxa.gen_invalid_NCBITaxon
-    options:
-        show_root_heading: True
-        header_level: 3
-
 ## Taxon worksheet classes
 
 ::: safedata_validator.taxa.GBIFTaxa
