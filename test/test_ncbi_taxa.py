@@ -1533,6 +1533,18 @@ def test_index_higher_taxa(
         ),
         pytest.param(
             DotMap(
+                {"data_columns": [tuple(), tuple()], "headers": ["name", "comments"]}
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "Additional fields provided:"),
+                (ERROR, "NCBI taxa sheet contains no taxonomic rank fields."),
+            ),
+            id="No rank fields",
+        ),
+        pytest.param(
+            DotMap(
                 {
                     "data_columns": [tuple(), tuple(), tuple(), tuple(), tuple()],
                     "headers": [

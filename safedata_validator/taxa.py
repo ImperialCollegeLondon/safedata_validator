@@ -592,10 +592,10 @@ class NCBIValidator:
         name, taxon id and parent taxon id, starting with the provided taxon id at the
         tip.
 
-        Every taxon id in the NCBI names table has a 'scientific name' usage that
-        defines the current canon usage. The following SQL query returns no rows -
-        showing that all rows in the names table have row with the same taxon ID and the
-        `scientific name` name class:
+        The canonical usage is taken from the row associated with each NCBI taxon ID
+        that is recorded as having the 'scientific name' name class. The SQL query below
+        demonstrates that all IDs have a canonical usage: there are no rows found with
+        taxon IDs that do not also appear with 'scientific name' status.
 
         ``` SQL
             SELECT count(*) FROM names
@@ -835,7 +835,7 @@ class NCBIValidator:
             # Warn if the usage is non-canon
             not_canon = match_taxon["name_class"] != "scientific name"
             if not_canon:
-                LOGGER.warn(
+                LOGGER.warning(
                     f"Non-canon usage: {leaf_name} is {match_taxon['name_class']} "
                     f"for {canon_hier[0][1]}"
                 )
@@ -911,7 +911,7 @@ class NCBIValidator:
                 # Warn if the usage is non-canon
                 not_canon = match_taxon["name_class"] != "scientific name"
                 if not_canon:
-                    LOGGER.warn(
+                    LOGGER.warning(
                         f"Non-canon usage: {leaf_name} is {match_taxon['name_class']} "
                         f"for {canon_hier[0][1]}"
                     )
@@ -1653,6 +1653,12 @@ class NCBITaxa:
         found_ranks = [
             rnk for rnk in self.validator.ncbi_ranks_root_to_leaf if rnk in headers
         ]
+
+        if not found_ranks:
+            LOGGER.error("NCBI taxa sheet contains no taxonomic rank fields.")
+            FORMATTER.pop()
+            return
+
         LOGGER.info(
             f"{len(found_ranks)} NCBI rank fields found: ", extra={"join": found_ranks}
         )
