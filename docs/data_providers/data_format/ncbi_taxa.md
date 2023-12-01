@@ -98,12 +98,12 @@ if you want to use `Crbe` in your data worksheets, rather than typing out
 
   Names can be provided in plain text, or alternatively in a commonly used notation,
   where the rank is indicated by a lower case first letter and the name follows after
-  two underscores (e.g. k__Bacteria for Kingdom Bacteria). Notation of this type should
-  be placed in the correct rank columns, and validation is carried out to check that the
-  rank implied by the notation matches the column rank.
+  two underscores (e.g. `k__Bacteria` for Kingdom Bacteria). Notation of this type
+  should be placed in the correct rank columns, and validation is carried out to check
+  that the rank implied by the notation matches the column rank.
 
   Two special cases are that NCBI outputs typically separate out the components of
-  binomial and trinomial names: for example, they might return `g_Escherichia` and
+  binomial and trinomial names: for example, they might return `g__Escherichia` and
   `s__coli`. In order to be able to match _complete_ species and subspecies names
   against the database, you must provide field information for genus, species and
   subspecies ranks. This information is used to assemble complete names for validation
@@ -117,7 +117,7 @@ if you want to use `Crbe` in your data worksheets, rather than typing out
     some taxa but providing it for others. However, sufficient information must be
     provided to unambiguously identify each taxon.
 
-* **Comments and other field**: These fields are obviously optional. If you
+* **Comments and other fields**: These fields are obviously optional. If you
   do have particular notes that you want to make - explaining disagreements with NCBI
   taxonomy, new species notes and the like - then these can be very useful for future
   researchers trying to place taxa. Equally if you want to record further information
