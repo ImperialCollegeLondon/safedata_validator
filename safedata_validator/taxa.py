@@ -2277,7 +2277,7 @@ def construct_bi_or_tri(higher_nm: str, lower_nm: str, tri: bool) -> str:
 
     Raises:
         ValueError: where the input cannot be safely parsed into a binomial or trinomial
-        name.
+            name.
     """
 
     # Determine whether a species binomial or a subspecies trinomial is considered
