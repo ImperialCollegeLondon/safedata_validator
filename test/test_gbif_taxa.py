@@ -688,7 +688,6 @@ def test_validate_taxon_sanitise(
 def test_validate_taxon_lookup(
     caplog, fixture_resources, taxon_tuple, expected_log_entries
 ):
-
     taxa_instance = taxa.GBIFTaxa(fixture_resources)
     taxa_instance.validate_and_add_taxon(taxon_tuple)
 
@@ -721,7 +720,6 @@ def test_validate_taxon_lookup(
 def test_validate_deleted_taxon_lookup(
     caplog, fixture_resources, taxon_tuple, expected_log_entries
 ):
-
     taxa_instance = taxa.GBIFTaxa(fixture_resources)
     taxa_instance.validate_and_add_taxon(taxon_tuple)
 
@@ -754,7 +752,10 @@ def test_validate_deleted_taxon_lookup(
         ),
         pytest.param(
             DotMap(
-                {"data_columns": ["some_columns"], "headers": ["name", "taxon name"]}
+                {
+                    "data_columns": [tuple(), tuple()],
+                    "headers": ["name", "taxon name"],
+                }
             ),
             (
                 (INFO, "Loading GBIFTaxa worksheet"),
@@ -766,35 +767,22 @@ def test_validate_deleted_taxon_lookup(
         pytest.param(
             DotMap(
                 {
-                    "data_columns": ["some_columns"],
+                    "data_columns": [tuple(), tuple(), tuple(), tuple()],
                     "headers": [
                         "name",
                         "taxon name",
                         "taxon type",
-                        "unexpected_header",
+                        "additional header",
                     ],
                 }
             ),
             (
                 (INFO, "Loading GBIFTaxa worksheet"),
                 (INFO, "Reading taxa data"),
-                (ERROR, "Unexpected (or misspelled) headers found:"),
+                (INFO, "Additional fields provided:"),
+                (INFO, "No taxon rows found"),
             ),
-            id="Unexpected header",
-        ),
-        pytest.param(
-            DotMap(
-                {
-                    "data_columns": ["some_columns"],
-                    "headers": ["name", "taxon name", "taxon type", "taxonID"],
-                }
-            ),
-            (
-                (INFO, "Loading GBIFTaxa worksheet"),
-                (INFO, "Reading taxa data"),
-                (ERROR, "Unexpected (or misspelled) headers found:"),
-            ),
-            id="Misspelled header",
+            id="Additional header",
         ),
     ],
 )

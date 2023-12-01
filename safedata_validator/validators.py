@@ -535,7 +535,7 @@ class GetDataFrame:
 
     Attributes:
         headers: A list of header values
-        data_columns: A list of list containing column data
+        data_columns: A list of tuples containing column data
         bad_headers: A dictionary of malformed header values
     """
 

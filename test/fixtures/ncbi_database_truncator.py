@@ -11,11 +11,6 @@ are found automatically and added to the database.
 import csv
 import sqlite3
 
-from safedata_validator.resources import Resources
-
-# Get the locally configured full databases
-resources = Resources()
-
 # The details file contains some whole row comments, so these are skipped
 fp = open("test_ncbi_taxa_details.csv")
 rdr = csv.DictReader(filter(lambda row: row[0] != "#", fp))
@@ -23,8 +18,18 @@ data = list(rdr)
 fp.close()
 
 # Copy truncated database from local non-git copy.
-source_db = sqlite3.connect(resources.ncbi_database)
+source_db = sqlite3.connect(
+    "../../local/ncbi_databases/ncbi_taxonomy_2023-11-01.sqlite"
+)
 dest_db = sqlite3.connect("ncbi_database_truncated.sqlite")
+
+# Duplicate table structure
+tables = source_db.execute("SELECT sql FROM sqlite_master WHERE type='table'")
+for (table_sql,) in tables:
+    cur = dest_db.execute(table_sql)
+
+dest_db.commit()
+
 
 # Get unique, non-user GBIF IDs from the data
 ncbi_ids = set([int(d["ncbi_id"]) for d in data])
@@ -49,15 +54,6 @@ for ind in range(0, len(prov_ids)):
         # End this when the parent taxon is root (ID=1)
         if taxon_row[1] == 1:
             lin_fnd = True
-
-# create the three tables
-tables = ["nodes", "names", "merge"]
-for t_name in tables:
-    cur = source_db.execute(
-        f"SELECT sql FROM sqlite_master WHERE type='table' AND name='{t_name}'"
-    )
-    schema = cur.fetchone()[0]
-    cur = dest_db.execute(schema)
 
 # copy rows
 for each_id in ncbi_ids:
@@ -84,15 +80,16 @@ for each_id in ncbi_ids:
 dest_db.commit()
 
 # timestamp table
-cur = source_db.execute(
-    "SELECT sql FROM sqlite_master WHERE type='table' AND name='timestamp'"
-)
-schema = cur.fetchone()[0]
-cur = dest_db.execute(schema)
-
 cur = source_db.execute("SELECT * FROM timestamp")
 timestamp = cur.fetchone()[0]
 ins = dest_db.execute(f'insert into timestamp values ("{timestamp}")')
+
+dest_db.commit()
+
+# unique ranks table
+cur = source_db.execute("SELECT * FROM unique_ncbi_ranks")
+ranks = cur.fetchall()
+ins = dest_db.executemany("insert into unique_ncbi_ranks values (?, ?)", ranks)
 
 dest_db.commit()
 

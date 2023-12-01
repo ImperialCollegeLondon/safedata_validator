@@ -10,12 +10,14 @@ that datasets can include a taxonomy timestamp.
 
 import csv
 import ftplib
+import graphlib
 import gzip
 import os
 import shutil
 import sqlite3
 import zipfile
 from io import TextIOWrapper
+from itertools import groupby
 from typing import Optional
 
 import requests
@@ -523,6 +525,42 @@ def build_local_ncbi(
         con.commit()
 
     archive.close()
+
+    # Populate a unique ranks table for this database
+    LOGGER.info("Creating unique ranks table")
+    con.execute("CREATE TABLE unique_ncbi_ranks (rank_index int, rank str);")
+
+    # Get the unique pairs of child + parent ranks
+    cur = con.execute(
+        """select distinct ch.rank, pr.rank
+            from nodes ch inner join nodes pr
+            on ch.parent_tax_id = pr.tax_id
+        """
+    )
+
+    # Filter out no rank and clade which have variable position
+    ranks = [
+        rw for rw in cur.fetchall() if ("no rank" not in rw) and ("clade" not in rw)
+    ]
+
+    # Group by parent
+    children_by_parents = {}
+    ranks.sort(key=lambda x: x[1])
+    grp_by_parent = groupby(ranks, lambda x: x[1])
+
+    for ky, gp in grp_by_parent:
+        children_by_parents[ky] = {ch for ch, _ in gp}
+
+    # Remove a circular reference and then find the static order through the graph
+    children_by_parents["forma specialis"].remove("forma specialis")
+    sorter = graphlib.TopologicalSorter(children_by_parents)
+    taxon_order = reversed(list(sorter.static_order()))
+
+    # Add the
+    con.executemany(
+        "INSERT INTO unique_ncbi_ranks VALUES (?, ?)", enumerate(taxon_order)
+    )
+    con.commit()
 
     # Create the indices
     LOGGER.info("Creating database indexes")
