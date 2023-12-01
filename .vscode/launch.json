@@ -24,6 +24,18 @@
                 "gazetteer.geojson",
                 "location_aliases.csv"
             ]
+        },
+        {
+            "name": "_safedata_validator_cli debug",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-r",
+                "local/config_files/live_safeweb_gbif_2016_07_25.cfg",
+                "../safedata_directory/1198522/1237724/template_SinghRamesh.xlsx"
+            ]
         }
     ]
 }

@@ -1,0 +1,16 @@
+cl_prompt $ safedata_zenodo publish_deposit -h
+usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ... publish_deposit
+       [-h] zenodo_json
+
+Publishes a Zenodo deposit. This is the final step in publishing a dataset and
+is not reversible. Once a dataset is published, the DOI associated with the
+record is published to Datacite.
+
+It may be worth reviewing the deposit webpage (https://zenodo.org/deposit/###)
+before finally publishing.
+
+positional arguments:
+  zenodo_json  Path to a Zenodo metadata file
+
+optional arguments:
+  -h, --help   show this help message and exit

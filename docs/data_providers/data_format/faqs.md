@@ -21,12 +21,3 @@ the dataset.
 
 The solution is to remove the Parent information - you would then get a warning about
 the synonymy but no error.
-
-## Data worksheets
-
-### Cannot parse data: field_name row not found
-
-Did you include the Locations and Taxa worksheets in your data worksheets list? Don't -
-we automatically check for these two sheets and they have a different format to data
-worksheets, so you will get this error when the checker code tries to read field
-descriptions and fails.

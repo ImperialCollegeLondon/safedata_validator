@@ -2,6 +2,7 @@
 from logging import ERROR, INFO, WARNING
 
 import pytest
+from dotmap import DotMap
 
 from safedata_validator import taxa
 
@@ -687,7 +688,6 @@ def test_validate_taxon_sanitise(
 def test_validate_taxon_lookup(
     caplog, fixture_resources, taxon_tuple, expected_log_entries
 ):
-
     taxa_instance = taxa.GBIFTaxa(fixture_resources)
     taxa_instance.validate_and_add_taxon(taxon_tuple)
 
@@ -720,7 +720,6 @@ def test_validate_taxon_lookup(
 def test_validate_deleted_taxon_lookup(
     caplog, fixture_resources, taxon_tuple, expected_log_entries
 ):
-
     taxa_instance = taxa.GBIFTaxa(fixture_resources)
     taxa_instance.validate_and_add_taxon(taxon_tuple)
 
@@ -728,6 +727,83 @@ def test_validate_deleted_taxon_lookup(
 
 
 # TODO - add test to check that duplicate worksheet names are caught.
+
+
+@pytest.mark.parametrize(
+    argnames=["mock_output", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            DotMap({"data_columns": []}),
+            (
+                (INFO, "Loading GBIFTaxa worksheet"),
+                (INFO, "Reading taxa data"),
+                (ERROR, "No data or only headers in GBIFTaxa worksheet"),
+            ),
+            id="No data in sheet",
+        ),
+        pytest.param(
+            DotMap({"data_columns": ["some_columns"], "bad_headers": "duplicated"}),
+            (
+                (INFO, "Loading GBIFTaxa worksheet"),
+                (INFO, "Reading taxa data"),
+                (ERROR, "Cannot parse taxa with duplicated headers"),
+            ),
+            id="Duplicated headers",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [tuple(), tuple()],
+                    "headers": ["name", "taxon name"],
+                }
+            ),
+            (
+                (INFO, "Loading GBIFTaxa worksheet"),
+                (INFO, "Reading taxa data"),
+                (ERROR, "Missing core fields:"),
+            ),
+            id="Missing core field",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [tuple(), tuple(), tuple(), tuple()],
+                    "headers": [
+                        "name",
+                        "taxon name",
+                        "taxon type",
+                        "additional header",
+                    ],
+                }
+            ),
+            (
+                (INFO, "Loading GBIFTaxa worksheet"),
+                (INFO, "Reading taxa data"),
+                (INFO, "Additional fields provided:"),
+                (INFO, "No taxon rows found"),
+            ),
+            id="Additional header",
+        ),
+    ],
+)
+def test_load_worksheet_headers(
+    caplog, mocker, fixture_resources, mock_output, expected_log_entries
+):
+    """Test that unexpected header names are caught by load."""
+    from safedata_validator.logger import FORMATTER
+
+    # Create GBIFTaxa class
+    tx = taxa.GBIFTaxa(fixture_resources)
+
+    # Setup mocking
+    mock_get = mocker.patch("safedata_validator.taxa.GetDataFrame")
+    mock_get.return_value = mock_output
+
+    tx.load("meaningless_string")
+    # This is needed to ensure that the logging depth is not altered by this test
+    FORMATTER.pop()
+
+    log_check(caplog, expected_log_entries)
 
 
 @pytest.mark.parametrize(

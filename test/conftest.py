@@ -1,5 +1,6 @@
 """Collection of fixtures to assist the testing scripts."""
 import os
+import sys
 from collections import OrderedDict
 
 import appdirs
@@ -34,6 +35,9 @@ def fixture_files():
     real_files = [
         ("gaz_file", "gazetteer_simple.geojson"),
         ("localias_file", "location_aliases_simple.csv"),
+        ("empty_localias_file", "location_aliases_empty.csv"),
+        ("project_database_file", "project_database_simple.csv"),
+        ("project_database_file_bad", "project_database_bad.csv"),
         ("gbif_file", "gbif_backbone_truncated.sqlite"),
         ("ncbi_file", "ncbi_database_truncated.sqlite"),
         ("json_not_locations", "notalocationsjson.json"),
@@ -58,6 +62,9 @@ def fixture_files():
             appdirs.site_config_dir(), "safedata_validator", "safedata_validator.cfg"
         ),
         "fix_config": os.path.join(fixture_dir, "safedata_validator.cfg"),
+        "fix_config_no_projects": os.path.join(
+            fixture_dir, "safedata_validator_no_proj.cfg"
+        ),
     }
 
     return DotMap(
@@ -114,6 +121,7 @@ def config_filesystem(fs):
         "location_aliases = ",
         "gbif_database = ",
         "ncbi_database = ",
+        "project_database = ",
         "[extents]",
         "temporal_soft_extent = 2002-02-02, 2030-01-31",
         "temporal_hard_extent = 2002-02-01, 2030-02-01",
@@ -135,6 +143,11 @@ def config_filesystem(fs):
     config_contents[1] += FIXTURE_FILES.rf.localias_file
     config_contents[2] += FIXTURE_FILES.rf.gbif_file
     config_contents[3] += FIXTURE_FILES.rf.ncbi_file
+    fs.create_file(
+        FIXTURE_FILES.vf.fix_config_no_projects, contents="\n".join(config_contents)
+    )
+
+    config_contents[4] += FIXTURE_FILES.rf.project_database_file
     fs.create_file(FIXTURE_FILES.vf.fix_config, contents="\n".join(config_contents))
 
     yield fs
@@ -183,12 +196,35 @@ def log_check(caplog, expected_log):
 
     assert len(expected_log) == len(caplog.records)
 
-    assert all(
-        [exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)]
-    )
-    assert all(
-        [exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)]
-    )
+    level_correct = [
+        exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)
+    ]
+
+    message_correct = [
+        exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)
+    ]
+
+    if not all(level_correct):
+        failed_records = (
+            (exp, obs)
+            for passed, exp, obs in zip(level_correct, expected_log, caplog.records)
+            if not passed
+        )
+        for obs, exp in failed_records:
+            sys.stderr.write(f"Log level mismatch: {obs}, {exp.levelno, exp.message}")
+
+        assert False
+
+    if not all(message_correct):
+        failed_records = (
+            (exp, obs)
+            for passed, exp, obs in zip(message_correct, expected_log, caplog.records)
+            if not passed
+        )
+        for obs, exp in failed_records:
+            sys.stderr.write(f"Log message mismatch: {obs}, {exp.levelno, exp.message}")
+
+        assert False
 
 
 # ------------------------------------------

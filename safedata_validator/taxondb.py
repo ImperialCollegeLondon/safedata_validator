@@ -1,6 +1,4 @@
-"""The taxondb module.
-
-This module contains functions to:
+"""This module contains functions to:
 
 1. download versions of the GBIF backbone taxonomy and NCBI taxonomy databases, and
 2. build and index SQLite3 databases of those datasets for use in local taxon
@@ -8,16 +6,18 @@ This module contains functions to:
 
 The functions also store the timestamp of each database version in the SQLite3 files, so
 that datasets can include a taxonomy timestamp.
-"""
+"""  # noqa D415
 
 import csv
 import ftplib
+import graphlib
 import gzip
 import os
 import shutil
 import sqlite3
 import zipfile
 from io import TextIOWrapper
+from itertools import groupby
 from typing import Optional
 
 import requests
@@ -246,8 +246,7 @@ def build_local_gbif(
 
     LOGGER.info("Adding core backbone taxa")
 
-    with gzip.open(simple, "rt") as bbn:
-
+    with gzip.open(simple, "rt", encoding="utf-8") as bbn:
         # The files are tab delimited but the quoting is sometimes unclosed,
         # so turning off quoting - includes quotes in the fields where present
         bb_reader = csv.reader(bbn, delimiter="\t", quoting=csv.QUOTE_NONE)
@@ -257,7 +256,6 @@ def build_local_gbif(
         # progress bar with real percentages, so just show a progress meter to show
         # things happening
         with tqdm(total=None) as pbar:
-
             # Loop over the lines in the file.
             for row in bb_reader:
                 row_clean = [
@@ -274,8 +272,7 @@ def build_local_gbif(
     if deleted is not None:
         LOGGER.info("Adding deleted taxa")
 
-        with gzip.open(deleted, "rt") as dlt:
-
+        with gzip.open(deleted, "rt", encoding="utf-8") as dlt:
             # The files are tab delimited but the quoting is sometimes unclosed,
             # so turning off quoting - includes quotes in the fields where present
             dl_reader = csv.reader(dlt, delimiter="\t", quoting=csv.QUOTE_NONE)
@@ -373,7 +370,6 @@ def download_ncbi_taxonomy(outdir: str, timestamp: Optional[str] = None) -> dict
     LOGGER.info(f"Downloading taxonomy to: {out_file}")
 
     with open(out_file, "wb") as outf:
-
         with tqdm(
             total=int(total),
             unit="B",
@@ -490,7 +486,6 @@ def build_local_ncbi(
 
     # Process each table
     for tbl, info in tables.items():
-
         # Get a logical index of which fields are being kept for this table
         drop_index = [True if vl[0] in info["drop"] else False for vl in info["schema"]]
 
@@ -510,8 +505,7 @@ def build_local_ncbi(
         insert_statement = f"INSERT INTO {tbl} VALUES ({placeholders})"
 
         # Import data from the archive
-        with archive.open(info["file"], "r") as data:
-
+        with archive.open(str(info["file"]), "r") as data:
             LOGGER.info(f"Populating {tbl} table from {info['file']}")
 
             # Use TextIOWrapper to expose the binary data from the Zip as text for CSV
@@ -531,6 +525,42 @@ def build_local_ncbi(
         con.commit()
 
     archive.close()
+
+    # Populate a unique ranks table for this database
+    LOGGER.info("Creating unique ranks table")
+    con.execute("CREATE TABLE unique_ncbi_ranks (rank_index int, rank str);")
+
+    # Get the unique pairs of child + parent ranks
+    cur = con.execute(
+        """select distinct ch.rank, pr.rank
+            from nodes ch inner join nodes pr
+            on ch.parent_tax_id = pr.tax_id
+        """
+    )
+
+    # Filter out no rank and clade which have variable position
+    ranks = [
+        rw for rw in cur.fetchall() if ("no rank" not in rw) and ("clade" not in rw)
+    ]
+
+    # Group by parent
+    children_by_parents = {}
+    ranks.sort(key=lambda x: x[1])
+    grp_by_parent = groupby(ranks, lambda x: x[1])
+
+    for ky, gp in grp_by_parent:
+        children_by_parents[ky] = {ch for ch, _ in gp}
+
+    # Remove a circular reference and then find the static order through the graph
+    children_by_parents["forma specialis"].remove("forma specialis")
+    sorter = graphlib.TopologicalSorter(children_by_parents)
+    taxon_order = reversed(list(sorter.static_order()))
+
+    # Add the
+    con.executemany(
+        "INSERT INTO unique_ncbi_ranks VALUES (?, ?)", enumerate(taxon_order)
+    )
+    con.commit()
 
     # Create the indices
     LOGGER.info("Creating database indexes")

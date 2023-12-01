@@ -1,14 +1,38 @@
 # The GBIFTaxa worksheet
 
+<!-- markdownlint-disable MD033 -->
+<style>
+
+/*fixing cell widths so everything lines up and adding borders*/
+table {
+  table-layout: fixed;
+}
+
+tbody td {
+  width: 14em;
+  min-width: 14em;
+  max-width: 14em;
+  border: 1px solid lightgrey;
+}
+
+thead th {
+  width: 14em;
+  min-width: 14em;
+  max-width: 14em;
+  border: 1px solid lightgrey;
+}
+</style>
+<!-- markdownlint-enable MD033 -->
+
 This worksheet exists to record taxonomic in information for organisms referred to in
 the Data worksheets. This taxonomic information should be recorded in a format that can
 be validated against the GBIF backbone taxonomy. Generally the GBIF backbone taxonomy is
 most suitable for taxa discovered via direct observation (rather than sequencing), so
 this worksheet is most appropriate for storing the details of directly observed taxa. If
-taxa are used anywhere in the dataset either this worksheet or the NCBITaxa worksheet
-must be included. It is also an option to provide both a GBIFTaxa worksheet and a
-NCBITaxa worksheet, e.g. in cases where both sequencing and direct observational data
-are being reported.
+taxa are used anywhere in the dataset either this worksheet or the [NCBITaxa
+worksheet](./ncbi_taxa.md) must be included. It is also an option to provide both a
+GBIFTaxa worksheet and a NCBITaxa worksheet, e.g. in cases where both sequencing and
+direct observational data are being reported.
 
 ## GBIF Taxon validation
 
@@ -58,7 +82,7 @@ three columns (Name, Taxon name and Taxon type) are mandatory and contain the fo
 - **Taxon type**: This column must provide the **taxonomic type** of the named taxon,
   which is usually the taxonomic **rank**. For example, the taxon _Pongo pygmaeus_ would
   be of type `Species` and the taxon Formicidae would be of type `Family`. If the taxon
-  type is not one of the core GBIF backbone levels ( Kingdom, Phylum, Order, Class,
+  type is not one of the core GBIF backbone ranks ( Kingdom, Phylum, Order, Class,
   Family, Genus, Species and Subspecies), or is one of the special values
   `Morphospecies` or `Functional group`, then you will need to provide a **parent
   taxon** (see below).
@@ -130,9 +154,12 @@ You would then get a message in the file validation report saying:
 
 ### Morphospecies and Functional groups
 
-For morphospecies and functional groups, the taxon name is the label to be used in the
-dataset. Set the Scientific name to be 'NA' - it cannot be blank - and then specify the
-taxon type as 'Morphospecies' or 'Functional group'.
+For morphospecies and functional groups, the **Taxon type** should be specified as
+'Morphospecies' or 'Functional group'. The **Name** field should be filled in with
+whatever name is used to label it in the dataset. In this case, the **Taxon name** field
+is not checked or used anywhere in the validation process, so can be filled in with
+whatever you wish. However, this the field still **has** to be filled out. If you do not
+wish to provide a name here, we recommend just filling it in with 'NA'.
 
 Now you need to provide a parent taxon and type. The level of taxonomic certainty for
 morphospecies and functional groups is quite variable, but we'd like the finest
@@ -161,8 +188,8 @@ not a synonym but is a separate taxon that belongs in _Microcopris_.
 The GBIF backbone also includes a large number of **deleted** taxon ids: these are a mix
 of duplicated names, typos in the database and other errors. The GBIF ID of these taxa
 are preserved, along with _some_ information, but we do not allow deleted taxa to be
-used in the GBIF Taxa worksheet.
+used in the GBIFTaxa worksheet.
 
 ## My data doesn't contain taxa
 
-Fine. You can omit the Taxa worksheet!
+Fine. You can omit either or both of the GBIFTaxa and NCBITaxa worksheets!

@@ -1,0 +1,16 @@
+cl_prompt $ safedata_zenodo generate_xml -h
+usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ... generate_xml
+       [-h] [-l LINEAGE_STATEMENT] zenodo_json dataset_json
+
+Creates an INSPIRE compliant XML metadata file for a published dataset,
+optionally including a user provided lineage statement (such as project
+details).
+
+positional arguments:
+  zenodo_json   Path to a Zenodo metadata file
+  dataset_json  Path to a dataset metadata file
+
+optional arguments:
+  -h, --help    show this help message and exit
+  -l LINEAGE_STATEMENT, --lineage-statement LINEAGE_STATEMENT
+                Path to a text file containing a lineage statement

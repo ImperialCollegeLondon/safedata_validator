@@ -1,30 +1,36 @@
-"""Logging setup for safedata_validator.
-
-This submodule extends the standard logging setup to provide extra functionality
+"""This submodule extends the standard logging setup to provide extra functionality
 and to expose some global logging objects for use throughout the code.
 
-The submodule defines CounterHandler as a subclass of logging.StreamHandler,
-extended to maintain a count of messages emitted at the different logging
-levels. An instance of this (`COUNTER_HANDLER`) is used with a StringIO
-instance (`LOG`) to maintain a logging history and provided error counts.
+1. The `logging.LogRecordFactory` is updated so that new records include a custom
+   `levelcode` attribute to visually indicate log record severity in validation
+   reports. 
 
-A second default logging.StreamHandler instance (`CONSOLE_HANDLER`) is used to
-emit records to the command line for use in scripts.
+2. The [IndentFormatter][safedata_validator.logger.IndentFormatter] class then extends
+   :class:`logging.Formatter` to provide compact messages with variable indentation to
+   show nested sections of the validation process using the level codes as visual cues
+   for problems.
 
-The submodule also defines IndentFormatter as a subclass of logging.Formatter,
-which is used in both `COUNTER_HANDLER` and `CONSOLE_HANDLER` to provide compact
-messages with variable indentation to show different sections of the validation
-process.
+3. The submodule then defines two `CounterHandler` classes which subclass
+   `logging.StreamHandler` and `logging.FileHandler`. Both extend the basic handlers to
+   add attributes that keep track of counts of different classes of records emitted
+   through the handler.
 
-Note that the handlers are created when the module is loaded, so when running
-behind a web server, the content of the handlers persist between runs of the
-code. To avoid constant concatenation of outputs, the logger should be cleared
-when a new Dataset is being validated.
-"""
+4. The submodule provides the functions
+   [use_file_logging][safedata_validator.logger.use_file_logging] and
+   [use_stream_logging][safedata_validator.logger.use_stream_logging] to assign
+   handlers to be used in the validation process. The
+   [get_handler][safedata_validator.logger.get_handler] function is then used as a
+   convenience function to retrieve the current handler to access counts of the various
+   emitted records.
+
+5. The functions [log_and_raise][safedata_validator.logger.log_and_raise] and
+   [loggerinfo_push_pop][safedata_validator.logger.loggerinfo_push_pop] are convenience
+   functions to minimise logging boilerplate code within the package.
+"""  # noqa D415
 
 import logging
 from functools import wraps
-from io import StringIO
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 from typing_extensions import Type
@@ -60,12 +66,11 @@ def record_factory(*args, **kwargs):
 logging.setLogRecordFactory(record_factory)
 
 
-class CounterHandler(logging.StreamHandler):
+class StreamCounterHandler(logging.StreamHandler):
     """Subclass of `logging.StreamHandler` counting calls emitted at each log level."""
 
     def __init__(self, *args, **kwargs) -> None:
-
-        logging.StreamHandler.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.counters = {"DEBUG": 0, "INFO": 0, "WARNING": 0, "ERROR": 0, "CRITICAL": 0}
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -75,10 +80,30 @@ class CounterHandler(logging.StreamHandler):
             record: A `logging.LogRecord` instance.
         """
         self.counters[record.levelname] += 1
+        super().emit(record=record)
 
-        msg = self.format(record=record)
-        self.stream.write(msg)
-        self.flush()
+    def reset(self) -> None:
+        """Reset the message counters to zero."""
+        self.counters = {"DEBUG": 0, "INFO": 0, "WARNING": 0, "ERROR": 0, "CRITICAL": 0}
+        self.stream.seek(0)
+        self.stream.truncate(0)
+
+
+class FileCounterHandler(logging.FileHandler):
+    """Subclass of `logging.FileHandler` counting calls emitted at each log level."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.counters = {"DEBUG": 0, "INFO": 0, "WARNING": 0, "ERROR": 0, "CRITICAL": 0}
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Emit a message and increment the counter for the message level.
+
+        Args:
+            record: A `logging.LogRecord` instance.
+        """
+        self.counters[record.levelname] += 1
+        super().emit(record=record)
 
     def reset(self) -> None:
         """Reset the message counters to zero."""
@@ -114,25 +139,24 @@ class IndentFormatter(logging.Formatter):
         datefmt: Optional[str] = None,
         indent: str = "    ",
     ) -> None:
-
         logging.Formatter.__init__(self, fmt, datefmt)
         self.depth = 0
         self.indent = indent
 
     def pop(self, n: int = 1) -> None:
-        """A convenience method to increase the indentation of the formatter.
+        """A convenience method to decrease the indentation of the formatter.
 
         Args:
-            n: Increase the indentation depth by n.
+            n: Decrease the indentation depth by n.
         """
 
         self.depth = max(0, self.depth - n)
 
     def push(self, n: int = 1) -> None:
-        """A convenience method to decrease the indentation of the formatter.
+        """A convenience method to increase the indentation of the formatter.
 
         Args:
-            n: Decrease the indentation depth by n.
+            n: Increase the indentation depth by n.
         """
         self.depth = self.depth + n
 
@@ -162,30 +186,6 @@ information and is customised to provide counts of error messages and an
 indented logging style formatted.
 """
 
-LOG = StringIO()
-"""io.StringIO: The safedata_validator message log
-
-This StringIO object is attached to a stream handler for LOGGER and is used
-to keep a programmatically accessible log of the messages emitted during validation.
-It should be truncated between validation runs to remove messages from previous
-runs.
-"""
-
-COUNTER_HANDLER = CounterHandler(LOG)
-"""CounterHandler: The safedata_validator counting handler
-
-This handler is used to track the number of messages emitted by the logger in
-different logging levels and emits log messages to the LOG StringIO instance to
-keep a record of the messages. It is exposed globally to make it easy to access
-counts and the validation log programmatically.
-"""
-
-CONSOLE_HANDLER = logging.StreamHandler()
-"""logging.StreamHandler: A logger outputting to the console
-
-This handler is used to write logging messages to the console, and is exposed
-globally to make it easier to mute it.
-"""
 
 FORMATTER = IndentFormatter()
 """IndentFormatter: The safedata_validator message formatter
@@ -195,22 +195,95 @@ package and is exposed globally to make it easier to adjust indent depth using
 the custom pop and push methods.
 """
 
-# Combine those instances into the full LOGGER setup with 2 handlers:
-# - COUNTER_HANDLER - logs records into LOG to keep a history of the validation and
-#        maintains counts of message levels handler
-# - CONSOLE_HANDLER - logs records to the console for command line use and can be
-#     muted
 
-COUNTER_HANDLER.setFormatter(FORMATTER)
-CONSOLE_HANDLER.setFormatter(FORMATTER)
+def use_file_logging(filename: Path, level: int = logging.DEBUG) -> None:
+    """Switch to file logging to a provided file path.
 
-LOGGER.setLevel(logging.DEBUG)
-LOGGER.addHandler(COUNTER_HANDLER)
-LOGGER.addHandler(CONSOLE_HANDLER)
+    This function adds a FileCounterHandler to :data:`~safedata_validator.logger.LOGGER`
+    using the provided ``filename`` path. It will remove any other existing handlers
+    first.
+
+    Args:
+        filename: The path to a file to use for logging.
+
+    Raises:
+        RuntimeError: If the file handler already exists. If the logging is to move to a
+            new file, the existing handler needs to be explicitly removed first.
+    """
+
+    # Check for an existing file logger
+    for handler in LOGGER.handlers:
+        if isinstance(handler, FileCounterHandler) and handler.name == "sdv_file_log":
+            raise RuntimeError(f"Already logging to file: {handler.baseFilename}")
+
+    # Remove an existing stream logger.
+    try:
+        sdv_stream_log = next(
+            handler for handler in LOGGER.handlers if handler.name == "sdv_stream_log"
+        )
+    except StopIteration:
+        sdv_stream_log = None
+
+    if sdv_stream_log:
+        sdv_stream_log.close()
+        LOGGER.removeHandler(sdv_stream_log)
+
+    # Add a file handler
+    handler = FileCounterHandler(filename=filename)
+    handler.setFormatter(FORMATTER)
+    handler.name = "sdv_file_log"
+    LOGGER.addHandler(handler)
+    LOGGER.setLevel(level)
+
+
+def use_stream_logging(level: int = logging.DEBUG) -> None:
+    """Switch to stream logging.
+
+    This function attempts to remove the ``vr_logfile`` FileHandler that is added by
+    :func:`~virtual_rainforest.core.logger.add_file_logger`. If that file handler is
+    not found it simple exits, otherwise it removes the file handler and restores
+    message propagation.
+    """
+
+    # Remove an existing file logger.
+    try:
+        sdv_file_log = next(
+            handler for handler in LOGGER.handlers if handler.name == "sdv_file_log"
+        )
+    except StopIteration:
+        sdv_file_log = None
+
+    if sdv_file_log:
+        sdv_file_log.close()
+        LOGGER.removeHandler(sdv_file_log)
+
+    # Check for an existing stream logger to avoid duplication
+    for handler in LOGGER.handlers:
+        if (
+            isinstance(handler, StreamCounterHandler)
+            and handler.name == "sdv_stream_log"
+        ):
+            return
+
+    # Add a stream handler
+    handler = StreamCounterHandler()
+    handler.setFormatter(FORMATTER)
+    handler.name = "sdv_stream_log"
+    LOGGER.addHandler(handler)
+    LOGGER.setLevel(level)
+
+
+# Initialise with stream logging.
+use_stream_logging()
 
 #
 # CONVENIENCE FUNCTIONS
 #
+
+
+def get_handler():
+    """Helper function to get a reference to the current logging handler."""
+    return next(hdlr for hdlr in LOGGER.handlers if hdlr.name.startswith("sdv"))
 
 
 def log_and_raise(
@@ -251,7 +324,6 @@ def loggerinfo_push_pop(wrapper_message: str) -> Callable:
     def decorator_func(function: Callable) -> Callable:
         @wraps(function)
         def wrapped_func(*args, **kwargs: Any):
-
             # Emit the logger info and step in a level
             LOGGER.info(wrapper_message)
             FORMATTER.push()

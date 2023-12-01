@@ -10,6 +10,8 @@ from collections import Counter
 from collections.abc import Iterable
 from typing import Any
 
+from openpyxl.worksheet.worksheet import Worksheet
+
 from safedata_validator.logger import LOGGER
 
 RE_WSPACE_ONLY = re.compile(r"^\s*$")
@@ -128,13 +130,11 @@ class Filter:
     """
 
     def __init__(self, values, keep_failed=True):
-
         self.failed = []
         self.keep_failed = keep_failed
         self.values = [v for v in self._filter(values)]
 
     def _filter(self, values):
-
         for val in values:
             if self.tfunc(val):
                 yield val
@@ -149,7 +149,7 @@ class Filter:
         return True
 
     @staticmethod
-    def rfunc(val) -> bool:
+    def rfunc(val) -> Any:
         """Clean a value that has failed testing."""
         return val
 
@@ -426,13 +426,12 @@ class HasDuplicates:
     """
 
     def __init__(self, values: Iterable):
-
         self.duplicated = list(self._get_duplicates(values))
 
     @staticmethod
     def _get_duplicates(values) -> Any:
         # https://stackoverflow.com/questions/46554866
-        c = Counter()
+        c: Counter = Counter()
         seen = set()
         for i in values:
             c[i] += 1
@@ -470,8 +469,7 @@ class IsInSet:
     """
 
     def __init__(self, values: Iterable, test_values: tuple):
-
-        self.failed = []
+        self.failed: list = []
         self.test_values = test_values
         self.values = [v for v in self.filter(values)]
 
@@ -487,7 +485,7 @@ class IsInSet:
             else:
                 self.failed.append(val)
 
-    def __bool__(self) -> str:
+    def __bool__(self) -> bool:
         """Class compares as False when all values in test set."""
         return not self.failed
 
@@ -503,10 +501,9 @@ class IsInSet:
 class TypeCheck(IsInSet):
     """Check the types of a set of values.
 
-    This class is used to check whether all the values are members of a
-    given set of types. It overrides the base
-    [filter][safedata_validator.validators.IsInSet.filter] method to check that the
-    types of `values` are all instances of test_values.
+    This class is used to check whether all the values are members of a given set of
+    types. It overrides the base [filter][safedata_validator.validators.IsInSet.filter]
+    method to check that the types of `values` are all instances of test_values.
     """
 
     def filter(self, values) -> Any:
@@ -538,12 +535,11 @@ class GetDataFrame:
 
     Attributes:
         headers: A list of header values
-        data_columns: A list of list containing column data
+        data_columns: A list of tuples containing column data
         bad_headers: A dictionary of malformed header values
     """
 
-    def __init__(self, ws, header_row=1):
-
+    def __init__(self, ws: Worksheet, header_row: int = 1):
         self.headers = []
         self.bad_headers = dict()
         self.data_columns = []
@@ -588,30 +584,31 @@ class GetDataFrame:
 
         # Check the headers
         # - should not be blank
-        headers = IsNotBlank(headers)
-        if not headers:
+        headers_chk: Filter = IsNotBlank(headers)
+        if not headers_chk:
             LOGGER.error("Headers contain empty or whitespace cells")
-            self.bad_headers["blank"] = headers.failed
+            self.bad_headers["blank"] = headers_chk.failed
 
         # - should be strings
-        headers = IsString(headers)
-        if not headers:
+        headers_chk = IsString(headers_chk)
+        if not headers_chk:
             LOGGER.error(
-                "Headers contain non-string values: ", extra={"join": headers.failed}
+                "Headers contain non-string values: ",
+                extra={"join": headers_chk.failed},
             )
-            self.bad_headers["non_string"] = headers.failed
+            self.bad_headers["non_string"] = headers_chk.failed
 
         # - should have no padding
-        headers = IsNotPadded(headers)
-        if not headers:
+        headers_chk = IsNotPadded(headers_chk)
+        if not headers_chk:
             LOGGER.error(
                 "Headers contain whitespace padded strings: ",
-                extra={"join": headers.failed},
+                extra={"join": headers_chk.failed},
             )
-            self.bad_headers["padded"] = headers.failed
+            self.bad_headers["padded"] = headers_chk.failed
 
         # - should be unique (after removing whitespace)
-        dupes = HasDuplicates(headers)
+        dupes = HasDuplicates(headers_chk)
         if dupes:
             LOGGER.error(
                 "Headers contain duplicated values: ", extra={"join": dupes.duplicated}
@@ -620,5 +617,5 @@ class GetDataFrame:
 
         # Do not package headers and columns into a dict - will lose duplicated
         # keys and can still validate fields with dupe keys
-        self.headers = headers.values
+        self.headers = headers_chk.values
         self.data_columns = data_columns

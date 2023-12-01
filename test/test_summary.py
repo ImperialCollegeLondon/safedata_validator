@@ -1,17 +1,37 @@
 """Tests to check that the summary sheet functions work as intended."""
 import datetime
+from logging import ERROR, INFO, WARNING
 
 import pytest
+from dotmap import DotMap
+from openpyxl import Workbook
 from sympy import Sum
 
 from safedata_validator.logger import LOGGER
+from safedata_validator.resources import Resources
 from safedata_validator.summary import Summary
+
+from .conftest import FIXTURE_FILES, log_check
 
 
 @pytest.fixture
 def fixture_summary(fixture_resources):
-
+    """Fixture providing summary instances for testing."""
     return Summary(fixture_resources)
+
+
+@pytest.fixture()
+def fixture_summary_projects(config_filesystem, request):
+    """Fixture providing summary instances for testing.
+
+    This uses indirect parameterisation to allow tests to pick between a summary with
+    projects and without.
+    """
+
+    if not request.param:
+        return Summary(Resources(FIXTURE_FILES.vf.fix_config_no_projects))
+
+    return Summary(Resources(FIXTURE_FILES.vf.fix_config))
 
 
 # NOTE - _read_block is being tested by repeated _read_`block` calls and
@@ -102,7 +122,6 @@ def fixture_summary(fixture_resources):
     ],
 )
 def test_authors(caplog, fixture_summary, alterations, should_log_error, expected_log):
-
     # Valid set of information
     input = {
         "author name": ("Orme, David",),
@@ -258,7 +277,6 @@ def test_authors(caplog, fixture_summary, alterations, should_log_error, expecte
     ],
 )
 def test_access(caplog, fixture_summary, row_data, should_log_error, expected_log):
-
     # Update valid to test error conditions and populate _rows
     # directly (bypassing .load() and need to pack in worksheet object
     fixture_summary._rows = row_data
@@ -299,7 +317,6 @@ def test_access(caplog, fixture_summary, row_data, should_log_error, expected_lo
     ],
 )
 def test_keywords(caplog, fixture_summary, alterations, should_log_error, expected_log):
-
     # Valid set of information
     input = {"keywords": ("abc", "def")}
 
@@ -383,7 +400,6 @@ def test_keywords(caplog, fixture_summary, alterations, should_log_error, expect
     ],
 )
 def test_permits(caplog, fixture_summary, alterations, should_log_error, expected_log):
-
     # Valid set of information
     input = {
         "permit type": ("research",),
@@ -439,7 +455,6 @@ def test_permits(caplog, fixture_summary, alterations, should_log_error, expecte
 def test_doi(
     caplog, fixture_summary, alterations, should_log_error, expected_log, do_val_doi
 ):
-
     # Valid set of information
     input = {"publication doi": ("https://doi.org/10.1098/rstb.2011.0049",)}
 
@@ -540,7 +555,6 @@ def test_doi(
     ],
 )
 def test_funders(caplog, fixture_summary, alterations, should_log_error, expected_log):
-
     # Valid set of information
     input = {
         "funding body": ("NERC",),
@@ -629,7 +643,6 @@ def test_funders(caplog, fixture_summary, alterations, should_log_error, expecte
 def test_temporal_extent(
     caplog, fixture_summary, alterations, should_log_error, expected_log
 ):
-
     # Valid set of information - openpyxl loads dates as datetimes but
     # the validation checks that these values are dates
     # (have no time information)
@@ -755,7 +768,6 @@ def test_temporal_extent(
 def test_geographic_extent(
     caplog, fixture_summary, alterations, should_log_error, expected_log
 ):
-
     # Valid set of information
     input = {"west": (116.75,), "east": (117.82,), "south": (4.50,), "north": (5.07,)}
 
@@ -822,7 +834,6 @@ def test_geographic_extent(
 def test_external_files(
     caplog, fixture_summary, alterations, should_log_error, expected_log
 ):
-
     # Valid set of information
     input = {
         "external file": ("BaitTrapImages.zip", "BaitTrapTransects.geojson"),
@@ -1087,3 +1098,291 @@ def test_summary_load(fixture_summary, example_excel_files, n_errors):
     )
 
     assert fixture_summary.n_errors == n_errors
+
+
+@pytest.mark.parametrize(
+    argnames=["fixture_summary_projects", "rows", "expected_log_entries"],
+    indirect=["fixture_summary_projects"],
+    argvalues=[
+        pytest.param(
+            False,
+            {
+                "title": ["title", None],
+                "description": ["desc", None],
+                "access status": ["open", None],
+                "author name": ["Author, Anne", None],
+                "keywords": ["testing", "testing"],
+            },
+            (
+                (
+                    (INFO, "Loading project id metadata"),
+                    (INFO, "No Project IDs metadata found"),
+                    (INFO, "No project id data required or provided."),
+                )
+            ),
+            id="not required or provided",
+        ),
+        pytest.param(
+            False,
+            {
+                "project id": [1, 2],
+                "title": ["title", None],
+                "description": ["desc", None],
+                "access status": ["open", None],
+                "author name": ["Author, Anne", None],
+                "keywords": ["testing", "testing"],
+            },
+            (
+                (INFO, "Loading project id metadata"),
+                (INFO, "Metadata for Project IDs found:"),
+                (ERROR, "Project ids are not required but are provided"),
+            ),
+            id="not required but provided",
+        ),
+        pytest.param(
+            True,
+            {
+                "title": ["title", None],
+                "description": ["desc", None],
+                "access status": ["open", None],
+                "author name": ["Author, Anne", None],
+                "keywords": ["testing", "testing"],
+            },
+            (
+                (INFO, "Loading project id metadata"),
+                (ERROR, "No Project IDs metadata found"),  # block is mandatory
+                (ERROR, "Project ids are required but not provided"),
+            ),
+            id="required but not provided",
+        ),
+        pytest.param(
+            True,
+            {
+                "safe project id": [1, 2],
+                "project id": [1, 2],
+                "title": ["title", None],
+                "description": ["desc", None],
+                "access status": ["open", None],
+                "author name": ["Author, Anne", None],
+                "keywords": ["testing", "testing"],
+            },
+            (
+                (INFO, "Loading project id metadata"),
+                (INFO, "Metadata for Project IDs found:"),
+                (
+                    ERROR,
+                    "Both 'project id' and 'safe project id' provided: "
+                    "use only 'project id'",
+                ),
+                (INFO, "Valid project ids provided:"),
+            ),
+            id="both project id keys provided",
+        ),
+        pytest.param(
+            True,
+            {
+                "safe project id": [1, 2],
+                "title": ["title", None],
+                "description": ["desc", None],
+                "access status": ["open", None],
+                "author name": ["Author, Anne", None],
+                "keywords": ["testing", "testing"],
+            },
+            (
+                (INFO, "Loading project id metadata"),
+                (INFO, "Metadata for Project IDs found:"),
+                (
+                    WARNING,
+                    "Use 'project id' rather than the legacy 'safe project id' key.",
+                ),
+                (INFO, "Valid project ids provided:"),
+            ),
+            id="using legacy safe project id",
+        ),
+        pytest.param(
+            True,
+            {
+                "project id": [1, 3000],
+                "title": ["title", None],
+                "description": ["desc", None],
+                "access status": ["open", None],
+                "author name": ["Author, Anne", None],
+                "keywords": ["testing", "testing"],
+            },
+            (
+                (INFO, "Loading project id metadata"),
+                (INFO, "Metadata for Project IDs found:"),
+                (ERROR, "Unknown project ids provided"),
+                (INFO, "Valid project ids provided:"),
+            ),
+            id="unknown ids",
+        ),
+        pytest.param(
+            True,
+            {
+                "project id": [1, 2],
+                "title": ["title", None],
+                "description": ["desc", None],
+                "access status": ["open", None],
+                "author name": ["Author, Anne", None],
+                "keywords": ["testing", "testing"],
+            },
+            (
+                (INFO, "Loading project id metadata"),
+                (INFO, "Metadata for Project IDs found:"),
+                (INFO, "Valid project ids provided:"),
+            ),
+            id="all good",
+        ),
+    ],
+)
+def test_project_ids(caplog, fixture_summary_projects, rows, expected_log_entries):
+    """Tests that project IDs are validated correctly.
+
+    The fixture_summary_indirect will be configured with or without projects, depending
+    on the indirect boolean value provided with each test.
+    """
+
+    # Add rows to fixture and toggle project use
+    fixture_summary_projects._rows = rows
+    fixture_summary_projects._ncols = 3
+
+    # Check that the mandatory fields are raised by key validation and that project id
+    # validation works as expected.
+    fixture_summary_projects._validate_keys()
+    fixture_summary_projects._load_project_ids()
+
+    log_check(caplog, expected_log_entries)
+
+
+@pytest.mark.parametrize(
+    argnames=["data", "expected_rows"],
+    argvalues=[
+        pytest.param(
+            [["header"]],
+            [("header",)],
+            id="simple case",
+        ),
+        pytest.param(
+            [["header_1", 1, 3], ["header_2", 2, 6], ["header_3", 3, 9]],
+            [("header_1", 1, 3), ("header_2", 2, 6), ("header_3", 3, 9)],
+            id="complex case",
+        ),
+    ],
+)
+def test_load_rows_from_worksheet(data, expected_rows):
+    """Test that function to load rows from a worksheet works as intended."""
+    from safedata_validator.summary import load_rows_from_worksheet
+
+    # Make an empty worksheet
+    workbook = Workbook()
+    worksheet = workbook.active
+
+    # Loop through the rows of the list of lists and add them to the worksheet
+    for row in data:
+        worksheet.append(row)
+
+    rows = load_rows_from_worksheet(worksheet)
+
+    # Test parsed rows match what was expected
+    assert rows == expected_rows
+
+
+@pytest.mark.parametrize(
+    argnames=["rows", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            {
+                "title": [],
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            (),
+            id="good only mandatory",
+        ),
+        pytest.param(
+            {
+                "project id": [],
+                "title": [],
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            (),
+            id="good with optional",
+        ),
+        pytest.param(
+            {
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "Missing mandatory metadata fields:"),),
+            id="missing title",
+        ),
+        pytest.param(
+            {
+                "sproject id": [],
+                "title": [],
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "Unknown metadata fields:"),),
+            id="unknown field",
+        ),
+    ],
+)
+def test_validate_keys(caplog, fixture_summary, rows, expected_log_entries):
+    """Test that function to check mandatory fields works as expected."""
+
+    # Add rows to fixture
+    fixture_summary._rows = rows
+
+    # Check that row row headers contain mandatory fields
+    fixture_summary._validate_keys()
+
+    log_check(caplog, expected_log_entries)
+
+
+@pytest.mark.parametrize(
+    argnames=["rows", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            {
+                "title": ("Test data set",),
+                "description": ("An example data set to test core loading",),
+            },
+            (
+                (INFO, "Loading core metadata"),
+                (INFO, "Metadata for Core fields found: 1 records"),
+            ),
+            id="valid core",
+        ),
+    ],
+)
+def test_core(
+    caplog,
+    fixture_summary,
+    rows,
+    expected_log_entries,
+):
+    """Test that function to load in core block works as expected."""
+
+    # Update valid to test error conditions and populate _rows
+    # directly (bypassing .load() and need to pack in worksheet object
+    fixture_summary._rows = rows
+
+    # Test the block load
+    fixture_summary._load_core()
+
+    # check that relevant attributes have be populated correctly
+    assert fixture_summary.title == "Test data set"
+    assert fixture_summary.description == "An example data set to test core loading"
+
+    log_check(caplog, expected_log_entries)
