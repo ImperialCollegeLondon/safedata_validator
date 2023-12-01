@@ -64,7 +64,7 @@ from .conftest import log_check
             ),
             pytest.raises(TypeError),
             "Taxonomic hierarchy not a list",
-            id="string instead of dictionary",
+            id="string instead of list",
         ),
         pytest.param(
             dict(
@@ -76,7 +76,7 @@ from .conftest import log_check
             ),
             pytest.raises(ValueError),
             "Taxon hierarchy empty",
-            id="empty dictionary",
+            id="empty list",
         ),
         pytest.param(
             dict(
@@ -393,21 +393,21 @@ def test_construct_bi_or_tri(caplog, test_input, raises, expected, expected_log)
         pytest.param(
             562,
             does_not_raise(),
-            ("Escherichia coli", "species", 562, 561),
+            ("species", "Escherichia coli", 562, 561),
             8,
             id="Backbone leaf",
         ),
         pytest.param(
-            562,
+            1444049,
             does_not_raise(),
-            ("Escherichia coli 1-110-08_S1_C1", "strain", 1444049, 562),
+            ("strain", "Escherichia coli 1-110-08_S1_C1", 1444049, 562),
             9,
             id="Non backbone leaf",
         ),
         pytest.param(
             131567,
             does_not_raise(),
-            ("cellular organisms", "no rank", 131567, 1),
+            ("no rank", "cellular organisms", 131567, 1),
             1,
             id="No backbone ranks",
         ),
@@ -418,10 +418,10 @@ def test_construct_bi_or_tri(caplog, test_input, raises, expected, expected_log)
 def test_get_canon_hierarchy(fixture_ncbi_validator, raises, tax_id, leaf, n_tax):
     """Test structure and failure modes of _get_hierarchy."""
 
-    with raises as err:
+    with raises:
         hier = fixture_ncbi_validator._get_canon_hierarchy(tax_id)
 
-        if isinstance(err, does_not_raise):
+        if isinstance(raises, does_not_raise):
             assert hier[0] == leaf
             assert len(hier) == n_tax
 

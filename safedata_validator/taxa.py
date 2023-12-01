@@ -2263,14 +2263,21 @@ def taxa_strip(name: str, rank: str) -> Optional[str]:
 def construct_bi_or_tri(higher_nm: str, lower_nm: str, tri: bool) -> str:
     """Generate a species binomial or a subspecies trinomial.
 
-    The NCBI database sometimes includes extra tags in binomials, such as 'candidatus'.
-    This function cleans up those names to remove extra tags. It returns the cleaned
-    name or raises a ValueError in the event of a parsing error.
+    NCBI tools often return the separate components of species and subspecies names: for
+    example, genus _Escherichia_ and species _coli_. However the NCBI database
+    associates taxon ID with complete binomial and trinomial names. This function parses
+    the provided inputs to try and construct those names, whilst also handling extra
+    tags in binomials, such as 'candidatus', that are included by the NCBI for some
+    taxa.
 
     Args:
         higher_nm: The NCBI genus/species name
         lower_nm: The NCBI species/subspecies name
         tri: Are we looking at a subspecies trinomial
+
+    Raises:
+        ValueError: where the input cannot be safely parsed into a binomial or trinomial
+        name.
     """
 
     # Determine whether a species binomial or a subspecies trinomial is considered
