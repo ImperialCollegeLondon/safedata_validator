@@ -251,8 +251,8 @@ class NCBITaxon:
         if not all(isinstance(x, tuple) for x in self.taxa_hier):
             raise ValueError("Taxon hierarchy values not all tuples")
 
-        # Check the tuple values are either a name and two ids or a name, an id and None
-        # (where None shows the root of the taxonomy).
+        # Check the tuple values: rank, name, ncbi_id and parent_ncbi_id/None,
+        # where None shows the root of the taxonomy.
         tuple_contents = set(tuple(map(type, x)) for x in self.taxa_hier)
         valid_tuples = set([(str, str, int, int), (str, str, int, type(None))])
         if not tuple_contents.issubset(valid_tuples):
@@ -545,8 +545,7 @@ class NCBIValidator:
     def id_lookup(self, nnme: str, ncbi_id: int) -> NCBITaxon:
         """Get an NCBITaxon by NCBI ID.
 
-        This method returns a populated NCBITaxon instance given an NCBI ID. It will
-        raise a NCBIError if the provided ID cannot be found.
+        This method returns a populated NCBITaxon instance given an NCBI ID.
 
         Args:
             nnme: A nickname to identify the taxon
@@ -554,6 +553,9 @@ class NCBIValidator:
 
         Returns:
             A populated NCBITaxon instance
+
+        Raises:
+            NCBIError: if the provided ID cannot be found.
         """
 
         if not isinstance(ncbi_id, int):
