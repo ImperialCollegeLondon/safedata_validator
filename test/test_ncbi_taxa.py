@@ -1279,12 +1279,6 @@ def test_validate_and_add_taxon(fixture_resources, test_input, counts, tx_index)
             ),
             id="whitespace padding in hierarchy",
         ),
-        # # Taxon hierarchy in wrong order
-        # (
-        #     ["E coli", {"species": "Escherichia coli", "genus": "Escherichia"}, None],
-        #     does_not_raise(),
-        #     ((ERROR, "Taxon hierarchy not in correct order"),),
-        # ),
         pytest.param(
             ["Morus", [("genus", "Morus")]],
             does_not_raise(),
@@ -1622,6 +1616,38 @@ def test_index_higher_taxa(
                 (INFO, "1 taxa loaded correctly"),
             ),
             id="good taxon",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("C marina",),
+                        ("Cytophaga",),
+                        ("marina",),
+                    ],
+                    "headers": ["name", "genus", "species"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "2 NCBI rank fields found: "),
+                (INFO, "Validating row 1: C marina"),
+                (
+                    WARNING,
+                    "Non-canon usage: Cytophaga marina is synonym "
+                    "for Tenacibaculum maritimum",
+                ),
+                (
+                    ERROR,
+                    "Taxonomy mismatch for Cytophaga at rank genus: "
+                    "expecting Tenacibaculum",
+                ),
+                (ERROR, "Match found for C marina with incongruent taxonomy"),
+                (ERROR, "Search based on taxon hierarchy failed"),
+                (INFO, "NCBITaxa contains 3 errors"),
+            ),
+            id="outdated taxonomy",
         ),
         pytest.param(
             DotMap(
