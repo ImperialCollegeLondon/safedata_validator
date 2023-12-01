@@ -640,34 +640,34 @@ def test_check_congruent_hierarchies(
 
 # First test the search function
 @pytest.mark.parametrize(
-    "test_input,expected",
+    "ncbi_id,expected",
     [
         pytest.param(
-            dict(nnme="E coli", ncbi_id=562),
+            562,
             ("species", "Escherichia coli", 562, 561),
             id="species",
         ),
         pytest.param(
-            dict(nnme="E coli strain", ncbi_id=1444049),
+            1444049,
             ("strain", "Escherichia coli 1-110-08_S1_C1", 1444049, 562),
             id="strain",
         ),
         pytest.param(
-            dict(nnme="Streptophytina", ncbi_id=131221),
+            131221,
             ("subphylum", "Streptophytina", 131221, 35493),
             id="subphylum",
         ),
         pytest.param(
-            dict(nnme="Opisthokonta", ncbi_id=33154),
+            33154,
             ("clade", "Opisthokonta", 33154, 2759),
             id="clade",
         ),
     ],
 )
-def test_id_lookup(fixture_ncbi_validator, test_input, expected):
+def test_id_lookup(fixture_ncbi_validator, ncbi_id, expected):
     """This test checks the results of looking up a specific NCBI taxonomy ID."""
 
-    fnd_tx = fixture_ncbi_validator.id_lookup(**test_input)
+    fnd_tx = fixture_ncbi_validator.id_lookup(ncbi_id=ncbi_id)
 
     # Check the properties and that the leaf of the hierarchy match
     assert (fnd_tx.rank, fnd_tx.name, fnd_tx.ncbi_id) == expected[:-1]
@@ -676,21 +676,19 @@ def test_id_lookup(fixture_ncbi_validator, test_input, expected):
 
 # Third function that checks that id_lookup throws the appropriate errors
 @pytest.mark.parametrize(
-    "test_input,expected_exception",
+    "ncbi_id,expected_exception",
     [
-        (None, TypeError),  # no parameters
-        (dict(nnme="E coli", ncbi_id="invalid_string"), TypeError),  # a string
-        (dict(nnme="E coli", ncbi_id=27.5), TypeError),  # non-integer ID
-        (dict(nnme=27, ncbi_id=27), TypeError),  # named using a number
-        (dict(nnme="E coli", ncbi_id=-1), ValueError),  # bad ID
-        (dict(nnme="E coli", ncbi_id=100000000000000), taxa.NCBIError),  # bad ID
+        ("invalid_string", TypeError),  # a string
+        (27.5, TypeError),  # non-integer ID
+        (-1, ValueError),  # bad ID
+        (100000000000000, taxa.NCBIError),  # bad ID
     ],
 )
-def test_id_lookup_errors(fixture_ncbi_validator, test_input, expected_exception):
+def test_id_lookup_errors(fixture_ncbi_validator, ncbi_id, expected_exception):
     """This test checks that validator.id_lookup inputs throw errors as expected."""
 
     with pytest.raises(expected_exception):
-        _ = fixture_ncbi_validator.id_lookup(**test_input)
+        _ = fixture_ncbi_validator.id_lookup(ncbi_id=ncbi_id)
 
 
 # Then do the same for the taxa search function

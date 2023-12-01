@@ -542,13 +542,12 @@ class NCBIValidator:
 
         self.ncbi_conn.close()
 
-    def id_lookup(self, nnme: str, ncbi_id: int) -> NCBITaxon:
+    def id_lookup(self, ncbi_id: int) -> NCBITaxon:
         """Get an NCBITaxon by NCBI ID.
 
         This method returns a populated NCBITaxon instance given an NCBI ID.
 
         Args:
-            nnme: A nickname to identify the taxon
             ncbi_id: Unique identifier for the taxon
 
         Returns:
@@ -560,10 +559,6 @@ class NCBIValidator:
 
         if not isinstance(ncbi_id, int):
             raise TypeError("Non-integer NCBI taxonomy ID")
-
-        # TODO - I don't think nnme is really needed anymore, was used in log messages.
-        if not isinstance(nnme, str):
-            raise TypeError("Non-string nickname")
 
         if not ncbi_id > 0:
             raise ValueError("Negative NCBI taxonomy ID")
@@ -862,7 +857,7 @@ class NCBIValidator:
             #        packages an NCBI taxon. We could redefine id_lookup as
             #        build_ncbi_taxon(..., canon_hier, ...)
 
-            mtaxon = self.id_lookup(nnme, taxon_rows[0]["tax_id"])
+            mtaxon = self.id_lookup(taxon_rows[0]["tax_id"])
 
         elif not taxon_hier:
             # No further taxonomic data to resolve multiple hits
@@ -922,7 +917,7 @@ class NCBIValidator:
                     )
 
                 LOGGER.info(f"Match found for {nnme}")
-                mtaxon = self.id_lookup(nnme, match_taxon["tax_id"])
+                mtaxon = self.id_lookup(match_taxon["tax_id"])
 
         if not_canon:
             mtaxon.non_canon_name = leaf_name
