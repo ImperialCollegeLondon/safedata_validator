@@ -223,24 +223,24 @@ class NCBITaxon:
         if not isinstance(self.rank, str):
             raise TypeError("Provided rank not in string form")
 
-        if (
-            isinstance(self.ncbi_id, float) and not self.ncbi_id.is_integer()
-        ) or not isinstance(
-            self.ncbi_id, int
-        ):  # Catch non int or float case
+        # Screen ncbi id values: int-like
+        if not (
+            isinstance(self.ncbi_id, int)
+            or (isinstance(self.ncbi_id, float) and self.ncbi_id.is_integer())
+        ):
             raise TypeError("NCBI ID is not an integer")
 
         self.ncbi_id = int(self.ncbi_id)
 
-        if (
-            isinstance(self.parent_ncbi_id, float)
-            and not self.parent_ncbi_id.is_integer()
-        ) or not isinstance(
-            self.parent_ncbi_id, int
-        ):  # Catch non int or float case
-            raise TypeError("Parent NCBI ID is not an integer")
-
-        self.parent_ncbi_id = int(self.parent_ncbi_id)
+        # Screen parent id values: None or int-like
+        if self.parent_ncbi_id is None:
+            pass
+        elif (
+            isinstance(self.parent_ncbi_id, float) and self.parent_ncbi_id.is_integer()
+        ):
+            self.parent_ncbi_id = int(self.parent_ncbi_id)
+        elif not isinstance(self.parent_ncbi_id, int):
+            raise TypeError("Parent NCBI ID is not an integer or None")
 
         if not isinstance(self.taxa_hier, list):
             raise TypeError("Taxon hierarchy not a list")
