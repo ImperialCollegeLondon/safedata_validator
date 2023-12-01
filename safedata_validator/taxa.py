@@ -232,6 +232,16 @@ class NCBITaxon:
 
         self.ncbi_id = int(self.ncbi_id)
 
+        if (
+            isinstance(self.parent_ncbi_id, float)
+            and not self.parent_ncbi_id.is_integer()
+        ) or not isinstance(
+            self.parent_ncbi_id, int
+        ):  # Catch non int or float case
+            raise TypeError("Parent NCBI ID is not an integer")
+
+        self.parent_ncbi_id = int(self.parent_ncbi_id)
+
         if not isinstance(self.taxa_hier, list):
             raise TypeError("Taxon hierarchy not a list")
 
