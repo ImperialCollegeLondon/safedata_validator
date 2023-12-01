@@ -50,64 +50,79 @@ taxonomic usage!) but the NCBI backbone has extremely good taxonomic coverage.
 The table format looks like this:
 
 <!-- markdownlint-disable MD013 -->
-| Name             | NCBI ID | Superkingdom | Kingdom     | Phylum           | Class               | Comments |
-| ---------------- | ------- | ------------ | ----------- | ---------------- | ------------------- | -------- |
-| G_proteobacteria | 1236    | Bacteria     |             | Pseudomonadota   | Gammaproteobacteria |          |
-| E_mycetes        | 147545  | Eukaryota    | Fungi       | Ascomycota       | Eurotiomycetes      |          |
-| Dinophyceae      |         | Eukaryota    |             |                  | Dinophyceae         |          |
-| Acidobact        |         |              | k__Bacteria | p__Acidobacteria | c__Acidobacteriia   |          |
+| Name             | New | Superkingdom | Kingdom     | Phylum           | Class               | Comments |
+| ---------------- | --- | ------------ | ----------- | ---------------- | ------------------- | -------- |
+| G_proteobacteria |     | Bacteria     |             | Pseudomonadota   | Gammaproteobacteria |          |
+| E_mycetes        |     | Eukaryota    | Fungi       | Ascomycota       | Eurotiomycetes      |          |
+| Dinophyceae      |     | Eukaryota    |             |                  | Dinophyceae         |          |
+| Acidobact        |     |              | k__Bacteria | p__Acidobacteria | c__Acidobacteriia   |          |
+| New_fungus       | Yes | Eukaryota    | Fungi       | Ascomycota       | Mynewfungusetes     |          |
 <!-- markdownlint-enable MD013 -->
 
-The table must contain column headers in the **first row** of the worksheet. The first
-two columns (Name, NCBI ID) are mandatory and contain the following:
+The table must contain column headers in the **first row** of the worksheet. The Name
+column is mandatory and must contain a local name for **all** of the taxa that you are
+going to use in the rest of the dataset, aside those that are already described on a
+GBIFTaxa worksheet.
 
-* **Name**: This column must contain a local name for **all** of the taxa that you are
-  going to use in the rest of the dataset, aside those that are already described on a
-  GBIFTaxa worksheet. If both a NCBITaxa and a GBIFTaxa worksheet are provided the same
-  taxa can be included in both, e.g. a species found both by observation and eDNA
-  sequencing. However, to avoid confusion these should be given different names, i.e.
-  `Vulpes_obs` and `Vulpes_seq` for observed and sequenced instances of `Vulpes`,
-  respectively. Names cannot be duplicated either within a NCBITaxa worksheet or from a
-  GBIFTaxa worksheet (when one exists)! Note that these can be abbreviations or codes:
-  if you want to use `Crbe` in your data worksheets, rather than typing out
-  `Crematogaster borneensis` every time, then that is fine.
+If both a NCBITaxa and a GBIFTaxa worksheet are provided the same
+taxa can be included in both, e.g. a species found both by observation and eDNA
+sequencing. However, to avoid confusion these should be given different names, i.e.
+`Vulpes_obs` and `Vulpes_seq` for observed and sequenced instances of `Vulpes`,
+respectively. Names cannot be duplicated either within a NCBITaxa worksheet or from a
+GBIFTaxa worksheet (when one exists)! Note that these can be abbreviations or codes:
+if you want to use `Crbe` in your data worksheets, rather than typing out
+`Crematogaster borneensis` every time, then that is fine.
 
 !!! Note
 
     These are the names that you are going to use in your data worksheet. The
     other columns are to help us validate the taxonomy of your names.
 
-* **NCBI ID**: This column is required but providing actual entries is optional, and can
-  be filled in with the ID that NCBI assigns to the taxon. This helps to ensure that the
-  correct match is found in the NCBI database.
+* **New**: This column can be optionally used to note that a row contains a new taxon
+  that is not expected to be present in the NCBI database. The taxon will be included as
+  a new taxon as a child of the next taxonomic rank.
 
 * **Ranks**: Here the column name (e.g. Phylum) provides a **taxonomic rank**, and the
-  row entries provide the relevant names for this rank. At least two columns using GBIF
-  backbone ranks must be provided. Non-backbone ranks (e.g. subphylum, strain) can also
-  be provided, so long as they are defined in the NCBI database. The ranks should be
-  listed in descending order from left to right. It is fine to skip specific backbone
-  ranks entirely. However, if species is provided as a rank, genus must also be
-  provided, and the same goes for subspecies and species. Species information can either
-  be provided as a binomial or as a single name. Likewise subspecies information can
-  either be provided as the full trinomial or as a single name. Names can be provided in
-  plain text, or alternatively in a commonly used notation, where the rank is indicated
-  by a lower case first letter and the name follows after two underscores (e.g.
-  k__Bacteria for Kingdom Bacteria). Notation of this type should be placed in the
-  correct rank columns, and validation is carried out to check that the rank implied by
-  the notation matches the column rank.
+  row entries provide the relevant names for this rank. In contrast to GBIF, which only
+  uses a small set of backbone ranks, the NCBI database also includes a large number of
+  intermediate ranks (e.g. subphylum, strain). Any of these ranks may be included as
+  headers in the worksheet, with the exception of `clade` and `no rank` as these ranks
+  can be duplicated within a taxon hierarchy.
+  
+  You are only required to provide the taxonomic name for the specific rank that you are
+  trying to match and can leave other fields empty. However it is probably more useful
+  to provide a more complete taxonomy! If you do provide higher taxonomic information
+  then it must be congruent with the hierarchy for the focal taxon. For example,
+  specifying Family Anatidae is sufficient to identify waterfowl, but providing Order
+  Carnivora (rather than Order Anseriformes) would result in an error.
 
-!!! Note
+  Names can be provided in plain text, or alternatively in a commonly used notation,
+  where the rank is indicated by a lower case first letter and the name follows after
+  two underscores (e.g. k__Bacteria for Kingdom Bacteria). Notation of this type should
+  be placed in the correct rank columns, and validation is carried out to check that the
+  rank implied by the notation matches the column rank.
 
-    Missing rank entries are completely fine, e.g. leaving out
-    phylum information for some taxa but providing it for others.
-    However, sufficient information must be provided to unambiguously
-    identify each taxon.
+  Two special cases are that NCBI outputs typically separate out the components of
+  binomial and trinomial names: for example, they might return `g_Escherichia` and
+  `s__coli`. In order to be able to match _complete_ species and subspecies names
+  against the database, you must provide field information for genus, species and
+  subspecies ranks. This information is used to assemble complete names for validation
+  against the NCBI names. Note that if you have already compiled complete names, so that
+  your genus field contains `Escherichia` and your species field contains `Escherichia
+  coli` then this will also be accepted, as long as the parts are compatible.
+  
+  !!! Note
 
-* **Comments**: This is entirely optional - if you have a fairly standard set of taxa
-  with no serious issues then you can leave it out entirely or it can be empty. If you
+    Missing rank entries are completely fine, e.g. leaving out phylum information for
+    some taxa but providing it for others. However, sufficient information must be
+    provided to unambiguously identify each taxon.
+
+* **Comments and other field**: These fields are obviously optional. If you
   do have particular notes that you want to make - explaining disagreements with NCBI
   taxonomy, new species notes and the like - then these can be very useful for future
-  researchers trying to place taxa.
+  researchers trying to place taxa. Equally if you want to record further information
+  about NCBI taxon rows, you can add additional fields as long as they do not duplicate
+  any of the field names mentioned above.
 
 ## Common issues
 
@@ -122,18 +137,18 @@ two columns (Name, NCBI ID) are mandatory and contain the following:
  kingdom information for Eukaryotes (e.g. Fungi, Metazoa, etc) and phylum information
  for Prokaryotes (Bacteria and Archaea).
 
-### Superseded NCBI taxonomy
+### Non-canon NCBI taxonomy
 
  The NCBI taxonomy database is regularly updated (particularly for microbial taxa). This
- means that both taxa names and NCBI IDs can become superseded. Generally, the up to
- date entries can be found based on superseded information, when this is the case a
- warning will be issued in this format:
+ means that taxa names can become synonymised or superseded. Generally, the current
+ canonical name for taxa can be found based on superseded information and this will
+ generate a warning like this:
 
-    ? Bacillus foraminis not accepted usage should be Mesobacillus foraminis instead
+    ? Non-canon name Enterococcus coli at rank species: synonym for Escherichia coli
 
- Then, both the superseded taxa information and the up to date information will be
- recorded. If you don't want both to be recorded, simply replace the superseded taxa
- information with the up to date information.
+ Then, both the superseded taxa information and the up to date information will be added
+ to the taxon index. If you don't want both to be recorded, simply replace the
+ superseded taxa information with the up to date information.
 
 ### Non-backbone ranks
 
@@ -141,21 +156,7 @@ two columns (Name, NCBI ID) are mandatory and contain the following:
  subspecies) with the addition of superkingdom. It is also fine to include non-backbone
  ranks such as strain or superorder. However, when the lineage of each taxa is found,
  only backbone ranks will be included, i.e. non-backbone ranks will only be recorded if
- they are the lowest taxonomic level for a specific taxon. Clades should only be
- included if they are the lowest known rank for a specific taxa. If they are used they
- should all be included as a single column, as repeated column names results in an
- error. Only the ordering of backbone ranks are checked so clades can be placed out of
- order to accomplish this.
-
-### New and unrecognised taxa
-
- If a taxon is new or not recognised by NCBI (and you're sure it isn't just a typo!) it
- can still be recorded. This requires that the entry for the next lowest rank in the
- taxon's hierarchy is recognised by NCBI. If so the worksheet name, rank and parent taxa
- details of the original taxa are recorded. When this happens a warning of the following
- type will be generated:
-
-    ? My new strain not registered with NCBI, but higher level taxon Escherichia coli is
+ they are the least nested taxonomic level for a specific taxon.
 
 ## My data is not sequencing data, and is hard to convert to NCBI taxonomy
 

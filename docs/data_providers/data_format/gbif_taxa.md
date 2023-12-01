@@ -82,7 +82,7 @@ three columns (Name, Taxon name and Taxon type) are mandatory and contain the fo
 - **Taxon type**: This column must provide the **taxonomic type** of the named taxon,
   which is usually the taxonomic **rank**. For example, the taxon _Pongo pygmaeus_ would
   be of type `Species` and the taxon Formicidae would be of type `Family`. If the taxon
-  type is not one of the core GBIF backbone levels ( Kingdom, Phylum, Order, Class,
+  type is not one of the core GBIF backbone ranks ( Kingdom, Phylum, Order, Class,
   Family, Genus, Species and Subspecies), or is one of the special values
   `Morphospecies` or `Functional group`, then you will need to provide a **parent
   taxon** (see below).
