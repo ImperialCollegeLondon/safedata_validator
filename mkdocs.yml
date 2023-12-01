@@ -1,25 +1,66 @@
-site_name: Data at the SAFE Project
+site_name: The safedata_validator package
 repo_url: https://github.com/ImperialCollegeLondon/safedata_validator/
-theme: readthedocs
+theme:
+  name: material
 markdown_extensions:
   - admonition
+  - def_list
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+plugins:
+  - search
+  - mkdocstrings
+  - include-markdown
 extra_css:
   - custom.css
 use_directory_urls: false
 nav:
-  - 'Introduction': 'index.md'
-  - 'Data availability': 'availability.md'
-  - 'Data format overview': 'data_format/overview.md'
-  - 'Excel format details':
-    - 'Summary worksheet': 'data_format/summary.md'
-    - 'Taxa worksheet': 'data_format/taxa.md'
-    - 'Locations worksheet': 'data_format/locations.md'
-    - 'Data worksheets': 'data_format/data.md'
-  - 'Other file formats': 'data_format/other_formats.md'
-  - 'Data format FAQs': 'faqs.md'
-  - 'The safedata_validator package':
-    - 'Usage': 'safedata_validator/usage.md'
-    - 'Installation': 'safedata_validator/install.md'
-    - 'Building local GBIF': 'safedata_validator/build_local_gbif.md'
-    - 'GBIF validation notes': 'safedata_validator/gbif_validation.md'
-  - 'Build notes': build_notes.md
+  - 'Overview': 'index.md'
+  - 'Data providers':
+    - 'Overview': 'data_providers/overview.md'
+    - 'Data availability': 'data_providers/availability.md'
+    - 'Excel format details':
+      - 'Overview': 'data_providers/data_format/overview.md'
+      - 'Summary worksheet': 'data_providers/data_format/summary.md'
+      - 'Taxa worksheets': 'data_providers/data_format/taxa.md'
+      - 'GBIFTaxa worksheet': 'data_providers/data_format/gbif_taxa.md'
+      - 'NCBITaxa worksheet': 'data_providers/data_format/ncbi_taxa.md'
+      - 'Locations worksheet': 'data_providers/data_format/locations.md'
+      - 'Data worksheets': 'data_providers/data_format/data.md'
+      - 'Other file formats': 'data_providers/data_format/other_formats.md'
+      - 'Data format FAQs': 'data_providers/data_format/faqs.md'
+  - 'Data managers':
+    - 'Overview': 'data_managers/overview.md'
+    - 'Installation and configuration':
+      - 'Installation': 'data_managers/install/install.md'
+      - 'Configuration': 'data_managers/install/configuration.md'
+      - 'Building the GBIF database': 'data_managers/install/build_local_gbif.md'
+      - 'Building the NCBI database': 'data_managers/install/build_local_ncbi.md'
+      - 'Creating a Gazetteer': 'data_managers/install/gazetteer.md'
+      - 'Taxonomic validation details': 'data_managers/install/taxonomic_validation.md'
+    - 'Using the safedata system':
+      - 'Overview': 'data_managers/using_safedata/overview.md'
+    - 'Command line tools': 
+      - 'Overview': 'data_managers/command_line_tools/overview.md'
+      - 'safedata_validate': 'data_managers/command_line_tools/safedata_validate.md'
+      - 'safedata_zenodo': 'data_managers/command_line_tools/safedata_zenodo.md'
+      - 'safedata_server': 'data_managers/command_line_tools/safedata_server.md'
+  - 'Developers':
+    - 'API Reference':
+      - 'Overview': 'developers/api//overview.md'
+      - 'Resources': 'developers/api/resources.md'
+      - 'Taxon database': 'developers/api/taxondb.md'
+      - 'Logger': 'developers/api/logger.md'
+      - 'Extents': 'developers/api/extent.md'
+      - 'Summary': 'developers/api/summary.md'
+      - 'Locations': 'developers/api/locations.md'
+      - 'Fields and dataworksheets': 'developers/api/field.md'
+      - 'Taxa': 'developers/api/taxa.md'
+      - 'Zenodo': 'developers/api/zenodo.md'
+    - 'Package development': developers/package_development.md
+  - 'safedata at the SAFE project': 'safedata_at_SAFE.md'
+

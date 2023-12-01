@@ -1,0 +1,41 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Current File with Args",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-r",
+                "safedata_validator_local_test.cfg",
+                "update_gazetteer",
+                "gazetteer.geojson",
+                "location_aliases.csv"
+            ]
+        },
+        {
+            "name": "_safedata_validator_cli debug",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-r",
+                "local/config_files/live_safeweb_gbif_2016_07_25.cfg",
+                "../safedata_directory/1198522/1237724/template_SinghRamesh.xlsx"
+            ]
+        }
+    ]
+}

@@ -1,9 +1,3 @@
-# Ignore test datasets for now
-SAFE_import_files*
-
-# ignore Excel backup files
-~*
-
 # PyCharm
 .idea/
 
@@ -13,9 +7,6 @@ SAFE_import_files*
 # compiled python
 *.pyc
 
-# notes folders
-local_notes
-
 # build and dist
 build
 dist
@@ -23,9 +14,11 @@ dist
 # mkdocs local site build
 site
 
-# Do not include the local copy of the taxon database
-local_db/backbone-current-simple.sqlite
-local_db/taxdump.tar.gz
-
 # Ignore local pyenv settings
 .python-version
+
+# Ignore code coverage map
+.coverage
+
+# Ignore local directory
+local/

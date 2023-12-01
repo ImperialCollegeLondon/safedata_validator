@@ -23,3 +23,25 @@ Fixed:
 2.0.0
 * Shifting to a pure Python 3 implementation. This is a hard shift from 2
   to 3: there will be no support for 2/3 in parallel.
+
+2.0.1 
+* Bugfix for incorrect CI Python version.
+
+3.0.0
+* Major refactor to split one giant nested class in a single file implementation
+  into a set of modules dealing with different parts of the structure. This
+  separation makes it easier to create unit testing of inputs and also facilitates 
+  code reuse for different file formats and functions.
+* Unit testing for modules.
+* Addition of Zenodo upload and publication tools.
+* Addition of NCBI taxon sheet and validation.
+* Addition of metadata posting to metadata server.
+* Implementation changes:
+  - 2.0.1 unintentionally masked multiple equal hits when valid parent taxa were
+    provided. You _could_ use parent taxon to resolve multiple hits, but at present the
+    mechanism is to use GBIF_ID explicitly. Parent taxon is intended for unknown taxa.
+  - 2.0.1 unintentionally allowed data worksheets with _no_ metadata. If a dataworksheet
+    exists, it is describing data, whether or not that data is in a separate file.
+
+Roadmap:
+* Validation of zipfiles of CSV files.

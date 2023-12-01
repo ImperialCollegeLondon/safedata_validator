@@ -1,2 +1,5 @@
-from .safedata_validator import Dataset, _safedata_validator_cli
-from .version import __version__
+# noqa: D104
+
+import importlib.metadata
+
+__version__ = importlib.metadata.version("safedata_validator")

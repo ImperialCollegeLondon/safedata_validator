@@ -1,29 +1,57 @@
-# Introduction
+# Overview
 
-The agreement for research projects working at the SAFE Project states that all project
-data are submitted to the SAFE Project data repository, so that it is available to future
-researchers. In order to make it easy for data to be found and used in the future, we need
-researchers to provide some (relatively!) simple metadata information in their datafiles.
+The `safedata_validator` package is a dataset validation and publishing tool for use
+with large collections of related but heterogenous datasets. It was originally built to
+handle the field data collections from the [SAFE Project](https://safeproject.net),
+which has generated a [large number of related
+datasets](https://zenodo.org/communities/safe).
 
-This documentation describes:
+It forms one element of the wider `safedata` system, which provide a general framework
+for use in providing data capture, validation, publication and discovery within long
+term ecological projects.
 
-1. the data formatting required to submit data to SAFE, and
-2. the software used (the python module `safedata_validator` to validate formatted data.
+## User starting points
 
-If you are planning to submit data, the  process in overview is:
+[Data providers](data_providers/overview.md)
+: These pages provide an overview of the data preparation and submission process.
 
-* Prepare your data following the formatting information on this site.
-* Go to the SAFE Project website and [Submit your dataset](https://www.safeproject.net/datasets/submit_dataset).
-* We will automatically validate the data formatting. 
-* If the validation succeeds then we will publish it on Zenodo.
-* If the validation fails then you will get an error report so you can fix the problems and resubmit.
+[Data managers](data_managers/command_line_tools/overview.md)
+: These pages provide an introduction to the command line tools used to validate and
+publish datasets.
 
-You can see published datasets at the  [SAFE Project Zenodo community](https://zenodo.org/communities/safe/).
+[Developers](developers/api/overview.md)
+: These pages provide the API for the package classes and methods.
 
-!!! Warning
+## Package components
 
-    You **must not** publish your dataset directly to Zenodo. This skips the validation step and means
-    that the datasets are not linked together under our [curation account](availability.md#data-curation).
+The `safedata_validator` package uses the following elements:
 
+- A [defined format](data_providers/data_format/overview.md) for annotating data
+  tables with metadata, validating sampling locations and taxonomic references and
+  providing a standard set of summary metadata.
+- The `safedata_validator` package itself, written in Python, which is used to check
+  that a dataset meets the standard format. The package provides:
+    - A programmatic API: `safedata_validator` can be imported and then used to
+      implement validation within another program.
+    - An implementation of the format checking process for data stored in Excel files,
+      although implementations for other formats are possible.
+    - Command line tools for both the validation (`safedata_validate`) and publication
+      (`safedata_zenodo`) of datasets
+- A data store to archive validated datasets. The `safedata_validator` packages
+  currently uses [Zenodo](https://zenodo.org) to store datasets.
 
-There is a separate document containing [build notes](build_notes.md) on the package design and build process.
+The wider `safedata` system then also uses:
+
+- The [`safedata_server`](https://github.com/ImperialCollegeLondon/safedata_server) web
+  application, which implements a metadata server for published datasets, used to
+  maintain a searchable interface to the full metadata extracted from datasets.
+- The [`safedata`](https://imperialcollegelondon.github.io/safedata/) package, which
+  provides data discovery and download for published datasets into the [R statistical
+  computing framework](https://www.r-project.org/).
+
+## Code availability
+
+The `safedata_validator` package is open source Python and  is maintained on
+[GitHub](https://github.com/ImperialCollegeLondon/safedata_validator). It can
+be installed using  [PyPI](https://pypi.org/project/safedata-validator).
+See the [installation notes](data_managers/install/install.md) for setup instructions.

@@ -1,0 +1,16 @@
+cl_prompt $ safedata_zenodo upload_file -h
+usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ... upload_file
+       [-h] [--zenodo_filename ZENODO_FILENAME] zenodo_json filepath
+
+Uploads the contents of a specified file to an _unpublished_ Zenodo deposit,
+optionally using an alternative filename. If you upload a new file to the same
+filename, it will replace the existing uploaded file.
+
+positional arguments:
+  zenodo_json   Path to a Zenodo metadata JSON for the deposit
+  filepath      The path to the file to be uploaded
+
+optional arguments:
+  -h, --help    show this help message and exit
+  --zenodo_filename ZENODO_FILENAME
+                An optional alternative file name to be used on Zenodo
