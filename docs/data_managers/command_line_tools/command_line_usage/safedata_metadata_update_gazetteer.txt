@@ -1,5 +1,5 @@
-cl_prompt $ safedata_server update_gazetteer -h
-usage: safedata_server update_gazetteer [-h] gazetteer_json location_aliases
+cl_prompt $ safedata_metadata update_gazetteer -h
+usage: safedata_metadata update_gazetteer [-h] gazetteer_json location_aliases
 
 This function updates the gazetteer resources being used by a safedata server
 instance. It uploads both the gazetteer geojson file and location aliases

@@ -1,5 +1,5 @@
-cl_prompt $ safedata_server -h
-usage: safedata_server [-h] [-r RESOURCES] [-q]  ...
+cl_prompt $ safedata_metadata -h
+usage: safedata_metadata [-h] [-r RESOURCES] [-q]  ...
 
 Post updated information to a safedata server instance.
 
