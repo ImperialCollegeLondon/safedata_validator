@@ -26,6 +26,7 @@ from safedata_validator.logger import (
     use_stream_logging,
 )
 from safedata_validator.resources import Resources
+from safedata_validator.server import post_metadata, update_resources
 from safedata_validator.taxondb import (
     build_local_gbif,
     build_local_ncbi,
@@ -40,10 +41,8 @@ from safedata_validator.zenodo import (
     download_ris_data,
     generate_inspire_xml,
     get_deposit,
-    post_metadata,
     publish_deposit,
     sync_local_dir,
-    update_gazetteer,
     update_published_metadata,
     upload_file,
     upload_metadata,
@@ -883,7 +882,7 @@ def _safedata_metadata_cli():
     resources = Resources(args.resources)
 
     # Handle the remaining subcommands
-    if args.subcommand in ["post_metadata", "cdep"]:
+    if args.subcommand in ["post_metadata", "post_md"]:
         # Open the two JSON files
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -904,26 +903,15 @@ def _safedata_metadata_cli():
 
         return
 
-    if args.subcommand in ["update_gazetteer"]:
-        # Open the two JSON files
-        with open(args.gazetteer_json) as gz_json:
-            gazetteer_json = simplejson.load(gz_json)
-
-        with open(args.location_aliases) as aliases_csv:
-            location_aliases = aliases_csv.read()
-
+    if args.subcommand in ["update_resources"]:
         # Run the function
-        response, error = update_gazetteer(
-            gazetteer=gazetteer_json,
-            location_aliases=location_aliases,
-            resources=resources,
-        )
+        response, error = update_resources(resources=resources)
 
         # Report on the outcome.
         if error is not None:
-            LOGGER.error(f"Failed to update gazetteer: {error}")
+            LOGGER.error(f"Failed to update resources: {error}")
         else:
-            LOGGER.info("Gazetteer updated")
+            LOGGER.info("Resources updated")
 
         return
 
