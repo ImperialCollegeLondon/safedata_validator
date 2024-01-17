@@ -70,15 +70,20 @@ def update_resources(resources: Resources) -> ZenodoFunctionResponseType:
     # Get resource configuration
     zres = _resources_to_zenodo_api(resources)
 
+    # Get payload
+    files = {
+        "gazetteer": open(resources.gaz_path, "rb"),
+        "location_aliases": open(resources.localias_path, "rb"),
+    }
+
+    if resources.project_database is not None:
+        files["project_database"] = open(resources.project_database, "rb")
+
     # post the resource files to the server
     response = requests.post(
         f"{zres['mdapi']}/update_gazetteer",
         params={"token": zres["mdtoken"]},
-        files={
-            "gazetteer": open(resources.gaz_path, "rb"),
-            "location_aliases": open(resources.localias_path, "rb"),
-            "project_database": open(resources.project_database, "rb"),
-        },
+        files=files,
     )
 
     # trap errors in uploading metadata and tidy up
