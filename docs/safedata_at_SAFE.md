@@ -28,9 +28,9 @@ anyway funding by a UK research council.
 
 The SAFE project has historically used the [SAFE website](https://safeproject.net) as a
 metadata server. It is not yet clear whether this will continue to be the case in the
-long run or whether the project will transition to using the `safedata_server` tool to
-generate a metadata server. If this transition occurs, we will inform you of the new
-server to upload metadata to.
+long run or whether the project will transition to using the `safedata_server`
+application to provide  a metadata server. If this transition occurs, we will inform
+you of the new server to upload metadata to.
 
 ## SAFE project Geographic extent
 

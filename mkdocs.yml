@@ -48,7 +48,7 @@ nav:
       - 'Overview': 'data_managers/command_line_tools/overview.md'
       - 'safedata_validate': 'data_managers/command_line_tools/safedata_validate.md'
       - 'safedata_zenodo': 'data_managers/command_line_tools/safedata_zenodo.md'
-      - 'safedata_server': 'data_managers/command_line_tools/safedata_server.md'
+      - 'safedata_metadata': 'data_managers/command_line_tools/safedata_metadata.md'
   - 'Developers':
     - 'API Reference':
       - 'Overview': 'developers/api//overview.md'

@@ -771,7 +771,7 @@ def _safedata_zenodo_cli():
     return
 
 
-def _safedata_server_cli():
+def _safedata_metadata_cli():
     """Post updated information to a safedata server instance.
 
     This command line tool provides functions to update a web server running
@@ -783,7 +783,7 @@ def _safedata_server_cli():
     """
 
     # create the top-level parser and configure to take subparsers
-    desc = textwrap.dedent(_safedata_server_cli.__doc__)
+    desc = textwrap.dedent(_safedata_metadata_cli.__doc__)
     fmt = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
 
