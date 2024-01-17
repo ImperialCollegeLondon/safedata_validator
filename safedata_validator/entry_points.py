@@ -827,27 +827,37 @@ def _safedata_metadata_cli():
         "dataset_json", type=str, help="Path to a dataset metadata file"
     )
 
-    # UPDATE GAZETTEER subcommand
+    # UPDATE RESOURCES subcommand, which has no arguments
 
-    update_gazetteer_desc = """
-    This function updates the gazetteer resources being used by a safedata server
-    instance. It uploads both the gazetteer geojson file and location aliases
-    file and the server then validates the file contents.
+    update_resources_desc = """
+    This function updates the resources being used by a safedata server instance. It
+    uploads the gazetteer geojson file, location aliases CSV and any project database
+    CSV being used. The server then validates the file contents.
+
+    The resource file being used sets both the metadata server instance IP address and
+    provides the paths to the files to be uploaded.
     """
 
-    update_gazetteer_parser = subparsers.add_parser(
-        "update_gazetteer",
-        description=textwrap.dedent(update_gazetteer_desc),
+    subparsers.add_parser(
+        "update_resources",
+        description=textwrap.dedent(update_resources_desc),
         help="Update the gazetteer data on safedata server",
         formatter_class=fmt,
     )
 
-    # positional argument inputs
-    update_gazetteer_parser.add_argument(
-        "gazetteer_json", type=str, help="Path to a gazetteer geojson file"
-    )
-    update_gazetteer_parser.add_argument(
-        "location_aliases", type=str, help="Path to a CSV of location aliases"
+    # SHOW RESOURCES subcommand, which has no arguments
+
+    show_resources_desc = """
+    This subcommand simply shows the details of the resources being used and can be used
+    to simply display the Zenodo and metadata server details of the default or specified
+    resources file.
+    """
+
+    subparsers.add_parser(
+        "show_resources",
+        description=textwrap.dedent(show_resources_desc),
+        help="Show the current resources details",
+        formatter_class=fmt,
     )
 
     # ------------------------------------------------------
@@ -862,7 +872,7 @@ def _safedata_metadata_cli():
         return
 
     # Show the package config and exit if requested
-    if args.subcommand == "show_config":
+    if args.subcommand == "show_resources":
         resources = Resources(args.resources)
         print("\nZenodo configuration:")
         for key, val in resources.zenodo.items():

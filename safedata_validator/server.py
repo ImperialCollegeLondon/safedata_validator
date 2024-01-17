@@ -7,7 +7,6 @@
 from typing import Optional
 
 import requests  # type: ignore
-import simplejson
 
 from safedata_validator.logger import FORMATTER, LOGGER
 from safedata_validator.resources import Resources
