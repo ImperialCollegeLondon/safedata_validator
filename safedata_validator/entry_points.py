@@ -848,9 +848,9 @@ def _safedata_metadata_cli():
     # SHOW RESOURCES subcommand, which has no arguments
 
     show_resources_desc = """
-    This subcommand simply shows the details of the resources being used and can be used
-    to simply display the Zenodo and metadata server details of the default or specified
-    resources file.
+    This subcommand simply shows the details of the resources being used and can
+    be used to simply display the Zenodo and metadata server details of the
+    default or specified resources file.
     """
 
     subparsers.add_parser(
