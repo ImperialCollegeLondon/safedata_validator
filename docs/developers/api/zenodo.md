@@ -13,8 +13,6 @@
             - discard_deposit
             - publish_deposit
             - delete_file
-            - post_metadata
-            - update_gazetteer
             - dataset_description
             - table_description
             - generate_inspire_xml

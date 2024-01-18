@@ -505,16 +505,16 @@ def _safedata_zenodo_cli():
         help="Path to a text file containing a lineage statement",
     )
 
-    # SHOW CONFIG subcommand
-    show_config_desc = """
-    Loads the safedata_validator configuration file, displays the config setup
+    # SHOW resources subcommand
+    show_resources_desc = """
+    Loads the safedata_validator resources file, displays the resources setup
     being used for safedata_zenodo and then exits.
     """
 
     # This has no arguments, so subparser object not needed
     _ = subparsers.add_parser(
-        "show_config",
-        description=textwrap.dedent(show_config_desc),
+        "show_resources",
+        description=textwrap.dedent(show_resources_desc),
         help="Report the config being used and exit",
         formatter_class=fmt,
     )
@@ -531,7 +531,7 @@ def _safedata_zenodo_cli():
         return
 
     # Show the package config and exit if requested
-    if args.subcommand == "show_config":
+    if args.subcommand == "show_resources":
         resources = Resources(args.resources)
         print("\nZenodo configuration:")
         for key, val in resources.zenodo.items():

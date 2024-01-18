@@ -6,6 +6,6 @@
         group_by_category: false
         members:
             - post_metadata
-            - update_gazetteer
+            - update_resources
         show_root_heading: false
         show_root_toc_entry: false

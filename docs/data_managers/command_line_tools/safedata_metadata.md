@@ -30,10 +30,10 @@ include "data_managers/command_line_tools/command_line_usage/safedata_metadata_p
 %}
 ```
 
-### The `update_gazetteer` subcommand
+### The `update_resources` subcommand
 
 ```sh
 {%
-include "data_managers/command_line_tools/command_line_usage/safedata_metadata_update_gazetteer.txt"
+include "data_managers/command_line_tools/command_line_usage/safedata_metadata_update_resources.txt"
 %}
 ```
