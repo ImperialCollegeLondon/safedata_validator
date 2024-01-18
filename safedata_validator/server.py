@@ -81,13 +81,13 @@ def update_resources(resources: Resources) -> ZenodoFunctionResponseType:
 
     # post the resource files to the server
     response = requests.post(
-        f"{zres['mdapi']}/update_gazetteer",
+        f"{zres['mdapi']}/update_resources",
         params={"token": zres["mdtoken"]},
         files=files,
     )
 
-    # trap errors in uploading metadata and tidy up
+    # Trap errors in uploading resources and tidy up
     if response.status_code != 201:
         return {}, response.text
     else:
-        return response.json(), None
+        return {}, None
