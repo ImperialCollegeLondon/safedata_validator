@@ -13,7 +13,8 @@ Post updated information to a safedata server instance.
 positional arguments:
   
     post_metadata       Post dataset metadata to a safedata server
-    update_gazetteer    Update the gazetteer data on safedata server
+    update_resources    Update the gazetteer data on safedata server
+    show_resources      Show the current resources details
 
 optional arguments:
   -h, --help            show this help message and exit

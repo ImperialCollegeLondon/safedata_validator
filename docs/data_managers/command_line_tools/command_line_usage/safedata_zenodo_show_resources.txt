@@ -1,0 +1,9 @@
+cl_prompt $ safedata_zenodo show_resources -h
+usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ... show_resources
+       [-h]
+
+Loads the safedata_validator resources file, displays the resources setup
+being used for safedata_zenodo and then exits.
+
+optional arguments:
+  -h, --help  show this help message and exit

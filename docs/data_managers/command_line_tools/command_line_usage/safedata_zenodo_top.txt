@@ -55,7 +55,7 @@ positional arguments:
                 Generate an HTML dataset description
     generate_xml
                 Create INSPIRE compliant metadata XML
-    show_config
+    show_resources
                 Report the config being used and exit
 
 optional arguments:

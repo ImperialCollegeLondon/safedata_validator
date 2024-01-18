@@ -5,9 +5,9 @@ import simplejson
 from safedata_validator.field import Dataset
 from safedata_validator.logger import LOGGER
 from safedata_validator.resources import Resources
+from safedata_validator.server import post_metadata
 from safedata_validator.zenodo import (
     create_deposit,
-    post_metadata,
     publish_deposit,
     upload_file,
     upload_metadata,

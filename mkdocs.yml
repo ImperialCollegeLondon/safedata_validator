@@ -61,6 +61,7 @@ nav:
       - 'Fields and dataworksheets': 'developers/api/field.md'
       - 'Taxa': 'developers/api/taxa.md'
       - 'Zenodo': 'developers/api/zenodo.md'
+      - 'Server': 'developers/api/server.md'
     - 'Package development': developers/package_development.md
   - 'safedata at the SAFE project': 'safedata_at_SAFE.md'
 
