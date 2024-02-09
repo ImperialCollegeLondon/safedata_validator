@@ -1,15 +1,9 @@
 """Test that Extent logs correctly."""
 
-import importlib
 import subprocess
 from contextlib import contextmanager
-from logging import CRITICAL, ERROR, WARNING
 
 import pytest
-
-from safedata_validator.extent import Extent
-
-from .conftest import log_check
 
 
 @contextmanager
@@ -30,12 +24,12 @@ def does_not_raise():
 def test_entry_points_run(entry_point):
     """This test checks the availability and basic function of the package entry points.
 
-    The tests do not test complex function, just that the entry point is available and
-    exits normally after getting the help text. For some reason, these tests fail in
-    VSCode debug mode, something to do with multiprocessing and shell=True?
+    The tests do not test complex functionality, just that the entry point is available
+    and exits normally after getting the help text. For some reason, these tests fail in
+    VSCode debug mode.
     """
 
-    result = subprocess.run([entry_point, "-h"])
+    result = subprocess.run(f"{entry_point} -h", shell=True)
 
     assert result.returncode == 0
 
