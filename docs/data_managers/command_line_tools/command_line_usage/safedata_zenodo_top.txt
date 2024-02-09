@@ -1,5 +1,5 @@
 cl_prompt $ safedata_zenodo -h
-usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ...
+usage: safedata_zenodo [-h] [-r RESOURCES] [-q]  ...
 
 Publish validated datasets to Zenodo using a command line interface.
 
