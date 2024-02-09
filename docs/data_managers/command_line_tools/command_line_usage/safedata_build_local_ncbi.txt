@@ -13,9 +13,9 @@ Build a local NCBI database.
     - to build a particular version, but defaults to the most recent version.
 
 positional arguments:
-  outdir                Location to create database file.
+  outdir        Location to create database file.
 
 optional arguments:
-  -h, --help            show this help message and exit
+  -h, --help    show this help message and exit
   -t TIMESTAMP, --timestamp TIMESTAMP
-                        The time stamp of a database archive version to use.
+                The time stamp of a database archive version to use.

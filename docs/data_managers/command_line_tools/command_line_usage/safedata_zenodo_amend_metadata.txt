@@ -1,6 +1,5 @@
 cl_prompt $ safedata_zenodo amend_metadata -h
-usage: safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ... amend_metadata
-       [-h] zenodo_json_update
+usage: safedata_zenodo amend_metadata [-h] zenodo_json_update
 
 Updates the Zenodo metadata for an published deposit. To use this, make sure
 you have the most recent Zenodo metadata for the deposit and then edit the
