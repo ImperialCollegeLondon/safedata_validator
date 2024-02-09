@@ -245,8 +245,8 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
         help="Suppress normal information messages. ",
     )
 
-    # Create subparsers to add shared options across actions - these can be added to
-    # individual actions via the parents argument
+    # Create subparsers to add shared positional arguments across actions - these can be
+    # added to individual actions via the parents argument
     parse_zenodo_metadata = argparse.ArgumentParser(add_help=False)
     parse_zenodo_metadata.add_argument(
         "zenodo_json",
@@ -500,11 +500,18 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
     resulting HTML.
     """
 
-    generate_html_parser = subparsers.add_parser(  # noqa: F841
+    generate_html_parser = subparsers.add_parser(
         "generate_html",
         description=textwrap.dedent(generate_html_desc),
         help="Generate an HTML dataset description",
         parents=[parse_zenodo_metadata, parse_dataset_metadata],
+    )
+
+    generate_html_parser.add_argument(
+        "html_out",
+        type=str,
+        default=None,
+        help="Output path for the HTML file",
     )
 
     # GENERATE XML subcommand
@@ -527,6 +534,13 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
         "--lineage-statement",
         type=str,
         help="Path to a text file containing a lineage statement",
+    )
+
+    generate_xml_parser.add_argument(
+        "xml_out",
+        type=str,
+        default=None,
+        help="Output path for the XML file",
     )
 
     # SHOW resources subcommand
@@ -760,10 +774,19 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
         with open(args.zenodo_json) as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
-        desc = dataset_description(metadata=dataset_json, zenodo=zenodo_json)
+        generated_html = dataset_description(
+            dataset_metadata=dataset_json, zenodo_metadata=zenodo_json
+        )
 
-        with open(args.html_out, "w") as outf:
-            outf.write(desc)
+        out_path = Path(args.html_out)
+        if out_path.exists():
+            LOGGER.error("HTML output file already exists")
+            return 1
+
+        with open(out_path, "w") as outf:
+            outf.write(generated_html)
+
+        LOGGER.info("HTML generated")
 
     elif args.subcommand in ["generate_xml", "xml"]:
         # Open the two JSON files
@@ -780,22 +803,24 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
             lineage_statement = None
 
         # Run the function
-        generated_xml = generate_inspire_xml(  # noqa: F841
-            metadata=dataset_json,
+        generated_xml = generate_inspire_xml(
+            dataset_metadata=dataset_json,
             zenodo_metadata=zenodo_json,
             resources=resources,
             lineage_statement=lineage_statement,
         )
 
-        # Report on the outcome.
-        # FIXME: This is borked
-        error = None
-        if error is not None:
-            LOGGER.error(f"Failed to generate INSPIRE xml: {error}")
-        else:
-            LOGGER.info("Inspire XML generated")
+        out_path = Path(args.xml_out)
+        if out_path.exists():
+            LOGGER.error("XML output file already exists")
+            return 1
 
-    return
+        with open(out_path, "wb") as outf:
+            outf.write(generated_xml)
+
+        LOGGER.info("Inspire XML generated")
+
+    return 0
 
 
 def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> None:
