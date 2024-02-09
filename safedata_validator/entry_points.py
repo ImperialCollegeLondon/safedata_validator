@@ -788,6 +788,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
         )
 
         # Report on the outcome.
+        # FIXME: This is borked
         error = None
         if error is not None:
             LOGGER.error(f"Failed to generate INSPIRE xml: {error}")
