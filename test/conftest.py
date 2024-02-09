@@ -1,4 +1,5 @@
 """Collection of fixtures to assist the testing scripts."""
+
 import os
 import sys
 from collections import OrderedDict
@@ -46,6 +47,8 @@ def fixture_files():
         ("bad_ncbi_file", "Test_format_bad_NCBI.xlsx"),
         ("weird_ncbi_file", "Test_format_weird_NCBI.xlsx"),
         ("good_ncbi_file", "Test_format_good_NCBI.xlsx"),
+        ("good_ncbi_file_dataset_json", "Test_format_good_NCBI.json"),
+        ("good_ncbi_file_zenodo_json", "zenodo_27557.json"),
     ]
 
     real_files = {ky: os.path.join(fixture_dir, vl) for ky, vl in real_files}
