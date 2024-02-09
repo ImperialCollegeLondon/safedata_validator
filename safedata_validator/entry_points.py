@@ -57,7 +57,7 @@ def _desc_formatter(prog):
     return argparse.RawDescriptionHelpFormatter(prog, max_help_position=16)
 
 
-def _safedata_validator_cli(args_list: Optional[list[str]] = None) -> None:
+def _safedata_validator_cli(args_list: Optional[list[str]] = None) -> int:
     """Validate a dataset using a command line interface.
 
     This program validates an Excel file formatted as a `safedata` dataset.
@@ -82,6 +82,9 @@ def _safedata_validator_cli(args_list: Optional[list[str]] = None) -> None:
             providing a list of command line argument strings to the entry point
             function. For example, ``safedata_validate show_resources`` can be
             replicated by calling ``_safedata_validate_cli(['show_resources'])``.
+
+    Returns:
+        An integer code showing success (0) or failure (1).
     """
 
     # If no arguments list is provided
@@ -93,7 +96,7 @@ def _safedata_validator_cli(args_list: Optional[list[str]] = None) -> None:
     # line docs
     if _safedata_validator_cli.__doc__ is not None:
         desc = textwrap.dedent(
-            "\n".join(_safedata_validator_cli.__doc__.splitlines()[:-7])
+            "\n".join(_safedata_validator_cli.__doc__.splitlines()[:-10])
         )
     else:
         desc = "Python in -OO mode: no docs"
@@ -161,19 +164,23 @@ def _safedata_validator_cli(args_list: Optional[list[str]] = None) -> None:
         chunk_size=args.chunk_size,
     )
 
-    if ds.passed:
-        json_file = os.path.splitext(args.filename)[0] + ".json"
+    if not ds.passed:
+        sys.stdout.write("File validation failed\n")
+        return 1
 
-        with open(json_file, "w") as json_out:
-            json_out.write(ds.to_json())
+    json_file = os.path.splitext(args.filename)[0] + ".json"
 
-        sys.stdout.write("------------------------\n")
-        sys.stdout.write("File validation passed\n")
-        sys.stdout.write(f"JSON metadata written to {json_file}\n")
-        sys.stdout.write("------------------------\n")
+    with open(json_file, "w") as json_out:
+        json_out.write(ds.to_json())
+
+    sys.stdout.write("------------------------\n")
+    sys.stdout.write("File validation passed\n")
+    sys.stdout.write(f"JSON metadata written to {json_file}\n")
+    sys.stdout.write("------------------------\n")
+    return 0
 
 
-def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
+def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
     """Publish validated datasets to Zenodo using a command line interface.
 
     This is a the command line interface for publishing safedata validated
@@ -207,6 +214,9 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
             providing a list of command line argument strings to the entry point
             function. For example, ``safedata_zenodo create_deposit`` can be
             replicated by calling ``_safedata_zenodo_cli(['create_deposit'])``.
+
+    Returns:
+        An integer code showing success (0) or failure (1).
     """
 
     # If no arguments list is provided
@@ -218,7 +228,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
     # line docs
     if _safedata_zenodo_cli.__doc__ is not None:
         desc = textwrap.dedent(
-            "\n".join(_safedata_zenodo_cli.__doc__.splitlines()[:-7])
+            "\n".join(_safedata_zenodo_cli.__doc__.splitlines()[:-10])
         )
     else:
         desc = "Python in -OO mode: no docs"
@@ -566,7 +576,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
 
     if args.subcommand is None:
         parser.print_usage()
-        return
+        return 0
 
     # Show the package config and exit if requested
     if args.subcommand == "show_resources":
@@ -577,7 +587,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
         print("\nMetadata server configuration:")
         for key, val in resources.metadata.items():
             print(f" - {key}: {val}")
-        return
+        return 0
 
     handler = get_handler()
     if args.quiet:
@@ -597,7 +607,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
         # Trap errors
         if error is not None:
             LOGGER.error(f"Failed to create deposit: {error}")
-            return
+            return 1
 
         # Output the response as a deposit  JSON file
         rec_id = response["record_id"]
@@ -619,8 +629,9 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
         # Report on the outcome.
         if error is not None:
             LOGGER.error(f"Failed to discard deposit: {error}")
-        else:
-            LOGGER.info("Deposit discarded")
+            return 1
+
+        LOGGER.info("Deposit discarded")
 
     elif args.subcommand in ["get_deposit", "gdep"]:
         # Run the command
@@ -628,7 +639,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
 
         if error is not None:
             LOGGER.error(f"Failed to get info: {error}")
-            return
+            return 1
 
         # Dump the response to a JSON file
         outfile = os.path.join(os.getcwd(), f"zenodo_{args.zenodo_id}.json")
@@ -667,7 +678,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
         # Report on the outcome.
         if error is not None:
             LOGGER.error(f"Failed to publish deposit: {error}")
-            return
+            return 1
 
         # Update the Zenodo JSON file with publication details
         LOGGER.info(f"Published to: {response['links']['record']}")
@@ -701,6 +712,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
         # Report on the outcome.
         if error is not None:
             LOGGER.error(f"Failed to upload file: {error}")
+            return 1
         else:
             LOGGER.info("File uploaded")
 
@@ -823,7 +835,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> None:
     return 0
 
 
-def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> None:
+def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> int:
     """Post updated information to a safedata server instance.
 
     This command line tool provides functions to update a web server running
@@ -838,6 +850,9 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> None:
             providing a list of command line argument strings to the entry point
             function. For example, ``safedata_zenodo create_deposit`` can be
             replicated by calling ``_safedata_zenodo_cli(['create_deposit'])``.
+
+    Returns:
+        An integer code showing success (0) or failure (1).
     """
 
     # If no arguments list is provided
@@ -849,7 +864,7 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> None:
     # line docs
     if _safedata_metadata_cli.__doc__ is not None:
         desc = textwrap.dedent(
-            "\n".join(_safedata_metadata_cli.__doc__.splitlines()[:-7])
+            "\n".join(_safedata_metadata_cli.__doc__.splitlines()[:-10])
         )
     else:
         desc = "Python in -OO mode: no docs"
@@ -944,7 +959,7 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> None:
 
     if args.subcommand is None:
         parser.print_usage()
-        return
+        return 0
 
     # Show the package config and exit if requested
     if args.subcommand == "show_resources":
@@ -955,7 +970,7 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> None:
         print("\nMetadata server configuration:")
         for key, val in resources.metadata.items():
             print(f" - {key}: {val}")
-        return
+        return 0
 
     handler = get_handler()
     if args.quiet:
@@ -983,10 +998,9 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> None:
         # Report on the outcome.
         if error is not None:
             LOGGER.error(f"Failed to post metadata: {error}")
-        else:
-            LOGGER.info("Metadata posted")
+            return 1
 
-        return
+        LOGGER.info("Metadata posted")
 
     if args.subcommand in ["update_resources"]:
         # Run the function
@@ -995,16 +1009,17 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> None:
         # Report on the outcome.
         if error is not None:
             LOGGER.error(f"Failed to update resources: {error}")
-        else:
-            LOGGER.info("Resources updated")
+            return 1
 
-        return
+        LOGGER.info("Resources updated")
+
+    return 0
 
 
 # Local Database building
 
 
-def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> None:
+def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> int:
     """Build a local GBIF database.
 
     This tool builds an SQLite database of the GBIF backbone taxonomy to use
@@ -1021,6 +1036,9 @@ def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> None:
             providing a list of command line argument strings to the entry point
             function. For example, ``safedata_zenodo create_deposit`` can be
             replicated by calling ``_safedata_zenodo_cli(['create_deposit'])``.
+
+    Returns:
+        An integer code showing success (0) or failure (1).
     """
 
     # If no arguments list is provided
@@ -1032,7 +1050,7 @@ def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> None:
     # line docs
     if _build_local_gbif_cli.__doc__ is not None:
         desc = textwrap.dedent(
-            "\n".join(_build_local_gbif_cli.__doc__.splitlines()[:-7])
+            "\n".join(_build_local_gbif_cli.__doc__.splitlines()[:-10])
         )
     else:
         desc = "Python in -OO mode: no docs"
@@ -1061,10 +1079,10 @@ def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> None:
         )
         build_local_gbif(outdir=args.outdir, **file_data)
 
-    return
+    return 0
 
 
-def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> None:
+def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> int:
     """Build a local NCBI database.
 
     This tool builds an SQLite database of the NCBI  taxonomy to use in
@@ -1081,6 +1099,9 @@ def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> None:
             providing a list of command line argument strings to the entry point
             function. For example, ``safedata_zenodo create_deposit`` can be
             replicated by calling ``_safedata_zenodo_cli(['create_deposit'])``.
+
+    Returns:
+        An integer code showing success (0) or failure (1).
     """
 
     # If no arguments list is provided
@@ -1092,7 +1113,7 @@ def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> None:
     # line docs
     if _build_local_ncbi_cli.__doc__ is not None:
         desc = textwrap.dedent(
-            "\n".join(_build_local_ncbi_cli.__doc__.splitlines()[:-7])
+            "\n".join(_build_local_ncbi_cli.__doc__.splitlines()[:-10])
         )
     else:
         desc = "Python in -OO mode: no docs"
@@ -1121,4 +1142,4 @@ def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> None:
         )
         build_local_ncbi(outdir=args.outdir, **file_data)
 
-    return
+    return 0

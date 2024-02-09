@@ -836,7 +836,7 @@ def generate_inspire_xml(
     zenodo_metadata: dict,
     resources: Resources,
     lineage_statement: Optional[str] = None,
-) -> str:
+) -> bytes:
     """Convert dataset and zenodo metadata into GEMINI XML.
 
     Produces an INSPIRE/GEMINI formatted XML record from dataset metadata,
