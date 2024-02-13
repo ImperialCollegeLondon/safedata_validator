@@ -26,7 +26,7 @@
             ]
         },
         {
-            "name": "_safedata_validator_cli debug",
+            "name": "_safedata_validate_cli debug",
             "type": "python",
             "request": "launch",
             "program": "${file}",
