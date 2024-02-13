@@ -5,6 +5,8 @@ from contextlib import contextmanager
 
 import pytest
 
+from .conftest import FIXTURE_FILES
+
 
 @contextmanager
 def does_not_raise():
@@ -60,3 +62,33 @@ def test_entry_points_via_call(entry_point):
         entry_point_function(args_list=["-h"])
 
     assert exit.value.code == 0
+
+
+@pytest.mark.parametrize(
+    argnames="command, file_exists, returns",
+    argvalues=[
+        pytest.param("generate_xml", False, 0, id="xml_ok"),
+        pytest.param("generate_html", False, 0, id="html_ok"),
+        pytest.param("generate_xml", True, 1, id="html_overwrite"),
+        pytest.param("generate_html", True, 1, id="xml_overwrite"),
+    ],
+)
+def test_sdv_zenodo_html_and_xml(user_config_file, command, file_exists, returns):
+    """Checks that the safedata_zenodo XML and HTML generation commands work."""
+
+    from safedata_validator.entry_points import _safedata_zenodo_cli
+
+    if file_exists:
+        with open("TMP", "w") as outfile:
+            outfile.write("Don't overwrite me!")
+
+    value = _safedata_zenodo_cli(
+        args_list=[
+            command,
+            FIXTURE_FILES.rf.good_ncbi_file_zenodo_json,
+            FIXTURE_FILES.rf.good_ncbi_file_dataset_json,
+            "TMP",
+        ]
+    )
+
+    assert value == returns

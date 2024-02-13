@@ -12,7 +12,9 @@ import copy
 import hashlib
 import os
 import shutil
+from datetime import datetime as dt
 from itertools import groupby
+from pathlib import Path
 from typing import Optional, Union
 
 import requests  # type: ignore
@@ -91,12 +93,12 @@ def _resources_to_zenodo_api(resources: Optional[Resources] = None) -> dict:
         contact_affiliation = resources.zenodo.contact_affiliation
         contact_orcid = resources.zenodo.contact_orcid
 
-    # Get the metadata api
-    metadata_api = resources.metadata.api
-    metadata_token = resources.metadata.token
-    if metadata_api is None or metadata_token is None:
-        config_fail = True
-    metadata_ssl = resources.metadata.ssl_verify
+    # # Get the metadata api
+    # metadata_api = resources.metadata.api
+    # metadata_token = resources.metadata.token
+    # if metadata_api is None or metadata_token is None:
+    #     config_fail = True
+    # metadata_ssl = resources.metadata.ssl_verify
 
     if config_fail:
         raise RuntimeError("safedata_validator not configured for Zenodo functions")
@@ -108,9 +110,9 @@ def _resources_to_zenodo_api(resources: Optional[Resources] = None) -> dict:
         "zcname": contact_name,
         "zcaffil": contact_affiliation,
         "zcorc": contact_orcid,
-        "mdapi": metadata_api,
-        "mdtoken": metadata_token,
-        "mdssl": metadata_ssl,
+        # "mdapi": metadata_api,
+        # "mdtoken": metadata_token,
+        # "mdssl": metadata_ssl,
     }
 
 
@@ -421,7 +423,7 @@ def upload_file(
 
     # trap errors in uploading file
     # - no success or mismatch in md5 checksums
-    if fls.status_code != 200:
+    if fls.status_code != 201:
         return {}, _zenodo_error_message(fls)
 
     # TODO - could this be inside with above? - both are looping over the file contents
@@ -542,8 +544,8 @@ Dataset description generation (HTML and GEMINI XML)
 
 
 def dataset_description(
-    metadata: dict,
-    zenodo: dict,
+    dataset_metadata: dict,
+    zenodo_metadata: dict,
     render: bool = True,
     extra: Optional[str] = None,
     resources: Optional[Resources] = None,
@@ -564,8 +566,8 @@ def dataset_description(
     extra argument. This content is inserted below the dataset description.
 
     Args:
-        metadata: The dataset metadata
-        zenodo: The Zenodo deposit metadata
+        dataset_metadata: The dataset metadata
+        zenodo_metadata: The Zenodo deposit metadata
         render: Should the html be returned as text or as the underlying
             dominate.tags.div object.
         extra: Additional HTML content to include in the description.
@@ -576,8 +578,8 @@ def dataset_description(
         Either a string of rendered HTML or a dominate.tags.div object.
     """
 
-    zres = _resources_to_zenodo_api(resources)
-    metadata_api = zres["mdapi"]
+    # zres = _resources_to_zenodo_api(resources)
+    # metadata_api = zres["mdapi"]
 
     # PROJECT Title and authors are added by Zenodo from zenodo metadata
     # TODO - option to include here?
@@ -586,7 +588,7 @@ def dataset_description(
 
     # Dataset summary
     desc += tags.b("Description: ")
-    desc += tags.p(metadata["description"].replace("\n", "<br>"))
+    desc += tags.p(dataset_metadata["description"].replace("\n", "</br>"))
 
     # Extra
     if extra is not None:
@@ -599,10 +601,10 @@ def dataset_description(
     ##
 
     # Funding information
-    if metadata["funders"]:
+    if dataset_metadata["funders"]:
         funder_info = []
 
-        for fnd in metadata["funders"]:
+        for fnd in dataset_metadata["funders"]:
             funder_details = [fnd["body"], "(", fnd["type"]]
 
             if fnd["ref"]:
@@ -627,7 +629,7 @@ def dataset_description(
         ]
 
     # Permits
-    if metadata["permits"]:
+    if dataset_metadata["permits"]:
         desc += tags.p(
             tags.b("Permits: "),
             "These data were collected under permit from the following authorities:",
@@ -636,28 +638,28 @@ def dataset_description(
                     tags.li(
                         f"{pmt['authority']} ({pmt['type']} licence {pmt['number']})"
                     )
-                    for pmt in metadata["permits"]
+                    for pmt in dataset_metadata["permits"]
                 ]
             ),
         )
 
-    # XML link
-    xml_url = f"{metadata_api}/xml/{zenodo['record_id']}"
+    # # XML link
+    # xml_url = f"{metadata_api}/xml/{zenodo['record_id']}"
 
-    desc += tags.p(
-        tags.b("XML metadata: "),
-        "GEMINI compliant metadata for this dataset is available ",
-        tags.a("here", href=xml_url),
-    )
+    # desc += tags.p(
+    #     tags.b("XML metadata: "),
+    #     "GEMINI compliant metadata for this dataset is available ",
+    #     tags.a("here", href=xml_url),
+    # )
 
     # Present a description of the file or files including 'external' files
     # (data files loaded directly to Zenodo).
-    ds_files = [metadata["filename"]]
+    ds_files = [dataset_metadata["filename"]]
     n_ds_files = 1
     ex_files = []
 
-    if metadata["external_files"]:
-        ex_files = metadata["external_files"]
+    if dataset_metadata["external_files"]:
+        ex_files = dataset_metadata["external_files"]
         ds_files += [f["file"] for f in ex_files]
         n_ds_files += len(ex_files)
 
@@ -671,7 +673,7 @@ def dataset_description(
     # in the submitted workbook - and collect them into a dictionary by source
     # file. get() is used here for older data where external was not present.
 
-    tables_by_source = metadata["dataworksheets"]
+    tables_by_source = dataset_metadata["dataworksheets"]
 
     # Now group into a dictionary keyed by external source file - cannot sort
     # None (no comparison operators) so use a substitute
@@ -685,7 +687,7 @@ def dataset_description(
     # descriptions that might have an entry for each file.
 
     # Report the worksheet first
-    desc += tags.p(tags.b(metadata["filename"]))
+    desc += tags.p(tags.b(dataset_metadata["filename"]))
 
     # Report internal tables
     if False in tables_by_source:
@@ -711,25 +713,27 @@ def dataset_description(
             desc += tags.ol([tags.li(table_description(tab)) for tab in ext_tabs])
 
     # Add extents if populated
-    if metadata["temporal_extent"] is not None:
+    if dataset_metadata["temporal_extent"] is not None:
         desc += tags.p(
             tags.b("Date range: "),
-            "{0[0]} to {0[1]}".format([x[:10] for x in metadata["temporal_extent"]]),
+            "{0[0]} to {0[1]}".format(
+                [x[:10] for x in dataset_metadata["temporal_extent"]]
+            ),
         )
-    if metadata["latitudinal_extent"] is not None:
+    if dataset_metadata["latitudinal_extent"] is not None:
         desc += tags.p(
             tags.b("Latitudinal extent: "),
-            "{0[0]:.4f} to {0[1]:.4f}".format(metadata["latitudinal_extent"]),
+            "{0[0]:.4f} to {0[1]:.4f}".format(dataset_metadata["latitudinal_extent"]),
         )
-    if metadata["longitudinal_extent"] is not None:
+    if dataset_metadata["longitudinal_extent"] is not None:
         desc += tags.p(
             tags.b("Longitudinal extent: "),
-            "{0[0]:.4f} to {0[1]:.4f}".format(metadata["longitudinal_extent"]),
+            "{0[0]:.4f} to {0[1]:.4f}".format(dataset_metadata["longitudinal_extent"]),
         )
 
     # Find taxa data from each database (if they exist)
-    gbif_taxon_index = metadata.get("gbif_taxa")
-    ncbi_taxon_index = metadata.get("ncbi_taxa")
+    gbif_taxon_index = dataset_metadata.get("gbif_taxa")
+    ncbi_taxon_index = dataset_metadata.get("ncbi_taxa")
 
     # When NCBI is absent use the old format for backwards compatibility
     if gbif_taxon_index or ncbi_taxon_index:
@@ -828,11 +832,11 @@ def table_description(tab: dict) -> tags.div:
 
 
 def generate_inspire_xml(
-    metadata: dict,
+    dataset_metadata: dict,
     zenodo_metadata: dict,
     resources: Resources,
     lineage_statement: Optional[str] = None,
-) -> str:
+) -> bytes:
     """Convert dataset and zenodo metadata into GEMINI XML.
 
     Produces an INSPIRE/GEMINI formatted XML record from dataset metadata,
@@ -843,7 +847,7 @@ def generate_inspire_xml(
     function it will appear as "Not provided".
 
     Args:
-        metadata: A dictionary of the dataset metadata
+        dataset_metadata: A dictionary of the dataset metadata
         zenodo_metadata: A dictionary of the Zenodo record metadata
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
@@ -854,22 +858,22 @@ def generate_inspire_xml(
     """
 
     # Get resource configuration
-    zres = _resources_to_zenodo_api(resources)
+    # zres = _resources_to_zenodo_api(resources)
 
     # parse the XML template and get the namespace map
-    template = os.path.join(__file__, "gemini_xml_template.xml")
+    template = Path(__file__).parent / "gemini_xml_template.xml"
     tree = etree.parse(template)
     root = tree.getroot()
     nsmap = root.nsmap
 
-    pub_date = metadata["publication_date"]
+    pub_date = dt.fromisoformat(zenodo_metadata["metadata"]["publication_date"])
 
     # Use find and XPATH to populate the template, working through from the top of the
     # file
 
     # file identifier
     root.find("./gmd:fileIdentifier/gco:CharacterString", nsmap).text = "zenodo." + str(
-        metadata["zenodo_record_id"]
+        zenodo_metadata["id"]
     )
 
     # date stamp (not clear what this is - taken as publication date)
@@ -880,31 +884,36 @@ def generate_inspire_xml(
 
     # CITATION
     citation = data_id.find("gmd:citation/gmd:CI_Citation", nsmap)
-    citation.find("gmd:title/gco:CharacterString", nsmap).text = metadata["title"]
+    citation.find("gmd:title/gco:CharacterString", nsmap).text = dataset_metadata[
+        "title"
+    ]
     citation.find(
         "gmd:date/gmd:CI_Date/gmd:date/gco:Date", nsmap
     ).text = pub_date.date().isoformat()
 
     # URIs - a dataset URL and the DOI
-    dataset_url = (
-        f"{zres['mdapi']}/datasets/view_dataset?id={metadata['zenodo_record_id']}"
-    )
-
-    citation.find(
-        "gmd:identifier/gmd:MD_Identifier/gmd:code/gco:CharacterString", nsmap
-    ).text = dataset_url
+    # dataset_url = (
+    #     f"{zres['mdapi']}/datasets/view_dataset"
+    #     f"?id={dataset_metadata['zenodo_record_id']}"
+    # )
+    # citation.find(
+    #     "gmd:identifier/gmd:MD_Identifier/gmd:code/gco:CharacterString", nsmap
+    # ).text = dataset_url
     citation.find(
         "gmd:identifier/gmd:RS_Identifier/gmd:code/gco:CharacterString", nsmap
-    ).text = metadata["zenodo_record_doi"]
+    ).text = zenodo_metadata["doi_url"]
 
     # The citation string
-    authors = [au["name"] for au in metadata["authors"]]
+    authors = [au["name"] for au in dataset_metadata["authors"]]
     author_string = ", ".join(authors)
     if len(authors) > 1:
         author_string = author_string.replace(", " + authors[-1], " & " + authors[-1])
 
     cite_string = "{} ({}) {} [Dataset] {}".format(
-        author_string, pub_date.year, metadata["title"], metadata["zenodo_record_doi"]
+        author_string,
+        pub_date.year,
+        dataset_metadata["title"],
+        zenodo_metadata["doi_url"],
     )
 
     citation.find(
@@ -912,7 +921,7 @@ def generate_inspire_xml(
     ).text = cite_string
 
     # ABSTRACT
-    data_id.find("gmd:abstract/gco:CharacterString", nsmap).text = metadata[
+    data_id.find("gmd:abstract/gco:CharacterString", nsmap).text = dataset_metadata[
         "description"
     ]
 
@@ -922,10 +931,10 @@ def generate_inspire_xml(
     # - get the placeholder node
     keywd_node = keywords.getchildren()[0]
     # - duplicate it if needed
-    for new_keywd in range(len(metadata["keywords"]) - 1):
+    for new_keywd in range(len(dataset_metadata["keywords"]) - 1):
         keywords.append(copy.deepcopy(keywd_node))
     # populate the nodes
-    for key_node, val in zip(keywords.getchildren(), metadata["keywords"]):
+    for key_node, val in zip(keywords.getchildren(), dataset_metadata["keywords"]):
         key_node.find("./gco:CharacterString", nsmap).text = val
 
     # AUTHORS - find the point of contact with author role from the template and its
@@ -938,7 +947,7 @@ def generate_inspire_xml(
     au_idx = data_id.index(au_node)
 
     # - duplicate it if needed into the tree
-    for n in range(len(metadata["authors"]) - 1):
+    for n in range(len(dataset_metadata["authors"]) - 1):
         data_id.insert(au_idx, copy.deepcopy(au_node))
 
     # now populate the author nodes, there should now be one for each author
@@ -948,7 +957,7 @@ def generate_inspire_xml(
     )
     au_node_list = data_id.xpath(au_ls_xpath, namespaces=nsmap)
 
-    for au_data, au_node in zip(metadata["authors"], au_node_list):
+    for au_data, au_node in zip(dataset_metadata["authors"], au_node_list):
         resp_party = au_node.find("gmd:CI_ResponsibleParty", nsmap)
         resp_party.find("gmd:individualName/gco:CharacterString", nsmap).text = au_data[
             "name"
@@ -985,15 +994,15 @@ def generate_inspire_xml(
         "gmd:resourceConstraints/gmd:MD_LegalConstraints/"
         "gmd:otherConstraints/gco:CharacterString"
     )
-    if metadata["access"] == "embargo":
+    if dataset_metadata["access"] == "embargo":
         data_id.find(embargo_path, nsmap).text = (
-            f"This data is under embargo until {metadata['embargo_date']}. After "
-            "that date there are no restrictions to public access."
+            f"This data is under embargo until {dataset_metadata['embargo_date']}."
+            "After that date there are no restrictions to public access."
         )
-    elif metadata["access"] == "closed":
+    elif dataset_metadata["access"] == "restricted":
         data_id.find(embargo_path, nsmap).text = (
             "This dataset is currently not publicly available, please contact the "
-            "authors to request access."
+            "Zenodo community owner to request access."
         )
     else:
         data_id.find(
@@ -1002,25 +1011,25 @@ def generate_inspire_xml(
 
     # EXTENTS
     temp_extent = root.find(".//gmd:EX_TemporalExtent", nsmap)
-    temp_extent.find(".//gml:beginPosition", nsmap).text = metadata["temporal_extent"][
-        0
-    ][:10]
-    temp_extent.find(".//gml:endPosition", nsmap).text = metadata["temporal_extent"][1][
-        :10
-    ]
+    temp_extent.find(".//gml:beginPosition", nsmap).text = dataset_metadata[
+        "temporal_extent"
+    ][0][:10]
+    temp_extent.find(".//gml:endPosition", nsmap).text = dataset_metadata[
+        "temporal_extent"
+    ][1][:10]
 
     geo_extent = root.find(".//gmd:EX_GeographicBoundingBox", nsmap)
     geo_extent.find("./gmd:westBoundLongitude/gco:Decimal", nsmap).text = str(
-        metadata["longitudinal_extent"][0]
+        dataset_metadata["longitudinal_extent"][0]
     )
     geo_extent.find("./gmd:eastBoundLongitude/gco:Decimal", nsmap).text = str(
-        metadata["longitudinal_extent"][1]
+        dataset_metadata["longitudinal_extent"][1]
     )
     geo_extent.find("./gmd:southBoundLatitude/gco:Decimal", nsmap).text = str(
-        metadata["latitudinal_extent"][0]
+        dataset_metadata["latitudinal_extent"][0]
     )
     geo_extent.find("./gmd:northBoundLatitude/gco:Decimal", nsmap).text = str(
-        metadata["latitudinal_extent"][1]
+        dataset_metadata["latitudinal_extent"][1]
     )
 
     # Dataset transfer options: direct download and dataset view on SAFE website
@@ -1038,7 +1047,7 @@ def generate_inspire_xml(
             "gmd:CI_OnlineResource/gmd:linkage/gmd:URL"
         ),
         nsmap,
-    ).text += str(metadata["zenodo_record_id"])
+    ).text += str(dataset_metadata["zenodo_record_id"])
 
     # LINEAGE STATEMENT
     # lineage = (

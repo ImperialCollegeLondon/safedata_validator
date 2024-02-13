@@ -1,0 +1,1882 @@
+{
+  "title": "Example data for the SAFE Project",
+  "description": "This is an example dataset to demonstrate the formatting of tabular datasets for the SAFE project. \n\nPlease note that you can use carriage returns within a cell!",
+  "authors": [
+    {
+      "name": "Orme, David",
+      "affiliation": "Imperial College London",
+      "email": "d.orme@imperial.ac.uk",
+      "orcid": "0000-0002-7005-1394"
+    },
+    {
+      "name": "Ewers, Rob",
+      "affiliation": "Imperial College London",
+      "email": "r.ewers@imperial.ac.uk",
+      "orcid": null
+    },
+    {
+      "name": "Cook, Jacob",
+      "affiliation": "Imperial College London",
+      "email": "j.cook17@imperial.ac.uk",
+      "orcid": null
+    }
+  ],
+  "filename": "Test_format_good_NCBI.xlsx",
+  "external_files": null,
+  "access": "Open",
+  "embargo_date": "2018-09-03 00:00:00",
+  "access_conditions": null,
+  "funders": [
+    {
+      "body": "NERC",
+      "type": "Standard grant",
+      "ref": "NE/K006339/1",
+      "url": "https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1"
+    }
+  ],
+  "permits": [
+    {
+      "type": "Research",
+      "authority": "Sabah Biodiversity Centre",
+      "number": "A-123-456"
+    },
+    {
+      "type": "Export",
+      "authority": "Sabah Biodiversity Centre",
+      "number": "B-567-890"
+    }
+  ],
+  "keywords": [
+    "Test data",
+    "Test code",
+    "Test microbe data"
+  ],
+  "dataworksheets": [
+    {
+      "taxa_fields": [
+        "Taxon"
+      ],
+      "max_row": 1038,
+      "max_col": 20,
+      "name": "DF",
+      "title": "My data table",
+      "description": "This is a test data worksheet",
+      "descriptors": [
+        "field_type",
+        "description",
+        "method",
+        "taxon_field",
+        "interaction_name",
+        "interaction_field",
+        "levels",
+        "units",
+        "field_name"
+      ],
+      "external": null,
+      "fields": [
+        {
+          "field_name": "Location",
+          "description": "SAFE 2nd order point number",
+          "field_type": "location",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 1
+        },
+        {
+          "field_name": "Date",
+          "description": "Collection date",
+          "field_type": "date",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 2
+        },
+        {
+          "field_name": "Latitude",
+          "description": "GPS Lat for sample point",
+          "field_type": "latitude",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 3
+        },
+        {
+          "field_name": "Longitude",
+          "description": "GPS Long for sample point",
+          "field_type": "longitude",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 4
+        },
+        {
+          "field_name": "QuadratNumber",
+          "description": "Four replicates",
+          "field_type": "replicate",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 5
+        },
+        {
+          "field_name": "Status",
+          "description": "Something",
+          "field_type": "numeric",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 6
+        },
+        {
+          "field_name": "Treat",
+          "description": "Something else",
+          "field_type": "categorical",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 7
+        },
+        {
+          "field_name": "Level",
+          "description": "Something else",
+          "field_type": "categorical",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 8
+        },
+        {
+          "field_name": "Time",
+          "description": "Something else",
+          "field_type": "categorical",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 9
+        },
+        {
+          "field_name": "Rain",
+          "description": "Something else",
+          "field_type": "numeric",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 10
+        },
+        {
+          "field_name": "Group",
+          "description": "Something else",
+          "field_type": "numeric",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 11
+        },
+        {
+          "field_name": "Obs_Time",
+          "description": "A time",
+          "field_type": "time",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 12
+        },
+        {
+          "field_name": "Datetime",
+          "description": "A date time field",
+          "field_type": "datetime",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 13
+        },
+        {
+          "field_name": "Taxon",
+          "description": "The taxon studied",
+          "field_type": "taxa",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 14
+        },
+        {
+          "field_name": "TagNumber",
+          "description": "Pit tags for the ants",
+          "field_type": "id",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 15
+        },
+        {
+          "field_name": "Species_count",
+          "description": "The species abundance",
+          "field_type": "abundance",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 16
+        },
+        {
+          "field_name": "Ant_mass",
+          "description": "The average individual mass",
+          "field_type": "numeric trait",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 17
+        },
+        {
+          "field_name": "Caste",
+          "description": "The caset of the individuals weighed",
+          "field_type": "ordered categorical trait",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 18
+        },
+        {
+          "field_name": "Lizard_predation",
+          "description": "Consumption of ants by lizards",
+          "field_type": "numeric interaction",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 19
+        },
+        {
+          "field_name": "Comments",
+          "description": "My comments",
+          "field_type": "comments",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 20
+        }
+      ],
+      "field_name_row": 9,
+      "n_data_row": 1029
+    },
+    {
+      "taxa_fields": [],
+      "max_row": 108,
+      "max_col": 7,
+      "name": "Incidence",
+      "title": "My incidence matrix",
+      "description": "A test data worksheet too",
+      "descriptors": [
+        "field_type",
+        "description",
+        "method",
+        "taxon_name",
+        "units",
+        "field_name"
+      ],
+      "external": null,
+      "fields": [
+        {
+          "field_name": "Location",
+          "description": "SAFE 2nd order point number",
+          "field_type": "location",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 1
+        },
+        {
+          "field_name": "Date",
+          "description": "Collection date",
+          "field_type": "date",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 2
+        },
+        {
+          "field_name": "Cr_bo",
+          "description": "Abundance of species",
+          "field_type": "abundance",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 3
+        },
+        {
+          "field_name": "Do_sp",
+          "description": "Abundance of species",
+          "field_type": "abundance",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 4
+        },
+        {
+          "field_name": "Fo_1",
+          "description": "Abundance of species",
+          "field_type": "abundance",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 5
+        },
+        {
+          "field_name": "Morph_1",
+          "description": "Abundance of species",
+          "field_type": "abundance",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 6
+        },
+        {
+          "field_name": "Cr_bo_mass",
+          "description": "Average mass of species",
+          "field_type": "numeric trait",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 7
+        }
+      ],
+      "field_name_row": 6,
+      "n_data_row": 102
+    },
+    {
+      "taxa_fields": [
+        "Taxon"
+      ],
+      "max_row": 20,
+      "max_col": 6,
+      "name": "MicrobeDF",
+      "title": "My sequencing data table",
+      "description": "Another test worksheet",
+      "descriptors": [
+        "field_type",
+        "description",
+        "method",
+        "taxon_field",
+        "units",
+        "field_name"
+      ],
+      "external": null,
+      "fields": [
+        {
+          "field_name": "Location",
+          "description": "SAFE 2nd order point number",
+          "field_type": "location",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 1
+        },
+        {
+          "field_name": "Latitude",
+          "description": "GPS Lat for sample point",
+          "field_type": "latitude",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 2
+        },
+        {
+          "field_name": "Longitude",
+          "description": "GPS Long for sample point",
+          "field_type": "longitude",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 3
+        },
+        {
+          "field_name": "Species_count",
+          "description": "The number of each taxon detected by sequencing",
+          "field_type": "abundance",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 4
+        },
+        {
+          "field_name": "Taxon",
+          "description": "The taxon studied",
+          "field_type": "taxa",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 5
+        },
+        {
+          "field_name": "Comments",
+          "description": "My comments",
+          "field_type": "comments",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 6
+        }
+      ],
+      "field_name_row": 6,
+      "n_data_row": 14
+    }
+  ],
+  "gbif_timestamp": "2021-11-26",
+  "gbif_taxa": [
+    {
+      "worksheet_name": "Crematogaster borneensis",
+      "taxon_id": 1324716,
+      "parent_id": 1324306,
+      "taxon_name": "Crematogaster borneensis",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Dolichoderus sp.",
+      "taxon_id": 1314182,
+      "parent_id": 4342,
+      "taxon_name": "Dolichoderus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 4342,
+      "parent_id": 1457,
+      "taxon_name": "Formicidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Ponerinae #1",
+      "taxon_id": -1,
+      "parent_id": 4342,
+      "taxon_name": "Ponerinae",
+      "taxon_rank": "subfamily",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": "Formicidae #1",
+      "taxon_id": 4342,
+      "parent_id": 1457,
+      "taxon_name": "Formicidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1470,
+      "parent_id": 216,
+      "taxon_name": "Coleoptera",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Morphospecies 1",
+      "taxon_id": -1,
+      "parent_id": 1470,
+      "taxon_name": "NA",
+      "taxon_rank": "morphospecies",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 359,
+      "parent_id": 44,
+      "taxon_name": "Mammalia",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Predator",
+      "taxon_id": -1,
+      "parent_id": 359,
+      "taxon_name": "NA",
+      "taxon_rank": "functional group",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1324306,
+      "parent_id": 4342,
+      "taxon_name": "Crematogaster",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Crematogaster ormei",
+      "taxon_id": -1,
+      "parent_id": 1324306,
+      "taxon_name": "Crematogaster ormei",
+      "taxon_rank": "species",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": "Water monitor",
+      "taxon_id": 9062878,
+      "parent_id": 2470685,
+      "taxon_name": "Varanus salvator macromaculatus",
+      "taxon_rank": "subspecies",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Alsomitra simplex",
+      "taxon_id": 5537041,
+      "parent_id": 7317605,
+      "taxon_name": "Alsomitra simplex",
+      "taxon_rank": "species",
+      "taxon_status": "homotypic_synonym"
+    },
+    {
+      "worksheet_name": "Alsomitra simplex",
+      "taxon_id": 3623287,
+      "parent_id": 7317605,
+      "taxon_name": "Neoalsomitra simplex",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Gannets",
+      "taxon_id": 2480962,
+      "parent_id": 9351,
+      "taxon_name": "Morus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Zenicomus photuroides",
+      "taxon_id": 1106854,
+      "parent_id": 1106852,
+      "taxon_name": "Zenicomus photuroides",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1682542,
+      "parent_id": 6049,
+      "taxon_name": "Cicada",
+      "taxon_rank": "genus",
+      "taxon_status": "doubtful"
+    },
+    {
+      "worksheet_name": "Cicada sanguinolenta",
+      "taxon_id": -1,
+      "parent_id": 1682542,
+      "taxon_name": "Cicada sanguinolenta",
+      "taxon_rank": "species",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": "Brachypodium madagascariensis",
+      "taxon_id": 7968664,
+      "parent_id": 2705713,
+      "taxon_name": "Brachypodium madagascariensis",
+      "taxon_rank": "species",
+      "taxon_status": "doubtful"
+    },
+    {
+      "worksheet_name": "Melaphorus potteri",
+      "taxon_id": 1327248,
+      "parent_id": 1327214,
+      "taxon_name": "Melophorus potteri",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Goniopholis tenuidens",
+      "taxon_id": 8548608,
+      "parent_id": 704,
+      "taxon_name": "Goniopholis tenuidens",
+      "taxon_rank": "species",
+      "taxon_status": "synonym"
+    },
+    {
+      "worksheet_name": "Goniopholis tenuidens",
+      "taxon_id": 4822253,
+      "parent_id": 704,
+      "taxon_name": "Goniopholididae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Solenopsis abdita",
+      "taxon_id": 5035012,
+      "parent_id": 9107211,
+      "taxon_name": "Solenopsis abdita",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 9107211,
+      "parent_id": 4342,
+      "taxon_name": "Solenopsis",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Solenopsis #1",
+      "taxon_id": -1,
+      "parent_id": 9107211,
+      "taxon_name": "NA",
+      "taxon_rank": "morphospecies",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": "Biarmosuchus tagax",
+      "taxon_id": 8651762,
+      "parent_id": 9372142,
+      "taxon_name": "Biarmosuchus tagax",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Camponotites kraussei",
+      "taxon_id": 8689344,
+      "parent_id": 7490427,
+      "taxon_name": "Camponotites kraussei",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 4673663,
+      "parent_id": 4342,
+      "taxon_name": "Bothroponera",
+      "taxon_rank": "genus",
+      "taxon_status": "synonym"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1319685,
+      "parent_id": 4342,
+      "taxon_name": "Pachycondyla",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Bothroponera novus",
+      "taxon_id": -1,
+      "parent_id": 4673663,
+      "taxon_name": "Bothroponera novus",
+      "taxon_rank": "species",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 6,
+      "parent_id": null,
+      "taxon_name": "Plantae",
+      "taxon_rank": "kingdom",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1,
+      "parent_id": null,
+      "taxon_name": "Animalia",
+      "taxon_rank": "kingdom",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 44,
+      "parent_id": 1,
+      "taxon_name": "Chordata",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 7707728,
+      "parent_id": 6,
+      "taxon_name": "Tracheophyta",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 54,
+      "parent_id": 1,
+      "taxon_name": "Arthropoda",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 358,
+      "parent_id": 44,
+      "taxon_name": "Reptilia",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 196,
+      "parent_id": 7707728,
+      "taxon_name": "Liliopsida",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 220,
+      "parent_id": 7707728,
+      "taxon_name": "Magnoliopsida",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 216,
+      "parent_id": 54,
+      "taxon_name": "Insecta",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 212,
+      "parent_id": 44,
+      "taxon_name": "Aves",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 7224005,
+      "parent_id": 220,
+      "taxon_name": "Cucurbitales",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 704,
+      "parent_id": 358,
+      "taxon_name": "Crocodylia",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1369,
+      "parent_id": 196,
+      "taxon_name": "Poales",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1457,
+      "parent_id": 216,
+      "taxon_name": "Hymenoptera",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 7192775,
+      "parent_id": 212,
+      "taxon_name": "Suliformes",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 715,
+      "parent_id": 358,
+      "taxon_name": "Squamata",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 809,
+      "parent_id": 216,
+      "taxon_name": "Hemiptera",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 6634,
+      "parent_id": 7224005,
+      "taxon_name": "Cucurbitaceae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 5023,
+      "parent_id": 715,
+      "taxon_name": "Varanidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 6049,
+      "parent_id": 809,
+      "taxon_name": "Cicadidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 3073,
+      "parent_id": 1369,
+      "taxon_name": "Poaceae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 5602,
+      "parent_id": 1470,
+      "taxon_name": "Cerambycidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 9351,
+      "parent_id": 7192775,
+      "taxon_name": "Sulidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 9394866,
+      "parent_id": 44,
+      "taxon_name": "Alrausuchidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2470872,
+      "parent_id": 5023,
+      "taxon_name": "Varanus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1106852,
+      "parent_id": 5602,
+      "taxon_name": "Zenicomus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 9372142,
+      "parent_id": 9394866,
+      "taxon_name": "Alrausuchus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1327214,
+      "parent_id": 4342,
+      "taxon_name": "Melophorus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 7490427,
+      "parent_id": 4342,
+      "taxon_name": "Camponotites",
+      "taxon_rank": "genus",
+      "taxon_status": "doubtful"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2705713,
+      "parent_id": 3073,
+      "taxon_name": "Brachypodium",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 7317605,
+      "parent_id": 6634,
+      "taxon_name": "Neoalsomitra",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2470685,
+      "parent_id": 2470872,
+      "taxon_name": "Varanus salvator",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    }
+  ],
+  "ncbi_timestamp": "2023-11-01",
+  "ncbi_taxa": [
+    {
+      "worksheet_name": "Bradyrhizobium",
+      "taxon_id": 374,
+      "parent_id": 41294,
+      "taxon_name": "Bradyrhizobium",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Bacillus",
+      "taxon_id": 1386,
+      "parent_id": 186817,
+      "taxon_name": "Bacillus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "E coli",
+      "taxon_id": 562,
+      "parent_id": 561,
+      "taxon_name": "Escherichia coli",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "M foraminis",
+      "taxon_id": 279826,
+      "parent_id": 2675231,
+      "taxon_name": "Mesobacillus foraminis",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Rhodoplanes 1",
+      "taxon_id": 29407,
+      "parent_id": 45401,
+      "taxon_name": "Rhodoplanes",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "B cereus",
+      "taxon_id": 1396,
+      "parent_id": 1386,
+      "taxon_name": "Bacillus cereus",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Bacillaceae",
+      "taxon_id": 186817,
+      "parent_id": 1385,
+      "taxon_name": "Bacillaceae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Alicyclobacillus",
+      "taxon_id": 29330,
+      "parent_id": 186823,
+      "taxon_name": "Alicyclobacillus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Rhodoplanes 2",
+      "taxon_id": 29407,
+      "parent_id": 45401,
+      "taxon_name": "Rhodoplanes",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Candidatus Koribacter",
+      "taxon_id": 658061,
+      "parent_id": 204434,
+      "taxon_name": "Candidatus Koribacter",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "B sp. nov. 1",
+      "taxon_id": -1,
+      "parent_id": 1386,
+      "taxon_name": "Bacillus sp_nov",
+      "taxon_rank": "species",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2,
+      "parent_id": null,
+      "taxon_name": "Bacteria",
+      "taxon_rank": "superkingdom",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1239,
+      "parent_id": 2,
+      "taxon_name": "Bacillota",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1224,
+      "parent_id": 2,
+      "taxon_name": "Pseudomonadota",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 57723,
+      "parent_id": 2,
+      "taxon_name": "Acidobacteriota",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 28211,
+      "parent_id": 1224,
+      "taxon_name": "Alphaproteobacteria",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 91061,
+      "parent_id": 1239,
+      "taxon_name": "Bacilli",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 204432,
+      "parent_id": 57723,
+      "taxon_name": "Terriglobia",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1236,
+      "parent_id": 1224,
+      "taxon_name": "Gammaproteobacteria",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 356,
+      "parent_id": 28211,
+      "taxon_name": "Hyphomicrobiales",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 204433,
+      "parent_id": 204432,
+      "taxon_name": "Terriglobales",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1385,
+      "parent_id": 91061,
+      "taxon_name": "Bacillales",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 91347,
+      "parent_id": 1236,
+      "taxon_name": "Enterobacterales",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 543,
+      "parent_id": 91347,
+      "taxon_name": "Enterobacteriaceae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 45401,
+      "parent_id": 356,
+      "taxon_name": "Hyphomicrobiaceae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 204434,
+      "parent_id": 204433,
+      "taxon_name": "Acidobacteriaceae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 186823,
+      "parent_id": 1385,
+      "taxon_name": "Alicyclobacillaceae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 41294,
+      "parent_id": 356,
+      "taxon_name": "Nitrobacteraceae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 561,
+      "parent_id": 543,
+      "taxon_name": "Escherichia",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2675231,
+      "parent_id": 186817,
+      "taxon_name": "Mesobacillus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    }
+  ],
+  "locations": [
+    {
+      "name": "VJR_573",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_538",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_568",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_220",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_425",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_233",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_423",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_542",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_217",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_210",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_218",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_555",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_546",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_551",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_219",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_541",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_561",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_579",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_196",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_544",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_437",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_554",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_575",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_576",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_208",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_566",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_197",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_567",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_230",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_547",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_556",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_572",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "D_636",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_571",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_564",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_535",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_540",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_559",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "193",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_534",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_195",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_209",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_548",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_236",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_206",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_543",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_550",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_570",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_560",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_429",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_438",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_549",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_562",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_533",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_240",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_537",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_574",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_194",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_229",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_545",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_553",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_231",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_237",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_439",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_552",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_428",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_198",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_221",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_446",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_207",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_529",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_435",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_239",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_238",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_421",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_577",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_232",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_530",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_539",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_558",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_432",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_426",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_431",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_222",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_578",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_422",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_565",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_427",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_234",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_436",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_531",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OP3_532",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_557",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_563",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "VJR_569",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_443",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_235",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_424",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_430",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_440",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "OG2_445",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_205",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "Danum_PIT_1",
+      "new_location": true,
+      "wkt_wgs84": "Point(117.776299 4.9576)"
+    },
+    {
+      "name": "Danum_PIT_2",
+      "new_location": true,
+      "wkt_wgs84": "Point(117.776023 4.957721)"
+    },
+    {
+      "name": "Danum_PIT_3",
+      "new_location": true,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "Danum_PIT_4",
+      "new_location": true,
+      "wkt_wgs84": "Point(117.7762 4.9576)"
+    },
+    {
+      "name": "Danum_PIT_5",
+      "new_location": true,
+      "wkt_wgs84": "Linestring(117.7762 4.9576, 117.7862 4.9676)"
+    }
+  ],
+  "zenodo_concept_id": null,
+  "zenodo_record_id": null,
+  "zenodo_publication_date": null,
+  "temporal_extent": [
+    "2012-06-01",
+    "2012-07-30"
+  ],
+  "latitudinal_extent": [
+    4.5,
+    5.07
+  ],
+  "longitudinal_extent": [
+    116.75,
+    117.82
+  ]
+}
