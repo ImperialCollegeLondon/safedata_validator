@@ -95,7 +95,11 @@ def test_sdv_zenodo_html_and_xml(user_config_file, command, file_exists, returns
 
 
 def test_safedata_validate(user_config_file):
-    """Test the safedata_validate entry point works."""
+    """Test the safedata_validate entry point works via the arglist.
+
+    It would be neat to demonstrate that this works via subprocess as an actual CLI call
+    but subprocess and pyfakefs do not work together. This is the next best thing.
+    """
 
     from safedata_validator.entry_points import _safedata_validate_cli
 
