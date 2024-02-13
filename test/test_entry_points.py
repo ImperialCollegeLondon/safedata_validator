@@ -92,3 +92,71 @@ def test_sdv_zenodo_html_and_xml(user_config_file, command, file_exists, returns
     )
 
     assert value == returns
+
+
+@pytest.mark.parametrize(
+    argnames="args, return_value",
+    argvalues=[
+        pytest.param(
+            ["/tmp_missing/notchecked.sqlite"],
+            1,
+            id="bad dir",
+        ),
+        pytest.param(
+            ["/tmp/blocking_file.sqlite"],
+            1,
+            id="existing file",
+        ),
+        pytest.param(
+            ["-t", "2022-11-29", "/tmp/should_be_ok.sqlite"],
+            1,
+            id="unknown timestamp",
+        ),
+        pytest.param(
+            ["-t", "2022_11_23", "/tmp/should_be_ok.sqlite"],
+            1,
+            id="bad timestamp format",
+        ),
+    ],
+)
+def test_build_local_gbif_cli(user_config_file, args, return_value):
+    """Test failure modes on _build_local_gbif_cli."""
+    from safedata_validator.entry_points import _build_local_gbif_cli
+
+    user_config_file.create_file("/tmp/blocking_file.sqlite")
+
+    assert _build_local_gbif_cli(args_list=args) == return_value
+
+
+@pytest.mark.parametrize(
+    argnames="args, return_value",
+    argvalues=[
+        pytest.param(
+            ["/tmp_missing/notchecked.sqlite"],
+            1,
+            id="bad dir",
+        ),
+        pytest.param(
+            ["/tmp/blocking_file.sqlite"],
+            1,
+            id="existing file",
+        ),
+        pytest.param(
+            ["-t", "2022-11-29", "/tmp/should_be_ok.sqlite"],
+            1,
+            id="unknown timestamp",
+        ),
+        pytest.param(
+            ["-t", "2022_11_23", "/tmp/should_be_ok.sqlite"],
+            1,
+            id="bad timestamp format",
+        ),
+    ],
+)
+def test_build_local_ncbi_cli(user_config_file, args, return_value):
+    """Test failure modes on _build_local_gbif_cli."""
+    from safedata_validator.entry_points import _build_local_ncbi_cli
+
+    user_config_file.create_file("/tmp/blocking_file.sqlite")
+
+    assert _build_local_ncbi_cli(args_list=args) == return_value

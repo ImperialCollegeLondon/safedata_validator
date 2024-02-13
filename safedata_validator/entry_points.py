@@ -35,6 +35,8 @@ from safedata_validator.taxondb import (
     build_local_ncbi,
     download_gbif_backbone,
     download_ncbi_taxonomy,
+    get_gbif_version,
+    get_ncbi_version,
 )
 from safedata_validator.zenodo import (
     create_deposit,
@@ -1034,8 +1036,8 @@ def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> int:
     Args:
         args_list: This is a developer option used to simulate command line usage by
             providing a list of command line argument strings to the entry point
-            function. For example, ``safedata_zenodo create_deposit`` can be
-            replicated by calling ``_safedata_zenodo_cli(['create_deposit'])``.
+            function. For example, ``_build_local_gbif_cli -t 2012-01-01 file`` can be
+            replicated using ``_safedata_zenodo_cli(['-t', '2012-01-01', 'file'])``.
 
     Returns:
         An integer code showing success (0) or failure (1).
@@ -1062,7 +1064,7 @@ def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> int:
         formatter_class=_desc_formatter,
     )
 
-    parser.add_argument("outdir", help="Location to create database file.")
+    parser.add_argument("outfile", help="Filename to use for database file.", type=Path)
     parser.add_argument(
         "-t",
         "--timestamp",
@@ -1073,11 +1075,31 @@ def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> int:
 
     args = parser.parse_args(args=args_list)
 
+    # Validate output file
+    # Look that file can be created without clobbering existing file
+    outdir = args.outfile.absolute().parent
+
+    if not (outdir.exists() and outdir.is_dir()):
+        LOGGER.error("The output directory does not exist.")
+        return 1
+
+    if args.outfile.absolute().exists():
+        LOGGER.error("The output file already exists.")
+        return 1
+
+    # Validate the timestamp
+    try:
+        timestamp, url = get_gbif_version(args.timestamp)
+    except ValueError as excep:
+        LOGGER.error(str(excep))
+        return 1
+
+    # Download and build from validated url
     with tempfile.TemporaryDirectory() as download_loc:
         file_data = download_gbif_backbone(
-            outdir=download_loc, timestamp=args.timestamp
+            outdir=download_loc, timestamp=timestamp, url=url
         )
-        build_local_gbif(outdir=args.outdir, **file_data)
+        build_local_gbif(outfile=args.outfile, **file_data)
 
     return 0
 
@@ -1136,9 +1158,14 @@ def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> int:
 
     args = parser.parse_args(args=args_list)
 
+    filename, timestamp, filesize = get_ncbi_version(timestamp=args.timestamp)
+
     with tempfile.TemporaryDirectory() as download_loc:
         file_data = download_ncbi_taxonomy(
-            outdir=download_loc, timestamp=args.timestamp
+            outdir=download_loc,
+            timestamp=timestamp,
+            filename=filename,
+            filesize=filesize,
         )
         build_local_ncbi(outdir=args.outdir, **file_data)
 
