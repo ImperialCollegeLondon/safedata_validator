@@ -39,7 +39,7 @@ def test_entry_points_run(entry_point):
 @pytest.mark.parametrize(
     argnames="entry_point",
     argvalues=[
-        "_safedata_validator_cli",
+        "_safedata_validate_cli",
         "_safedata_zenodo_cli",
         "_safedata_metadata_cli",
         "_build_local_gbif_cli",
@@ -92,3 +92,23 @@ def test_sdv_zenodo_html_and_xml(user_config_file, command, file_exists, returns
     )
 
     assert value == returns
+
+
+def test_safedata_validate(user_config_file):
+    """Test the safedata_validate entry point works."""
+
+    from safedata_validator.entry_points import _safedata_validate_cli
+
+    # Need to create fake files to be used for the validation outputs
+    user_config_file.create_file("/tmp/validation_log.txt")
+    user_config_file.create_file("/tmp/validation_report.json")
+
+    _ = _safedata_validate_cli(
+        args_list=[
+            "--log",
+            "/tmp/validation_log.txt",
+            "--json",
+            "/tmp/validation_report.json",
+            FIXTURE_FILES.rf.good_ncbi_file,
+        ]
+    )
