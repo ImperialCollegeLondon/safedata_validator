@@ -247,6 +247,13 @@ def build_local_gbif(
         keep: Should the original datafiles be retained.
     """
 
+    # Guard against madly long fields: these are typically the issues and published in
+    # fields that are dropped in building the database itself, but they can be so long
+    # that they exceed the default CSV field read limit which explodes the csv reader.
+    # For example, the 2022-11-23 version has a row with 231Kb of crab literature. This
+    # increases that limit to 512Kb.
+    csv.field_size_limit(524288)
+
     # Create the output file and turn off safety features for speed
     LOGGER.info(f"Building GBIF backbone database in: {outfile}")
     FORMATTER.push()
