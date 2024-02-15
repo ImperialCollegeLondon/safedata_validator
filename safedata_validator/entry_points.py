@@ -1147,7 +1147,7 @@ def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> int:
         formatter_class=_desc_formatter,
     )
 
-    parser.add_argument("outdir", help="Location to create database file.")
+    parser.add_argument("outfile", help="Filename to use for database file.", type=Path)
     parser.add_argument(
         "-t",
         "--timestamp",
@@ -1158,6 +1158,18 @@ def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> int:
 
     args = parser.parse_args(args=args_list)
 
+    # Validate output file
+    # Look that file can be created without clobbering existing file
+    outdir = args.outfile.absolute().parent
+
+    if not (outdir.exists() and outdir.is_dir()):
+        LOGGER.error("The output directory does not exist.")
+        return 1
+
+    if args.outfile.absolute().exists():
+        LOGGER.error("The output file already exists.")
+        return 1
+
     filename, timestamp, filesize = get_ncbi_version(timestamp=args.timestamp)
 
     with tempfile.TemporaryDirectory() as download_loc:
@@ -1167,6 +1179,6 @@ def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> int:
             filename=filename,
             filesize=filesize,
         )
-        build_local_ncbi(outdir=args.outdir, **file_data)
+        build_local_ncbi(outfile=args.outfile, **file_data)
 
     return 0

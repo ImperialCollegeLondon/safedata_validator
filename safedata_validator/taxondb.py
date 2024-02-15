@@ -462,7 +462,7 @@ def download_ncbi_taxonomy(
 
 
 def build_local_ncbi(
-    outdir: str, timestamp: str, taxdmp: str, keep: bool = False
+    outfile: str, timestamp: str, taxdmp: str, keep: bool = False
 ) -> None:
     """Create a local NCBI taxonomy database.
 
@@ -480,19 +480,18 @@ def build_local_ncbi(
     but the 'keep' argument can be used to retain them.
 
     Args:
-        outdir: The location to create the SQLite file
+        outfile: The filepath to use to create the SQLite file
         timestamp: The timestamp of the downloaded version.
         taxdmp: The path to the taxdmp ZIP archive.
         keep: Should the original archive be retained.
     """
 
     # Create the output file
-    db_file = os.path.join(outdir, f"ncbi_taxonomy_{timestamp}.sqlite")
-    LOGGER.info(f"Building GBIF backbone database in: {db_file}")
+    LOGGER.info(f"Building GBIF backbone database in: {outfile}")
     FORMATTER.push()
 
     # Create the output file and turn off safety features for speed
-    con = sqlite3.connect(db_file)
+    con = sqlite3.connect(outfile)
     con.execute("PRAGMA synchronous = OFF")
 
     # Write the timestamp into a table
