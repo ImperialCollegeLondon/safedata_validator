@@ -1170,8 +1170,14 @@ def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> int:
         LOGGER.error("The output file already exists.")
         return 1
 
-    filename, timestamp, filesize = get_ncbi_version(timestamp=args.timestamp)
+    # Validate the timestamp
+    try:
+        filename, timestamp, filesize = get_ncbi_version(timestamp=args.timestamp)
+    except ValueError as excep:
+        LOGGER.error(str(excep))
+        return 1
 
+    # Download and build
     with tempfile.TemporaryDirectory() as download_loc:
         file_data = download_ncbi_taxonomy(
             outdir=download_loc,
