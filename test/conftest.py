@@ -394,3 +394,20 @@ def fixture_dataworksheet(fixture_dataset):
     )
 
     return dws
+
+
+@pytest.fixture()
+def mocked_requests(requests_mock):
+    """Prototype requests mocker.
+
+    This fixture can be switched from mocking the request URLs to using the actual URLs
+    by setting the SDV_DO_NOT_MOCK_REQUESTS environment variable. This allows test to be
+    run using the actual APIs to validate that the mocked and real APIs have not
+    diverged. This will result in some long running tests and we will need to configure
+    GitHub Action secrets and other environment variables to interact with Zenodo.
+    """
+
+    requests_mock.real_http = True
+
+    if "SDV_DO_NOT_MOCK_REQUESTS" not in os.environ:
+        requests_mock.get("http://google.com", text="data")
