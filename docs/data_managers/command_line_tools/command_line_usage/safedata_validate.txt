@@ -1,6 +1,7 @@
 cl_prompt $ safedata_validate -h
 usage: safedata_validate [-h] [-r RESOURCES] [--validate_doi]
-                         [--chunk_size CHUNK_SIZE] [-o OUTPUT] [--version]
+                         [--chunk_size CHUNK_SIZE] [-l LOG] [-j JSON]
+                         [--version]
                          filename
 
 Validate a dataset using a command line interface.
@@ -19,8 +20,14 @@ Validate a dataset using a command line interface.
     your operating system.
 
     If validation is successful, then a JSON format file containing key
-    metadata will be saved to the same location as the validated file.
-    The JSON metadata is used in the dataset publication process.
+    metadata will be saved. This is used in the dataset publication process.
+    By default, the JSON file is saved to the same directory as the input
+    file, using the same filename but with the `.json` extension. This can
+    be saved elsewhere using the `--json` option.
+
+    The command also outputs a log of the validation process, which
+    identifies validation issues. This defaults to being written to
+    stderr but can be redirected to a file using the `--log` option.
 
 positional arguments:
   filename      Path to the Excel file to be validated.
@@ -35,7 +42,8 @@ optional arguments:
   --chunk_size CHUNK_SIZE
                 Data are loaded from worksheets in chunks: the number of rows
                 in a chunk is set by this argument
-  -o OUTPUT, --output OUTPUT
-                Save the validation report to a file, not print to the
-                console.
+  -l LOG, --log LOG
+                Save the validation log to a file, not print to the console.
+  -j JSON, --json JSON
+                An optional output path for the validated dataset JSON.
   --version     show program's version number and exit

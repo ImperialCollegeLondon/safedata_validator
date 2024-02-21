@@ -59,7 +59,7 @@ def _desc_formatter(prog):
     return argparse.RawDescriptionHelpFormatter(prog, max_help_position=16)
 
 
-def _safedata_validator_cli(args_list: Optional[list[str]] = None) -> int:
+def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
     """Validate a dataset using a command line interface.
 
     This program validates an Excel file formatted as a `safedata` dataset.
@@ -76,8 +76,14 @@ def _safedata_validator_cli(args_list: Optional[list[str]] = None) -> int:
     your operating system.
 
     If validation is successful, then a JSON format file containing key
-    metadata will be saved to the same location as the validated file.
-    The JSON metadata is used in the dataset publication process.
+    metadata will be saved. This is used in the dataset publication process.
+    By default, the JSON file is saved to the same directory as the input
+    file, using the same filename but with the `.json` extension. This can
+    be saved elsewhere using the `--json` option.
+
+    The command also outputs a log of the validation process, which
+    identifies validation issues. This defaults to being written to
+    stderr but can be redirected to a file using the `--log` option.
 
     Args:
         args_list: This is a developer option used to simulate command line usage by
@@ -96,9 +102,9 @@ def _safedata_validator_cli(args_list: Optional[list[str]] = None) -> int:
     # Check function docstring exists to safeguard against -OO mode, and strip off the
     # description of the function args_list, which should not be included in the command
     # line docs
-    if _safedata_validator_cli.__doc__ is not None:
+    if _safedata_validate_cli.__doc__ is not None:
         desc = textwrap.dedent(
-            "\n".join(_safedata_validator_cli.__doc__.splitlines()[:-10])
+            "\n".join(_safedata_validate_cli.__doc__.splitlines()[:-10])
         )
     else:
         desc = "Python in -OO mode: no docs"
@@ -137,11 +143,19 @@ def _safedata_validator_cli(args_list: Optional[list[str]] = None) -> int:
         ),
     )
     parser.add_argument(
-        "-o",
-        "--output",
+        "-l",
+        "--log",
         default=None,
         type=Path,
-        help=("Save the validation report to a file, not print to the console."),
+        help=("Save the validation log to a file, not print to the console."),
+    )
+
+    parser.add_argument(
+        "-j",
+        "--json",
+        default=None,
+        type=Path,
+        help=("An optional output path for the validated dataset JSON."),
     )
 
     parser.add_argument(
@@ -153,10 +167,10 @@ def _safedata_validator_cli(args_list: Optional[list[str]] = None) -> int:
     args = parser.parse_args(args=args_list)
 
     # Configure the logging location
-    if args.output is None:
+    if args.log is None:
         use_stream_logging()
     else:
-        use_file_logging(args.output)
+        use_file_logging(args.log)
 
     # Create the dataset and load from workbook
     ds = Dataset(resources=Resources(args.resources))
@@ -170,15 +184,13 @@ def _safedata_validator_cli(args_list: Optional[list[str]] = None) -> int:
         sys.stdout.write("File validation failed\n")
         return 1
 
-    json_file = os.path.splitext(args.filename)[0] + ".json"
-
+    # Output JSON file
+    json_file = args.json or os.path.splitext(args.filename)[0] + ".json"
     with open(json_file, "w") as json_out:
         json_out.write(ds.to_json())
 
-    sys.stdout.write("------------------------\n")
     sys.stdout.write("File validation passed\n")
     sys.stdout.write(f"JSON metadata written to {json_file}\n")
-    sys.stdout.write("------------------------\n")
     return 0
 
 

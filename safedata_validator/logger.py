@@ -85,8 +85,6 @@ class StreamCounterHandler(logging.StreamHandler):
     def reset(self) -> None:
         """Reset the message counters to zero."""
         self.counters = {"DEBUG": 0, "INFO": 0, "WARNING": 0, "ERROR": 0, "CRITICAL": 0}
-        self.stream.seek(0)
-        self.stream.truncate(0)
 
 
 class FileCounterHandler(logging.FileHandler):
