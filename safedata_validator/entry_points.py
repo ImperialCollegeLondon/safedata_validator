@@ -1036,8 +1036,8 @@ def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> int:
     Args:
         args_list: This is a developer option used to simulate command line usage by
             providing a list of command line argument strings to the entry point
-            function. For example, ``safedata_build_local_gbif -t 2012-01-01 file`` 
-            can be replicated using ``_build_local_gbif_cli(['-t', '2012-01-01', 
+            function. For example, ``safedata_build_local_gbif -t 2012-01-01 file``
+            can be replicated using ``_build_local_gbif_cli(['-t', '2012-01-01',
             'file'])``.
 
     Returns:
@@ -1120,8 +1120,8 @@ def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> int:
     Args:
         args_list: This is a developer option used to simulate command line usage by
             providing a list of command line argument strings to the entry point
-            function. For example, ``safedata_build_local_ncbi -t 2012-01-01 file`` 
-            can be replicated by calling ``_build_local_ncbi_cli(['-t', '2012-01-01', 
+            function. For example, ``safedata_build_local_ncbi -t 2012-01-01 file``
+            can be replicated by calling ``_build_local_ncbi_cli(['-t', '2012-01-01',
             'file']))``.
 
     Returns:
