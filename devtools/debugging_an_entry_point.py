@@ -14,7 +14,7 @@ safedata_validate \
 ```
 
 The `safedata_validate` command line function is a pointer to the
-`safedata_validator.entry_points._safedata_validator_cli` function, which then handles
+`safedata_validator.entry_points._safedata_validate_cli` function, which then handles
 parsing those command line arguments using `argparse`. In order to allow this to be
 debugged, the _Python_ function needs to be run from within a Python debugger, and hence
 needs a way to provide those arguments to `argparse`.
@@ -25,7 +25,7 @@ The JSON to do that looks like this:
 
 ```json
     {
-        "name": "_safedata_validator_cli debug",
+        "name": "_safedata_validate_cli debug",
         "type": "python",
         "request": "launch",
         "program": "${file}",
@@ -49,6 +49,6 @@ arguments given in the 'args' data above. Breakpoints in the code can then be us
 interact with the running code and allow step through.
 """
 
-from safedata_validator.entry_points import _safedata_validator_cli
+from safedata_validator.entry_points import _safedata_validate_cli
 
-_safedata_validator_cli()
+_safedata_validate_cli()

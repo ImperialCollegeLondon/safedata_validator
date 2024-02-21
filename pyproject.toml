@@ -17,7 +17,7 @@ authors = [
 license = "MIT"
 
 [tool.poetry.scripts]
-safedata_validate = "safedata_validator.entry_points:_safedata_validator_cli"
+safedata_validate = "safedata_validator.entry_points:_safedata_validate_cli"
 safedata_zenodo = "safedata_validator.entry_points:_safedata_zenodo_cli"
 safedata_metadata = "safedata_validator.entry_points:_safedata_metadata_cli"
 safedata_build_local_gbif = "safedata_validator.entry_points:_build_local_gbif_cli"
