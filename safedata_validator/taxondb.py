@@ -98,7 +98,7 @@ def get_ncbi_version(timestamp: Optional[str] = None) -> tuple[str, str, int]:
         https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/
 
     Args:
-        timestamp: A string giving an optional isoformat date that identifies a GBIF
+        timestamp: A string giving an optional isoformat date that identifies a NCBI
             backbone version.
 
     Returns:
