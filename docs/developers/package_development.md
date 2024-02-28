@@ -85,17 +85,19 @@ look at the PR to review the changes prior to release, and to make commits to th
 to update the PR or fix issues.
 
 Once everything seems to be running smoothly, the next steps are to make sure that the
-publication process and website build work correctly. The package can be published to
-the Test PyPi site (see below for details) using:
+website builds correctly on Read The Docs (details below) and then that the package
+publication process works correctly.
+
+ReadTheDocs needs to be updated to build the `release/x.y.z` branch. The branch
+needs to be 'Activated' from the Versions tab on the RTD project admin site - it should
+be 'Active' but also 'Hidden'.
+
+The package can be published to **the Test PyPi site** (see below for details) using:
 
 ```bash
 poetry build
 poetry publish -r test-pypi
 ```
-
-ReadTheDocs then needs to be updated to build the `release/x.y.z` branch. The branch
-needs to be 'Activated' from the Versions tab on the RTD project admin site - it should
-be 'Active' but also 'Hidden'.
 
 Once the relevant changes have been made and checks have been performed the final commit
 should bump the version using `poetry` so that the correct version is recorded in
