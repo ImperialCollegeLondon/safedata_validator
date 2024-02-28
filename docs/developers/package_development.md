@@ -53,11 +53,12 @@ whenever commits are made to this repository and for all pull requests.
 
 ## Releasing a new version
 
-All new package releases should be from the `master` branch, so the changes to `develop`
+All new package releases should be from the `main` branch, so the changes to `develop`
 have to be moved here. This is achieved using a `release` branch.
 
 ```bash
 git branch release/x.y.z
+git switch release/x.y.z
 ```
 
 The version of this branch should be updated to a pre-release version using `poetry`.
@@ -76,13 +77,25 @@ ready to be pushed to the remote repo to ensure that other developers have acces
 git push --set-upstream origin release/x.y.z
 ```
 
-This gives all developers an opportunity to fix problems they have noticed, prior to
-release. This can be done by making pull requests against the `release` branch. The
-following checks should also be carried out:
+This branch ultimately needs to be merged into `main` (and back into `develop`), so once
+the release branch is on GitHub, a **pull request should be made against `main`** from
+the release branch. This will cause the GitHub continuous integration tests and
+documentation building to run, validating the release branch. Other developers can also
+look at the PR to review the changes prior to release, and to make commits to the branch
+to update the PR or fix issues.
 
-* All GitHub continuous integration tests pass
-* Upload to [Test PyPi](https://test.pypi.org) works correctly
-* Online documentation builds properly for the `release` branch
+Once everything seems to be running smoothly, the next steps are to make sure that the
+publication process and website build work correctly. The package can be published to
+the Test PyPi site (see below for details) using:
+
+```bash
+poetry build
+poetry publish -r test-pypi
+```
+
+ReadTheDocs then needs to be updated to build the `release/x.y.z` branch. The branch
+needs to be 'Activated' from the Versions tab on the RTD project admin site - it should
+be 'Active' but also 'Hidden'.
 
 Once the relevant changes have been made and checks have been performed the final commit
 should bump the version using `poetry` so that the correct version is recorded in
@@ -92,31 +105,22 @@ should bump the version using `poetry` so that the correct version is recorded i
 poetry version [major/minor/patch]
 ```
 
-The `release` branch now is ready to be merged with the `master` branch. To do so you
-should switch to the `master` branch and merge the `release` branch into it.
+Alternatively, edit `pyproject.toml` by hand if the release tag to be used is unusual in
+some way (e.g. `x.y.zrc1`). Commit this last change!
 
-```bash
-git switch master
-git merge release/x.y.z
-```
-
-A tag should be added marking the package version, and then the updated `master` branch
-should be pushed to the remote repository.
+The `release` branch now is ready to be merged with the `main` branch and the pull
+request should be accepted and merged online. A tag should be added marking the package
+version, and then the updated `main` branch should be pushed to the remote repository.
 
 ```bash
 git tag x.y.z
 git push origin x.y.z
 ```
 
-Finally, any changes added to the `release` branch should be merged back into `develop`.
+A PR should also be created online to merge any changes added to the `release` branch
+back into `develop`.
 
-```bash
-git switch develop
-git merge release/x.y.z
-git push
-```
-
-Note that the `master` branch should _only_ be used for new releases.
+Note that the `main` branch should _only_ be used for new releases.
 
 ## Uploading package releases to test PyPi
 
@@ -150,9 +154,10 @@ poetry publish -r testpypi
 ```
 
 It is important to note that a test upload should **always** be done before the package
-is uploaded to PyPi. You should perform a test upload when the `release` branch is
-created. You should also perform another test upload whenever significant changes are
-made to the `release` branch.
+is uploaded to PyPi. You should perform a test upload when the `release` branch
+otherwise ready to merge to `main`. If the `release` branch changes after this point,
+use `poetry version prerelease` to increment the version and run another test upload to
+confirm that the final version can be uploaded cleanly.
 
 ## Documentation
 
@@ -171,14 +176,14 @@ In order to build and deploy the documentation.
   commands are updated, these inputs need to be recreated.
 * From the package root, run `mkdocs build`. This will create the docs site in
   the `site` folder - note that this folder is not included in the git repo.
-* Changes made to the `master` branch of the repository will automatically trigger a
+* Changes made to the `main` branch of the repository will automatically trigger a
   rebuild of the package documentation.
 * To build the documentation for specific branches you need to login to [Read the
   Docs](https://readthedocs.org). You can then build whichever branch you require.
 
 ## Final publication of new package version
 
-Once a `release` branch has passed all the tests and been merged into `master`, it
+Once a `release` branch has passed all the tests and been merged into `main`, it
 should be published to [PyPi](https://pypi.org/). This allows users to install the new
 package version via `pip`. As with test PyPi, publication is handled by the `poetry`
 package manager. PyPi is automatically configured as the default upload repository, so
@@ -203,8 +208,11 @@ package versions if you are a maintainer. If you wish to upload a new package ve
 you should therefore contact the current maintainers to request maintainer status.
 
 Once `poetry` has been setup to allow publication of `safedata_validator` to PyPi, the
-new package version can then be published.
+new package version can then be published from the `main` branch:
 
 ```bash
+git switch main
+poetry build
 poetry publish
+git switch develop
 ```
