@@ -1,10 +1,12 @@
 """Provide command line scripts.
 
-This module provides command line scripts to expose validation and publishing
-functionality.
+This module provides functions exposed as command line entry points:
 
-* _safedata_validate_cli, exposed as `safedata_validate`
-* _safedata_zenodo_cli, exposed as `safedata_zenodo`
+* ``_safedata_validate_cli``, exposed as `safedata_validate`
+* ``_safedata_zenodo_cli``, exposed as `safedata_zenodo`
+* ``_safedata_metadata_cli``, exposed as `safedata_metadata`
+* ``_build_local_gbif_cli``, exposed as `safedata_build_local_gbif`
+* ``_build_local_ncbi_cli``, exposed as `safedata_build_local_ncbi`
 """
 
 import argparse
@@ -13,6 +15,7 @@ import sys
 import tempfile
 import textwrap
 from pathlib import Path
+from typing import Optional
 
 import simplejson
 
@@ -26,11 +29,14 @@ from safedata_validator.logger import (
     use_stream_logging,
 )
 from safedata_validator.resources import Resources
+from safedata_validator.server import post_metadata, update_resources
 from safedata_validator.taxondb import (
     build_local_gbif,
     build_local_ncbi,
     download_gbif_backbone,
     download_ncbi_taxonomy,
+    get_gbif_version,
+    get_ncbi_version,
 )
 from safedata_validator.zenodo import (
     create_deposit,
@@ -40,17 +46,20 @@ from safedata_validator.zenodo import (
     download_ris_data,
     generate_inspire_xml,
     get_deposit,
-    post_metadata,
     publish_deposit,
     sync_local_dir,
-    update_gazetteer,
     update_published_metadata,
     upload_file,
     upload_metadata,
 )
 
 
-def _safedata_validator_cli():
+def _desc_formatter(prog):
+    """Bespoke argparse description formatting."""
+    return argparse.RawDescriptionHelpFormatter(prog, max_help_position=16)
+
+
+def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
     """Validate a dataset using a command line interface.
 
     This program validates an Excel file formatted as a `safedata` dataset.
@@ -67,13 +76,44 @@ def _safedata_validator_cli():
     your operating system.
 
     If validation is successful, then a JSON format file containing key
-    metadata will be saved to the same location as the validated file.
-    The JSON metadata is used in the dataset publication process.
+    metadata will be saved. This is used in the dataset publication process.
+    By default, the JSON file is saved to the same directory as the input
+    file, using the same filename but with the `.json` extension. This can
+    be saved elsewhere using the `--json` option.
+
+    The command also outputs a log of the validation process, which
+    identifies validation issues. This defaults to being written to
+    stderr but can be redirected to a file using the `--log` option.
+
+    Args:
+        args_list: This is a developer option used to simulate command line usage by
+            providing a list of command line argument strings to the entry point
+            function. For example, ``safedata_validate show_resources`` can be
+            replicated by calling ``_safedata_validate_cli(['show_resources'])``.
+
+    Returns:
+        An integer code showing success (0) or failure (1).
     """
 
-    desc = textwrap.dedent(_safedata_validator_cli.__doc__)
-    fmt = argparse.RawDescriptionHelpFormatter
-    parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
+    # If no arguments list is provided
+    if args_list is None:
+        args_list = sys.argv[1:]
+
+    # Check function docstring exists to safeguard against -OO mode, and strip off the
+    # description of the function args_list, which should not be included in the command
+    # line docs
+    if _safedata_validate_cli.__doc__ is not None:
+        desc = textwrap.dedent(
+            "\n".join(_safedata_validate_cli.__doc__.splitlines()[:-10])
+        )
+    else:
+        desc = "Python in -OO mode: no docs"
+
+    parser = argparse.ArgumentParser(
+        prog="safedata_validate",
+        description=desc,
+        formatter_class=_desc_formatter,
+    )
 
     parser.add_argument("filename", help="Path to the Excel file to be validated.")
 
@@ -103,11 +143,19 @@ def _safedata_validator_cli():
         ),
     )
     parser.add_argument(
-        "-o",
-        "--output",
+        "-l",
+        "--log",
         default=None,
         type=Path,
-        help=("Save the validation report to a file, not print to the console."),
+        help=("Save the validation log to a file, not print to the console."),
+    )
+
+    parser.add_argument(
+        "-j",
+        "--json",
+        default=None,
+        type=Path,
+        help=("An optional output path for the validated dataset JSON."),
     )
 
     parser.add_argument(
@@ -116,13 +164,13 @@ def _safedata_validator_cli():
         version="%(prog)s {version}".format(version=__version__),
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(args=args_list)
 
     # Configure the logging location
-    if args.output is None:
+    if args.log is None:
         use_stream_logging()
     else:
-        use_file_logging(args.output)
+        use_file_logging(args.log)
 
     # Create the dataset and load from workbook
     ds = Dataset(resources=Resources(args.resources))
@@ -132,24 +180,21 @@ def _safedata_validator_cli():
         chunk_size=args.chunk_size,
     )
 
-    if ds.passed:
-        json_file = os.path.splitext(args.filename)[0] + ".json"
+    if not ds.passed:
+        sys.stdout.write("File validation failed\n")
+        return 1
 
-        with open(json_file, "w") as json_out:
-            json_out.write(ds.to_json())
+    # Output JSON file
+    json_file = args.json or os.path.splitext(args.filename)[0] + ".json"
+    with open(json_file, "w") as json_out:
+        json_out.write(ds.to_json())
 
-        sys.stdout.write("------------------------\n")
-        sys.stdout.write("File validation passed\n")
-        sys.stdout.write(f"JSON metadata written to {json_file}\n")
-        sys.stdout.write("------------------------\n")
-
-
-def _desc_formatter(prog):
-    """Bespoke argparse description formatting."""
-    return argparse.RawDescriptionHelpFormatter(prog, max_help_position=16)
+    sys.stdout.write("File validation passed\n")
+    sys.stdout.write(f"JSON metadata written to {json_file}\n")
+    return 0
 
 
-def _safedata_zenodo_cli():
+def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
     """Publish validated datasets to Zenodo using a command line interface.
 
     This is a the command line interface for publishing safedata validated
@@ -177,16 +222,36 @@ def _safedata_zenodo_cli():
         associated with a Zenodo deposit or published record.
 
     Note that most of these actions are also available via the Zenodo website.
+
+    Args:
+        args_list: This is a developer option used to simulate command line usage by
+            providing a list of command line argument strings to the entry point
+            function. For example, ``safedata_zenodo create_deposit`` can be
+            replicated by calling ``_safedata_zenodo_cli(['create_deposit'])``.
+
+    Returns:
+        An integer code showing success (0) or failure (1).
     """
 
+    # If no arguments list is provided
+    if args_list is None:
+        args_list = sys.argv[1:]
+
+    # Check function docstring exists to safeguard against -OO mode, and strip off the
+    # description of the function args_list, which should not be included in the command
+    # line docs
+    if _safedata_zenodo_cli.__doc__ is not None:
+        desc = textwrap.dedent(
+            "\n".join(_safedata_zenodo_cli.__doc__.splitlines()[:-10])
+        )
+    else:
+        desc = "Python in -OO mode: no docs"
+
     # create the top-level parser and configure to take subparsers
-    desc = textwrap.dedent(_safedata_zenodo_cli.__doc__)
-    fmt = _desc_formatter
     parser = argparse.ArgumentParser(
         prog="safedata_zenodo",
         description=desc,
-        formatter_class=fmt,
-        usage="safedata_zenodo [-h] [-r RESOURCES] [-q] SUBCOMMAND ...",
+        formatter_class=_desc_formatter,
     )
 
     parser.add_argument(
@@ -204,6 +269,24 @@ def _safedata_zenodo_cli():
         help="Suppress normal information messages. ",
     )
 
+    # Create subparsers to add shared positional arguments across actions - these can be
+    # added to individual actions via the parents argument
+    parse_zenodo_metadata = argparse.ArgumentParser(add_help=False)
+    parse_zenodo_metadata.add_argument(
+        "zenodo_json",
+        type=str,
+        default=None,
+        help="Path to a Zenodo JSON file for a deposit",
+    )
+
+    parse_dataset_metadata = argparse.ArgumentParser(add_help=False)
+    parse_dataset_metadata.add_argument(
+        "dataset_json",
+        type=str,
+        default=None,
+        help="Path to a JSON metadata file for a dataset",
+    )
+
     subparsers = parser.add_subparsers(dest="subcommand", metavar="")
 
     # CREATE DEPOSIT subcommand
@@ -219,7 +302,7 @@ def _safedata_zenodo_cli():
         "create_deposit",
         description=textwrap.dedent(create_deposit_desc),
         help="Create a new Zenodo draft deposit",
-        formatter_class=fmt,
+        formatter_class=_desc_formatter,
     )
 
     create_deposit_parser.add_argument(
@@ -236,18 +319,12 @@ def _safedata_zenodo_cli():
     removed from Zenodo.
     """
 
-    discard_deposit_parser = subparsers.add_parser(
+    discard_deposit_parser = subparsers.add_parser(  # noqa: F841
         "discard_deposit",
         description=textwrap.dedent(discard_deposit_desc),
         help="Discard an unpublished deposit",
-        formatter_class=fmt,
-    )
-
-    discard_deposit_parser.add_argument(
-        "zenodo_json",
-        type=str,
-        default=None,
-        help="Path to a Zenodo metadata file for the deposit to discard",
+        formatter_class=_desc_formatter,
+        parents=[parse_zenodo_metadata],
     )
 
     # GET DEPOSIT subcommand
@@ -277,15 +354,12 @@ def _safedata_zenodo_cli():
     before finally publishing.
     """
 
-    publish_deposit_parser = subparsers.add_parser(
+    publish_deposit_parser = subparsers.add_parser(  # noqa: F841
         "publish_deposit",
         description=textwrap.dedent(publish_deposit_desc),
         help="Publish a draft deposit",
-        formatter_class=fmt,
-    )
-
-    publish_deposit_parser.add_argument(
-        "zenodo_json", type=str, help="Path to a Zenodo metadata file"
+        formatter_class=_desc_formatter,
+        parents=[parse_zenodo_metadata],
     )
 
     # UPLOAD FILE subcommand
@@ -299,15 +373,10 @@ def _safedata_zenodo_cli():
         "upload_file",
         description=textwrap.dedent(upload_file_desc),
         help="Upload a file to an unpublished deposit",
-        formatter_class=fmt,
+        formatter_class=_desc_formatter,
+        parents=[parse_zenodo_metadata],
     )
 
-    upload_file_parser.add_argument(
-        "zenodo_json",
-        type=str,
-        default=None,
-        help="Path to a Zenodo metadata JSON for the deposit",
-    )
     upload_file_parser.add_argument(
         "filepath", type=str, default=None, help="The path to the file to be uploaded"
     )
@@ -328,15 +397,10 @@ def _safedata_zenodo_cli():
         "delete_file",
         description=textwrap.dedent(delete_file_desc),
         help="Delete a file from an unpublished deposit",
-        formatter_class=fmt,
+        formatter_class=_desc_formatter,
+        parents=[parse_zenodo_metadata],
     )
 
-    delete_file_parser.add_argument(
-        "zenodo_json",
-        type=str,
-        default=None,
-        help="Path to a Zenodo metadata file for the deposit to discard",
-    )
     delete_file_parser.add_argument(
         "filename", type=str, default=None, help="The name of the file to delete"
     )
@@ -347,18 +411,12 @@ def _safedata_zenodo_cli():
     required Zenodo metadata for an unpublished deposit.
     """
 
-    upload_metadata_parser = subparsers.add_parser(
+    upload_metadata_parser = subparsers.add_parser(  # noqa: F841
         "upload_metadata",
         description=textwrap.dedent(upload_metadata_desc),
         help="Populate the Zenodo metadata",
-        formatter_class=fmt,
-    )
-
-    upload_metadata_parser.add_argument(
-        "zenodo_json", type=str, help="Path to a Zenodo metadata file"
-    )
-    upload_metadata_parser.add_argument(
-        "dataset_json", type=str, help="Path to a dataset metadata file"
+        formatter_class=_desc_formatter,
+        parents=[parse_zenodo_metadata, parse_dataset_metadata],
     )
 
     # AMEND METADATA subcommand
@@ -376,7 +434,7 @@ def _safedata_zenodo_cli():
         "amend_metadata",
         description=textwrap.dedent(amend_metadata_desc),
         help="Update published Zenodo metadata",
-        formatter_class=fmt,
+        formatter_class=_desc_formatter,
     )
 
     amend_metadata_parser.add_argument(
@@ -408,7 +466,7 @@ def _safedata_zenodo_cli():
         "sync_local_dir",
         description=textwrap.dedent(sync_local_dir_desc),
         help="Create or update a local safedata directory",
-        formatter_class=fmt,
+        formatter_class=_desc_formatter,
     )
 
     sync_local_dir_parser.add_argument(
@@ -446,7 +504,7 @@ def _safedata_zenodo_cli():
         "maintain_ris",
         description=textwrap.dedent(maintain_ris_desc),
         help="Maintain a RIS bibliography file for datasets",
-        formatter_class=fmt,
+        formatter_class=_desc_formatter,
     )
 
     # positional argument inputs
@@ -470,13 +528,14 @@ def _safedata_zenodo_cli():
         "generate_html",
         description=textwrap.dedent(generate_html_desc),
         help="Generate an HTML dataset description",
+        parents=[parse_zenodo_metadata, parse_dataset_metadata],
     )
 
     generate_html_parser.add_argument(
-        "zenodo_json", type=str, help="Path to a Zenodo metadata file"
-    )
-    generate_html_parser.add_argument(
-        "dataset_json", type=str, help="Path to a dataset metadata file"
+        "html_out",
+        type=str,
+        default=None,
+        help="Output path for the HTML file",
     )
 
     # GENERATE XML subcommand
@@ -490,15 +549,10 @@ def _safedata_zenodo_cli():
         "generate_xml",
         description=textwrap.dedent(generate_xml_desc),
         help="Create INSPIRE compliant metadata XML",
-        formatter_class=fmt,
+        formatter_class=_desc_formatter,
+        parents=[parse_zenodo_metadata, parse_dataset_metadata],
     )
 
-    generate_xml_parser.add_argument(
-        "zenodo_json", type=str, help="Path to a Zenodo metadata file"
-    )
-    generate_xml_parser.add_argument(
-        "dataset_json", type=str, help="Path to a dataset metadata file"
-    )
     generate_xml_parser.add_argument(
         "-l",
         "--lineage-statement",
@@ -506,18 +560,25 @@ def _safedata_zenodo_cli():
         help="Path to a text file containing a lineage statement",
     )
 
-    # SHOW CONFIG subcommand
-    show_config_desc = """
-    Loads the safedata_validator configuration file, displays the config setup
+    generate_xml_parser.add_argument(
+        "xml_out",
+        type=str,
+        default=None,
+        help="Output path for the XML file",
+    )
+
+    # SHOW resources subcommand
+    show_resources_desc = """
+    Loads the safedata_validator resources file, displays the resources setup
     being used for safedata_zenodo and then exits.
     """
 
     # This has no arguments, so subparser object not needed
     _ = subparsers.add_parser(
-        "show_config",
-        description=textwrap.dedent(show_config_desc),
+        "show_resources",
+        description=textwrap.dedent(show_resources_desc),
         help="Report the config being used and exit",
-        formatter_class=fmt,
+        formatter_class=_desc_formatter,
     )
 
     # ------------------------------------------------------
@@ -525,14 +586,14 @@ def _safedata_zenodo_cli():
     # ------------------------------------------------------
 
     # Parse the arguments and set the verbosity
-    args = parser.parse_args()
+    args = parser.parse_args(args=args_list)
 
     if args.subcommand is None:
         parser.print_usage()
-        return
+        return 0
 
     # Show the package config and exit if requested
-    if args.subcommand == "show_config":
+    if args.subcommand == "show_resources":
         resources = Resources(args.resources)
         print("\nZenodo configuration:")
         for key, val in resources.zenodo.items():
@@ -540,7 +601,7 @@ def _safedata_zenodo_cli():
         print("\nMetadata server configuration:")
         for key, val in resources.metadata.items():
             print(f" - {key}: {val}")
-        return
+        return 0
 
     handler = get_handler()
     if args.quiet:
@@ -560,7 +621,7 @@ def _safedata_zenodo_cli():
         # Trap errors
         if error is not None:
             LOGGER.error(f"Failed to create deposit: {error}")
-            return
+            return 1
 
         # Output the response as a deposit  JSON file
         rec_id = response["record_id"]
@@ -582,8 +643,9 @@ def _safedata_zenodo_cli():
         # Report on the outcome.
         if error is not None:
             LOGGER.error(f"Failed to discard deposit: {error}")
-        else:
-            LOGGER.info("Deposit discarded")
+            return 1
+
+        LOGGER.info("Deposit discarded")
 
     elif args.subcommand in ["get_deposit", "gdep"]:
         # Run the command
@@ -591,7 +653,7 @@ def _safedata_zenodo_cli():
 
         if error is not None:
             LOGGER.error(f"Failed to get info: {error}")
-            return
+            return 1
 
         # Dump the response to a JSON file
         outfile = os.path.join(os.getcwd(), f"zenodo_{args.zenodo_id}.json")
@@ -630,7 +692,7 @@ def _safedata_zenodo_cli():
         # Report on the outcome.
         if error is not None:
             LOGGER.error(f"Failed to publish deposit: {error}")
-            return
+            return 1
 
         # Update the Zenodo JSON file with publication details
         LOGGER.info(f"Published to: {response['links']['record']}")
@@ -664,6 +726,7 @@ def _safedata_zenodo_cli():
         # Report on the outcome.
         if error is not None:
             LOGGER.error(f"Failed to upload file: {error}")
+            return 1
         else:
             LOGGER.info("File uploaded")
 
@@ -708,7 +771,7 @@ def _safedata_zenodo_cli():
 
         # Run the function
         response, error = update_published_metadata(
-            zenodo_md=zenodo_json_update,
+            zenodo=zenodo_json_update,
             resources=resources,
         )
 
@@ -734,11 +797,22 @@ def _safedata_zenodo_cli():
         # Run the download RIS data function
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
+        with open(args.zenodo_json) as zn_json:
+            zenodo_json = simplejson.load(zn_json)
 
-        desc = dataset_description(metadata=dataset_json)
+        generated_html = dataset_description(
+            dataset_metadata=dataset_json, zenodo_metadata=zenodo_json
+        )
 
-        with open(args.html_out, "w") as outf:
-            outf.write(desc)
+        out_path = Path(args.html_out)
+        if out_path.exists():
+            LOGGER.error("HTML output file already exists")
+            return 1
+
+        with open(out_path, "w") as outf:
+            outf.write(generated_html)
+
+        LOGGER.info("HTML generated")
 
     elif args.subcommand in ["generate_xml", "xml"]:
         # Open the two JSON files
@@ -750,28 +824,32 @@ def _safedata_zenodo_cli():
 
         if args.lineage_statement is not None:
             with open(args.lineage_statement) as lin_file:
-                lineage_statement = lin_file.readlines()
+                lineage_statement = lin_file.read()
         else:
             lineage_statement = None
 
         # Run the function
-        response, error = generate_inspire_xml(
-            metadata=dataset_json,
-            zenodo=zenodo_json,
+        generated_xml = generate_inspire_xml(
+            dataset_metadata=dataset_json,
+            zenodo_metadata=zenodo_json,
             resources=resources,
             lineage_statement=lineage_statement,
         )
 
-        # Report on the outcome.
-        if error is not None:
-            LOGGER.error(f"Failed to generate INSPIRE xml: {error}")
-        else:
-            LOGGER.info("Inspire XML generated")
+        out_path = Path(args.xml_out)
+        if out_path.exists():
+            LOGGER.error("XML output file already exists")
+            return 1
 
-    return
+        with open(out_path, "wb") as outf:
+            outf.write(generated_xml)
+
+        LOGGER.info("Inspire XML generated")
+
+    return 0
 
 
-def _safedata_server_cli():
+def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> int:
     """Post updated information to a safedata server instance.
 
     This command line tool provides functions to update a web server running
@@ -780,12 +858,37 @@ def _safedata_server_cli():
 
     To use these tools, the safedata_validator Resources configuration must
     contain the URL for the server and an access token.
+
+    Args:
+        args_list: This is a developer option used to simulate command line usage by
+            providing a list of command line argument strings to the entry point
+            function. For example, ``safedata_metadata update_resources`` can be
+            replicated by calling ``_safedata_metadata_cli(['update_resources'])``.
+
+    Returns:
+        An integer code showing success (0) or failure (1).
     """
 
+    # If no arguments list is provided
+    if args_list is None:
+        args_list = sys.argv[1:]
+
+    # Check function docstring exists to safeguard against -OO mode, and strip off the
+    # description of the function args_list, which should not be included in the command
+    # line docs
+    if _safedata_metadata_cli.__doc__ is not None:
+        desc = textwrap.dedent(
+            "\n".join(_safedata_metadata_cli.__doc__.splitlines()[:-10])
+        )
+    else:
+        desc = "Python in -OO mode: no docs"
+
     # create the top-level parser and configure to take subparsers
-    desc = textwrap.dedent(_safedata_server_cli.__doc__)
-    fmt = argparse.RawDescriptionHelpFormatter
-    parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
+    parser = argparse.ArgumentParser(
+        prog="safedata_metadata",
+        description=desc,
+        formatter_class=_desc_formatter,
+    )
 
     parser.add_argument(
         "-r",
@@ -817,7 +920,7 @@ def _safedata_server_cli():
         "post_metadata",
         description=textwrap.dedent(post_metadata_desc),
         help="Post dataset metadata to a safedata server",
-        formatter_class=fmt,
+        formatter_class=_desc_formatter,
     )
 
     # positional argument inputs
@@ -828,27 +931,37 @@ def _safedata_server_cli():
         "dataset_json", type=str, help="Path to a dataset metadata file"
     )
 
-    # UPDATE GAZETTEER subcommand
+    # UPDATE RESOURCES subcommand, which has no arguments
 
-    update_gazetteer_desc = """
-    This function updates the gazetteer resources being used by a safedata server
-    instance. It uploads both the gazetteer geojson file and location aliases
-    file and the server then validates the file contents.
+    update_resources_desc = """
+    This function updates the resources being used by a safedata server instance. It
+    uploads the gazetteer geojson file, location aliases CSV and any project database
+    CSV being used. The server then validates the file contents.
+
+    The resource file being used sets both the metadata server instance IP address and
+    provides the paths to the files to be uploaded.
     """
 
-    update_gazetteer_parser = subparsers.add_parser(
-        "update_gazetteer",
-        description=textwrap.dedent(update_gazetteer_desc),
+    subparsers.add_parser(
+        "update_resources",
+        description=textwrap.dedent(update_resources_desc),
         help="Update the gazetteer data on safedata server",
-        formatter_class=fmt,
+        formatter_class=_desc_formatter,
     )
 
-    # positional argument inputs
-    update_gazetteer_parser.add_argument(
-        "gazetteer_json", type=str, help="Path to a gazetteer geojson file"
-    )
-    update_gazetteer_parser.add_argument(
-        "location_aliases", type=str, help="Path to a CSV of location aliases"
+    # SHOW RESOURCES subcommand, which has no arguments
+
+    show_resources_desc = """
+    This subcommand simply shows the details of the resources being used and can
+    be used to simply display the Zenodo and metadata server details of the
+    default or specified resources file.
+    """
+
+    subparsers.add_parser(
+        "show_resources",
+        description=textwrap.dedent(show_resources_desc),
+        help="Show the current resources details",
+        formatter_class=_desc_formatter,
     )
 
     # ------------------------------------------------------
@@ -856,14 +969,14 @@ def _safedata_server_cli():
     # ------------------------------------------------------
 
     # Parse the arguments and set the verbosity
-    args = parser.parse_args()
+    args = parser.parse_args(args=args_list)
 
     if args.subcommand is None:
         parser.print_usage()
-        return
+        return 0
 
     # Show the package config and exit if requested
-    if args.subcommand == "show_config":
+    if args.subcommand == "show_resources":
         resources = Resources(args.resources)
         print("\nZenodo configuration:")
         for key, val in resources.zenodo.items():
@@ -871,7 +984,7 @@ def _safedata_server_cli():
         print("\nMetadata server configuration:")
         for key, val in resources.metadata.items():
             print(f" - {key}: {val}")
-        return
+        return 0
 
     handler = get_handler()
     if args.quiet:
@@ -883,7 +996,7 @@ def _safedata_server_cli():
     resources = Resources(args.resources)
 
     # Handle the remaining subcommands
-    if args.subcommand in ["post_metadata", "cdep"]:
+    if args.subcommand in ["post_metadata", "post_md"]:
         # Open the two JSON files
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -899,39 +1012,28 @@ def _safedata_server_cli():
         # Report on the outcome.
         if error is not None:
             LOGGER.error(f"Failed to post metadata: {error}")
-        else:
-            LOGGER.info("Metadata posted")
+            return 1
 
-        return
+        LOGGER.info("Metadata posted")
 
-    if args.subcommand in ["update_gazetteer"]:
-        # Open the two JSON files
-        with open(args.gazetteer_json) as gz_json:
-            gazetteer_json = simplejson.load(gz_json)
-
-        with open(args.location_aliases) as aliases_csv:
-            location_aliases = aliases_csv.read()
-
+    if args.subcommand in ["update_resources"]:
         # Run the function
-        response, error = update_gazetteer(
-            gazetteer=gazetteer_json,
-            location_aliases=location_aliases,
-            resources=resources,
-        )
+        response, error = update_resources(resources=resources)
 
         # Report on the outcome.
         if error is not None:
-            LOGGER.error(f"Failed to update gazetteer: {error}")
-        else:
-            LOGGER.info("Gazetteer updated")
+            LOGGER.error(f"Failed to update resources: {error}")
+            return 1
 
-        return
+        LOGGER.info("Resources updated")
+
+    return 0
 
 
 # Local Database building
 
 
-def _build_local_gbif_cli():
+def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> int:
     """Build a local GBIF database.
 
     This tool builds an SQLite database of the GBIF backbone taxonomy to use
@@ -942,13 +1044,40 @@ def _build_local_gbif_cli():
 
     The tool will optionally take a timestamp - using the format '2021-11-26'
     - to build a particular version, but defaults to the most recent version.
+
+    Args:
+        args_list: This is a developer option used to simulate command line usage by
+            providing a list of command line argument strings to the entry point
+            function. For example, ``safedata_build_local_gbif -t 2012-01-01 file``
+            can be replicated using ``_build_local_gbif_cli(['-t', '2012-01-01',
+            'file'])``.
+
+    Returns:
+        An integer code showing success (0) or failure (1).
     """
 
-    desc = textwrap.dedent(_build_local_gbif_cli.__doc__)
-    fmt = argparse.RawDescriptionHelpFormatter
-    parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
+    # If no arguments list is provided
+    if args_list is None:
+        args_list = sys.argv[1:]
 
-    parser.add_argument("outdir", help="Location to create database file.")
+    # Check function docstring exists to safeguard against -OO mode, and strip off the
+    # description of the function args_list, which should not be included in the command
+    # line docs
+    if _build_local_gbif_cli.__doc__ is not None:
+        desc = textwrap.dedent(
+            "\n".join(_build_local_gbif_cli.__doc__.splitlines()[:-10])
+        )
+    else:
+        desc = "Python in -OO mode: no docs"
+
+    # create the parser
+    parser = argparse.ArgumentParser(
+        prog="safedata_build_local_gbif",
+        description=desc,
+        formatter_class=_desc_formatter,
+    )
+
+    parser.add_argument("outfile", help="Filename to use for database file.", type=Path)
     parser.add_argument(
         "-t",
         "--timestamp",
@@ -957,18 +1086,38 @@ def _build_local_gbif_cli():
         help="The time stamp of a database archive version to use.",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(args=args_list)
 
+    # Validate output file
+    # Look that file can be created without clobbering existing file
+    outdir = args.outfile.absolute().parent
+
+    if not (outdir.exists() and outdir.is_dir()):
+        LOGGER.error("The output directory does not exist.")
+        return 1
+
+    if args.outfile.absolute().exists():
+        LOGGER.error("The output file already exists.")
+        return 1
+
+    # Validate the timestamp
+    try:
+        timestamp, url = get_gbif_version(args.timestamp)
+    except ValueError as excep:
+        LOGGER.error(str(excep))
+        return 1
+
+    # Download and build from validated url
     with tempfile.TemporaryDirectory() as download_loc:
         file_data = download_gbif_backbone(
-            outdir=download_loc, timestamp=args.timestamp
+            outdir=download_loc, timestamp=timestamp, url=url
         )
-        build_local_gbif(outdir=args.outdir, **file_data)
+        build_local_gbif(outfile=args.outfile, **file_data)
 
-    return
+    return 0
 
 
-def _build_local_ncbi_cli():
+def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> int:
     """Build a local NCBI database.
 
     This tool builds an SQLite database of the NCBI  taxonomy to use in
@@ -979,13 +1128,40 @@ def _build_local_ncbi_cli():
 
     The tool will optionally take a timestamp - using the format '2021-11-26'
     - to build a particular version, but defaults to the most recent version.
+
+    Args:
+        args_list: This is a developer option used to simulate command line usage by
+            providing a list of command line argument strings to the entry point
+            function. For example, ``safedata_build_local_ncbi -t 2012-01-01 file``
+            can be replicated by calling ``_build_local_ncbi_cli(['-t', '2012-01-01',
+            'file']))``.
+
+    Returns:
+        An integer code showing success (0) or failure (1).
     """
 
-    desc = textwrap.dedent(_build_local_ncbi_cli.__doc__)
-    fmt = argparse.RawDescriptionHelpFormatter
-    parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
+    # If no arguments list is provided
+    if args_list is None:
+        args_list = sys.argv[1:]
 
-    parser.add_argument("outdir", help="Location to create database file.")
+    # Check function docstring exists to safeguard against -OO mode, and strip off the
+    # description of the function args_list, which should not be included in the command
+    # line docs
+    if _build_local_ncbi_cli.__doc__ is not None:
+        desc = textwrap.dedent(
+            "\n".join(_build_local_ncbi_cli.__doc__.splitlines()[:-10])
+        )
+    else:
+        desc = "Python in -OO mode: no docs"
+
+    # create the parser
+    parser = argparse.ArgumentParser(
+        prog="safedata_build_local_ncbi",
+        description=desc,
+        formatter_class=_desc_formatter,
+    )
+
+    parser.add_argument("outfile", help="Filename to use for database file.", type=Path)
     parser.add_argument(
         "-t",
         "--timestamp",
@@ -994,12 +1170,35 @@ def _build_local_ncbi_cli():
         help="The time stamp of a database archive version to use.",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(args=args_list)
 
+    # Validate output file
+    # Look that file can be created without clobbering existing file
+    outdir = args.outfile.absolute().parent
+
+    if not (outdir.exists() and outdir.is_dir()):
+        LOGGER.error("The output directory does not exist.")
+        return 1
+
+    if args.outfile.absolute().exists():
+        LOGGER.error("The output file already exists.")
+        return 1
+
+    # Validate the timestamp
+    try:
+        filename, timestamp, filesize = get_ncbi_version(timestamp=args.timestamp)
+    except ValueError as excep:
+        LOGGER.error(str(excep))
+        return 1
+
+    # Download and build
     with tempfile.TemporaryDirectory() as download_loc:
         file_data = download_ncbi_taxonomy(
-            outdir=download_loc, timestamp=args.timestamp
+            outdir=download_loc,
+            timestamp=timestamp,
+            filename=filename,
+            filesize=filesize,
         )
-        build_local_ncbi(outdir=args.outdir, **file_data)
+        build_local_ncbi(outfile=args.outfile, **file_data)
 
-    return
+    return 0

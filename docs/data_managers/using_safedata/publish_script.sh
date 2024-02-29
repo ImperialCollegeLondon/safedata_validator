@@ -27,4 +27,4 @@ safedata_zenodo upload_metadata zenodo_1143714.json SAFE_dataset.json
 safedata_zenodo publish_deposit zenodo_1143714.json
 
 # Publish the dataset and zenodo metadata to the metadata server
-safedata_server post_metadata zenodo_1143714.json SAFE_dataset.json
+safedata_metadata post_metadata zenodo_1143714.json SAFE_dataset.json

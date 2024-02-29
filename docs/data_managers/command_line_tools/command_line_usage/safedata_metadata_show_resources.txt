@@ -1,0 +1,9 @@
+cl_prompt $ safedata_metadata show_resources -h
+usage: safedata_metadata show_resources [-h]
+
+This subcommand simply shows the details of the resources being used and can
+be used to simply display the Zenodo and metadata server details of the
+default or specified resources file.
+
+optional arguments:
+  -h, --help  show this help message and exit

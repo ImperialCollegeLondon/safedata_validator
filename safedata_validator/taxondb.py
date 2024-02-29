@@ -27,31 +27,38 @@ from tqdm.auto import tqdm
 from safedata_validator.logger import FORMATTER, LOGGER, log_and_raise
 
 
-def download_gbif_backbone(outdir: str, timestamp: Optional[str] = None) -> dict:
-    """Download the GBIF backbone database.
+def get_gbif_version(timestamp: Optional[str] = None) -> tuple[str, str]:
+    """Resolve the timestamp for a GBIF version.
 
-    This function downloads the data for a GBIF backbone taxonomy version to a given
-    location. By default, the most recent version ('current') is downloaded. A timestamp
+    This function validates a user-provided GBIF version timestamp or locates the most
+    recent version of the GBIF backbone if the timestamp is not provided. A timestamp
     (e.g. '2021-11-26') can be provided to select a particular version from the list at:
 
         https://hosted-datasets.gbif.org/datasets/backbone/.
 
     Args:
-        outdir: The location to download the files to
-        timestamp: The timestamp for an available GBIF backbone version.
+        timestamp: A string giving an optional isoformat date that identifies a GBIF
+            backbone version.
 
     Returns:
-        A dictionary giving the paths to the downloaded files and timestamp of the
-        version downloaded.
+        A tuple of strings giving the isoformat date of the version and the URL for the
+            directory containing the version.
     """
 
-    LOGGER.info(f"Downloading GBIF data to: {outdir}")
-    FORMATTER.push()
-    return_dict = {}
+    if timestamp is not None:
+        # Validate the timestamp - must be a str at this point
+        try:
+            timestamp_dt = isoparse(timestamp)  # type: ignore
+        except ValueError:
+            log_and_raise(f"Could not parse timestamp as date: {timestamp}", ValueError)
 
-    # Get the timestamp of the current database if none is provided - could just use
-    # 'current', but need a reliable source of the date to use in a filename.
-    if timestamp is None:
+        # Render timestamp as ISO date string
+        timestamp = timestamp_dt.date().isoformat()
+        LOGGER.info(f"Checking for version with provided timestamp: {timestamp}")
+    else:
+        # Get the timestamp of the current database if none is provided - could just use
+        # the 'current' entry in the hosted datasets URL, but need a reliable source of
+        # the date to use in a filename.
         gbif_backbone = (
             "https://api.gbif.org/v1/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c"
         )
@@ -63,20 +70,10 @@ def download_gbif_backbone(outdir: str, timestamp: Optional[str] = None) -> dict
             )
 
         timestamp = timestamp_req.json()["pubDate"]
-
-    # Validate the timestamp - must be a str at this point
-    try:
-        timestamp_dt = isoparse(timestamp)  # type: ignore
-    except ValueError:
-        log_and_raise(f"Could not parse timestamp: {timestamp}", ValueError)
-
-    # Render timestamp as ISO date string
-    timestamp = timestamp_dt.date().isoformat()
-    return_dict["timestamp"] = timestamp
+        timestamp = isoparse(timestamp).date().isoformat()
+        LOGGER.info(f"Using most recent timestamp: {timestamp}")
 
     # Try and download the files - check heads to make sure files exists
-    LOGGER.info(f"Checking for version with timestamp {timestamp}")
-
     url = f"https://hosted-datasets.gbif.org/datasets/backbone/{timestamp}/"
 
     timestamp_head = requests.head(url)
@@ -87,6 +84,91 @@ def download_gbif_backbone(outdir: str, timestamp: Optional[str] = None) -> dict
             "    https://hosted-datasets.gbif.org/datasets/backbone",
             ValueError,
         )
+
+    return timestamp, url
+
+
+def get_ncbi_version(timestamp: Optional[str] = None) -> tuple[str, str, int]:
+    """Resolve the timestamp for an NCBI version.
+
+    This function validates a user-provided NCBI version timestamp or locates the most
+    recent version of the NCBI taxonomy if the timestamp is not provided. A timestamp
+    (e.g. '2021-11-26') can be provided to select a particular version from the list at:
+
+        https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/
+
+    Args:
+        timestamp: A string giving an optional isoformat date that identifies a NCBI
+            backbone version.
+
+    Returns:
+        A tuple giving the isoformat date of the version, the filename for the taxon
+        dump and the dump file size
+    """
+
+    # Get the available versions and metadata via FTP.
+    try:
+        LOGGER.info("Connecting to NCBI FTP server")
+        ftp = ftplib.FTP(host="ftp.ncbi.nlm.nih.gov")
+        ftp.login()
+        ftp.cwd("pub/taxonomy/taxdump_archive/")
+        available_versions = list(ftp.mlsd("."))
+    except ftplib.all_errors:
+        log_and_raise("Could not retrieve available versions", IOError)
+
+    # Get a list of filename, date, size tuples in newest to oldest order.
+    versions = [
+        (fnm, parse(md["modify"]).date().isoformat(), int(md["size"]))
+        for fnm, md in available_versions
+        if fnm.startswith("taxdmp")
+    ]
+    versions.sort(key=lambda val: val[1], reverse=True)
+
+    if timestamp is not None:
+        # Validate the timestamp - must be a str at this point
+        try:
+            timestamp_dt = isoparse(timestamp)  # type: ignore
+        except ValueError:
+            log_and_raise(f"Could not parse timestamp as date: {timestamp}", ValueError)
+
+        # Render timestamp as ISO date string
+        timestamp = timestamp_dt.date().isoformat()
+        LOGGER.info(f"Checking for version with provided timestamp: {timestamp}")
+
+        # Find the timestamp in the list
+        fnames, dates, sizes = zip(*versions)
+        if timestamp not in dates:
+            log_and_raise(
+                "Timestamp does not exist. Check the available timestamps at: \n"
+                "    https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/",
+                ValueError,
+            )
+        idx = dates.index(timestamp)
+        return fnames[idx], timestamp, sizes[idx]
+
+    else:
+        return versions[0]
+
+
+def download_gbif_backbone(outdir: str, timestamp: str, url: str) -> dict:
+    """Download the GBIF backbone database.
+
+    This function downloads the data for a GBIF backbone taxonomy version to a given
+    location.
+
+    Args:
+        outdir: The location to download the files to
+        timestamp: The timestamp for an available GBIF backbone version.
+        url: The download URL for the provided version.
+
+    Returns:
+        A dictionary giving the paths to the downloaded files and timestamp of the
+        version downloaded.
+    """
+
+    LOGGER.info(f"Downloading {timestamp} GBIF data to: {outdir}")
+    FORMATTER.push()
+    return_dict = {"timestamp": timestamp}
 
     # Two possible names for the key backbone file: backbone in earlier snapshots.
     simple_head = requests.head(url + "simple.txt.gz")
@@ -136,7 +218,7 @@ def download_gbif_backbone(outdir: str, timestamp: Optional[str] = None) -> dict
 
 
 def build_local_gbif(
-    outdir: str,
+    outfile: str,
     timestamp: str,
     simple: str,
     deleted: Optional[str] = None,
@@ -146,9 +228,8 @@ def build_local_gbif(
 
     This function takes the paths to downloaded data files for the GBIF backbone
     taxonomy and builds a SQLite3 database file for use in local validation in the
-    safedata_validator package. The database file is created in the provided outdir
-    location with the name 'gbif_backbone_timestamp.sqlite'. The location of this file
-    then needs to be included in the package configuration to be used in validation.
+    safedata_validator package. The location of this file then needs to be included in
+    the package configuration to be used in validation.
 
     The data files can be downloaded using the download_gbif_backbone function and two
     files can be used. The main data is in 'simple.txt.gz' but deleted taxa can also be
@@ -159,15 +240,21 @@ def build_local_gbif(
     but the 'keep' argument can be used to retain them.
 
     Args:
-        outdir: The location to create the SQLite file
+        outfile: The filepath to use to create the SQLite file
         timestamp: The timestamp of the downloaded version.
         simple: The path to the simple.txt.gz file.
         deleted: The path to the simple-deleted.txt.gz
         keep: Should the original datafiles be retained.
     """
 
+    # Guard against madly long fields: these are typically the issues and published in
+    # fields that are dropped in building the database itself, but they can be so long
+    # that they exceed the default CSV field read limit which explodes the csv reader.
+    # For example, the 2022-11-23 version has a row with 231Kb of crab literature. This
+    # increases that limit to 512Kb.
+    csv.field_size_limit(524288)
+
     # Create the output file and turn off safety features for speed
-    outfile = os.path.join(outdir, f"gbif_backbone_{timestamp}.sqlite")
     LOGGER.info(f"Building GBIF backbone database in: {outfile}")
     FORMATTER.push()
 
@@ -310,7 +397,9 @@ def build_local_gbif(
     FORMATTER.pop()
 
 
-def download_ncbi_taxonomy(outdir: str, timestamp: Optional[str] = None) -> dict:
+def download_ncbi_taxonomy(
+    outdir: str, timestamp: str, filename: str, filesize: int
+) -> dict:
     """Download the NCBI taxonomy database.
 
     This function downloads the data for the NCBI taxonomy to a given location. By
@@ -320,58 +409,29 @@ def download_ncbi_taxonomy(outdir: str, timestamp: Optional[str] = None) -> dict
         https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/
 
     Args:
-        outdir: The location to download the files to
+        outdir: The location to download the taxonomy dump file to
         timestamp: The timestamp for an available NCBI taxonomy version.
+        filename: The name of the corresponding dump file.
+        filesize: The size in bytes of the dump file.
 
     Returns:
         A dictionary giving the paths to the downloaded files and timestamp of the
         version downloaded.
     """
 
-    LOGGER.info(f"Downloading NCBI data to: {outdir}")
+    LOGGER.info(f"Downloading {timestamp} NCBI data to: {outdir}")
     FORMATTER.push()
     return_dict = {}
-
-    # Get the available versions and metadata via FTP.
-    try:
-        LOGGER.info("Connecting to FTP server")
-        ftp = ftplib.FTP(host="ftp.ncbi.nlm.nih.gov")
-        ftp.login()
-        ftp.cwd("pub/taxonomy/taxdump_archive/")
-        available_versions = list(ftp.mlsd("."))
-    except ftplib.all_errors:
-        log_and_raise("Could not retrieve available versions", IOError)
-
-    # Get a list of filename, date tuples
-    versions = [
-        (fnm, parse(md["modify"]).date().isoformat(), md["size"])
-        for fnm, md in available_versions
-        if fnm.startswith("taxdmp")
-    ]
-    versions.sort(key=lambda val: val[1], reverse=True)
-
-    if timestamp is None:
-        # Get most recent version
-        file, timestamp, total = versions[0]
-        LOGGER.info(f"Using most recent archive: {timestamp}")
-    else:
-        # Find the timestamp in the list
-        fnames, dates, sizes = zip(*versions)
-        if timestamp not in dates:
-            log_and_raise(f"No version found with timestamp: {timestamp}", ValueError)
-        idx = dates.index(timestamp)
-        file = fnames[idx]
-        total = sizes[idx]
 
     return_dict["timestamp"] = timestamp
 
     # Retrieve the requested file, using a callback wrapper to track progress
-    out_file = os.path.join(outdir, file)
+    out_file = os.path.join(outdir, filename)
     LOGGER.info(f"Downloading taxonomy to: {out_file}")
 
     with open(out_file, "wb") as outf:
         with tqdm(
-            total=int(total),
+            total=filesize,
             unit="B",
             unit_scale=True,
             unit_divisor=1024,
@@ -382,9 +442,16 @@ def download_ncbi_taxonomy(outdir: str, timestamp: Optional[str] = None) -> dict
                 pbar.update(data_len)
                 outf.write(data)
 
-            ftp.retrbinary(f"RETR {file}", _callback)
+            try:
+                LOGGER.info("Connecting to NCBI FTP server")
+                ftp = ftplib.FTP(host="ftp.ncbi.nlm.nih.gov")
+                ftp.login()
+                ftp.cwd("pub/taxonomy/taxdump_archive/")
+            except ftplib.all_errors:
+                log_and_raise("Could not connect to FTP site", IOError)
 
-    ftp.close()
+            ftp.retrbinary(f"RETR {filename}", _callback)
+            ftp.close()
 
     # store the file path
     return_dict["taxdmp"] = out_file
@@ -395,7 +462,7 @@ def download_ncbi_taxonomy(outdir: str, timestamp: Optional[str] = None) -> dict
 
 
 def build_local_ncbi(
-    outdir: str, timestamp: str, taxdmp: str, keep: bool = False
+    outfile: str, timestamp: str, taxdmp: str, keep: bool = False
 ) -> None:
     """Create a local NCBI taxonomy database.
 
@@ -413,19 +480,18 @@ def build_local_ncbi(
     but the 'keep' argument can be used to retain them.
 
     Args:
-        outdir: The location to create the SQLite file
+        outfile: The filepath to use to create the SQLite file
         timestamp: The timestamp of the downloaded version.
         taxdmp: The path to the taxdmp ZIP archive.
         keep: Should the original archive be retained.
     """
 
     # Create the output file
-    db_file = os.path.join(outdir, f"ncbi_taxonomy_{timestamp}.sqlite")
-    LOGGER.info(f"Building GBIF backbone database in: {db_file}")
+    LOGGER.info(f"Building GBIF backbone database in: {outfile}")
     FORMATTER.push()
 
     # Create the output file and turn off safety features for speed
-    con = sqlite3.connect(db_file)
+    con = sqlite3.connect(outfile)
     con.execute("PRAGMA synchronous = OFF")
 
     # Write the timestamp into a table

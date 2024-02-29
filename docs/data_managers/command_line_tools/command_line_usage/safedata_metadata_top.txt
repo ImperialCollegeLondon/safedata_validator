@@ -1,5 +1,5 @@
-cl_prompt $ safedata_server -h
-usage: safedata_server [-h] [-r RESOURCES] [-q]  ...
+cl_prompt $ safedata_metadata -h
+usage: safedata_metadata [-h] [-r RESOURCES] [-q]  ...
 
 Post updated information to a safedata server instance.
 
@@ -12,12 +12,15 @@ Post updated information to a safedata server instance.
 
 positional arguments:
   
-    post_metadata       Post dataset metadata to a safedata server
-    update_gazetteer    Update the gazetteer data on safedata server
+    post_metadata
+                Post dataset metadata to a safedata server
+    update_resources
+                Update the gazetteer data on safedata server
+    show_resources
+                Show the current resources details
 
 optional arguments:
-  -h, --help            show this help message and exit
+  -h, --help    show this help message and exit
   -r RESOURCES, --resources RESOURCES
-                        Path to a safedata_validator resource configuration
-                        file
-  -q, --quiet           Suppress normal information messages.
+                Path to a safedata_validator resource configuration file
+  -q, --quiet   Suppress normal information messages.

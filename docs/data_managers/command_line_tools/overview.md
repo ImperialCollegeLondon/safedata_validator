@@ -21,11 +21,11 @@ community account and access tokens.
 
 For more details, see [here](safedata_zenodo.md).
 
-## `safedata_server`
+## `safedata_metadata`
 
 These tools are used to manage the updating an instance of the safedata metadata server,
 including adding the details of published datasets and configuring core data such as the
 gazetteer. The configuration requires a URL for a server running the safedata server API
 and an access token for posting data to the server.
 
-For more details, see [here](safedata_server.md).
+For more details, see [here](safedata_metadata.md).
