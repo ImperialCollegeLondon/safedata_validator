@@ -1,4 +1,5 @@
 """General tests to check that config files are handled sensibly."""
+
 import os
 from contextlib import contextmanager
 from logging import CRITICAL, ERROR, INFO, WARNING

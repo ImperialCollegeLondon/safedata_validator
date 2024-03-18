@@ -4,7 +4,6 @@ The module contains a set of classes providing data validation for use throughou
 safedata_validator package
 """
 
-
 import re
 from collections import Counter
 from collections.abc import Iterable

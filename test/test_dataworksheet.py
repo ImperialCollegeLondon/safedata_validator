@@ -1,4 +1,5 @@
 """Test of logging and exception behaviour of DataWorksheet."""
+
 from collections import OrderedDict
 from logging import CRITICAL, ERROR, INFO, WARNING
 

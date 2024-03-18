@@ -1,4 +1,5 @@
 """Tests checking that the GBIF specific classes work as intended."""
+
 from logging import ERROR, INFO, WARNING
 
 import pytest
