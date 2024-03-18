@@ -1,4 +1,5 @@
 """Tests to check that validator helper functions are working as intended."""
+
 import os
 import string
 

@@ -1,4 +1,5 @@
 """Tests to check that the summary sheet functions work as intended."""
+
 import datetime
 from logging import ERROR, INFO, WARNING
 

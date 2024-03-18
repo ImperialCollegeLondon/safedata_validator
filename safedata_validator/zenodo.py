@@ -887,9 +887,9 @@ def generate_inspire_xml(
     citation.find("gmd:title/gco:CharacterString", nsmap).text = dataset_metadata[
         "title"
     ]
-    citation.find(
-        "gmd:date/gmd:CI_Date/gmd:date/gco:Date", nsmap
-    ).text = pub_date.date().isoformat()
+    citation.find("gmd:date/gmd:CI_Date/gmd:date/gco:Date", nsmap).text = (
+        pub_date.date().isoformat()
+    )
 
     # URIs - a dataset URL and the DOI
     # dataset_url = (
@@ -916,9 +916,9 @@ def generate_inspire_xml(
         zenodo_metadata["doi_url"],
     )
 
-    citation.find(
-        "gmd:otherCitationDetails/gco:CharacterString", nsmap
-    ).text = cite_string
+    citation.find("gmd:otherCitationDetails/gco:CharacterString", nsmap).text = (
+        cite_string
+    )
 
     # ABSTRACT
     data_id.find("gmd:abstract/gco:CharacterString", nsmap).text = dataset_metadata[
@@ -962,9 +962,9 @@ def generate_inspire_xml(
         resp_party.find("gmd:individualName/gco:CharacterString", nsmap).text = au_data[
             "name"
         ]
-        resp_party.find(
-            "gmd:organisationName/gco:CharacterString", nsmap
-        ).text = au_data["affiliation"]
+        resp_party.find("gmd:organisationName/gco:CharacterString", nsmap).text = (
+            au_data["affiliation"]
+        )
         contact_info = resp_party.find("gmd:contactInfo/gmd:CI_Contact", nsmap)
         email_path = (
             "gmd:address/gmd:CI_Address/gmd:electronicMailAddress/gco:CharacterString"
@@ -1005,9 +1005,9 @@ def generate_inspire_xml(
             "Zenodo community owner to request access."
         )
     else:
-        data_id.find(
-            embargo_path, nsmap
-        ).text = "There are no restrictions to public access."
+        data_id.find(embargo_path, nsmap).text = (
+            "There are no restrictions to public access."
+        )
 
     # EXTENTS
     temp_extent = root.find(".//gmd:EX_TemporalExtent", nsmap)
