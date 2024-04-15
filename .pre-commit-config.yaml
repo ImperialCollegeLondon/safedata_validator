@@ -30,3 +30,8 @@ repos:
     rev: v0.39.0
     hooks:
     - id: markdownlint
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.15.2
+    hooks:
+      - id: pyupgrade
+        args: [--py310-plus]
