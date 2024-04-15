@@ -24,7 +24,6 @@ the user and then site config locations defined by the `appdirs` package. See
 details.
 """  # noqa D415
 
-
 import contextlib
 import os
 import sqlite3

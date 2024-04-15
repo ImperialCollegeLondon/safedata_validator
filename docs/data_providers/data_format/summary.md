@@ -334,7 +334,7 @@ minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
 | Description               | This is an example dataset.                                 |                                                              |                                  |
 | Access status             | Embargo                                                     |                                                              |                                  |
 | Embargo date              | 03/09/18                                                    |                                                              |                                  |
-| Access conditions         |                  |               |
+| Access conditions         |                  |               |               |
 | Author name               | Orme, David                                                 |                                                              |                                  |
 | Author email              | <d.orme@imperial.ac.uk>                                       |                                                              |                                  |
 | Author affiliation        | Imperial College London                                     |                                                              |                                  |
