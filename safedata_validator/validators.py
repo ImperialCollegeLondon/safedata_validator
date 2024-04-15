@@ -25,19 +25,17 @@ RE_R_NAME_CHARS = re.compile(r"^[\w\.]+$")
 RE_R_NAME_BAD_START = re.compile(r"^_|^\\.[0-9]")
 """Constants defining global regular expressions for the module"""
 
-EXCEL_ERRORS = set(
-    [
-        "#DIV/0!",
-        "#NAME?",
-        "#N/A",
-        "#NUM!",
-        "#VALUE!",
-        "#REF!",
-        "#NULL!",
-        "#SPILL!",
-        "#CALC!",
-    ]
-)
+EXCEL_ERRORS = {
+    "#DIV/0!",
+    "#NAME?",
+    "#N/A",
+    "#NUM!",
+    "#VALUE!",
+    "#REF!",
+    "#NULL!",
+    "#SPILL!",
+    "#CALC!",
+}
 """A global set of openpyxl error strings for Worksheets using data_only=True"""
 
 
@@ -344,7 +342,7 @@ class IsNotNA(Filter):
     @staticmethod
     def tfunc(val) -> bool:
         """Test for NA strings."""
-        return not ((isinstance(val, str) and val == "NA"))
+        return not (isinstance(val, str) and val == "NA")
 
     @staticmethod
     def rfunc(val) -> Any:

@@ -7,7 +7,6 @@ methods for loading the summary data from file.
 import datetime
 import re
 from dataclasses import dataclass
-from typing import Optional, Union
 
 import requests  # type: ignore
 from openpyxl.worksheet.worksheet import Worksheet
@@ -44,8 +43,8 @@ class SummaryField:
 
     key: str
     mandatory: bool
-    internal: Optional[str]
-    types: Union[type, tuple[type, ...]]
+    internal: str | None
+    types: type | tuple[type, ...]
 
 
 @dataclass
@@ -120,7 +119,7 @@ class Summary:
             soft_bounds=resources.extents.longitudinal_soft_extent,
         )
         """Extent instance for the longitudinal extent of the Dataset."""
-        self.external_files: Optional[list[dict]] = None
+        self.external_files: list[dict] | None = None
         """A list of dictionaries of external file metadata."""
         self.data_worksheets: list[Worksheet] = []
         """A list of dictionaries of data tables in the Dataset."""
@@ -133,7 +132,7 @@ class Summary:
         """The number of validation errors found in the summary."""
         self.projects: dict[int, str] = resources.projects
         """A dictionary of valid project data."""
-        self.project_id: Optional[list[int]] = None
+        self.project_id: list[int] | None = None
         """A list of project ID codes, if project IDs are configured."""
 
         self.validate_doi = False
@@ -326,7 +325,7 @@ class Summary:
         # summary of processing
         self.n_errors = handler.counters["ERROR"] - start_errors
         if self.n_errors > 0:
-            LOGGER.info("Summary contains {} errors".format(self.n_errors))
+            LOGGER.info(f"Summary contains {self.n_errors} errors")
         else:
             LOGGER.info("Summary formatted correctly")
 
@@ -360,7 +359,7 @@ class Summary:
         if unknown:
             LOGGER.error("Unknown metadata fields: ", extra={"join": unknown})
 
-    def _read_block(self, block: SummaryBlock) -> Optional[list]:
+    def _read_block(self, block: SummaryBlock) -> list | None:
         """Read a block of fields from a summary table.
 
         This internal method takes a given block definition from the Summary class

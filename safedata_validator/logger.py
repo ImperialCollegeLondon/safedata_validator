@@ -29,11 +29,10 @@ and to expose some global logging objects for use throughout the code.
 """  # noqa D415
 
 import logging
+from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Optional
-
-from typing_extensions import Type
+from typing import Any
 
 LOGGER_CODES = {
     "DEBUG": ">",
@@ -134,7 +133,7 @@ class IndentFormatter(logging.Formatter):
     def __init__(
         self,
         fmt: str = "%(levelcode)s %(message)s",
-        datefmt: Optional[str] = None,
+        datefmt: str | None = None,
         indent: str = "    ",
     ) -> None:
         logging.Formatter.__init__(self, fmt, datefmt)
@@ -285,7 +284,7 @@ def get_handler():
 
 
 def log_and_raise(
-    msg: str, exception: Type[Exception], extra: Optional[dict] = None
+    msg: str, exception: type[Exception], extra: dict | None = None
 ) -> None:
     """Emit a critical error message and raise an Exception.
 

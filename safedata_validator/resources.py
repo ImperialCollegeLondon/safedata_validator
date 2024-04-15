@@ -30,7 +30,6 @@ import sqlite3
 from csv import DictReader
 from csv import Error as csvError
 from datetime import date
-from typing import Any, Optional, Union
 
 import appdirs
 import simplejson
@@ -156,7 +155,7 @@ class Resources:
         zenodo: A DotMap of Zenodo information
     """
 
-    def __init__(self, config: Optional[Union[str, list, dict]] = None) -> None:
+    def __init__(self, config: str | list | dict | None = None) -> None:
         # User and site config paths
         user_cfg_file = os.path.join(
             appdirs.user_config_dir(), "safedata_validator", "safedata_validator.cfg"
@@ -219,8 +218,8 @@ class Resources:
         self.zenodo = config_loaded.zenodo
         self.metadata = config_loaded.metadata
 
-        self.gbif_timestamp: Optional[str] = None
-        self.ncbi_timestamp: Optional[str] = None
+        self.gbif_timestamp: str | None = None
+        self.ncbi_timestamp: str | None = None
 
         # Valid locations is a dictionary keying string location names to tuples of
         # floats describing the location bounding box
@@ -238,7 +237,7 @@ class Resources:
         self._validate_projects()
 
     @staticmethod
-    def _load_config(config: Union[str, list, dict], cfg_type: str) -> DotMap:
+    def _load_config(config: str | list | dict, cfg_type: str) -> DotMap:
         """Load a configuration file.
 
         This private static method attempts to load a JSON configuration file
@@ -297,7 +296,7 @@ class Resources:
             log_and_raise("Gazetteer file not found", OSError)
 
         try:
-            loc_payload = simplejson.load(open(self.gaz_path, mode="r"))
+            loc_payload = simplejson.load(open(self.gaz_path))
         except (JSONDecodeError, UnicodeDecodeError):
             log_and_raise("Gazetteer file not valid JSON", OSError)
 
@@ -337,7 +336,7 @@ class Resources:
 
         # Now check to see whether the locations file behaves as expected
         try:
-            dictr = DictReader(open(self.localias_path, mode="r"))
+            dictr = DictReader(open(self.localias_path))
         except FileNotFoundError:
             log_and_raise("Location aliases file not found", FileNotFoundError)
         except IsADirectoryError:
@@ -356,7 +355,7 @@ class Resources:
                 ValueError,
             )
 
-        if fieldnames != set(["zenodo_record_id", "location", "alias"]):
+        if fieldnames != {"zenodo_record_id", "location", "alias"}:
             log_and_raise(
                 "Location aliases file not readable as a CSV file with valid headers",
                 ValueError,
@@ -403,7 +402,7 @@ class Resources:
 
         # Now check to see whether the project database behaves as expected
         try:
-            dictr = DictReader(open(self.project_database, mode="r", encoding="UTF-8"))
+            dictr = DictReader(open(self.project_database, encoding="UTF-8"))
         except FileNotFoundError:
             log_and_raise("Project database file not found", FileNotFoundError)
         except IsADirectoryError:
@@ -422,7 +421,7 @@ class Resources:
             )
             raise excep
 
-        required_names = set(["project_id", "title"])
+        required_names = {"project_id", "title"}
         if required_names.intersection(fieldnames) != required_names:
             log_and_raise(
                 "Project database file does not contain project_id and title headers.",
@@ -481,7 +480,7 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
             log_and_raise(f"Local {db_name} database not an SQLite3 file", ValueError)
 
         # Check the required tables against found tables
-        db_tables_set = set([rw[0] for rw in db_tables.fetchall()])
+        db_tables_set = {rw[0] for rw in db_tables.fetchall()}
         required_tables = set(tables + ["timestamp"])
         missing = required_tables.difference(db_tables_set)
 

@@ -18,7 +18,6 @@ import sqlite3
 import zipfile
 from io import TextIOWrapper
 from itertools import groupby
-from typing import Optional
 
 import requests
 from dateutil.parser import isoparse, parse
@@ -27,7 +26,7 @@ from tqdm.auto import tqdm
 from safedata_validator.logger import FORMATTER, LOGGER, log_and_raise
 
 
-def get_gbif_version(timestamp: Optional[str] = None) -> tuple[str, str]:
+def get_gbif_version(timestamp: str | None = None) -> tuple[str, str]:
     """Resolve the timestamp for a GBIF version.
 
     This function validates a user-provided GBIF version timestamp or locates the most
@@ -88,7 +87,7 @@ def get_gbif_version(timestamp: Optional[str] = None) -> tuple[str, str]:
     return timestamp, url
 
 
-def get_ncbi_version(timestamp: Optional[str] = None) -> tuple[str, str, int]:
+def get_ncbi_version(timestamp: str | None = None) -> tuple[str, str, int]:
     """Resolve the timestamp for an NCBI version.
 
     This function validates a user-provided NCBI version timestamp or locates the most
@@ -221,7 +220,7 @@ def build_local_gbif(
     outfile: str,
     timestamp: str,
     simple: str,
-    deleted: Optional[str] = None,
+    deleted: str | None = None,
     keep: bool = False,
 ) -> None:
     """Create a local GBIF backbone database.
