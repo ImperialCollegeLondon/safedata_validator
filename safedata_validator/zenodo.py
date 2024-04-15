@@ -8,6 +8,8 @@
 3. compile a RIS format bibliographic file for published datasets.
 """  # noqa D415
 
+from __future__ import annotations
+
 import copy
 import hashlib
 import os

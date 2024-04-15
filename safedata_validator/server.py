@@ -4,6 +4,8 @@
 2. update the resources on the server to match the local versions.
 """  # noqa D415
 
+from __future__ import annotations
+
 import requests  # type: ignore
 
 from safedata_validator.logger import FORMATTER, LOGGER
