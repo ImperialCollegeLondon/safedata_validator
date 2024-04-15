@@ -31,7 +31,7 @@ import sqlite3
 from collections import Counter
 from io import StringIO
 from itertools import compress, groupby
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from dominate import tags
 from dominate.util import raw
@@ -125,13 +125,13 @@ class GBIFTaxon:
     # Init properties
     name: str
     rank: str
-    gbif_id: Optional[int] = None
+    gbif_id: int | None = None
     is_backbone: bool = dataclasses.field(init=False)
     is_canon: bool = dataclasses.field(init=False)
     # https://stackoverflow.com/questions/33533148
     canon_usage: Optional["GBIFTaxon"] = dataclasses.field(init=False)
-    parent_id: Optional[int] = dataclasses.field(init=False)
-    taxon_status: Optional[str] = dataclasses.field(init=False)
+    parent_id: int | None = dataclasses.field(init=False)
+    taxon_status: str | None = dataclasses.field(init=False)
     lookup_status: str = dataclasses.field(init=False)
     hierarchy: list = dataclasses.field(init=False)
 
@@ -211,8 +211,8 @@ class NCBITaxon:
     taxa_hier: list[tuple[Any, ...]]
     ncbi_id: int
     parent_ncbi_id: int
-    non_canon_name: Optional[str] = None
-    non_canon_name_class: Optional[str] = None
+    non_canon_name: str | None = None
+    non_canon_name_class: str | None = None
 
     def __post_init__(self):
         """Sets the defaults for the post-init properties and checks inputs."""
@@ -253,8 +253,8 @@ class NCBITaxon:
 
         # Check the tuple values: rank, name, ncbi_id and parent_ncbi_id/None,
         # where None shows the root of the taxonomy.
-        tuple_contents = set(tuple(map(type, x)) for x in self.taxa_hier)
-        valid_tuples = set([(str, str, int, int), (str, str, int, type(None))])
+        tuple_contents = {tuple(map(type, x)) for x in self.taxa_hier}
+        valid_tuples = {(str, str, int, int), (str, str, int, type(None))}
         if not tuple_contents.issubset(valid_tuples):
             raise ValueError("Taxon hierarchy tuples malformed")
 
@@ -1030,18 +1030,16 @@ class GBIFTaxa:
             return
 
         # Fields used to describe taxa
-        tx_fields = set(
-            [
-                "name",
-                "taxon name",
-                "taxon type",
-                "taxon id",
-                "ignore id",
-                "parent name",
-                "parent type",
-                "parent id",
-            ]
-        )
+        tx_fields = {
+            "name",
+            "taxon name",
+            "taxon type",
+            "taxon id",
+            "ignore id",
+            "parent name",
+            "parent type",
+            "parent id",
+        }
 
         # Now check for extra fields and report them to the user
         extra_fields = set(headers).difference(tx_fields)
@@ -1083,7 +1081,7 @@ class GBIFTaxa:
                 row["taxon id"],
                 row["ignore id"],
             ]
-            parent_info: Optional[list] = [
+            parent_info: list | None = [
                 row["parent name"],
                 row["parent type"],
                 row["parent id"],
@@ -1107,9 +1105,9 @@ class GBIFTaxa:
         if self.n_errors is None:
             LOGGER.critical("GBIFTaxa error logging has broken!")
         elif self.n_errors > 0:
-            LOGGER.info("GBIFTaxa contains {} errors".format(self.n_errors))
+            LOGGER.info(f"GBIFTaxa contains {self.n_errors} errors")
         else:
-            LOGGER.info("{} taxa loaded correctly".format(len(self.taxon_names)))
+            LOGGER.info(f"{len(self.taxon_names)} taxa loaded correctly")
 
         FORMATTER.pop()
 
@@ -1831,9 +1829,9 @@ class NCBITaxa:
         if self.n_errors is None:
             LOGGER.critical("NCBITaxa error logging has broken!")
         elif self.n_errors > 0:
-            LOGGER.info("NCBITaxa contains {} errors".format(self.n_errors))
+            LOGGER.info(f"NCBITaxa contains {self.n_errors} errors")
         else:
-            LOGGER.info("{} taxa loaded correctly".format(len(self.taxon_names)))
+            LOGGER.info(f"{len(self.taxon_names)} taxa loaded correctly")
 
         FORMATTER.pop()
 
@@ -2045,7 +2043,7 @@ class Taxa:
 
 def taxon_index_to_text(
     taxa: list[dict], html: bool = False, indent_width: int = 4, auth: str = "GBIF"
-) -> Union[str, tags.div]:
+) -> str | tags.div:
     """Render a taxon index as text or html.
 
     This function takes a taxon index and renders the contents into either a text or
@@ -2231,7 +2229,7 @@ def taxon_index_to_text(
         return html_out.getvalue()
 
 
-def taxa_strip(name: str, rank: str) -> Optional[str]:
+def taxa_strip(name: str, rank: str) -> str | None:
     """Strip NCBI style rank prefixes from taxon names.
 
     This function removes NCBI `k__` type notation from taxa names. It returns the

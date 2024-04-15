@@ -8,6 +8,8 @@
 3. compile a RIS format bibliographic file for published datasets.
 """  # noqa D415
 
+from __future__ import annotations
+
 import copy
 import hashlib
 import os
@@ -15,7 +17,7 @@ import shutil
 from datetime import datetime as dt
 from itertools import groupby
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import requests  # type: ignore
 import rispy
@@ -57,7 +59,7 @@ response, error = zenodo_function(args)
 """
 
 
-def _resources_to_zenodo_api(resources: Optional[Resources] = None) -> dict:
+def _resources_to_zenodo_api(resources: Resources | None = None) -> dict:
     """Get a dictionary of the Zenodo and Metadata config from Resources.
 
     Args:
@@ -134,7 +136,7 @@ def _zenodo_error_message(response) -> str:
 
 
 def get_deposit(
-    deposit_id: int, resources: Optional[Resources] = None
+    deposit_id: int, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Download the metadata of a Zenodo deposit.
 
@@ -164,7 +166,7 @@ def get_deposit(
 
 
 def create_deposit(
-    concept_id: Optional[int] = None, resources: Optional[Resources] = None
+    concept_id: int | None = None, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Create a new deposit.
 
@@ -216,7 +218,7 @@ def create_deposit(
 
 
 def upload_metadata(
-    metadata: dict, zenodo: dict, resources: Optional[Resources] = None
+    metadata: dict, zenodo: dict, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Upload dataset metadata.
 
@@ -296,7 +298,7 @@ def upload_metadata(
 
 def update_published_metadata(
     zenodo: dict,
-    resources: Optional[Resources] = None,
+    resources: Resources | None = None,
 ) -> ZenodoFunctionResponseType:
     """Update published deposit metadata.
 
@@ -369,9 +371,9 @@ def update_published_metadata(
 def upload_file(
     metadata: dict,
     filepath: str,
-    zenodo_filename: Optional[str] = None,
+    zenodo_filename: str | None = None,
     progress_bar: bool = True,
-    resources: Optional[Resources] = None,
+    resources: Resources | None = None,
 ) -> ZenodoFunctionResponseType:
     """Upload a file to Zenodo.
 
@@ -398,7 +400,7 @@ def upload_file(
     # Check the file and get the filename if an alternative is not provided
     filepath = os.path.abspath(filepath)
     if not (os.path.exists(filepath) and os.path.isfile(filepath)):
-        raise IOError(f"The file path is either a directory or not found: {filepath} ")
+        raise OSError(f"The file path is either a directory or not found: {filepath} ")
 
     if zenodo_filename is None:
         file_name = os.path.basename(filepath)
@@ -437,7 +439,7 @@ def upload_file(
 
 
 def discard_deposit(
-    metadata: dict, resources: Optional[Resources] = None
+    metadata: dict, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Discard a deposit.
 
@@ -467,7 +469,7 @@ def discard_deposit(
 
 
 def publish_deposit(
-    zenodo: dict, resources: Optional[Resources] = None
+    zenodo: dict, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Publish a created deposit.
 
@@ -495,7 +497,7 @@ def publish_deposit(
 
 
 def delete_file(
-    metadata: dict, filename: str, resources: Optional[Resources] = None
+    metadata: dict, filename: str, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Delete an uploaded file from an unpublished Zenodo deposit.
 
@@ -547,9 +549,9 @@ def dataset_description(
     dataset_metadata: dict,
     zenodo_metadata: dict,
     render: bool = True,
-    extra: Optional[str] = None,
-    resources: Optional[Resources] = None,
-) -> Union[tags.div, str]:
+    extra: str | None = None,
+    resources: Resources | None = None,
+) -> tags.div | str:
     """Create an HTML dataset description.
 
     This function turns a dataset metadata JSON into html for inclusion in
@@ -835,7 +837,7 @@ def generate_inspire_xml(
     dataset_metadata: dict,
     zenodo_metadata: dict,
     resources: Resources,
-    lineage_statement: Optional[str] = None,
+    lineage_statement: str | None = None,
 ) -> bytes:
     """Convert dataset and zenodo metadata into GEMINI XML.
 
@@ -1071,7 +1073,7 @@ def generate_inspire_xml(
 
 
 def download_ris_data(
-    resources: Optional[Resources] = None, ris_file: Optional[str] = None
+    resources: Resources | None = None, ris_file: str | None = None
 ) -> None:
     """Downloads Zenodo records into a RIS format bibliography file.
 
@@ -1101,7 +1103,7 @@ def download_ris_data(
     new_doi = []
 
     if ris_file and os.path.exists(ris_file):
-        with open(ris_file, "r") as bibliography_file:
+        with open(ris_file) as bibliography_file:
             entries = rispy.load(bibliography_file)
             for entry in entries:
                 record_id = int(entry["url"].split("/")[-1])
@@ -1126,7 +1128,7 @@ def download_ris_data(
         safe_data = requests.get(api)
 
         if safe_data.status_code != 200:
-            raise IOError("Cannot access Zenodo API")
+            raise OSError("Cannot access Zenodo API")
         else:
             # Retrieve the record data and store the DOI for each record
             safe_data_dict = safe_data.json()
@@ -1192,7 +1194,7 @@ def sync_local_dir(
     datadir: str,
     xlsx_only: bool = True,
     replace_modified: bool = False,
-    resources: Optional[Resources] = None,
+    resources: Resources | None = None,
 ) -> None:
     """Synchronise a local data directory with a Zenodo community.
 
@@ -1219,7 +1221,7 @@ def sync_local_dir(
     """
 
     # Private helper functions
-    def _get_file(url: str, outf: str, params: Optional[dict] = None) -> None:
+    def _get_file(url: str, outf: str, params: dict | None = None) -> None:
         """Download a file from a URL."""
         resource = requests.get(url, params=params, stream=True)
 
@@ -1233,7 +1235,7 @@ def sync_local_dir(
 
     # The dir argument should be an existing path
     if not (os.path.exists(datadir) and os.path.isdir(datadir)):
-        raise IOError(f"{datadir} is not an existing directory")
+        raise OSError(f"{datadir} is not an existing directory")
 
     # Get the configured metadata api
     api = zres["mdapi"]
@@ -1242,7 +1244,7 @@ def sync_local_dir(
     url_file = os.path.join(datadir, "url.json")
 
     if os.path.exists(url_file):
-        with open(url_file, "r") as urlf:
+        with open(url_file) as urlf:
             dir_api = simplejson.load(urlf)["url"][0]
 
         if api != dir_api:

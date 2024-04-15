@@ -10,7 +10,6 @@ import datetime
 import os
 from itertools import islice
 from logging import CRITICAL, ERROR, WARNING
-from typing import Optional, Union
 
 import simplejson
 from dateutil import parser
@@ -70,12 +69,12 @@ class Dataset:
             dataset.
     """
 
-    def __init__(self, resources: Optional[Resources] = None) -> None:
+    def __init__(self, resources: Resources | None = None) -> None:
         # Try and load the default resources if None provided
         if resources is None:
             resources = Resources()
 
-        self.filename: Optional[str] = None
+        self.filename: str | None = None
         self.resources = resources
         self.summary = Summary(resources)
         self.taxa = Taxa(resources)
@@ -176,7 +175,7 @@ class Dataset:
             LOGGER.warning("No locations worksheet found - moving on")
 
         # Throw an error if both Taxa and GBIFTaxa have been given as worksheet names
-        gbif_sheets = set(["GBIFTaxa", "Taxa"]).intersection(wb.sheetnames)
+        gbif_sheets = {"GBIFTaxa", "Taxa"}.intersection(wb.sheetnames)
 
         if len(gbif_sheets) == 2:
             LOGGER.error(
@@ -464,7 +463,7 @@ class DataWorksheet:
     def __init__(
         self,
         sheet_meta: dict,
-        dataset: Optional[Dataset] = None,
+        dataset: Dataset | None = None,
     ) -> None:
         # Set initial values
 
@@ -487,7 +486,7 @@ class DataWorksheet:
         self.n_trailing_empty_fields: int = 0
         self.n_descriptors: int
         self.descriptors: list = []
-        self.fields: list[Union[EmptyField, BaseField]] = []
+        self.fields: list[EmptyField | BaseField] = []
         self.taxa_fields: list = []
 
         # Keep track of row numbering
@@ -536,8 +535,8 @@ class DataWorksheet:
 
         # Checking field_meta structure - should be an equal length and non-zero tuple
         # of values for each descriptor. If not, return without setting fields_loaded.
-        descriptor_tuple_lengths = set([len(tp) for tp in field_meta.values()])
-        if len(descriptor_tuple_lengths) > 1 or descriptor_tuple_lengths == set([0]):
+        descriptor_tuple_lengths = {len(tp) for tp in field_meta.values()}
+        if len(descriptor_tuple_lengths) > 1 or descriptor_tuple_lengths == {0}:
             LOGGER.error("Cannot load unequal length or empty field metadata")
             return
 
@@ -605,7 +604,7 @@ class DataWorksheet:
         #   trigger warnings about descriptors
 
         # Get logical flags for empty and trailing empty metadata
-        field_meta_empty = [set(vl.values()) == set([None]) for vl in self.field_meta]
+        field_meta_empty = [set(vl.values()) == {None} for vl in self.field_meta]
         trailing_empty = [
             all(field_meta_empty[-(n + 1) :]) for n in range(0, len(field_meta_empty))
         ]
@@ -664,7 +663,7 @@ class DataWorksheet:
             LOGGER.critical("Empty data_rows passed to validate_data_rows")
             return
 
-        row_lengths = set([len(rw) for rw in data_rows])
+        row_lengths = {len(rw) for rw in data_rows}
 
         if len(row_lengths) != 1:
             LOGGER.critical("Data rows of unequal length - cannot validate")
@@ -676,7 +675,7 @@ class DataWorksheet:
             return
 
         # Handle empty rows.
-        blank_set = set([None])
+        blank_set = {None}
         blank_row = [set(vals) == blank_set for vals in data_rows]
 
         trailing_blank_row = [
@@ -852,7 +851,7 @@ class DataWorksheet:
                 break
 
         # Convert field meta to dict and validate
-        field_meta_dict = dict(((rw[0], rw[1:]) for rw in field_meta))
+        field_meta_dict = {rw[0]: rw[1:] for rw in field_meta}
         self.validate_field_meta(field_meta_dict)
 
         if self.fields_loaded:
@@ -974,7 +973,7 @@ class BaseField:
     # required descriptors for those field_types. The no_validation attributes is used
     # to suppress data validation for use on e.g. comments fields.
 
-    field_types: Optional[tuple[str, ...]] = None
+    field_types: tuple[str, ...] | None = None
     required_descriptors = MANDATORY_DESCRIPTORS
     check_taxon_meta = False
     check_interaction_meta = False
@@ -982,13 +981,13 @@ class BaseField:
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         self.meta = meta
         self.dwsh = dwsh
 
-        self.taxa: Optional[Taxa] = None
+        self.taxa: Taxa | None = None
         self.locations = None
         self.summary = None
 
@@ -1043,7 +1042,7 @@ class BaseField:
         if self.check_interaction_meta:
             self._check_interaction_meta()
 
-    def _log(self, msg: str, level: int = ERROR, extra: Optional[dict] = None) -> None:
+    def _log(self, msg: str, level: int = ERROR, extra: dict | None = None) -> None:
         """Adds messages to the field log stack.
 
         Rather than directly emitting a log message, field processing accumulates a
@@ -1252,7 +1251,7 @@ class BaseField:
         else:
             return False
 
-    def _parse_levels(self, txt: str) -> tuple[list[str], tuple[Optional[str], ...]]:
+    def _parse_levels(self, txt: str) -> tuple[list[str], tuple[str | None, ...]]:
         """Parse categorical variable level descriptions.
 
         Splits up category information formatted as label:desc;label:desc, which is used
@@ -1441,7 +1440,7 @@ class BaseField:
         FORMATTER.pop()
 
 
-def field_to_dict(fld: Union[EmptyField, BaseField], col_idx: int) -> dict:
+def field_to_dict(fld: EmptyField | BaseField, col_idx: int) -> dict:
     """Convert a object inheriting from BaseField into a dictionary.
 
     A function to return a dictionary representation of a field object. This would more
@@ -1565,8 +1564,8 @@ class CategoricalField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -1638,8 +1637,8 @@ class TaxaField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -1706,8 +1705,8 @@ class LocationsField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -1778,8 +1777,8 @@ class GeoField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -1918,13 +1917,13 @@ class TimeField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         # Defaults
-        self.first_data_class_set: Optional[set] = None
+        self.first_data_class_set: set | None = None
         self.consistent_class = True
         self.expected_class = True
 
@@ -2031,8 +2030,8 @@ class DatetimeField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -2040,7 +2039,7 @@ class DatetimeField(BaseField):
             self._log("No dataset object provided - cannot update extents")
 
         # Defaults
-        self.first_data_class_set: Optional[set] = None
+        self.first_data_class_set: set | None = None
         self.consistent_class = True
         self.expected_class = True
         self.all_midnight = True
@@ -2186,8 +2185,8 @@ class FileField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 

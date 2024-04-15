@@ -28,7 +28,7 @@ safedata_build_local_ncbi = "safedata_validator.entry_points:_build_local_ncbi_c
 ignore_missing_imports = true
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 openpyxl = "^3.0.10"
 requests = "^2.31.0"
 simplejson = "^3.17.6"
