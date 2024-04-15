@@ -10,7 +10,7 @@ import datetime
 import os
 from itertools import islice
 from logging import CRITICAL, ERROR, WARNING
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import simplejson
 from dateutil import parser
@@ -713,12 +713,12 @@ class DataWorksheet:
         row_numbers = data_cols.pop(0)
 
         # Check for bad values (blanks, non integers) in row numbers
-        row_numbers = IsNotBlank(row_numbers, keep_failed=False)
+        valid_row_numbers = IsNotBlank(row_numbers, keep_failed=False)
 
-        if not row_numbers:
+        if not valid_row_numbers:
             self.row_numbers_missing = True
 
-        row_numbers = row_numbers.values
+        row_numbers = valid_row_numbers.values
 
         if any([not isinstance(vl, int) for vl in row_numbers]):
             self.row_numbers_noninteger = True
@@ -740,7 +740,7 @@ class DataWorksheet:
 
         # Now feed the sets of values into the Field validation
         for data, field_inst in zip(data_cols, self.fields):
-            field_inst.validate_data(data)
+            field_inst.validate_data(list(data))
 
     def report(self) -> None:
         """Report data validation for a data table.
