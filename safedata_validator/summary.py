@@ -306,20 +306,8 @@ class Summary:
         # continue processing.
         self._rows = {str(rw[0]).lower(): rw[1:] for rw in rows}
 
-        # Check if metadata field names have white space padding
-        clean_field_names = IsNotPadded(self._rows.keys())
-        if not clean_field_names:
-            # Report whitespace padding and clean up tuples
-            LOGGER.error(
-                "Whitespace padding in summary field names: ",
-                extra={"join": clean_field_names.failed},
-            )
-
-            # Order preserved in dict and validator
-            cleaned_entries = [
-                (ky, val) for ky, val in zip(clean_field_names, self._rows.values())
-            ]
-            self._rows = dict(cleaned_entries)
+        # Check if metadata keys have white space padding
+        self._check_for_whitespace()
 
         # Validate the keys found in the summary table
         self._validate_keys()
@@ -344,6 +332,27 @@ class Summary:
             LOGGER.info(f"Summary contains {self.n_errors} errors")
         else:
             LOGGER.info("Summary formatted correctly")
+
+    def _check_for_whitespace(self) -> None:
+        """Check that the summary keys do not have whitespace padding.
+
+        This function checks that the keys in a summary table do not have white space
+        padding, if they do the white space padding is removed and an error is logged.
+        """
+
+        clean_metadata_keys = IsNotPadded(self._rows.keys())
+        if not clean_metadata_keys:
+            # Report whitespace padding and clean up tuples
+            LOGGER.error(
+                "Whitespace padding in summary field names: ",
+                extra={"join": clean_metadata_keys.failed},
+            )
+
+            # Order preserved in dict and validator
+            cleaned_entries = [
+                (ky, val) for ky, val in zip(clean_metadata_keys, self._rows.values())
+            ]
+            self._rows = dict(cleaned_entries)
 
     def _validate_keys(self) -> None:
         """Validate the summary keys recovered.
