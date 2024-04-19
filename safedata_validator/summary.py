@@ -15,6 +15,7 @@ from safedata_validator.extent import Extent
 from safedata_validator.logger import LOGGER, get_handler, loggerinfo_push_pop
 from safedata_validator.resources import Resources
 from safedata_validator.validators import (
+    IsNotPadded,
     IsNotSpace,
     IsString,
     NoPunctuation,
@@ -304,6 +305,21 @@ class Summary:
         # Now we have warned about bad values, explicitly cast row keys to string to
         # continue processing.
         self._rows = {str(rw[0]).lower(): rw[1:] for rw in rows}
+
+        # Check if metadata field names have white space padding
+        clean_field_names = IsNotPadded(self._rows.keys())
+        if not clean_field_names:
+            # Report whitespace padding and clean up tuples
+            LOGGER.error(
+                "Whitespace padding in summary field names: ",
+                extra={"join": clean_field_names.failed},
+            )
+
+            # Order preserved in dict and validator
+            cleaned_entries = [
+                (ky, val) for ky, val in zip(clean_field_names, self._rows.values())
+            ]
+            self._rows = dict(cleaned_entries)
 
         # Validate the keys found in the summary table
         self._validate_keys()
