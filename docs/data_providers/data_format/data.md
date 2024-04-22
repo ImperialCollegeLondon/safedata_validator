@@ -48,7 +48,7 @@ The worksheet is organised into two sections:
     constitutes a valid name in `R`.
 
     Finally, the worksheet names must match with the worksheet names that were provided
-    in the [Summary sheet](./summary.md#data-worksheet).
+    in the [Summary sheet](./summary.md#the-data-worksheet-block).
 
 ## Field metadata
 

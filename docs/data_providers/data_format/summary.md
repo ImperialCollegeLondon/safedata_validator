@@ -151,8 +151,7 @@ URL `http://orcid.org/0000-0002-7005-1394`.
     researchers who facilitated the work, such as project supervisors and local
     collaborators.
 
-<!-- markdownlint-disable-next-line MD033 -->
-## The data worksheet block <a name="data-worksheet"></a>
+## The data worksheet block
 
 !!! Warning "Mandatory block"
     The **Worksheet external file** field is only required if a worksheet entry
