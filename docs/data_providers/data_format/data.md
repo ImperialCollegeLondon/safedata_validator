@@ -36,6 +36,20 @@ The worksheet is organised into two sections:
 * field metadata appears at the top of the sheet, and then
 * the actual data for each field appear below the metadata.
 
+!!! Note "Naming"
+    The Data worksheets can be given whatever names you feel are most appropriate, with
+    a few restrictions.
+
+    Firstly, the following names are not allowed as they are reserved for another
+    purpose: "Summary", "Taxa", "GBIFTaxa", "NCBITaxa", "Locations"
+
+    Secondly, all worksheet names should be valid `R` names. See
+    [here](https://adv-r.hadley.nz/names-values.html#non-syntactic) for details of what
+    constitutes a valid name in `R`.
+
+    Finally, the worksheet names must match with the worksheet names that were provided
+    in the [Summary sheet](./summary.md#data-worksheet).
+
 ## Field metadata
 
 Each data worksheet will require a particular set of **metadata descriptors** - some are
