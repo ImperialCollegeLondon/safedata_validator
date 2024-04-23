@@ -44,6 +44,11 @@ should appear in this worksheet. The worksheet must have the following structure
 | My_transect_1 | Yes | NA       | NA         | Linestring | Linestring(117.7762 4.9576, 117.7862 4.9676) |
 <!-- markdownlint-enable MD013 -->
 
+!!! Note "Naming"
+    This sheet must be called "Locations" for dataset validation to work properly. If it
+    is called something similar but not identical to "Locations" (e.g. "locations")
+    validation will fail.
+
 ## Known locations
 
 The location names are checked against a curated gazetteer of known locations maintained

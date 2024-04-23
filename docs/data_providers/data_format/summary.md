@@ -15,6 +15,11 @@ Some blocks allow multiple records (e.g. authors and data worksheets) with sets
 of values in adjacent columns  but other blocks only allow a single record (e.g.
 core fields and geographic extents).
 
+!!! Note "Naming"
+    This sheet must be called "Summary" for dataset validation to work properly. If it is
+    called something similar but not identical to "Summary" (e.g. "summary") validation
+    will fail.
+
 <!-- markdownlint-disable MD033 -->
 <style>
 
