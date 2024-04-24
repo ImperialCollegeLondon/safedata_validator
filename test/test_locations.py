@@ -342,10 +342,6 @@ def test_add_known_locations(caplog, locations_inst, known_loc_names, expected_l
                 (INFO, "Validating WKT data"),
                 (
                     ERROR,
-                    "ParseException: Expected number but encountered ')'",
-                ),  # From shapely.geos
-                (
-                    ERROR,
                     "WKT information badly formatted, not geometrically valid or 3D",
                 ),
             ),
