@@ -58,3 +58,17 @@ published.
 Once you have installed and configured these tools, then you can use the provided
 [command line tools](command_line_tools/overview.md) to validate and publish datasets.
 The [usage recipes](using_safedata/overview.md) show how the tools are used.
+
+## Example `safedata` format datasets
+
+<!-- The links here are hard coded to main, so if you've changed one of the files but 
+can't see the change in the docs that is why-->
+To help both data managers and data providers understand the `safedata` format we
+provide a number of resources. A template dataset containing the required worksheets,
+labels and headers, can be downloaded [here](https://github.com/ImperialCollegeLondon/safedata_validator/blob/main/docs/data_providers/data_format/Template.xlsx).
+<!-- TODO - Add a link to the example file here-->
+You can also look at existing published datasets, such as those from the SAFE Project,
+to see how the format is used:
+
+- [https://safeproject.net/datasets/view_datasets](https://safeproject.net/datasets/view_datasets)
+- [https://zenodo.org/communities/safe/](https://zenodo.org/communities/safe/)
