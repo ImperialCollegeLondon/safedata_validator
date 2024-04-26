@@ -69,6 +69,7 @@ mkdocs-include-markdown-plugin = "^6.0.4"
 mkdocs-material = "^8.3.9"
 mkdocstrings = "^0.24.0"
 mkdocstrings-python = "^1.7.5"
+mkdocs-table-reader-plugin = "^2.1.0"
 
 [build-system]
 requires = ["poetry-core>=1.2.0"]
