@@ -20,7 +20,7 @@ of the package.
 A configuration file can be passed as `config` when creating an instance, but if no
 arguments are provided then an attempt is made to find and load configuration files in
 the user and then site config locations defined by the `appdirs` package. See
-[here](../../data_managers/install/configuration.md#configuration-file-location) for
+[here](../../data_managers/install/configuration.md#configuration-file-locations) for
 details.
 """  # noqa D415
 
