@@ -32,7 +32,7 @@ Validate a dataset using a command line interface.
 positional arguments:
   filename      Path to the Excel file to be validated.
 
-optional arguments:
+options:
   -h, --help    show this help message and exit
   -r RESOURCES, --resources RESOURCES
                 A path to a resources configuration file

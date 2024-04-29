@@ -19,7 +19,7 @@ positional arguments:
     show_resources
                 Show the current resources details
 
-optional arguments:
+options:
   -h, --help    show this help message and exit
   -r RESOURCES, --resources RESOURCES
                 Path to a safedata_validator resource configuration file
