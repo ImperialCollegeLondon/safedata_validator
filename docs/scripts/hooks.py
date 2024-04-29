@@ -5,8 +5,14 @@ Details of how these hooks work can be found
 to INSERT USE CASE 1, INSERT USE CASE 2.
 """
 
+import os
+import subprocess
+
 
 def on_pre_build(config, **kwargs) -> None:
     """Generate the files needed to fully render the documentation."""
-    # THINK I SHOULD LOOK INTO
-    print("Hello world.")
+
+    # Change directory to commmand line usage folder
+    os.chdir("docs/data_managers/command_line_tools/command_line_usage/")
+    # Then run script to generate the command line usage text files
+    subprocess.call(["sh", "update_command_line_usage.sh"])
