@@ -10,7 +10,7 @@ positional arguments:
   zenodo_json   Path to a Zenodo JSON file for a deposit
   filepath      The path to the file to be uploaded
 
-optional arguments:
+options:
   -h, --help    show this help message and exit
   --zenodo_filename ZENODO_FILENAME
                 An optional alternative file name to be used on Zenodo
