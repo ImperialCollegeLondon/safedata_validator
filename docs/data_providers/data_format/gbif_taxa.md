@@ -51,15 +51,7 @@ usage!) but the GBIF backbone has very good taxonomic coverage and is well curat
 The table format looks like this:
 
 <!-- markdownlint-disable MD013 -->
-| Name       | Taxon name               | Taxon type    | Taxon ID | Ignore ID | Parent name | Parent type | Parent ID | Comments    |
-| ---------- | ------------------------ | ------------- | -------- | --------- | ----------- | ----------- | --------- | ----------- |
-| crbo       | Crematogaster borneensis | Species       |          |           |             |             |           |             |
-| dolic_sp   | Dolichoderus             | Genus         |          |           |             |             |           |             |
-| gannets    | Morus                    | Genus         | 2480962  |           |             |             |           |             |
-| lost_orang | Pongo tapanuliensis      | Species       |          |           | Pongo       | Genus       |           | New species |
-| morpho1    | NA                       | Morphospecies |          |           | Formicidae  | Family      |           |             |
-| bombines   | Bombini                  | Tribe         |          |           | Apidae      | Family      |           |             |
-| micr_hid   | Microcopris hidakai      | Species       |          | 1090433   | Microcopris | Genus       |           |             |
+{{ read_excel('Example.xlsx', sheet_name = 'GBIFTaxa', keep_default_na = False, tablefmt = 'github') }}
 <!-- markdownlint-enable MD013 -->
 
 The table must contain column headers in the **first row** of the worksheet. The first

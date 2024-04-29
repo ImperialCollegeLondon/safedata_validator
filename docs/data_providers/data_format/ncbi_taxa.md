@@ -50,13 +50,7 @@ taxonomic usage!) but the NCBI backbone has extremely good taxonomic coverage.
 The table format looks like this:
 
 <!-- markdownlint-disable MD013 -->
-| Name             | New | Superkingdom | Kingdom     | Phylum           | Class               | Comments |
-| ---------------- | --- | ------------ | ----------- | ---------------- | ------------------- | -------- |
-| G_proteobacteria |     | Bacteria     |             | Pseudomonadota   | Gammaproteobacteria |          |
-| E_mycetes        |     | Eukaryota    | Fungi       | Ascomycota       | Eurotiomycetes      |          |
-| Dinophyceae      |     | Eukaryota    |             |                  | Dinophyceae         |          |
-| Acidobact        |     |              | k__Bacteria | p__Acidobacteria | c__Acidobacteriia   |          |
-| New_fungus       | Yes | Eukaryota    | Fungi       | Ascomycota       | Mynewfungusetes     |          |
+{{ read_excel('Example.xlsx', sheet_name = 'NCBITaxa', keep_default_na = False, tablefmt = 'github') }}
 <!-- markdownlint-enable MD013 -->
 
 The table must contain column headers in the **first row** of the worksheet. The Name
