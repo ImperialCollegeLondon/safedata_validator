@@ -16,6 +16,8 @@ plugins:
   - mkdocstrings
   - include-markdown
   - table-reader
+hooks:
+  - docs/scripts/hooks.py
 extra_css:
   - custom.css
 use_directory_urls: false
