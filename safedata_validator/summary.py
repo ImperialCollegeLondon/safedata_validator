@@ -807,7 +807,7 @@ class Summary:
                     elif embargo_date > now + datetime.timedelta(days=2 * 365):
                         LOGGER.error("Embargo date more than two years in the future.")
                     else:
-                        LOGGER.info(f"Dataset access: embargoed until {embargo_date }")
+                        LOGGER.info(f"Dataset access: embargoed until {embargo_date}")
 
                 if access["access_conditions"] is not None:
                     LOGGER.error("Access conditions cannot be set on embargoed data.")
