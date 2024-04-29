@@ -868,7 +868,9 @@ def generate_inspire_xml(
     root = tree.getroot()
     nsmap = root.nsmap
 
-    pub_date = dt.fromisoformat(zenodo_metadata["metadata"]["publication_date"])
+    # A true "publication" date is not available until a record is published, so use the
+    # creation date of the deposit.
+    pub_date = dt.fromisoformat(zenodo_metadata["created"])
 
     # Use find and XPATH to populate the template, working through from the top of the
     # file
@@ -893,17 +895,11 @@ def generate_inspire_xml(
         pub_date.date().isoformat()
     )
 
-    # URIs - a dataset URL and the DOI
-    # dataset_url = (
-    #     f"{zres['mdapi']}/datasets/view_dataset"
-    #     f"?id={dataset_metadata['zenodo_record_id']}"
-    # )
-    # citation.find(
-    #     "gmd:identifier/gmd:MD_Identifier/gmd:code/gco:CharacterString", nsmap
-    # ).text = dataset_url
+    # URIs -  form the DOI URL from the prereserved DOI metadata
+    doi_url = f"https://doi.org/{zenodo_metadata['metadata']['prereserve_doi']['doi']}"
     citation.find(
-        "gmd:identifier/gmd:RS_Identifier/gmd:code/gco:CharacterString", nsmap
-    ).text = zenodo_metadata["doi_url"]
+        "gmd:identifier/gmd:MD_Identifier/gmd:code/gco:CharacterString", nsmap
+    ).text = doi_url
 
     # The citation string
     authors = [au["name"] for au in dataset_metadata["authors"]]
@@ -915,7 +911,7 @@ def generate_inspire_xml(
         author_string,
         pub_date.year,
         dataset_metadata["title"],
-        zenodo_metadata["doi_url"],
+        doi_url,
     )
 
     citation.find("gmd:otherCitationDetails/gco:CharacterString", nsmap).text = (
@@ -1034,7 +1030,12 @@ def generate_inspire_xml(
         dataset_metadata["latitudinal_extent"][1]
     )
 
-    # Dataset transfer options: direct download and dataset view on SAFE website
+    # Dataset transfer options: DOI
+    # NOTE - in an ideal world, this would point to the download URLs of the files, but
+    #        those are only finalised when the deposit is published and are only
+    #        populated in the draft as each file is added. So using the DOI is more
+    #        robust and also avoids an issue if the XML is added first.
+
     distrib = root.find("gmd:distributionInfo/gmd:MD_Distribution", nsmap)
     distrib.find(
         (
@@ -1042,14 +1043,7 @@ def generate_inspire_xml(
             "gmd:CI_OnlineResource/gmd:linkage/gmd:URL"
         ),
         nsmap,
-    ).text = zenodo_metadata["files"][0]["links"]["download"]
-    distrib.find(
-        (
-            "gmd:transferOptions[2]/gmd:MD_DigitalTransferOptions/gmd:onLine/"
-            "gmd:CI_OnlineResource/gmd:linkage/gmd:URL"
-        ),
-        nsmap,
-    ).text += str(dataset_metadata["zenodo_record_id"])
+    ).text = doi_url
 
     # LINEAGE STATEMENT
     # lineage = (
