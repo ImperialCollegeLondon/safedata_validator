@@ -15,7 +15,6 @@ import sys
 import tempfile
 import textwrap
 from pathlib import Path
-from typing import Optional
 
 import simplejson
 
@@ -59,7 +58,7 @@ def _desc_formatter(prog):
     return argparse.RawDescriptionHelpFormatter(prog, max_help_position=16)
 
 
-def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
+def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
     """Validate a dataset using a command line interface.
 
     This program validates an Excel file formatted as a `safedata` dataset.
@@ -161,7 +160,7 @@ def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s {version}".format(version=__version__),
+        version=f"%(prog)s {__version__}",
     )
 
     args = parser.parse_args(args=args_list)
@@ -194,7 +193,7 @@ def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
     return 0
 
 
-def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
+def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     """Publish validated datasets to Zenodo using a command line interface.
 
     This is a the command line interface for publishing safedata validated
@@ -849,7 +848,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
     return 0
 
 
-def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> int:
+def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
     """Post updated information to a safedata server instance.
 
     This command line tool provides functions to update a web server running
@@ -1033,7 +1032,7 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> int:
 # Local Database building
 
 
-def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> int:
+def _build_local_gbif_cli(args_list: list[str] | None = None) -> int:
     """Build a local GBIF database.
 
     This tool builds an SQLite database of the GBIF backbone taxonomy to use
@@ -1117,7 +1116,7 @@ def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> int:
     return 0
 
 
-def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> int:
+def _build_local_ncbi_cli(args_list: list[str] | None = None) -> int:
     """Build a local NCBI database.
 
     This tool builds an SQLite database of the NCBI  taxonomy to use in

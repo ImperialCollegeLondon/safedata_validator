@@ -1,11 +1,10 @@
 """Tests to check that the summary sheet functions work as intended."""
+
 import datetime
 from logging import ERROR, INFO, WARNING
 
 import pytest
-from dotmap import DotMap
 from openpyxl import Workbook
-from sympy import Sum
 
 from safedata_validator.logger import LOGGER
 from safedata_validator.resources import Resources
@@ -1286,6 +1285,56 @@ def test_load_rows_from_worksheet(data, expected_rows):
 
     # Test parsed rows match what was expected
     assert rows == expected_rows
+
+
+@pytest.mark.parametrize(
+    argnames=["rows", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            {
+                "title": [],
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            (),
+            id="good no padding",
+        ),
+        pytest.param(
+            {
+                "title ": [],
+                "description": [],
+                "access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "Whitespace padding in summary field names:"),),
+            id="padding after",
+        ),
+        pytest.param(
+            {
+                "title": [],
+                " description": [],
+                " access status": [],
+                "author name": [],
+                "keywords": [],
+            },
+            ((ERROR, "Whitespace padding in summary field names:"),),
+            id="padding before",
+        ),
+    ],
+)
+def test_check_for_whitespace(caplog, fixture_summary, rows, expected_log_entries):
+    """Test that function to check for whitespace padding in summary fields works."""
+
+    # Add rows to fixture
+    fixture_summary._rows = rows
+
+    # Check that row row headers contain mandatory fields
+    fixture_summary._check_for_whitespace()
+
+    log_check(caplog, expected_log_entries)
 
 
 @pytest.mark.parametrize(

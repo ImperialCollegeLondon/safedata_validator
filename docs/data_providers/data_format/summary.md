@@ -15,6 +15,11 @@ Some blocks allow multiple records (e.g. authors and data worksheets) with sets
 of values in adjacent columns  but other blocks only allow a single record (e.g.
 core fields and geographic extents).
 
+!!! Note "Naming"
+    This sheet must be called "Summary" for dataset validation to work properly. If it is
+    called something similar but not identical to "Summary" (e.g. "summary") validation
+    will fail.
+
 <!-- markdownlint-disable MD033 -->
 <style>
 
@@ -269,6 +274,12 @@ permits used to collect this data. The permit type value must be one of `researc
 | Permit authority | Sabah Biodiversity Centre |  |  |
 | Permit number    | ABC-123-456               |  |  |
 
+!!! Note "Unknown permit numbers"
+    With older datasets permit numbers are often no longer readily available, but it
+    remains important to acknowledge permit authorities. While effort should be made to
+    obtain original permit numbers, if they cannot be found "Unknown" should be entered
+    in the "Permit number" field.
+
 ## Gemini metadata
 
 It is important to publish dataset metadata using a recognised standard, as this aids
@@ -334,7 +345,7 @@ minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
 | Description               | This is an example dataset.                                 |                                                              |                                  |
 | Access status             | Embargo                                                     |                                                              |                                  |
 | Embargo date              | 03/09/18                                                    |                                                              |                                  |
-| Access conditions         |                  |               |
+| Access conditions         |                  |               |               |
 | Author name               | Orme, David                                                 |                                                              |                                  |
 | Author email              | <d.orme@imperial.ac.uk>                                       |                                                              |                                  |
 | Author affiliation        | Imperial College London                                     |                                                              |                                  |

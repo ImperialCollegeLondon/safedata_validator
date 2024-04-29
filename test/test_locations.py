@@ -1,4 +1,5 @@
 """Tests checking that the Locations class behaves as intended."""
+
 from logging import CRITICAL, ERROR, INFO, WARNING
 
 import openpyxl
@@ -339,10 +340,6 @@ def test_add_known_locations(caplog, locations_inst, known_loc_names, expected_l
             (
                 (INFO, "Checking new locations"),
                 (INFO, "Validating WKT data"),
-                (
-                    ERROR,
-                    "ParseException: Expected number but encountered ')'",
-                ),  # From shapely.geos
                 (
                     ERROR,
                     "WKT information badly formatted, not geometrically valid or 3D",

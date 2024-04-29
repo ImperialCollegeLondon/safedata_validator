@@ -7,7 +7,6 @@ methods for loading the summary data from file.
 import datetime
 import re
 from dataclasses import dataclass
-from typing import Optional, Union
 
 import requests  # type: ignore
 from openpyxl.worksheet.worksheet import Worksheet
@@ -16,6 +15,7 @@ from safedata_validator.extent import Extent
 from safedata_validator.logger import LOGGER, get_handler, loggerinfo_push_pop
 from safedata_validator.resources import Resources
 from safedata_validator.validators import (
+    IsNotPadded,
     IsNotSpace,
     IsString,
     NoPunctuation,
@@ -44,8 +44,8 @@ class SummaryField:
 
     key: str
     mandatory: bool
-    internal: Optional[str]
-    types: Union[type, tuple[type, ...]]
+    internal: str | None
+    types: type | tuple[type, ...]
 
 
 @dataclass
@@ -120,7 +120,7 @@ class Summary:
             soft_bounds=resources.extents.longitudinal_soft_extent,
         )
         """Extent instance for the longitudinal extent of the Dataset."""
-        self.external_files: Optional[list[dict]] = None
+        self.external_files: list[dict] | None = None
         """A list of dictionaries of external file metadata."""
         self.data_worksheets: list[Worksheet] = []
         """A list of dictionaries of data tables in the Dataset."""
@@ -133,7 +133,7 @@ class Summary:
         """The number of validation errors found in the summary."""
         self.projects: dict[int, str] = resources.projects
         """A dictionary of valid project data."""
-        self.project_id: Optional[list[int]] = None
+        self.project_id: list[int] | None = None
         """A list of project ID codes, if project IDs are configured."""
 
         self.validate_doi = False
@@ -306,6 +306,9 @@ class Summary:
         # continue processing.
         self._rows = {str(rw[0]).lower(): rw[1:] for rw in rows}
 
+        # Check if metadata keys have white space padding
+        self._check_for_whitespace()
+
         # Validate the keys found in the summary table
         self._validate_keys()
 
@@ -326,9 +329,30 @@ class Summary:
         # summary of processing
         self.n_errors = handler.counters["ERROR"] - start_errors
         if self.n_errors > 0:
-            LOGGER.info("Summary contains {} errors".format(self.n_errors))
+            LOGGER.info(f"Summary contains {self.n_errors} errors")
         else:
             LOGGER.info("Summary formatted correctly")
+
+    def _check_for_whitespace(self) -> None:
+        """Check that the summary keys do not have whitespace padding.
+
+        This function checks that the keys in a summary table do not have white space
+        padding, if they do the white space padding is removed and an error is logged.
+        """
+
+        clean_metadata_keys = IsNotPadded(self._rows.keys())
+        if not clean_metadata_keys:
+            # Report whitespace padding and clean up tuples
+            LOGGER.error(
+                "Whitespace padding in summary field names: ",
+                extra={"join": clean_metadata_keys.failed},
+            )
+
+            # Order preserved in dict and validator
+            cleaned_entries = [
+                (ky, val) for ky, val in zip(clean_metadata_keys, self._rows.values())
+            ]
+            self._rows = dict(cleaned_entries)
 
     def _validate_keys(self) -> None:
         """Validate the summary keys recovered.
@@ -360,7 +384,7 @@ class Summary:
         if unknown:
             LOGGER.error("Unknown metadata fields: ", extra={"join": unknown})
 
-    def _read_block(self, block: SummaryBlock) -> Optional[list]:
+    def _read_block(self, block: SummaryBlock) -> list | None:
         """Read a block of fields from a summary table.
 
         This internal method takes a given block definition from the Summary class
@@ -783,7 +807,7 @@ class Summary:
                     elif embargo_date > now + datetime.timedelta(days=2 * 365):
                         LOGGER.error("Embargo date more than two years in the future.")
                     else:
-                        LOGGER.info(f"Dataset access: embargoed until {embargo_date }")
+                        LOGGER.info(f"Dataset access: embargoed until {embargo_date}")
 
                 if access["access_conditions"] is not None:
                     LOGGER.error("Access conditions cannot be set on embargoed data.")
