@@ -1,3 +1,4 @@
+#!/bin/bash
 # This script echoes the command line usage for script tools to files in this
 # directory that can then be transcluded into markdown files using the 
 # mkdocs plugin include-markdown. The syntax is:
