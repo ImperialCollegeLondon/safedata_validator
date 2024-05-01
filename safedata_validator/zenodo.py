@@ -646,15 +646,6 @@ def dataset_description(
             ),
         )
 
-    # # XML link
-    # xml_url = f"{metadata_api}/xml/{zenodo['record_id']}"
-
-    # desc += tags.p(
-    #     tags.b("XML metadata: "),
-    #     "GEMINI compliant metadata for this dataset is available ",
-    #     tags.a("here", href=xml_url),
-    # )
-
     # Present a description of the file or files including 'external' files
     # (data files loaded directly to Zenodo).
     ds_files = [dataset_metadata["filename"]]
