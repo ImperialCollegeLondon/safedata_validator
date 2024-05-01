@@ -8,5 +8,5 @@ positional arguments:
   zenodo_json  Path to a Zenodo JSON file for a deposit
   filename     The name of the file to delete
 
-optional arguments:
+options:
   -h, --help   show this help message and exit

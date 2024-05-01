@@ -3,6 +3,7 @@
 import os
 import sys
 from collections import OrderedDict
+from importlib import resources
 
 import appdirs
 import certifi
@@ -55,6 +56,11 @@ def fixture_files():
 
     # Need to provide the path to the certifi CA bundle or requests breaks!
     real_files["certifi"] = certifi.where()
+
+    # Provide a path to the XML template location
+    real_files["xml_template"] = resources.path(
+        "safedata_validator.templates", "gemini_xml_template.xml"
+    )
 
     # Virtual file paths for the locations of config files.
     virtual_files = {
@@ -139,6 +145,22 @@ def config_filesystem(fs):
         "zenodo_sandbox_token = xyz",
         "zenodo_api = https://api.zenodo.org",
         "zenodo_token = xyz",
+        "[xml]",
+        "languageCode=eng",
+        "characterSet=utf8",
+        "contactName=The SAFE Project",
+        "contactCountry=United Kingdom",
+        "contactEmail=admin@safeproject.net",
+        "contactOrcID=http://orcid.org/0000-0003-3378-2814",
+        "contactRole=pointOfContact",
+        "epsgCode=4326",
+        "pointofcontactName=The SAFE Project",
+        "pointofcontactCountry=United Kingdom",
+        "pointofcontactEmail=admin@safeproject.net",
+        "pointofcontactOrcID=http://orcid.org/0000-0003-3378-2814",
+        "citationMDIdentifier=safe_project_dataset_website",
+        "topicCategories=biota,environment,geoscientificInformation",
+        "lineageStatement=A lineage statement",
     ]
 
     # Create config with local paths in the fixture directory

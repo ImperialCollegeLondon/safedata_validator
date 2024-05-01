@@ -6,8 +6,8 @@ configuration file.
 
 ## Configuration file format
 
-The file structure for the configuration file is a simple text file containing
-the details below:
+The file structure for the configuration file is a text file containing the details
+below:
 
 ```ini
 gbif_database = /path/to/local/backbone.sqlite3
@@ -39,6 +39,26 @@ zenodo_sandbox_token = xyz
 api = https://safeproject.net
 token = xyz
 ssl_verify = true
+
+[xml]
+languageCode=eng
+characterSet=utf8
+contactName=The SAFE Project
+contactCountry=United Kingdom
+contactEmail=admin@safeproject.net
+contactOrcID=http://orcid.org/0000-0003-3378-2814
+contactRole=pointOfContact
+epsgCode=4326
+pointofcontactName=The SAFE Project
+pointofcontactCountry=United Kingdom
+pointofcontactEmail=admin@safeproject.net
+pointofcontactOrcID=http://orcid.org/0000-0003-3378-2814
+citationMDIdentifier=safe_project_dataset_website
+topicCategories=biota,environment,geoscientificInformation
+lineageStatement="""This dataset was collected as part of a research project
+based at The SAFE Project. For details of the project and data collection,
+see the methods information contained within the datafile and the project
+website: https://safeproject.net."""
 ```
 
 ## Configuration file locations
@@ -99,7 +119,8 @@ The configuration file content breaks down into three distinct parts of the
   and the extents settings for a project, that are used to check a dataset is valid.
 
 * **Publication**: the account settings and access tokens used to publish validated
-  datasets to Zenodo.
+  datasets to Zenodo. This also includes the section of XML details, since we recommend
+  including XML metadata with published datasets.
 
 * **Metadata**: the URL and access tokens to send metadata about a dataset to a
   metadata server, allowing datasets to be accessed using the
@@ -218,6 +239,20 @@ configuration elements:
 
 : When this element is `true`, all datasets will be published to the testing sandbox
   site. Set this to `false` when you are ready to actually start publishing datasets.
+
+### XML configuration
+
+The `safedata_zenodo` tool can be used to generate a geo-spatial XML metadata file for a
+dataset. This is relatively high-level metadata that just includes the temporal and
+spatial bounds of the data, along with some contact and access details.
+
+We recommend that this file is included when datasets are published. If you want to do
+this, you will need to update this section with the details for your own project. You
+will likely only need to update the `contact...`, `pointofcontact...`, `topicCategories`
+and `lineageStatement` elements. The `contact...` details provide a general contact for
+the project and metadata, whereas the `pointofcontact` provides a contact about the
+specific dataset in addition to the authors. These contacts may very well be the same
+central data manager details. You do not have to provide OrcID, but we recommend it.
 
 ### Metadata configuration
 

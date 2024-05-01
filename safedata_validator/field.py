@@ -302,13 +302,19 @@ class Dataset:
             ):
                 LOGGER.error(
                     f"{label} extent values from the data fall outside the extents "
-                    f"set in the Summary sheet "
+                    "set in the Summary sheet "
                     f"({[str(x) for x in dataset_extent.extent]})"
                 )
             elif dataset_extent.populated and summary_extent.populated:
                 LOGGER.warning(
                     f"The {label} extent is set in Summary but also "
-                    f"is populated from the data - this may be deliberate!"
+                    "is populated from the data - this may be deliberate!"
+                )
+            elif dataset_extent.populated and not summary_extent.populated:
+                summary_extent = dataset_extent
+                LOGGER.info(
+                    f"The {label} extent in Summary is not set and has "
+                    "been populated from the data"
                 )
 
         # Dedent for final result
@@ -410,11 +416,12 @@ class Dataset:
 
         # Extents - summary take priority over dataset.
         for ext in ("temporal_extent", "latitudinal_extent", "longitudinal_extent"):
-            sum_ext = getattr(self.summary, ext)
-            if sum_ext is not None:
-                json_dict[ext] = sum_ext.extent
+            summary_extent = getattr(self.summary, ext)
+            data_extent = getattr(self, ext)
+            if summary_extent.populated:
+                json_dict[ext] = summary_extent.extent
             else:
-                json_dict[ext] = self.extent
+                json_dict[ext] = data_extent.extent
 
         return simplejson.dumps(json_dict, default=str, indent=2)
 
