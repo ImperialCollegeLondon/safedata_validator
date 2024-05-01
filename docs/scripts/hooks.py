@@ -21,4 +21,4 @@ def on_pre_build(config, **kwargs) -> None:
     # Change directory to command line usage folder
     os.chdir("docs/data_managers/command_line_tools/command_line_usage/")
     # Then run script to generate the command line usage text files
-    subprocess.run(["sh", "update_command_line_usage.sh > /dev/null"], shell=True)
+    subprocess.run(["sh", "update_command_line_usage.sh"], stdout=subprocess.DEVNULL)
