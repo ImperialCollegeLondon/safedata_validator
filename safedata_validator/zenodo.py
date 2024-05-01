@@ -546,7 +546,7 @@ Dataset description generation (HTML and GEMINI XML)
 """
 
 
-def dataset_description(
+def dataset_description_old(
     dataset_metadata: dict,
     zenodo_metadata: dict,
     render: bool = True,
@@ -1200,3 +1200,160 @@ def sync_local_dir(
             _get_file(f"{api}/api/record/{rec_id}", metadata)
 
         FORMATTER.pop()
+
+
+def dataset_description(
+    dataset_metadata: dict,
+    zenodo_metadata: dict,
+    render: bool = True,
+    extra: str | None = None,
+    resources: Resources | None = None,
+) -> tags.div | str:
+    """Create an HTML dataset description.
+
+    This function turns a dataset metadata JSON into html for inclusion in
+    published datasets. This content is used to populate the dataset description
+    section in the Zenodo metadata. Zenodo has a limited set of permitted HTML
+    tags, so this is quite simple HTML.
+
+    The available tags are: a, p, br, blockquote, strong, b, u, i, em, ul, ol,
+    li, sub, sup, div, strike. Note that `<a>` is currently only available on
+    Zenodo when descriptions are uploaded programmatically as a bug in their
+    web interface strips links.
+
+    The description can be modified for specific uses by including HTML via the
+    extra argument. This content is inserted below the dataset description.
+
+    Args:
+        dataset_metadata: The dataset metadata
+        zenodo_metadata: The Zenodo deposit metadata
+        render: Should the html be returned as text or as the underlying
+            dominate.tags.div object.
+        extra: Additional HTML content to include in the description.
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
+
+    Returns:
+        Either a string of rendered HTML or a dominate.tags.div object.
+    """
+
+    template_path = il_resources.path("safedata_validator", "templates")
+
+    # Using autoescape=False is not generally recommended, but some of the context
+    # elements contain HTML tags
+    env = Environment(
+        loader=FileSystemLoader(str(template_path)),
+        autoescape=False,
+    )
+
+    template = env.get_template("description_template.html")
+
+    # PROJECT Title and authors are added by Zenodo from zenodo metadata
+    # TODO - option to include here?
+    desc = tags.div()
+
+    context_dict = dict(
+        description=dataset_metadata["description"].replace("\n", "</br>")
+    )
+
+    # proj_url = URL('projects', 'project_view', args=[metadata['project_id']],
+    #               scheme=True, host=True)
+    # desc += P(B('Project: '), 'This dataset was collected as part of the following '
+    #                          'SAFE research project: ', A(B(title), _href=proj_url))
+    ##
+
+    # Funding information
+    context_dict["funders"] = dataset_metadata["funders"]
+    context_dict["permits"] = dataset_metadata["permits"]
+
+    # Filenames associated with the dataset
+    # TODO - the external file default should be an empty list, not None
+    context_dict["dataset_filename"] = dataset_metadata["filename"]
+    context_dict["external_files"] = (
+        []
+        if dataset_metadata["external_files"] is None
+        else dataset_metadata["external_files"]
+    )
+
+    context_dict["all_files"] = [context_dict["dataset_filename"]] + context_dict[
+        "external_files"
+    ]
+
+    ds_files = [dataset_metadata["filename"]]
+    n_ds_files = 1
+    ex_files = []
+
+    if dataset_metadata["external_files"]:
+        ex_files = dataset_metadata["external_files"]
+        ds_files += [f["file"] for f in ex_files]
+        n_ds_files += len(ex_files)
+
+    # Group the sheets by their 'external' file - which is None for sheets
+    # in the submitted workbook - and collect them into a dictionary by source
+    # file. get() is used here for older data where external was not present.
+
+    tables_by_source = dataset_metadata["dataworksheets"]
+
+    # Now group into a dictionary keyed by external source file - cannot sort
+    # None (no comparison operators) so use a substitute
+    tables_by_source.sort(key=lambda sh: sh.get("external") or False)
+    tables_by_source = groupby(
+        tables_by_source, key=lambda sh: sh.get("external") or False
+    )
+    tables_by_source = {g: list(v) for g, v in tables_by_source}
+
+    # We've now got a set of files (worksheet + externals) and a dictionary of table
+    # descriptions that might have an entry for each file.
+
+    # Report the worksheet first
+    desc += tags.p(tags.b(dataset_metadata["filename"]))
+
+    # Report internal tables
+    if False in tables_by_source:
+        context_dict["internal_tables"] = tables_by_source[False]
+        # [
+        #     table_description(tab) for tab in tables_by_source[False]
+        # ]
+    else:
+        context_dict["internal_tables"] = []
+
+    # Report on the other files
+    for exf in ex_files:
+        desc += tags.p(
+            tags.b(exf["file"]), tags.p(f"Description: {exf['description']}")
+        )
+
+        if exf["file"] in tables_by_source:
+            # Report table description
+            ext_tabs = tables_by_source[exf["file"]]
+            desc += tags.p(f"This file contains {len(ext_tabs)} data tables:")
+            desc += tags.ol([tags.li(table_description(tab)) for tab in ext_tabs])
+
+    # Add extents if populated
+    context_dict["temporal_extent"] = dataset_metadata["temporal_extent"]
+    context_dict["latitudinal_extent"] = dataset_metadata["latitudinal_extent"]
+    context_dict["longitudinal_extent"] = dataset_metadata["longitudinal_extent"]
+
+    # Find taxa data from each database and convert to HTML representation. The metadata
+    # will be an empty list if the dataset does not contain any taxa.
+    context_dict["gbif_timestamp"] = dataset_metadata["gbif_timestamp"]
+    context_dict["ncbi_timestamp"] = dataset_metadata["ncbi_timestamp"]
+
+    gbif_taxon_index = dataset_metadata["gbif_taxa"]
+    ncbi_taxon_index = dataset_metadata["ncbi_taxa"]
+
+    context_dict["gbif_taxa"] = (
+        taxon_index_to_text(taxa=gbif_taxon_index, html=True, auth="GBIF")
+        if gbif_taxon_index
+        else None
+    )
+
+    context_dict["ncbi_taxa"] = (
+        taxon_index_to_text(taxa=ncbi_taxon_index, html=True, auth="NCBI")
+        if ncbi_taxon_index
+        else None
+    )
+
+    html = template.render(context_dict)
+
+    return html
