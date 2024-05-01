@@ -868,7 +868,7 @@ def generate_inspire_xml(
         autoescape=select_autoescape(),
     )
 
-    template = env.get_template("gemini_xml_template_2.xml")
+    template = env.get_template("gemini_xml_template.xml")
 
     # Build some reused values from the metadata
     # URIs -  form the DOI URL from the prereserved DOI metadata

@@ -879,7 +879,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             LOGGER.error("XML output file already exists")
             return 1
 
-        with open(out_path, "wb") as outf:
+        with open(out_path, "w") as outf:
             outf.write(generated_xml)
 
         LOGGER.info("Inspire XML generated")

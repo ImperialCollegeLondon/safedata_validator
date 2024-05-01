@@ -79,8 +79,8 @@ CONFIGSPEC = {
     },
     "xml": {
         # Elements from the project wide configuration
-        "languageCode": "string(default=eng8)",
-        "characterSet": "string(default=utf8)",
+        "languageCode": "string(default=None)",
+        "characterSet": "string(default=None)",
         "contactName": "string(default=None)",
         "contactCountry": "string(default=None)",
         "contactEmail": "string(default=None)",
