@@ -139,6 +139,22 @@ def config_filesystem(fs):
         "zenodo_sandbox_token = xyz",
         "zenodo_api = https://api.zenodo.org",
         "zenodo_token = xyz",
+        "[xml]",
+        "languageCode=eng",
+        "characterSet=utf8",
+        "contactName=The SAFE Project",
+        "contactCountry=United Kingdom",
+        "contactEmail=admin@safeproject.net",
+        "contactOrcID=http://orcid.org/0000-0003-3378-2814",
+        "contactRole=pointOfContact",
+        "epsgCode=4326",
+        "pointofcontactName=The SAFE Project",
+        "pointofcontactCountry=United Kingdom",
+        "pointofcontactEmail=admin@safeproject.net",
+        "pointofcontactOrcID=http://orcid.org/0000-0003-3378-2814",
+        "citationMDIdentifier=safe_project_dataset_website",
+        "topicCategories=biota,environment,geoscientificInformation",
+        "lineageStatement=A lineage statement",
     ]
 
     # Create config with local paths in the fixture directory
