@@ -839,7 +839,9 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             zenodo_json = simplejson.load(zn_json)
 
         generated_html = dataset_description(
-            dataset_metadata=dataset_json, zenodo_metadata=zenodo_json
+            dataset_metadata=dataset_json,
+            zenodo_metadata=zenodo_json,
+            resources=resources,
         )
 
         out_path = Path(args.html_out)

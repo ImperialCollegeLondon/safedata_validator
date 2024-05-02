@@ -1236,16 +1236,27 @@ def dataset_description(
     if resources is None:
         resources = Resources()
 
-    template_path = il_resources.path("safedata_validator", "templates")
+    # Get the template path elements
+    if resources.zenodo.html_template is None:
+        template_path = str(il_resources.path("safedata_validator", "templates"))
+        template_file = "description_template.html"
+    else:
+        user_template = Path(resources.zenodo.html_template)
+        if not user_template.exists():
+            raise FileNotFoundError(
+                f"Configured html template not found: {resources.zenodo.html_template}"
+            )
+        template_path = str(user_template.parent)
+        template_file = user_template.name
 
     # Using autoescape=False is not generally recommended, but the title and taxa
     # context elements contain HTML tags
     env = Environment(
-        loader=FileSystemLoader(str(template_path)),
+        loader=FileSystemLoader(template_path),
         autoescape=False,
     )
 
-    template = env.get_template("description_template.html")
+    template = env.get_template(template_file)
 
     # PROJECT Title and authors are added by Zenodo from zenodo metadata
     # TODO - option to include here?
