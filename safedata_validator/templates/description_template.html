@@ -12,9 +12,10 @@
   </p>
   <ul>
     {% for fnd in funders %}
-    <li>{{ fnd.body}} ({{ fnd.type }}),
-      <!-- <a
-        href="https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1">https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1</a>) -->
+    <li>{{ fnd.body}} ({{ fnd.type }} {{ ', ' ~ fnd.ref if fnd.ref }}
+      {% if fnd.url %}
+      , <a href="{{ fnd.url }}">{{ fnd.url }}</a>
+      {% endif %})
     </li>
     {% endfor %}
   </ul>
@@ -41,9 +42,9 @@
   <!-- File information section -->
   <h1>Files</h1>
 
-  <p>This dataset consists of {{ all_files | length}} {{ 'file' if all_files |length == 1
+  <p>This dataset consists of {{ all_filenames | length}} {{ 'file' if all_filenames |length == 1
     else 'files' }}:
-    {{ all_files | join(', ') }}</p>
+    {{ all_filenames | join(', ') }}</p>
 
   <!-- Report on main dataset contents -->
   <h2>{{ dataset_filename }}</h2>
@@ -67,8 +68,32 @@
   {% endfor %}
   {% endif %}
 
-  <h1>Extents</h1>
+  <!-- Report on external files -->
+  {% for external_filename , external_tables in external_file_tables.items() %}
+  <h2>{{ external_filename }}</h2>
 
+  <p>This file contains {{ external_tables | length}} data tables:</p>
+  {% if external_tables %}
+  {% for tab in external_tables %}
+  <h3>{{ tab.title }}</h3>
+  <ul>
+    <li>Worksheet: {{ tab.name }}</li>
+    <li>Description: {{ tab.description }}</li>
+    <li>Number of fields: {{ tab.max_col }}</li>
+    <li>Number of data rows: {{ 'Unavailable (table metadata description only).' if
+      tab.n_data_row == 0 else tab.n_data_row }}</li>
+    <ul>
+      {% for fld in tab.fields %}
+      <li>{{ fld.field_name }}: {{ fld.description }} (type: {{ fld.field_type }})</li>
+      {% endfor %}
+    </ul>
+  </ul>
+  {% endfor %}
+  {% endif %}
+  {% endfor %}
+
+  <!-- Temporal and geographic extents -->
+  <h1>Extents</h1>
   <ul>
     <li>Date range: {{ temporal_extent | join(' to ') }}</li>
     <li>Latitudinal extent: {{ latitudinal_extent[0] | round(3) }}° to {{ latitudinal_extent[1] | round(3) }}°</li>

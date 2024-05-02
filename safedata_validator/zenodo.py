@@ -1211,18 +1211,13 @@ def dataset_description(
 ) -> tags.div | str:
     """Create an HTML dataset description.
 
-    This function turns a dataset metadata JSON into html for inclusion in
-    published datasets. This content is used to populate the dataset description
-    section in the Zenodo metadata. Zenodo has a limited set of permitted HTML
-    tags, so this is quite simple HTML.
+    This function takes the dataset metadata exported by safedata_validate and uses it
+    to populate an HTML template file. The resulting HTML can then be used to to provide
+    a summary description of the dataset, either for local use or to upload as the
+    description component of the Zenodo metadata,
 
-    The available tags are: a, p, br, blockquote, strong, b, u, i, em, ul, ol,
-    li, sub, sup, div, strike. Note that `<a>` is currently only available on
-    Zenodo when descriptions are uploaded programmatically as a bug in their
-    web interface strips links.
-
-    The description can be modified for specific uses by including HTML via the
-    extra argument. This content is inserted below the dataset description.
+    A default template is provided with the safedata_validator package, but users can
+    provide bespoke templates via the configuration file.
 
     Args:
         dataset_metadata: The dataset metadata
@@ -1237,10 +1232,14 @@ def dataset_description(
         Either a string of rendered HTML or a dominate.tags.div object.
     """
 
+    # Load resources if needed
+    if resources is None:
+        resources = Resources()
+
     template_path = il_resources.path("safedata_validator", "templates")
 
-    # Using autoescape=False is not generally recommended, but some of the context
-    # elements contain HTML tags
+    # Using autoescape=False is not generally recommended, but the title and taxa
+    # context elements contain HTML tags
     env = Environment(
         loader=FileSystemLoader(str(template_path)),
         autoescape=False,
@@ -1250,7 +1249,6 @@ def dataset_description(
 
     # PROJECT Title and authors are added by Zenodo from zenodo metadata
     # TODO - option to include here?
-    desc = tags.div()
 
     context_dict = dict(
         description=dataset_metadata["description"].replace("\n", "</br>")
@@ -1275,59 +1273,39 @@ def dataset_description(
         else dataset_metadata["external_files"]
     )
 
-    context_dict["all_files"] = [context_dict["dataset_filename"]] + context_dict[
-        "external_files"
+    context_dict["all_filenames"] = [context_dict["dataset_filename"]] + [
+        f["file"] for f in context_dict["external_files"]
     ]
-
-    ds_files = [dataset_metadata["filename"]]
-    n_ds_files = 1
-    ex_files = []
-
-    if dataset_metadata["external_files"]:
-        ex_files = dataset_metadata["external_files"]
-        ds_files += [f["file"] for f in ex_files]
-        n_ds_files += len(ex_files)
 
     # Group the sheets by their 'external' file - which is None for sheets
     # in the submitted workbook - and collect them into a dictionary by source
-    # file. get() is used here for older data where external was not present.
+    # file. Because you can't sort None elements, this uses  '__internal__' to
+    # represent internal sheets.
+    tables_by_source = [
+        (sh["external"] or "__internal__", sh)
+        for sh in dataset_metadata["dataworksheets"]
+    ]
 
-    tables_by_source = dataset_metadata["dataworksheets"]
-
-    # Now group into a dictionary keyed by external source file - cannot sort
-    # None (no comparison operators) so use a substitute
-    tables_by_source.sort(key=lambda sh: sh.get("external") or False)
-    tables_by_source = groupby(
-        tables_by_source, key=lambda sh: sh.get("external") or False
-    )
-    tables_by_source = {g: list(v) for g, v in tables_by_source}
+    # Now group into a dictionary keyed by __internal__ or external file names
+    tables_by_source.sort(key=lambda sh: sh[0])
+    tables_grouped_by_source = groupby(tables_by_source, key=lambda sh: sh[0])
+    tables_dict_by_source = {
+        ky: [val[1] for val in tpl] for ky, tpl in tables_grouped_by_source
+    }
 
     # We've now got a set of files (worksheet + externals) and a dictionary of table
     # descriptions that might have an entry for each file.
-
-    # Report the worksheet first
-    desc += tags.p(tags.b(dataset_metadata["filename"]))
-
-    # Report internal tables
-    if False in tables_by_source:
-        context_dict["internal_tables"] = tables_by_source[False]
-        # [
-        #     table_description(tab) for tab in tables_by_source[False]
-        # ]
+    # Add internal tables to context
+    if "__internal__" in tables_dict_by_source:
+        context_dict["internal_tables"] = tables_dict_by_source.pop("__internal__")
     else:
         context_dict["internal_tables"] = []
 
-    # Report on the other files
-    for exf in ex_files:
-        desc += tags.p(
-            tags.b(exf["file"]), tags.p(f"Description: {exf['description']}")
-        )
-
-        if exf["file"] in tables_by_source:
-            # Report table description
-            ext_tabs = tables_by_source[exf["file"]]
-            desc += tags.p(f"This file contains {len(ext_tabs)} data tables:")
-            desc += tags.ol([tags.li(table_description(tab)) for tab in ext_tabs])
+    # Add external tables to context if there are any remaining entries
+    if tables_dict_by_source:
+        context_dict["external_file_tables"] = tables_dict_by_source
+    else:
+        context_dict["external_file_tables"] = dict()
 
     # Add extents if populated
     context_dict["temporal_extent"] = dataset_metadata["temporal_extent"]
