@@ -49,8 +49,8 @@
   <!-- Report on main dataset contents -->
   <h2>{{ dataset_filename }}</h2>
 
-  <p>This file contains dataset metadata and {{ internal_tables | length}} data tables:</p>
   {% if internal_tables %}
+  <p>This file contains dataset metadata and {{ internal_tables | length}} data tables:</p>
   {% for tab in internal_tables %}
   <h3>{{ tab.title }}</h3>
   <ul>
@@ -66,15 +66,20 @@
     </ul>
   </ul>
   {% endfor %}
+  {% else %}
+  <p>This file only contains dataset metadata.</p>
   {% endif %}
 
   <!-- Report on external files -->
-  {% for external_filename , external_tables in external_file_tables.items() %}
+  {% for external_filename , external_data in external_file_data.items() %}
   <h2>{{ external_filename }}</h2>
 
-  <p>This file contains {{ external_tables | length}} data tables:</p>
-  {% if external_tables %}
-  {% for tab in external_tables %}
+  <p>{{ external_data['description'] }}</p>
+
+  {% if external_data['tables'] %}
+  <p>This file contains {{ external_data['tables'] | length}} data tables:</p>
+
+  {% for tab in external_data['tables'] %}
   <h3>{{ tab.title }}</h3>
   <ul>
     <li>Worksheet: {{ tab.name }}</li>

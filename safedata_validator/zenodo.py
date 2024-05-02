@@ -284,7 +284,7 @@ def upload_metadata(
     ]
 
     zen_md["metadata"]["description"] = dataset_description(
-        metadata, zenodo, render=True, resources=resources
+        dataset_metadata=metadata, zenodo_metadata=zenodo, resources=resources
     )
 
     # attach the metadata to the deposit resource
@@ -1205,8 +1205,6 @@ def sync_local_dir(
 def dataset_description(
     dataset_metadata: dict,
     zenodo_metadata: dict,
-    render: bool = True,
-    extra: str | None = None,
     resources: Resources | None = None,
 ) -> tags.div | str:
     """Create an HTML dataset description.
@@ -1222,15 +1220,16 @@ def dataset_description(
     Args:
         dataset_metadata: The dataset metadata
         zenodo_metadata: The Zenodo deposit metadata
-        render: Should the html be returned as text or as the underlying
-            dominate.tags.div object.
-        extra: Additional HTML content to include in the description.
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
     Returns:
         Either a string of rendered HTML or a dominate.tags.div object.
     """
+
+    # NOTE - this could conceivably just pass the complete dataset metadata dictionary
+    #        straight to the Jinja template context. That would make the template more
+    #        complex but would also expose all of the metadata.
 
     # Load resources if needed
     if resources is None:
@@ -1276,8 +1275,9 @@ def dataset_description(
     context_dict["permits"] = dataset_metadata["permits"]
 
     # Filenames associated with the dataset
-    # TODO - the external file default should be an empty list, not None
     context_dict["dataset_filename"] = dataset_metadata["filename"]
+    # TODO - the external file default in the metadata definition should be an
+    #        empty list, not None
     context_dict["external_files"] = (
         []
         if dataset_metadata["external_files"] is None
@@ -1288,10 +1288,10 @@ def dataset_description(
         f["file"] for f in context_dict["external_files"]
     ]
 
-    # Group the sheets by their 'external' file - which is None for sheets
-    # in the submitted workbook - and collect them into a dictionary by source
-    # file. Because you can't sort None elements, this uses  '__internal__' to
-    # represent internal sheets.
+    # Group the sheets by their 'external' file - which is None for sheets in the
+    # submitted workbook - and collect them into a dictionary by source file. Because
+    # you can't sort a mix of strings and None elements, this substitutes in
+    # '__internal__' to represent internal sheets.
     tables_by_source = [
         (sh["external"] or "__internal__", sh)
         for sh in dataset_metadata["dataworksheets"]
@@ -1300,23 +1300,41 @@ def dataset_description(
     # Now group into a dictionary keyed by __internal__ or external file names
     tables_by_source.sort(key=lambda sh: sh[0])
     tables_grouped_by_source = groupby(tables_by_source, key=lambda sh: sh[0])
+
+    # Convert to a list of table information, keyed by file.
     tables_dict_by_source = {
         ky: [val[1] for val in tpl] for ky, tpl in tables_grouped_by_source
     }
 
-    # We've now got a set of files (worksheet + externals) and a dictionary of table
-    # descriptions that might have an entry for each file.
-    # Add internal tables to context
+    # We've now  a dictionary of table descriptions that might have an entry for each
+    # provided file. Get the internal tables separately in the context
     if "__internal__" in tables_dict_by_source:
         context_dict["internal_tables"] = tables_dict_by_source.pop("__internal__")
     else:
         context_dict["internal_tables"] = []
 
-    # Add external tables to context if there are any remaining entries
-    if tables_dict_by_source:
-        context_dict["external_file_tables"] = tables_dict_by_source
+    # Now need to pair any external table metadata with the external file descriptions.
+    # TODO - the external file default in the metadata definition should be an
+    #        empty list, not None
+    if dataset_metadata["external_files"] is None:
+        external_files = dict()
     else:
-        context_dict["external_file_tables"] = dict()
+        # Repackage external metadata to be keyed by file name and provide description
+        # and a default empty list of tables
+        external_files = {
+            vl["file"]: {"description": vl["description"], "tables": []}
+            for vl in dataset_metadata["external_files"]
+        }
+        # Add the remaining table descriptions to the appropriate files.
+        for extf_key, extf_tabs in tables_dict_by_source.items():
+            external_files[extf_key]["tables"] = extf_tabs
+
+    context_dict["external_file_data"] = external_files
+
+    # Populate a list of filenames
+    context_dict["all_filenames"] = [context_dict["dataset_filename"]] + list(
+        external_files.keys()
+    )
 
     # Add extents if populated
     context_dict["temporal_extent"] = dataset_metadata["temporal_extent"]
