@@ -34,6 +34,7 @@ zenodo_api = https://api.zenodo.org
 zenodo_token = abc
 zenodo_sandbox_api = https://sandbox.zenodo.org
 zenodo_sandbox_token = xyz
+html_template = /path/to/html_jinja_template.html
 
 [metadata]
 api = https://safeproject.net
@@ -232,6 +233,27 @@ configuration elements:
 
 : When this element is `true`, all datasets will be published to the testing sandbox
   site. Set this to `false` when you are ready to actually start publishing datasets.
+
+**The `html_template` element**
+
+: An optional path to an alternative template for generating an HTML dataset description
+  for use in Zenodo (see below).
+
+#### HTML description template
+
+A published Zenodo record contains a description of the dataset, which is formatted
+using HTML. This is basically just a more human readable summary of the dataset
+metadata, and is created by filling in a template with the metadata for a given
+dataset. The `safedata_validator` package contains a [default
+template](https://raw.githubusercontent.com/ImperialCollegeLondon/safedata_validator/main/safedata_validator/templates/description_template.html)
+that implements a fairly complete description of the main dataset metadata.
+
+However, you may want to use a different template: you might want a different structure
+or wording or you might want to leave out some of the bulkier information. You can do
+this by taking the default template, editing it and then providing the path to the new
+template in your configuration file. The template uses the [Jinja templating
+syntax](https://jinja.palletsprojects.com/en/latest/templates/) and the default uses all
+of the metadata elements currently exposed for generating descriptions.
 
 ### XML configuration
 

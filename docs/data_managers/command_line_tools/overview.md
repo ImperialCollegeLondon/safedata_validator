@@ -32,7 +32,9 @@ For more details, see [here](safedata_validate.md).
 
 These tools are used to manage the process of publishing a validated dataset to Zenodo.
 The configuration is a little more complex, as it requires the setup of a Zenodo
-community account and access tokens.
+community account and access tokens and you may also want to edit the default
+[HTML description](../install/configuration.md#html-description-template) used on Zenodo
+and provide additional information to include XML summary metadata.
 
 For more details, see [here](safedata_zenodo.md).
 
