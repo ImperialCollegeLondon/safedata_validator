@@ -254,9 +254,9 @@ metadata specification.
 **The `languageCode`, `characterSet` and `epsgCode` elements**
 
 : It is unlikely that you will need to change these, but they just identify the language
-used in the dataset, the character encoding of the metadata and the [EPSG](epsg.io) code
-of the geographic coordinate system used in the data. The default value of 4326 is the
-code for the widely used WGS84 datum.
+used in the dataset, the character encoding of the metadata and the
+[EPSG](https://epsg.io) code of the geographic coordinate system used in the data. The
+default value of 4326 is the code for the widely used WGS84 datum.
 
 **The `contactCountry` and `contactEmail` elements**
 
