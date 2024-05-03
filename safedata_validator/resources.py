@@ -77,6 +77,17 @@ CONFIGSPEC = {
         "token": "string(default=None)",
         "ssl_verify": "boolean(default=True)",
     },
+    "xml": {
+        # Additional elements required for XML
+        "languageCode": "string(default=None)",
+        "characterSet": "string(default=None)",
+        "contactCountry": "string(default=None)",
+        "contactEmail": "string(default=None)",
+        "epsgCode": "integer(default=4326)",
+        "projectURL": "string(default=None)",
+        "topicCategories": "string_list(default=None)",
+        "lineageStatement": "string(default=None)",
+    },
 }
 """dict: The safedata_validator package use the `configobj.ConfigObj`
 package to handle resource configuration. This dict defines the basic expected
@@ -235,6 +246,7 @@ class Resources:
         self.extents = config_loaded.extents
         self.zenodo = config_loaded.zenodo
         self.metadata = config_loaded.metadata
+        self.xml = config_loaded.xml
 
         self.gbif_timestamp: str | None = None
         self.ncbi_timestamp: str | None = None

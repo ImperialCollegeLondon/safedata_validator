@@ -11,5 +11,5 @@ positional arguments:
   dataset_json  Path to a JSON metadata file for a dataset
   html_out      Output path for the HTML file
 
-optional arguments:
+options:
   -h, --help    show this help message and exit

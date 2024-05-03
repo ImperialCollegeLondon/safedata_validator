@@ -11,10 +11,12 @@
 from __future__ import annotations
 
 import copy
+import decimal
 import hashlib
 import os
 import shutil
 from datetime import datetime as dt
+from importlib import resources as il_resources  # avoid confusion with sdv.resources
 from itertools import groupby
 from pathlib import Path
 from typing import Optional
@@ -24,7 +26,7 @@ import rispy
 import simplejson
 from dominate import tags
 from dominate.util import raw
-from lxml import etree
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from tqdm import tqdm
 from tqdm.utils import CallbackIOWrapper
 
@@ -130,6 +132,22 @@ def _compute_md5(fname: str) -> str:
 def _zenodo_error_message(response) -> str:
     """Format a Zenodo JSON error response as a string."""
     return f"{response.json()['message']} ({response.json()['status']})"
+
+
+def _min_dp(val: float, min_digits: int = 2) -> str:
+    """Display a number with a minimum number of decimal places.
+
+    INSPIRE/GEMINI XML requires a bounding box with at least two decimal places
+    provided, even if that is 4.50 rather than 4.5. This function tries to ensure that
+    representation.
+    """
+
+    decimal_val = decimal.Decimal(str(val))
+    round_precision = decimal_val.as_tuple().exponent
+    format_precision = max(abs(round_precision), min_digits)  # type: ignore [arg-type]
+    string_format = f"0.{format_precision}f"
+
+    return format(val, string_format)
 
 
 # Zenodo action functions
@@ -645,15 +663,6 @@ def dataset_description(
             ),
         )
 
-    # # XML link
-    # xml_url = f"{metadata_api}/xml/{zenodo['record_id']}"
-
-    # desc += tags.p(
-    #     tags.b("XML metadata: "),
-    #     "GEMINI compliant metadata for this dataset is available ",
-    #     tags.a("here", href=xml_url),
-    # )
-
     # Present a description of the file or files including 'external' files
     # (data files loaded directly to Zenodo).
     ds_files = [dataset_metadata["filename"]]
@@ -838,238 +847,115 @@ def generate_inspire_xml(
     zenodo_metadata: dict,
     resources: Resources,
     lineage_statement: str | None = None,
-) -> bytes:
+) -> str:
     """Convert dataset and zenodo metadata into GEMINI XML.
 
     Produces an INSPIRE/GEMINI formatted XML record from dataset metadata,
     and Zenodo record metadata using a template XML file. The dataset URL
     defaults to the Zenodo record but can be replaced if a separate URL (such as
     a project specific website) is used. The Gemini XML standard requires a
-    statement about the lineage of a dataset - if this is not provided to this
-    function it will appear as "Not provided".
+    statement about the lineage of a dataset - this is automatically taken from the
+    package configuration but can be overridden for individual datasets, for example to
+    add dataset specific links, using the `lineage_statement` argument.
 
     Args:
         dataset_metadata: A dictionary of the dataset metadata
         zenodo_metadata: A dictionary of the Zenodo record metadata
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
-        lineage_statement: An optional lineage statement about the data.
+        lineage_statement: An optional alternative lineage statement about the data.
 
     Returns:
         A string containing GEMINI compliant XML.
     """
 
-    # Get resource configuration
-    # zres = _resources_to_zenodo_api(resources)
-
-    # parse the XML template and get the namespace map
-    template = Path(__file__).parent / "gemini_xml_template.xml"
-    tree = etree.parse(template)
-    root = tree.getroot()
-    nsmap = root.nsmap
-
-    pub_date = dt.fromisoformat(zenodo_metadata["metadata"]["publication_date"])
-
-    # Use find and XPATH to populate the template, working through from the top of the
-    # file
-
-    # file identifier
-    root.find("./gmd:fileIdentifier/gco:CharacterString", nsmap).text = "zenodo." + str(
-        zenodo_metadata["id"]
+    template_path = il_resources.files("safedata_validator.templates").joinpath(
+        "gemini_xml_template.xml"
     )
 
-    # date stamp (not clear what this is - taken as publication date)
-    root.find("./gmd:dateStamp/gco:DateTime", nsmap).text = pub_date.isoformat()
-
-    # Now zoom to the data identification section
-    data_id = root.find(".//gmd:MD_DataIdentification", nsmap)
-
-    # CITATION
-    citation = data_id.find("gmd:citation/gmd:CI_Citation", nsmap)
-    citation.find("gmd:title/gco:CharacterString", nsmap).text = dataset_metadata[
-        "title"
-    ]
-    citation.find("gmd:date/gmd:CI_Date/gmd:date/gco:Date", nsmap).text = (
-        pub_date.date().isoformat()
+    # Get the Jinja environment and load the template
+    # - mypy: importlib returns a Traversable, which is a protocol that Path complies
+    #         with, but the attribute isn't being recognized
+    env = Environment(
+        loader=FileSystemLoader(template_path.parent),  # type: ignore [attr-defined]
+        autoescape=select_autoescape(),
     )
 
-    # URIs - a dataset URL and the DOI
-    # dataset_url = (
-    #     f"{zres['mdapi']}/datasets/view_dataset"
-    #     f"?id={dataset_metadata['zenodo_record_id']}"
-    # )
-    # citation.find(
-    #     "gmd:identifier/gmd:MD_Identifier/gmd:code/gco:CharacterString", nsmap
-    # ).text = dataset_url
-    citation.find(
-        "gmd:identifier/gmd:RS_Identifier/gmd:code/gco:CharacterString", nsmap
-    ).text = zenodo_metadata["doi_url"]
+    template = env.get_template(template_path.name)
 
-    # The citation string
+    # Build some reused values from the metadata
+    # URIs -  form the DOI URL from the prereserved DOI metadata
+    doi_url = f"https://doi.org/{zenodo_metadata['metadata']['prereserve_doi']['doi']}"
+
+    # A true "publication" date is not available until a record is published, so use the
+    # creation date of the deposit as a reasonable replacement, with the caveat that you
+    # should generate the XML and publish on the same day.
+    pub_date = dt.fromisoformat(zenodo_metadata["created"]).date()
+
+    # A citation string
     authors = [au["name"] for au in dataset_metadata["authors"]]
     author_string = ", ".join(authors)
     if len(authors) > 1:
         author_string = author_string.replace(", " + authors[-1], " & " + authors[-1])
 
-    cite_string = "{} ({}) {} [Dataset] {}".format(
-        author_string,
-        pub_date.year,
-        dataset_metadata["title"],
-        zenodo_metadata["doi_url"],
+    citation_string = (
+        f"{author_string} ({pub_date.year}) "
+        f"{dataset_metadata['title']} [Dataset] {doi_url}"
     )
 
-    citation.find("gmd:otherCitationDetails/gco:CharacterString", nsmap).text = (
-        cite_string
-    )
-
-    # ABSTRACT
-    data_id.find("gmd:abstract/gco:CharacterString", nsmap).text = dataset_metadata[
-        "description"
-    ]
-
-    # KEYWORDS
-    # - find the container node for the free keywords
-    keywords = data_id.find("./gmd:descriptiveKeywords/gmd:MD_Keywords", nsmap)
-    # - get the placeholder node
-    keywd_node = keywords.getchildren()[0]
-    # - duplicate it if needed
-    for new_keywd in range(len(dataset_metadata["keywords"]) - 1):
-        keywords.append(copy.deepcopy(keywd_node))
-    # populate the nodes
-    for key_node, val in zip(keywords.getchildren(), dataset_metadata["keywords"]):
-        key_node.find("./gco:CharacterString", nsmap).text = val
-
-    # AUTHORS - find the point of contact with author role from the template and its
-    # index using xpath() here to access full xpath predicate search.
-    au_xpath = (
-        "./gmd:pointOfContact[gmd:CI_ResponsibleParty/"
-        "gmd:role/gmd:CI_RoleCode='author']"
-    )
-    au_node = data_id.xpath(au_xpath, namespaces=nsmap)[0]
-    au_idx = data_id.index(au_node)
-
-    # - duplicate it if needed into the tree
-    for n in range(len(dataset_metadata["authors"]) - 1):
-        data_id.insert(au_idx, copy.deepcopy(au_node))
-
-    # now populate the author nodes, there should now be one for each author
-    au_ls_xpath = (
-        "./gmd:pointOfContact[gmd:CI_ResponsibleParty/"
-        "gmd:role/gmd:CI_RoleCode='author']"
-    )
-    au_node_list = data_id.xpath(au_ls_xpath, namespaces=nsmap)
-
-    for au_data, au_node in zip(dataset_metadata["authors"], au_node_list):
-        resp_party = au_node.find("gmd:CI_ResponsibleParty", nsmap)
-        resp_party.find("gmd:individualName/gco:CharacterString", nsmap).text = au_data[
-            "name"
-        ]
-        resp_party.find("gmd:organisationName/gco:CharacterString", nsmap).text = (
-            au_data["affiliation"]
-        )
-        contact_info = resp_party.find("gmd:contactInfo/gmd:CI_Contact", nsmap)
-        email_path = (
-            "gmd:address/gmd:CI_Address/gmd:electronicMailAddress/gco:CharacterString"
-        )
-        contact_info.find(email_path, nsmap).text = au_data["email"]
-
-        # handle orcid resource
-        orcid = contact_info.find("gmd:onlineResource", nsmap)
-        if au_data["orcid"] is None:
-            contact_info.remove(orcid)
-        else:
-            orcid.find("gmd:CI_OnlineResource/gmd:linkage/gmd:URL", nsmap).text = (
-                "http://orcid.org/" + au_data["orcid"]
-            )
-
-    # CONSTRAINTS
-    # update the citation information in the second md constraint
-    md_path = (
-        "gmd:resourceConstraints/gmd:MD_Constraints/"
-        "gmd:useLimitation/gco:CharacterString"
-    )
-    md_constraint = data_id.find(md_path, nsmap)
-    md_constraint.text += cite_string
-
-    # embargo or not?
-    embargo_path = (
-        "gmd:resourceConstraints/gmd:MD_LegalConstraints/"
-        "gmd:otherConstraints/gco:CharacterString"
-    )
+    # Resource constraints text
     if dataset_metadata["access"] == "embargo":
-        data_id.find(embargo_path, nsmap).text = (
+        access_statement = (
             f"This data is under embargo until {dataset_metadata['embargo_date']}."
             "After that date there are no restrictions to public access."
         )
     elif dataset_metadata["access"] == "restricted":
-        data_id.find(embargo_path, nsmap).text = (
+        access_statement = (
             "This dataset is currently not publicly available, please contact the "
             "Zenodo community owner to request access."
         )
     else:
-        data_id.find(embargo_path, nsmap).text = (
-            "There are no restrictions to public access."
-        )
+        access_statement = "There are no restrictions to public access."
 
-    # EXTENTS
-    temp_extent = root.find(".//gmd:EX_TemporalExtent", nsmap)
-    temp_extent.find(".//gml:beginPosition", nsmap).text = dataset_metadata[
-        "temporal_extent"
-    ][0][:10]
-    temp_extent.find(".//gml:endPosition", nsmap).text = dataset_metadata[
-        "temporal_extent"
-    ][1][:10]
+    # Get a copy of the project wide XML configuration from the resources and update it
+    # with the file specific elements from the zenodo and dataset metadata
+    context_dict = resources.xml.copy()
 
-    geo_extent = root.find(".//gmd:EX_GeographicBoundingBox", nsmap)
-    geo_extent.find("./gmd:westBoundLongitude/gco:Decimal", nsmap).text = str(
-        dataset_metadata["longitudinal_extent"][0]
+    context_dict.update(
+        # Values also used on the Zenodo information or duplicated in the xml
+        contactName=resources.zenodo.contact_name,
+        contactOrcID=resources.zenodo.contact_orcid,
+        pointofcontactName=resources.zenodo.contact_name,
+        pointofcontactCountry=resources.xml.contactCountry,
+        pointofcontactEmail=resources.xml.contactEmail,
+        pointofcontactOrcID=resources.zenodo.contact_name,
+        # Dataset specific information
+        citationRSIdentifier=doi_url,
+        dateStamp=pub_date.isoformat(),
+        publicationDate=pub_date.isoformat(),
+        fileIdentifier=str(zenodo_metadata["id"]),
+        title=dataset_metadata["title"],
+        authors=dataset_metadata["authors"],
+        abstract=dataset_metadata["description"],
+        keywords=dataset_metadata["keywords"],
+        citationString=citation_string,
+        embargoValue=access_statement,
+        startDate=dataset_metadata["temporal_extent"][0][:10],
+        endDate=dataset_metadata["temporal_extent"][1][:10],
+        westBoundLongitude=_min_dp(dataset_metadata["longitudinal_extent"][0], 2),
+        eastBoundLongitude=_min_dp(dataset_metadata["longitudinal_extent"][1], 2),
+        southBoundLatitude=_min_dp(dataset_metadata["latitudinal_extent"][0], 2),
+        northBoundLatitude=_min_dp(dataset_metadata["latitudinal_extent"][1], 2),
+        downloadLink=doi_url,
     )
-    geo_extent.find("./gmd:eastBoundLongitude/gco:Decimal", nsmap).text = str(
-        dataset_metadata["longitudinal_extent"][1]
-    )
-    geo_extent.find("./gmd:southBoundLatitude/gco:Decimal", nsmap).text = str(
-        dataset_metadata["latitudinal_extent"][0]
-    )
-    geo_extent.find("./gmd:northBoundLatitude/gco:Decimal", nsmap).text = str(
-        dataset_metadata["latitudinal_extent"][1]
-    )
 
-    # Dataset transfer options: direct download and dataset view on SAFE website
-    distrib = root.find("gmd:distributionInfo/gmd:MD_Distribution", nsmap)
-    distrib.find(
-        (
-            "gmd:transferOptions[1]/gmd:MD_DigitalTransferOptions/gmd:onLine/"
-            "gmd:CI_OnlineResource/gmd:linkage/gmd:URL"
-        ),
-        nsmap,
-    ).text = zenodo_metadata["files"][0]["links"]["download"]
-    distrib.find(
-        (
-            "gmd:transferOptions[2]/gmd:MD_DigitalTransferOptions/gmd:onLine/"
-            "gmd:CI_OnlineResource/gmd:linkage/gmd:URL"
-        ),
-        nsmap,
-    ).text += str(dataset_metadata["zenodo_record_id"])
+    # Override global lineage statement
+    if lineage_statement is not None:
+        context_dict["lineageStatement"] = lineage_statement
 
-    # LINEAGE STATEMENT
-    # lineage = (
-    #     "This dataset was collected as part of a research project based at The"
-    #     " SAFE Project. For details of the project and data collection, see the "
-    #     "methods information contained within the datafile and the project "
-    #     "website: "
-    # ) + URL("projects", "view_project", args=record.project_id, scheme=True,
-    # host=True)
+    xml = template.render(context_dict)
 
-    root.find(
-        (
-            "gmd:dataQualityInfo/gmd:DQ_DataQuality/gmd:lineage/gmd:LI_Lineage/"
-            "gmd:statement/gco:CharacterString"
-        ),
-        nsmap,
-    ).text = lineage_statement
-
-    # return the string contents
-    return etree.tostring(tree)
+    return xml
 
 
 def download_ris_data(

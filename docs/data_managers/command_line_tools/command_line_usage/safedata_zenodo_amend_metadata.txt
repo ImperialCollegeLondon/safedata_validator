@@ -13,5 +13,5 @@ positional arguments:
   zenodo_json_update
                 Path to an updated Zenodo metadata file
 
-optional arguments:
+options:
   -h, --help    show this help message and exit

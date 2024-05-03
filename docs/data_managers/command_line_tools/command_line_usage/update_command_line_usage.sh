@@ -19,7 +19,7 @@ safedata_zenodo -h >> safedata_zenodo_top.txt
 
 subcommands=(create_deposit get_deposit discard_deposit publish_deposit \
              upload_file delete_file upload_metadata amend_metadata \
-             sync_local_dir maintain_ris generate_html generate_xml show_resources)
+             sync_local_dir maintain_ris generate_html generate_xml)
 
 for subc in "${subcommands[@]}";
 do
@@ -31,7 +31,7 @@ done
 echo "cl_prompt $ safedata_metadata -h" > safedata_metadata_top.txt
 safedata_metadata -h >> safedata_metadata_top.txt
 
-subcommands=(post_metadata update_resources show_resources)
+subcommands=(post_metadata update_resources)
 
 for subc in "${subcommands[@]}";
 do

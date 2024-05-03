@@ -10,6 +10,7 @@ This module provides functions exposed as command line entry points:
 """
 
 import argparse
+import datetime
 import os
 import sys
 import tempfile
@@ -58,6 +59,23 @@ def _desc_formatter(prog):
     return argparse.RawDescriptionHelpFormatter(prog, max_help_position=16)
 
 
+def _show_resources(resources: Resources) -> None:
+    """Simple function to print out the resources to the display."""
+
+    print("\nValidation extents:")
+    for key, val in resources.extents.items():
+        # handle date formatting
+        if val is not None and isinstance(val[0], datetime.date):
+            val = [v.isoformat() for v in val]
+        print(f" - {key}: {val}")
+    print("\nZenodo configuration:")
+    for key, val in resources.zenodo.items():
+        print(f" - {key}: {val}")
+    print("\nMetadata server configuration:")
+    for key, val in resources.metadata.items():
+        print(f" - {key}: {val}")
+
+
 def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
     """Validate a dataset using a command line interface.
 
@@ -87,8 +105,8 @@ def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
     Args:
         args_list: This is a developer option used to simulate command line usage by
             providing a list of command line argument strings to the entry point
-            function. For example, ``safedata_validate show_resources`` can be
-            replicated by calling ``_safedata_validate_cli(['show_resources'])``.
+            function. For example, ``safedata_validate --show-resources`` can be
+            replicated by calling ``_safedata_validate_cli(['--show-resources'])``.
 
     Returns:
         An integer code showing success (0) or failure (1).
@@ -114,15 +132,27 @@ def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
         formatter_class=_desc_formatter,
     )
 
-    parser.add_argument("filename", help="Path to the Excel file to be validated.")
+    # Filename is 'optional' in that show resources can run without a filename
+    parser.add_argument(
+        "filename", help="Path to the Excel file to be validated", nargs="?"
+    )
 
     parser.add_argument(
         "-r",
         "--resources",
         type=str,
         default=None,
-        help=("A path to a resources configuration file"),
+        help="A path to a resources configuration file",
     )
+
+    parser.add_argument(
+        "-s",
+        "--show-resources",
+        action="store_true",
+        default=False,
+        help="Validate and display the selected resources and exit",
+    )
+
     parser.add_argument(
         "--validate_doi",
         action="store_true",
@@ -132,6 +162,7 @@ def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
             "provided by the user. Requires a web connection."
         ),
     )
+
     parser.add_argument(
         "--chunk_size",
         default=1000,
@@ -141,12 +172,13 @@ def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
             "number of rows in a chunk is set by this argument"
         ),
     )
+
     parser.add_argument(
         "-l",
         "--log",
         default=None,
         type=Path,
-        help=("Save the validation log to a file, not print to the console."),
+        help="Save the validation log to a file, not print to the console.",
     )
 
     parser.add_argument(
@@ -154,7 +186,7 @@ def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
         "--json",
         default=None,
         type=Path,
-        help=("An optional output path for the validated dataset JSON."),
+        help="An optional output path for the validated dataset JSON.",
     )
 
     parser.add_argument(
@@ -165,6 +197,23 @@ def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
 
     args = parser.parse_args(args=args_list)
 
+    # Load resources
+    resources = Resources(args.resources)
+
+    # Show the resources and exit if requested
+    if args.show_resources:
+        _show_resources(resources)
+        return 0
+
+    # Catch the possibility that filename is empty, which is only allowed if
+    # --show-resources is specified
+    if args.filename is None:
+        parser.print_usage()
+        print(
+            "safedata_validate: error: the following arguments are required: filename"
+        )
+        return 1
+
     # Configure the logging location
     if args.log is None:
         use_stream_logging()
@@ -172,7 +221,7 @@ def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
         use_file_logging(args.log)
 
     # Create the dataset and load from workbook
-    ds = Dataset(resources=Resources(args.resources))
+    ds = Dataset(resources=resources)
     ds.load_from_workbook(
         filename=args.filename,
         validate_doi=args.validate_doi,
@@ -259,6 +308,14 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         type=str,
         default=None,
         help="Path to a safedata_validator resource configuration file",
+    )
+
+    parser.add_argument(
+        "-s",
+        "--show-resources",
+        action="store_true",
+        default=False,
+        help="Validate and display the selected resources and exit",
     )
 
     parser.add_argument(
@@ -578,50 +635,32 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         help="Output path for the XML file",
     )
 
-    # SHOW resources subcommand
-    show_resources_desc = """
-    Loads the safedata_validator resources file, displays the resources setup
-    being used for safedata_zenodo and then exits.
-    """
-
-    # This has no arguments, so subparser object not needed
-    _ = subparsers.add_parser(
-        "show_resources",
-        description=textwrap.dedent(show_resources_desc),
-        help="Report the config being used and exit",
-        formatter_class=_desc_formatter,
-    )
-
     # ------------------------------------------------------
     # Parser definition complete - now handle the inputs
     # ------------------------------------------------------
 
-    # Parse the arguments and set the verbosity
+    # Parse the arguments
     args = parser.parse_args(args=args_list)
+
+    # Load resources
+    resources = Resources(args.resources)
+
+    # Show the resources and exit if requested
+    if args.show_resources:
+        _show_resources(resources)
+        return 0
 
     if args.subcommand is None:
         parser.print_usage()
         return 0
 
-    # Show the package config and exit if requested
-    if args.subcommand == "show_resources":
-        resources = Resources(args.resources)
-        print("\nZenodo configuration:")
-        for key, val in resources.zenodo.items():
-            print(f" - {key}: {val}")
-        print("\nMetadata server configuration:")
-        for key, val in resources.metadata.items():
-            print(f" - {key}: {val}")
-        return 0
-
+    # Set the verbosity
     handler = get_handler()
     if args.quiet:
         # Don't suppress error messages
         handler.setLevel("ERROR")
     else:
         handler.setLevel("DEBUG")
-
-    resources = Resources(args.resources)
 
     # Handle the remaining subcommands
     if args.subcommand in ["create_deposit", "cdep"]:
@@ -856,7 +895,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             LOGGER.error("XML output file already exists")
             return 1
 
-        with open(out_path, "wb") as outf:
+        with open(out_path, "w") as outf:
             outf.write(generated_xml)
 
         LOGGER.info("Inspire XML generated")
@@ -914,6 +953,14 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
     )
 
     parser.add_argument(
+        "-s",
+        "--show-resources",
+        action="store_true",
+        default=False,
+        help="Validate and display the selected resources and exit",
+    )
+
+    parser.add_argument(
         "-q",
         "--quiet",
         action="store_true",
@@ -964,43 +1011,26 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
         formatter_class=_desc_formatter,
     )
 
-    # SHOW RESOURCES subcommand, which has no arguments
-
-    show_resources_desc = """
-    This subcommand simply shows the details of the resources being used and can
-    be used to simply display the Zenodo and metadata server details of the
-    default or specified resources file.
-    """
-
-    subparsers.add_parser(
-        "show_resources",
-        description=textwrap.dedent(show_resources_desc),
-        help="Show the current resources details",
-        formatter_class=_desc_formatter,
-    )
-
     # ------------------------------------------------------
     # Parser definition complete - now handle the inputs
     # ------------------------------------------------------
 
-    # Parse the arguments and set the verbosity
+    # Parse the arguments
     args = parser.parse_args(args=args_list)
+
+    # Load resources
+    resources = Resources(args.resources)
+
+    # Show the resources and exit if requested
+    if args.show_resources:
+        _show_resources(resources)
+        return 0
 
     if args.subcommand is None:
         parser.print_usage()
         return 0
 
-    # Show the package config and exit if requested
-    if args.subcommand == "show_resources":
-        resources = Resources(args.resources)
-        print("\nZenodo configuration:")
-        for key, val in resources.zenodo.items():
-            print(f" - {key}: {val}")
-        print("\nMetadata server configuration:")
-        for key, val in resources.metadata.items():
-            print(f" - {key}: {val}")
-        return 0
-
+    # Set the verbosity
     handler = get_handler()
     if args.quiet:
         # Don't suppress error messages
