@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import copy
+import decimal
 import hashlib
 import os
 import shutil
@@ -131,6 +132,22 @@ def _compute_md5(fname: str) -> str:
 def _zenodo_error_message(response) -> str:
     """Format a Zenodo JSON error response as a string."""
     return f"{response.json()['message']} ({response.json()['status']})"
+
+
+def _min_dp(val: float, min_digits: int = 2) -> str:
+    """Display a number with a minimum number of decimal places.
+
+    INSPIRE/GEMINI XML requires a bounding box with at least two decimal places
+    provided, even if that is 4.50 rather than 4.5. This function tries to ensure that
+    representation.
+    """
+
+    decimal_val = decimal.Decimal(str(val))
+    round_precision = decimal_val.as_tuple().exponent
+    format_precision = max(abs(round_precision), min_digits)  # type: ignore [arg-type]
+    string_format = f"0.{format_precision}f"
+
+    return format(val, string_format)
 
 
 # Zenodo action functions
@@ -903,7 +920,16 @@ def generate_inspire_xml(
     # Get a copy of the project wide XML configuration from the resources and update it
     # with the file specific elements from the zenodo and dataset metadata
     context_dict = resources.xml.copy()
+
     context_dict.update(
+        # Values also used on the Zenodo information or duplicated in the xml
+        contactName=resources.zenodo.contact_name,
+        contactOrcID=resources.zenodo.contact_orcid,
+        pointofcontactName=resources.zenodo.contact_name,
+        pointofcontactCountry=resources.xml.contactCountry,
+        pointofcontactEmail=resources.xml.contactEmail,
+        pointofcontactOrcID=resources.zenodo.contact_name,
+        # Dataset specific information
         citationRSIdentifier=doi_url,
         dateStamp=pub_date.isoformat(),
         publicationDate=pub_date.isoformat(),
@@ -916,10 +942,10 @@ def generate_inspire_xml(
         embargoValue=access_statement,
         startDate=dataset_metadata["temporal_extent"][0][:10],
         endDate=dataset_metadata["temporal_extent"][1][:10],
-        westBoundLongitude=dataset_metadata["longitudinal_extent"][0],
-        eastBoundLongitude=dataset_metadata["longitudinal_extent"][1],
-        southBoundLatitude=dataset_metadata["latitudinal_extent"][0],
-        northBoundLatitude=dataset_metadata["latitudinal_extent"][1],
+        westBoundLongitude=_min_dp(dataset_metadata["longitudinal_extent"][0], 2),
+        eastBoundLongitude=_min_dp(dataset_metadata["longitudinal_extent"][1], 2),
+        southBoundLatitude=_min_dp(dataset_metadata["latitudinal_extent"][0], 2),
+        northBoundLatitude=_min_dp(dataset_metadata["latitudinal_extent"][1], 2),
         downloadLink=doi_url,
     )
 

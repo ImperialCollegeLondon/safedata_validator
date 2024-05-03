@@ -78,20 +78,13 @@ CONFIGSPEC = {
         "ssl_verify": "boolean(default=True)",
     },
     "xml": {
-        # Elements from the project wide configuration
+        # Additional elements required for XML
         "languageCode": "string(default=None)",
         "characterSet": "string(default=None)",
-        "contactName": "string(default=None)",
         "contactCountry": "string(default=None)",
         "contactEmail": "string(default=None)",
-        "contactOrcID": "string(default=None)",
-        "contactRole": "string(default=pointOfContact)",
         "epsgCode": "integer(default=4326)",
-        "pointofcontactName": "string(default=None)",
-        "pointofcontactCountry": "string(default=None)",
-        "pointofcontactEmail": "string(default=None)",
-        "pointofcontactOrcID": "string(default=None)",
-        "citationMDIdentifier": "string(default=None)",
+        "projectURL": "string(default=None)",
         "topicCategories": "string_list(default=None)",
         "lineageStatement": "string(default=None)",
     },

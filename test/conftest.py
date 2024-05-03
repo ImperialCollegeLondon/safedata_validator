@@ -119,9 +119,7 @@ def config_filesystem(fs):
 
     # Point to real locations of test fixture example resources
     for ky, val in FIXTURE_FILES.rf.items():
-        print(ky, val)
         fs.add_real_file(val)
-        print("SUCCESS")
 
     # The config files _cannot_ be real files because they need to
     # contain absolute paths to the resources available on the specific
