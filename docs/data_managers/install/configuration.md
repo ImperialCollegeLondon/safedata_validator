@@ -43,17 +43,10 @@ ssl_verify = true
 [xml]
 languageCode=eng
 characterSet=utf8
-contactName=The SAFE Project
 contactCountry=United Kingdom
 contactEmail=admin@safeproject.net
-contactOrcID=http://orcid.org/0000-0003-3378-2814
-contactRole=pointOfContact
 epsgCode=4326
-pointofcontactName=The SAFE Project
-pointofcontactCountry=United Kingdom
-pointofcontactEmail=admin@safeproject.net
-pointofcontactOrcID=http://orcid.org/0000-0003-3378-2814
-citationMDIdentifier=safe_project_dataset_website
+projectURL=https://safeproject.net
 topicCategories=biota,environment,geoscientificInformation
 lineageStatement="""This dataset was collected as part of a research project
 based at The SAFE Project. For details of the project and data collection,
@@ -242,17 +235,54 @@ configuration elements:
 
 ### XML configuration
 
-The `safedata_zenodo` tool can be used to generate a geo-spatial XML metadata file for a
-dataset. This is relatively high-level metadata that just includes the temporal and
-spatial bounds of the data, along with some contact and access details.
-
+The `safedata_zenodo generate_xml` tool can be used to generate a geo-spatial XML
+metadata file for a dataset. This is relatively high-level metadata that just includes
+the temporal and spatial bounds of the data, along with some contact and access details.
 We recommend that this file is included when datasets are published. If you want to do
-this, you will need to update this section with the details for your own project. You
-will likely only need to update the `contact...`, `pointofcontact...`, `topicCategories`
-and `lineageStatement` elements. The `contact...` details provide a general contact for
-the project and metadata, whereas the `pointofcontact` provides a contact about the
-specific dataset in addition to the authors. These contacts may very well be the same
-central data manager details. You do not have to provide OrcID, but we recommend it.
+this, you will need to update this section with the details for your own project.
+
+The generated XML uses a template that is filled in with using project wide and dataset
+specific elements. We have tested this template using the [INSPIRE validator
+tool](https://inspire.ec.europa.eu/validator/test-selection/index.html) using the
+"Common Requirements for ISO/TC 19139:2007" and "Conformance Class 1: 'Baseline metadata
+for data sets and data set series" test suites. This tool may be of use for validating
+your own XML configuration but does include some elements that are specific to the EU
+INSPIRE implementation  of the more general [ISO/TC
+19139:2007](https://wiki.icaci.org/index.php?title=ISO/TS_19139:2007_Geographic_information_-_Metadata_-_XML_schema_implementation)
+metadata specification.
+
+**The `languageCode`, `characterSet` and `epsgCode` elements**
+
+: It is unlikely that you will need to change these, but they just identify the language
+used in the dataset, the character encoding of the metadata and the
+[EPSG](https://epsg.io) code of the geographic coordinate system used in the data. The
+default value of 4326 is the code for the widely used WGS84 datum.
+
+**The `contactCountry` and `contactEmail` elements**
+
+: The XML includes a number of contact details, including the authors, but also requires
+a general point of contact. Some of these details (name and OrcID) are re-used from the
+Zenodo point of contact information above, but the XML validation requires a country and
+email, so these need to be provided here.
+
+**The `projectURL` element**
+
+: This is optional - if you want to include a link in the XML to a project site to give
+context for the dataset, then include it here.
+
+**The `topicCategories` element**
+
+: This is a troublesome element - it is just a list of topic categories, but different
+implementations of this XML standard have different list of acceptable values. If highly
+compliant XML is important to your project, you may need to identify the precise set of
+topics that this will be validated against.
+
+**The `lineageStatement`**
+
+: The XML specification requires a lineage statement for the dataset. This could be a
+highly dataset specific record of the lineage of the data, but this entry is used to
+provide a generic statement intended to cover all of the dataset collected within a
+project.
 
 ### Metadata configuration
 

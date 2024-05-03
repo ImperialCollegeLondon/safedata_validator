@@ -3,7 +3,7 @@
 import os
 import sys
 from collections import OrderedDict
-from importlib import resources
+from importlib import resources as il_resources
 
 import appdirs
 import certifi
@@ -58,9 +58,9 @@ def fixture_files():
     real_files["certifi"] = certifi.where()
 
     # Provide a path to the XML template location
-    real_files["xml_template"] = resources.path(
-        "safedata_validator.templates", "gemini_xml_template.xml"
-    )
+    real_files["xml_template"] = il_resources.files(
+        "safedata_validator.templates"
+    ).joinpath("gemini_xml_template.xml")
 
     # Virtual file paths for the locations of config files.
     virtual_files = {
