@@ -300,8 +300,9 @@ def upload_metadata(
         for auth in metadata["authors"]
     ]
 
+    # Add the html description
     zen_md["metadata"]["description"] = dataset_description(
-        metadata, zenodo, render=True, resources=resources
+        dataset_metadata=metadata, resources=resources
     )
 
     # attach the metadata to the deposit resource
@@ -565,32 +566,20 @@ Dataset description generation (HTML and GEMINI XML)
 
 def dataset_description(
     dataset_metadata: dict,
-    zenodo_metadata: dict,
-    render: bool = True,
-    extra: str | None = None,
     resources: Resources | None = None,
 ) -> tags.div | str:
     """Create an HTML dataset description.
 
-    This function turns a dataset metadata JSON into html for inclusion in
-    published datasets. This content is used to populate the dataset description
-    section in the Zenodo metadata. Zenodo has a limited set of permitted HTML
-    tags, so this is quite simple HTML.
+    This function takes the dataset metadata exported by safedata_validate and uses it
+    to populate an HTML template file. The resulting HTML can then be used to to provide
+    a summary description of the dataset, either for local use or to upload as the
+    description component of the Zenodo metadata,
 
-    The available tags are: a, p, br, blockquote, strong, b, u, i, em, ul, ol,
-    li, sub, sup, div, strike. Note that `<a>` is currently only available on
-    Zenodo when descriptions are uploaded programmatically as a bug in their
-    web interface strips links.
-
-    The description can be modified for specific uses by including HTML via the
-    extra argument. This content is inserted below the dataset description.
+    A default template is provided with the safedata_validator package, but users can
+    provide bespoke templates via the configuration file.
 
     Args:
         dataset_metadata: The dataset metadata
-        zenodo_metadata: The Zenodo deposit metadata
-        render: Should the html be returned as text or as the underlying
-            dominate.tags.div object.
-        extra: Additional HTML content to include in the description.
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -598,21 +587,43 @@ def dataset_description(
         Either a string of rendered HTML or a dominate.tags.div object.
     """
 
-    # zres = _resources_to_zenodo_api(resources)
-    # metadata_api = zres["mdapi"]
+    # NOTE - this could conceivably just pass the complete dataset metadata dictionary
+    #        straight to the Jinja template context. That would make the template more
+    #        complex but would also expose all of the metadata.
+
+    # Load resources if needed
+    if resources is None:
+        resources = Resources()
+
+    # Get the template path elements
+    if resources.zenodo.html_template is None:
+        template_path = il_resources.files("safedata_validator.templates").joinpath(
+            "description_template.html"
+        )
+    else:
+        user_template = Path(resources.zenodo.html_template)
+        if not user_template.exists():
+            raise FileNotFoundError(
+                f"Configured html template not found: {resources.zenodo.html_template}"
+            )
+
+    # Using autoescape=False is not generally recommended, but the title and taxa
+    # context elements contain HTML tags
+    # - mypy: importlib returns a Traversable, which is a protocol that Path complies
+    #         with, but the attribute isn't being recognized
+    env = Environment(
+        loader=FileSystemLoader(template_path.parent),  # type: ignore [attr-defined]
+        autoescape=False,
+    )
+
+    template = env.get_template(template_path.name)
 
     # PROJECT Title and authors are added by Zenodo from zenodo metadata
     # TODO - option to include here?
 
-    desc = tags.div()
-
-    # Dataset summary
-    desc += tags.b("Description: ")
-    desc += tags.p(dataset_metadata["description"].replace("\n", "</br>"))
-
-    # Extra
-    if extra is not None:
-        desc += raw(extra)
+    context_dict = dict(
+        description=dataset_metadata["description"].replace("\n", "</br>")
+    )
 
     # proj_url = URL('projects', 'project_view', args=[metadata['project_id']],
     #               scheme=True, host=True)
@@ -621,225 +632,99 @@ def dataset_description(
     ##
 
     # Funding information
-    if dataset_metadata["funders"]:
-        funder_info = []
+    context_dict["funders"] = dataset_metadata["funders"]
+    context_dict["permits"] = dataset_metadata["permits"]
 
-        for fnd in dataset_metadata["funders"]:
-            funder_details = [fnd["body"], "(", fnd["type"]]
-
-            if fnd["ref"]:
-                funder_details.append(str(fnd["ref"]))
-            if fnd["url"]:
-                funder_details.append(tags.a(fnd["url"], _href=fnd["url"]))
-
-            funder_details.append(")")
-            funder_info.append(tags.li(funder_details))
-
-        desc += [
-            tags.p(
-                tags.b("Funding: "),
-                "These data were collected as part of research funded by: ",
-                tags.ul(funder_info),
-            ),
-            tags.p(
-                "This dataset is released under the CC-BY 4.0 licence, requiring that "
-                "you cite the dataset in any outputs, but has the additional condition "
-                "that you acknowledge the contribution of these funders in any outputs."
-            ),
-        ]
-
-    # Permits
-    if dataset_metadata["permits"]:
-        desc += tags.p(
-            tags.b("Permits: "),
-            "These data were collected under permit from the following authorities:",
-            tags.ul(
-                [
-                    tags.li(
-                        f"{pmt['authority']} ({pmt['type']} licence {pmt['number']})"
-                    )
-                    for pmt in dataset_metadata["permits"]
-                ]
-            ),
-        )
-
-    # Present a description of the file or files including 'external' files
-    # (data files loaded directly to Zenodo).
-    ds_files = [dataset_metadata["filename"]]
-    n_ds_files = 1
-    ex_files = []
-
-    if dataset_metadata["external_files"]:
-        ex_files = dataset_metadata["external_files"]
-        ds_files += [f["file"] for f in ex_files]
-        n_ds_files += len(ex_files)
-
-    desc += tags.p(
-        tags.b("Files: "),
-        f"This dataset consists of {n_ds_files} files: ",
-        ", ".join(ds_files),
+    # Filenames associated with the dataset
+    context_dict["dataset_filename"] = dataset_metadata["filename"]
+    # TODO - the external file default in the metadata definition should be an
+    #        empty list, not None
+    context_dict["external_files"] = (
+        []
+        if dataset_metadata["external_files"] is None
+        else dataset_metadata["external_files"]
     )
 
-    # Group the sheets by their 'external' file - which is None for sheets
-    # in the submitted workbook - and collect them into a dictionary by source
-    # file. get() is used here for older data where external was not present.
+    context_dict["all_filenames"] = [context_dict["dataset_filename"]] + [
+        f["file"] for f in context_dict["external_files"]
+    ]
 
-    tables_by_source = dataset_metadata["dataworksheets"]
+    # Group the sheets by their 'external' file - which is None for sheets in the
+    # submitted workbook - and collect them into a dictionary by source file. Because
+    # you can't sort a mix of strings and None elements, this substitutes in
+    # '__internal__' to represent internal sheets.
+    tables_by_source = [
+        (sh["external"] or "__internal__", sh)
+        for sh in dataset_metadata["dataworksheets"]
+    ]
 
-    # Now group into a dictionary keyed by external source file - cannot sort
-    # None (no comparison operators) so use a substitute
-    tables_by_source.sort(key=lambda sh: sh.get("external") or False)
-    tables_by_source = groupby(
-        tables_by_source, key=lambda sh: sh.get("external") or False
-    )
-    tables_by_source = {g: list(v) for g, v in tables_by_source}
+    # Now group into a dictionary keyed by __internal__ or external file names
+    tables_by_source.sort(key=lambda sh: sh[0])
+    tables_grouped_by_source = groupby(tables_by_source, key=lambda sh: sh[0])
 
-    # We've now got a set of files (worksheet + externals) and a dictionary of table
-    # descriptions that might have an entry for each file.
+    # Convert to a list of table information, keyed by file.
+    tables_dict_by_source = {
+        ky: [val[1] for val in tpl] for ky, tpl in tables_grouped_by_source
+    }
 
-    # Report the worksheet first
-    desc += tags.p(tags.b(dataset_metadata["filename"]))
-
-    # Report internal tables
-    if False in tables_by_source:
-        int_tabs = tables_by_source[False]
-        desc += tags.p(
-            f"This file contains dataset metadata and {len(int_tabs)} data tables:"
-        )
-        desc += tags.ol([tags.li(table_description(tab)) for tab in int_tabs])
+    # We've now  a dictionary of table descriptions that might have an entry for each
+    # provided file. Get the internal tables separately in the context
+    if "__internal__" in tables_dict_by_source:
+        context_dict["internal_tables"] = tables_dict_by_source.pop("__internal__")
     else:
-        # No internal tables at all.
-        desc += tags.p("This file only contains metadata for the files below")
+        context_dict["internal_tables"] = []
 
-    # Report on the other files
-    for exf in ex_files:
-        desc += tags.p(
-            tags.b(exf["file"]), tags.p(f"Description: {exf['description']}")
-        )
+    # Now need to pair any external table metadata with the external file descriptions.
+    # TODO - the external file default in the metadata definition should be an
+    #        empty list, not None
+    if dataset_metadata["external_files"] is None:
+        external_files = dict()
+    else:
+        # Repackage external metadata to be keyed by file name and provide description
+        # and a default empty list of tables
+        external_files = {
+            vl["file"]: {"description": vl["description"], "tables": []}
+            for vl in dataset_metadata["external_files"]
+        }
+        # Add the remaining table descriptions to the appropriate files.
+        for extf_key, extf_tabs in tables_dict_by_source.items():
+            external_files[extf_key]["tables"] = extf_tabs
 
-        if exf["file"] in tables_by_source:
-            # Report table description
-            ext_tabs = tables_by_source[exf["file"]]
-            desc += tags.p(f"This file contains {len(ext_tabs)} data tables:")
-            desc += tags.ol([tags.li(table_description(tab)) for tab in ext_tabs])
+    context_dict["external_file_data"] = external_files
+
+    # Populate a list of filenames
+    context_dict["all_filenames"] = [context_dict["dataset_filename"]] + list(
+        external_files.keys()
+    )
 
     # Add extents if populated
-    if dataset_metadata["temporal_extent"] is not None:
-        desc += tags.p(
-            tags.b("Date range: "),
-            "{0[0]} to {0[1]}".format(
-                [x[:10] for x in dataset_metadata["temporal_extent"]]
-            ),
-        )
-    if dataset_metadata["latitudinal_extent"] is not None:
-        desc += tags.p(
-            tags.b("Latitudinal extent: "),
-            "{0[0]:.4f} to {0[1]:.4f}".format(dataset_metadata["latitudinal_extent"]),
-        )
-    if dataset_metadata["longitudinal_extent"] is not None:
-        desc += tags.p(
-            tags.b("Longitudinal extent: "),
-            "{0[0]:.4f} to {0[1]:.4f}".format(dataset_metadata["longitudinal_extent"]),
-        )
+    context_dict["temporal_extent"] = dataset_metadata["temporal_extent"]
+    context_dict["latitudinal_extent"] = dataset_metadata["latitudinal_extent"]
+    context_dict["longitudinal_extent"] = dataset_metadata["longitudinal_extent"]
 
-    # Find taxa data from each database (if they exist)
-    gbif_taxon_index = dataset_metadata.get("gbif_taxa")
-    ncbi_taxon_index = dataset_metadata.get("ncbi_taxa")
+    # Find taxa data from each database and convert to HTML representation. The metadata
+    # will be an empty list if the dataset does not contain any taxa.
+    context_dict["gbif_timestamp"] = dataset_metadata["gbif_timestamp"]
+    context_dict["ncbi_timestamp"] = dataset_metadata["ncbi_timestamp"]
 
-    # When NCBI is absent use the old format for backwards compatibility
-    if gbif_taxon_index or ncbi_taxon_index:
-        desc += tags.p(
-            tags.b("Taxonomic coverage: "),
-            tags.br(),
-            "This dataset contains data associated with taxa and these have been "
-            "validated against appropriate taxonomic authority databases.",
-        )
+    gbif_taxon_index = dataset_metadata["gbif_taxa"]
+    ncbi_taxon_index = dataset_metadata["ncbi_taxa"]
 
-    if gbif_taxon_index:
-        desc += tags.p(
-            tags.u("GBIF taxa details: "),
-            tags.br(),
-            tags.br(),
-            "The following taxa were validated against the GBIF backbone dataset."
-            "If a dataset uses a synonym, the accepted usage is shown followed by the "
-            "dataset usage in brackets. Taxa that cannot be validated, including new "
-            "species and other unknown taxa, morphospecies, functional groups and "
-            "taxonomic levels not used in the GBIF backbone are shown in square "
-            "brackets.",
-            taxon_index_to_text(gbif_taxon_index, True, auth="GBIF"),
-        )
-
-    if ncbi_taxon_index:
-        desc += tags.p(
-            tags.u("NCBI taxa details: "),
-            tags.br(),
-            tags.br(),
-            "The following taxa were validated against the NCBI taxonomy dataset."
-            " If a dataset uses a synonym, the accepted usage is shown followed by the "
-            "dataset usage in brackets. Taxa that cannot be validated, e.g. new or "
-            "unknown species are shown in square brackets. Non-backbone taxonomic "
-            "ranks (e.g. strains or subphyla) can be validated using the NCBI "
-            "database. However, they will only be shown if the user explicitly "
-            "provided a non-backbone taxon. When they are shown they will be "
-            "accompanied by an message stating their rank.",
-            taxon_index_to_text(ncbi_taxon_index, True, auth="NCBI"),
-        )
-
-    if render:
-        return desc.render()
-    else:
-        return desc
-
-
-def table_description(tab: dict) -> tags.div:
-    """Convert a dict containing table contents into an HTML table.
-
-    Function to return a description for an individual source file in a dataset.
-    Typically datasets only have a single source file - the Excel workbook that
-    also contains the metadata - but they may also report on external files loaded
-    directly to Zenodo, and which uses the same mechanism.
-
-    Args:
-        tab: A dict describing a data table
-
-    Returns:
-        A `dominate.tags.div` instance containing an HTML description of the table
-    """
-
-    # table summary
-    tab_desc = tags.div(
-        tags.p(tags.b(tab["title"]), f" (described in worksheet {tab['name']})"),
-        tags.p(f"Description: {tab['description']}"),
-        tags.p(f"Number of fields: {tab['max_col'] - 1}"),
+    context_dict["gbif_taxa"] = (
+        taxon_index_to_text(taxa=gbif_taxon_index, html=True, auth="GBIF")
+        if gbif_taxon_index
+        else None
     )
 
-    # The explicit n_data_row key isn't available for older records
-    if "n_data_row" in tab:
-        if tab["n_data_row"] == 0:
-            tab_desc += tags.p(
-                "Number of data rows: Unavailable (table metadata description only)."
-            )
-        else:
-            tab_desc += tags.p(f"Number of data rows: {tab['n_data_row']}")
-    else:
-        tab_desc += tags.p(
-            f"Number of data rows: {tab['max_row'] - len(tab['descriptors'])}"
-        )
+    context_dict["ncbi_taxa"] = (
+        taxon_index_to_text(taxa=ncbi_taxon_index, html=True, auth="NCBI")
+        if ncbi_taxon_index
+        else None
+    )
 
-    # add fields
-    tab_desc += tags.p("Fields: ")
+    html = template.render(context_dict)
 
-    # fields summary
-    flds = tags.ul()
-    for each_fld in tab["fields"]:
-        flds += tags.li(
-            tags.b(each_fld["field_name"]),
-            f": {each_fld['description']} (Field type: {each_fld['field_type']})",
-        )
-
-    tab_desc += flds
-
-    return tab_desc
+    return html
 
 
 def generate_inspire_xml(

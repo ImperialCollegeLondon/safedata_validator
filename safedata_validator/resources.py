@@ -71,6 +71,7 @@ CONFIGSPEC = {
         "contact_name": "string(default=None)",
         "contact_affiliation": "string(default=None)",
         "contact_orcid": "string(default=None)",
+        "html_template": "string(default=None)",
     },
     "metadata": {
         "api": "string(default=None)",
