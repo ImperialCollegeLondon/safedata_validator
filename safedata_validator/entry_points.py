@@ -296,6 +296,10 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     When successful, the function downloads and saves a JSON file containing the
     resulting Zenodo deposit metadata. This file is used as an input to other
     subcommands that work with an existing deposit.
+
+    The --id-to-stdout option can be provided to explicitly return the new
+    deposit ID to stdout, where it can be captured for use in shell scripts.
+    All other logging is written to stderr.
     """
     create_deposit_parser = subparsers.add_parser(
         "create_deposit",
@@ -310,6 +314,14 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         type=int,
         default=None,
         help="A Zenodo concept ID",
+    )
+
+    create_deposit_parser.add_argument(
+        "-i",
+        "--id-to-stdout",
+        action="store_true",
+        default=False,
+        help="Write the deposit record ID to stdout.",
     )
 
     # DISCARD DEPOSIT subcommand
@@ -630,6 +642,10 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         with open(outfile, "w") as outf:
             simplejson.dump(response, outf)
             LOGGER.info(f"Zenodo deposit metadata downloaded to: {outfile}")
+
+        # If requested, write the record ID to standard out for capture in scripts
+        if args.id_to_stdout:
+            sys.stdout.write(str(rec_id))
 
     elif args.subcommand in ["discard_deposit", "ddep"]:
         # Load the Zenodo deposit JSON, which contains API links
