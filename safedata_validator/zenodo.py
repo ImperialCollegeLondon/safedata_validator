@@ -852,14 +852,19 @@ def generate_inspire_xml(
         A string containing GEMINI compliant XML.
     """
 
-    template_path = il_resources.path("safedata_validator", "templates")
+    template_path = il_resources.files("safedata_validator.templates").joinpath(
+        "gemini_xml_template.xml"
+    )
 
+    # Get the Jinja environment and load the template
+    # - mypy: importlib returns a Traversable, which is a protocol that Path complies
+    #         with, but the attribute isn't being recognized
     env = Environment(
-        loader=FileSystemLoader(str(template_path)),
+        loader=FileSystemLoader(template_path.parent),  # type: ignore [attr-defined]
         autoescape=select_autoescape(),
     )
 
-    template = env.get_template("gemini_xml_template.xml")
+    template = env.get_template(template_path.name)
 
     # Build some reused values from the metadata
     # URIs -  form the DOI URL from the prereserved DOI metadata
