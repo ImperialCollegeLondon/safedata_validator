@@ -14,10 +14,14 @@ safedata_validate SAFE_dataset.xlsx
 #    generate a deposit metadata file called something like zenodo_1156212.json
 safedata_zenodo create_deposit -c 1143713
 
-# 2) Upload the dataset file and external files named in the dataset
-#    summary. This uses the zenodo metadata file to confirm the upload destination.
+# 2) Generate a GEMINI XML metadata file for the deposit
+safedata_zenodo generate_xml zenodo_1156212.json SAFE_dataset.json 1156212_GEMINI.xml
+
+# 3) Upload the dataset file, external files named in the dataset summary and the XML
+#    metadata. This uses the zenodo metadata file to confirm the upload destination.
 safedata_zenodo upload_file zenodo_1156212.json SAFE_dataset.xlsx
 safedata_zenodo upload_file zenodo_1156212.json Supplementary_files.zip
+safedata_zenodo upload_file zenodo_1156212.json 1156212_GEMINI.xml
 
 # 3) Update the Zenodo deposit webpage - this populates the deposit description
 #    on Zenodo from the dataset metadata

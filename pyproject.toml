@@ -37,12 +37,12 @@ python-dateutil = "^2.8.2"
 dotmap = "^1.3.30"
 configobj = "^5.0.6"
 sympy = "^1.10.1"
-lxml = "^4.9.0"
 rispy = "^0.7.1"
 dominate = "^2.6.0"
 tqdm = "^4.64.0"
 typing-extensions = "^4.8.0"
 shapely = "^2.0.4"
+jinja2 = "^3.1.3"
 
 [tool.poetry.group.test.dependencies]
 pyfakefs = "^4.5.6"

@@ -280,13 +280,15 @@ permits used to collect this data. The permit type value must be one of `researc
     obtain original permit numbers, if they cannot be found "Unknown" should be entered
     in the "Permit number" field.
 
-## Gemini metadata
+## Extents metadata
 
 It is important to publish dataset metadata using a recognised standard, as this aids
-dataset discovery. The `safedata` system uses the UK
-[GEMINI](https://www.agi.org.uk/agi-groups/standards-committee/uk-gemini) standard, and
-produces XML metadata compliant with this standard for all datasets. In the UK GEMINI
-standard, **temporal** and **geographic** extents are **mandatory**.
+dataset discovery. The `safedata_validator` package provides tools for data managers to
+generate XML metadata documents following the UK
+[GEMINI](https://www.agi.org.uk/agi-groups/standards-committee/uk-gemini) standard.
+These metadata documents are very broad: the contents of the file are mostly contact
+details and access restrictions, but do also have to include **temporal** and
+**geographic** extents.
 
 Ordinarily, the dataset checking process will calculate these extents
 automatically from the reported locations for the geographic extent and from any
@@ -307,7 +309,7 @@ in your Summary worksheet that provide extent metadata as described below.
 
 !!! Warning "Potentially mandatory block"
     If temporal extents cannot be inferred from your dataset (see
-    [above](#gemini-metadata)) then **all** rows in this block are required.
+    [above](#extents-metadata)) then **all** rows in this block are required.
 
 The start and end date values must be provided as an Excel date formatted cell.
 
@@ -320,7 +322,7 @@ The start and end date values must be provided as an Excel date formatted cell.
 
 !!! Warning "Potentially mandatory block"
     If geographic extents cannot be inferred from your dataset (see
-    [above](#gemini-metadata)) then **all** rows in this block are required.
+    [above](#extents-metadata)) then **all** rows in this block are required.
 
 The geographic extents must be provided as decimal degrees (16.75) not degrees,
 minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
