@@ -609,6 +609,8 @@ def dataset_description(
 
     # Using autoescape=False is not generally recommended, but the title and taxa
     # context elements contain HTML tags
+    # - mypy: importlib returns a Traversable, which is a protocol that Path complies
+    #         with, but the attribute isn't being recognized
     env = Environment(
         loader=FileSystemLoader(template_path.parent),  # type: ignore [attr-defined]
         autoescape=False,
