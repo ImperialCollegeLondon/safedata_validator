@@ -46,6 +46,7 @@ from safedata_validator.zenodo import (
     download_ris_data,
     generate_inspire_xml,
     get_deposit,
+    publish_dataset,
     publish_deposit,
     sync_local_dir,
     update_published_metadata,
@@ -635,6 +636,52 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         help="Output path for the XML file",
     )
 
+    # PUBLISH DATASET subcommand
+    publish_dataset_desc = """
+    This subcommand runs through the complete publication process for a validated
+    dataset and any external files. It does not provide all of the options of the
+    subcommands for individual steps but covers the main common usage of the
+    safedata_zenodo command. If the publication process fails, the resulting partial
+    deposit is discarded.
+    """
+    publish_dataset_parser = subparsers.add_parser(
+        "publish_dataset",
+        description=textwrap.dedent(publish_dataset_desc),
+        help="Publish a validated dataset",
+        formatter_class=_desc_formatter,
+        parents=[parse_dataset_metadata],
+    )
+
+    publish_dataset_parser.add_argument(
+        "dataset",
+        type=Path,
+        help="Path to the Excel file to be published",
+    )
+
+    publish_dataset_parser.add_argument(
+        "-c",
+        "--concept_id",
+        type=int,
+        default=None,
+        help="A Zenodo concept ID",
+    )
+
+    publish_dataset_parser.add_argument(
+        "--no-xml",
+        action="store_true",
+        default=False,
+        help="Do not include metadata XML in the published record",
+    )
+
+    publish_dataset_parser.add_argument(
+        "-e",
+        "--external-files",
+        default=[],
+        type=Path,
+        nargs="*",
+        help="A set of external files documented in the dataset to be included.",
+    )
+
     # ------------------------------------------------------
     # Parser definition complete - now handle the inputs
     # ------------------------------------------------------
@@ -897,6 +944,19 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             outf.write(generated_xml)
 
         LOGGER.info("Inspire XML generated")
+
+    elif args.subcommand in ["publish_dataset"]:
+
+        with open(args.dataset_json) as ds_json:
+            dataset_json = simplejson.load(ds_json)
+
+        publish_dataset(
+            resources=resources,
+            dataset=args.dataset,
+            dataset_metadata=dataset_json,
+            external_files=args.external_files,
+            concept_id=args.concept_id,
+        )
 
     return 0
 
