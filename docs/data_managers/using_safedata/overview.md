@@ -12,6 +12,10 @@ an additional ZIP file containing additional files:
 * `SAFE_dataset.xlsx`
 * `Supplementary_files.zip`
 
+Both of the examples below include a stage for creating and including a GEMINI compliant
+XML metadata file in a published dataset. We recommend this as good practice, but it is
+optional.
+
 ## Validating and publishing as a new dataset
 
 These examples show the typical workflow for publishing these data and accompanying

@@ -169,16 +169,10 @@ include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_gen
 
 #### The `generate_xml` subcommand
 
+See also [here](../install/configuration.md#xml-configuration).
+
 ```sh
 {%
 include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_generate_xml.txt"
-%}
-```
-
-#### The `show_resources` subcommand
-
-```sh
-{%
-include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_show_resources.txt"
 %}
 ```

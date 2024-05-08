@@ -69,8 +69,8 @@ def test_entry_points_via_call(entry_point):
     argvalues=[
         pytest.param("generate_xml", False, 0, id="xml_ok"),
         pytest.param("generate_html", False, 0, id="html_ok"),
-        pytest.param("generate_xml", True, 1, id="html_overwrite"),
-        pytest.param("generate_html", True, 1, id="xml_overwrite"),
+        pytest.param("generate_xml", True, 1, id="xml_overwrite"),
+        pytest.param("generate_html", True, 1, id="html_overwrite"),
     ],
 )
 def test_sdv_zenodo_html_and_xml(user_config_file, command, file_exists, returns):

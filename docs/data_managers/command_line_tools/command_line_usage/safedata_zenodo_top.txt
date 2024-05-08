@@ -1,5 +1,5 @@
 cl_prompt $ safedata_zenodo -h
-usage: safedata_zenodo [-h] [-r RESOURCES] [-q]  ...
+usage: safedata_zenodo [-h] [-r RESOURCES] [-s] [-q]  ...
 
 Publish validated datasets to Zenodo using a command line interface.
 
@@ -55,11 +55,11 @@ positional arguments:
                 Generate an HTML dataset description
     generate_xml
                 Create INSPIRE compliant metadata XML
-    show_resources
-                Report the config being used and exit
 
 options:
   -h, --help    show this help message and exit
   -r RESOURCES, --resources RESOURCES
                 Path to a safedata_validator resource configuration file
+  -s, --show-resources
+                Validate and display the selected resources and exit
   -q, --quiet   Suppress normal information messages.

@@ -5,6 +5,21 @@ the installation documentation for tools to build local copies of the
 [GBIF](../install/build_local_gbif.md) and [NCBI](../install/build_local_ncbi.md)
 taxonomic databases.
 
+## Resources
+
+All of the `safedata_validator` command line tools require access to a shared
+configuration file providing validation resources and configuration information. These
+files are described in the [configuration](../install/configuration.md) page and
+normally all of the commands on this page will automatically load your configuration
+data from the locations given on that page.
+
+However, all three of the commands below also accept a manual path to a resource
+configuration file using `--resources /path/to/file.cfg` or `-r /path/to/file.cfg`. This
+can be useful, for example, if you want to have a separate configuration set up to use
+the Zenodo sandbox for checking your publication process. If you want to check the
+contents of a resources file, then all three commands also accept the `--show-resources`
+or `-s` option, which will validate the resources and then print a summary to screen.
+
 ## `safedata_validate`
 
 This tool is simply used to validate a dataset that is in [the `safedata`

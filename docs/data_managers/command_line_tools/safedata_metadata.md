@@ -37,11 +37,3 @@ include "data_managers/command_line_tools/command_line_usage/safedata_metadata_p
 include "data_managers/command_line_tools/command_line_usage/safedata_metadata_update_resources.txt"
 %}
 ```
-
-### The `show_resources` subcommand
-
-```sh
-{%
-include "data_managers/command_line_tools/command_line_usage/safedata_metadata_show_resources.txt"
-%}
-```
