@@ -882,7 +882,7 @@ def publish_dataset(
     not_found = [str(f) for f in files_to_upload if not f.exists()]
 
     if not_found:
-        raise FileNotFoundError(f"Some upload files not found: {', '.join(not_found)}")
+        raise FileNotFoundError(f"Files not found: {', '.join(not_found)}")
 
     # Are all external files listed in the dataset provided
     metadata_ext_files = {val["file"] for val in dataset_metadata["external_files"]}
@@ -901,6 +901,7 @@ def publish_dataset(
     if error is None:
         zenodo_id = zenodo_metadata["id"]
         all_good = True
+        print(f"Deposit created: {zenodo_id}")
     else:
         all_good = False
 
@@ -916,10 +917,12 @@ def publish_dataset(
         with open(xml_file, "w") as xml_out:
             xml_out.write(xml_content)
         files_to_upload.append(xml_file)
+        print(f"XML created: {xml_file}")
 
     # Post the files
     for file in files_to_upload:
         if all_good:
+            print(f"Uploading file: {file}")
             file_upload_response, error = upload_file(
                 metadata=zenodo_metadata, filepath=file, resources=resources
             )
@@ -927,6 +930,7 @@ def publish_dataset(
 
     # Post the metadata
     if all_good:
+        print("Uploading deposit metadata")
         md_upload_response, error = upload_metadata(
             metadata=dataset_metadata, zenodo=zenodo_metadata, resources=resources
         )
@@ -939,8 +943,14 @@ def publish_dataset(
         )
         all_good = error is None
 
+    if not all_good:
+        raise RuntimeError(error)
+
     # Return the new publication ID and link
-    return (zenodo_id, publish_response["links"]["html"])
+    zenodo_url = publish_response["links"]["html"]
+    print(f"Dataset published: {zenodo_url}")
+
+    return (zenodo_id, zenodo_url)
 
 
 # Bibliographic and local database functions

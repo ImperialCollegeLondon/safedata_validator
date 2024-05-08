@@ -950,13 +950,19 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        publish_dataset(
-            resources=resources,
-            dataset=args.dataset,
-            dataset_metadata=dataset_json,
-            external_files=args.external_files,
-            concept_id=args.concept_id,
-        )
+        # Publish the dataset, trapping the possible exceptions to simply print a
+        # message and return a failure exit code.
+        try:
+            publish_id, publish_url = publish_dataset(
+                resources=resources,
+                dataset=args.dataset,
+                dataset_metadata=dataset_json,
+                external_files=args.external_files,
+                concept_id=args.concept_id,
+            )
+        except (FileNotFoundError, ValueError, RuntimeError) as excep:
+            print(excep)
+            return 1
 
     return 0
 
