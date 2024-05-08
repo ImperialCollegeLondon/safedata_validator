@@ -577,14 +577,14 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     Generates an html file containing a standard description of a dataset from the JSON
     metadata. Usually this will be generated and uploaded as part of the dataset
     publication process, but this subcommand can be used for local checking of the
-    resulting HTML.
+    resulting HTML and developing custom templates.
     """
 
     generate_html_parser = subparsers.add_parser(
         "generate_html",
         description=textwrap.dedent(generate_html_desc),
         help="Generate an HTML dataset description",
-        parents=[parse_zenodo_metadata, parse_dataset_metadata],
+        parents=[parse_dataset_metadata],
     )
 
     generate_html_parser.add_argument(
@@ -835,11 +835,9 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         # Run the download RIS data function
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
-        with open(args.zenodo_json) as zn_json:
-            zenodo_json = simplejson.load(zn_json)
 
         generated_html = dataset_description(
-            dataset_metadata=dataset_json, zenodo_metadata=zenodo_json
+            dataset_metadata=dataset_json, resources=resources
         )
 
         out_path = Path(args.html_out)
