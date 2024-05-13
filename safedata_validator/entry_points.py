@@ -253,8 +253,8 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     The safedata_zenodo command is used by providing subcommands for the
     different actions required to publish a validated dataset. The list of
-    subcommands (with aliases) is shown below and individual help is
-    available for each of the subcommands:
+    subcommands is shown below and individual help is available for each
+    of the subcommands:
 
         safedata_zenodo subcommand -h
 
@@ -710,7 +710,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         handler.setLevel("DEBUG")
 
     # Handle the remaining subcommands
-    if args.subcommand in ["create_deposit", "cdep"]:
+    if args.subcommand == "create_deposit":
         # Run the command
         response, error = create_deposit(
             concept_id=args.concept_id, resources=resources
@@ -733,13 +733,13 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         if args.id_to_stdout:
             sys.stdout.write(str(rec_id))
 
-    elif args.subcommand in ["discard_deposit", "ddep"]:
+    elif args.subcommand == "discard_deposit":
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Run the command
-        response, error = discard_deposit(metadata=metadata, resources=resources)
+        response, error = discard_deposit(zenodo_metadata=metadata, resources=resources)
 
         # Report on the outcome.
         if error is not None:
@@ -748,7 +748,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
         LOGGER.info("Deposit discarded")
 
-    elif args.subcommand in ["get_deposit", "gdep"]:
+    elif args.subcommand == "get_deposit":
         # Run the command
         response, error = get_deposit(deposit_id=args.zenodo_id, resources=resources)
 
@@ -783,7 +783,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
         LOGGER.info(f"Metadata downloaded to: {outfile}")
 
-    elif args.subcommand in ["publish_deposit", "pdep"]:
+    elif args.subcommand == "publish_deposit":
         with open(args.zenodo_json) as zn_json:
             zenodo_json_data = simplejson.load(zn_json)
 
@@ -801,7 +801,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             simplejson.dump(response, zn_json)
             LOGGER.info("Zenodo metadata updated")
 
-    elif args.subcommand in ["upload_file", "ufile"]:
+    elif args.subcommand == "upload_file":
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
@@ -831,7 +831,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         else:
             LOGGER.info("File uploaded")
 
-    elif args.subcommand in ["delete_file", "dfile"]:
+    elif args.subcommand == "delete_file":
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
@@ -847,7 +847,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         else:
             LOGGER.info("File deleted")
 
-    elif args.subcommand in ["upload_metadata", "umeta"]:
+    elif args.subcommand == "upload_metadata":
         # Open the two JSON files
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -866,7 +866,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         else:
             LOGGER.info("Metadata uploaded")
 
-    elif args.subcommand in ["amend_metadata", "ameta"]:
+    elif args.subcommand == "amend_metadata":
         with open(args.deposit_json_update) as zn_json_update:
             zenodo_json_update = simplejson.load(zn_json_update)
 
@@ -882,7 +882,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         else:
             LOGGER.info("Metadata updated")
 
-    elif args.subcommand in ["sync_local_dir", "sync"]:
+    elif args.subcommand == "sync_local_dir":
         sync_local_dir(
             datadir=args.datadir,
             xlsx_only=not args.not_just_xlsx,
@@ -890,11 +890,11 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             replace_modified=args.replace_modified,
         )
 
-    elif args.subcommand in ["maintain_ris", "ris"]:
+    elif args.subcommand == "maintain_ris":
         # Run the download RIS data function
         download_ris_data(ris_file=args.ris_file, resources=resources)
 
-    elif args.subcommand in ["generate_html", "html"]:
+    elif args.subcommand == "generate_html":
         # Run the download RIS data function
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -913,7 +913,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
         LOGGER.info("HTML generated")
 
-    elif args.subcommand in ["generate_xml", "xml"]:
+    elif args.subcommand == "generate_xml":
         # Open the two JSON files
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -945,7 +945,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
         LOGGER.info("Inspire XML generated")
 
-    elif args.subcommand in ["publish_dataset"]:
+    elif args.subcommand == "publish_dataset":
 
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -1105,7 +1105,7 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
     resources = Resources(args.resources)
 
     # Handle the remaining subcommands
-    if args.subcommand in ["post_metadata", "post_md"]:
+    if args.subcommand == "post_metadata":
         # Open the two JSON files
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -1125,7 +1125,7 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
 
         LOGGER.info("Metadata posted")
 
-    if args.subcommand in ["update_resources"]:
+    if args.subcommand == "update_resources":
         # Run the function
         response, error = update_resources(resources=resources)
 
