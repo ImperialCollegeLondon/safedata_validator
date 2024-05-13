@@ -459,7 +459,7 @@ def upload_file(
 
 
 def discard_deposit(
-    metadata: dict, resources: Resources | None = None
+    zenodo_metadata: dict, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Discard a deposit.
 
@@ -468,7 +468,7 @@ def discard_deposit(
     be deleted via the API - contact the Zenodo team for help.
 
     Args:
-        metadata: The Zenodo metadata dictionary for a deposit
+        zenodo_metadata: The Zenodo metadata dictionary for a deposit
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -480,7 +480,7 @@ def discard_deposit(
     zres = _resources_to_zenodo_api(resources)
     params = zres["ztoken"]
 
-    delete = requests.delete(metadata["links"]["self"], params=params)
+    delete = requests.delete(zenodo_metadata["links"]["self"], params=params)
 
     if delete.status_code == 204:
         return {"result": "success"}, None
@@ -857,7 +857,9 @@ def publish_dataset(
     This function takes a dataset and its validated metadata, along with any additional
     files named in the dataset, and publishes them to a new Zenodo record. It merges
     several of the :mod:`~safedata_validator.zenodo` functions to provide a single
-    interface to carry out the complete publication process.
+    interface to carry out the complete publication process. The function checks that
+    the set of provided files (dataset and external files) matches the files documented
+    in the dataset.
 
     It returns the URL of the resulting published datset. If the publication process
     fails, the partly completed deposit is deleted to avoid cluttering the Zenodo
@@ -875,6 +877,11 @@ def publish_dataset(
 
     Returns:
         A tuple containing the id number and URL of the new record.
+
+    Raises:
+        FileNotFoundError: dataset or external files not found.
+        ValueError: provided files do not match documented files.
+        RuntimeError: issues with Zenodo API.
     """
 
     # Check the files to upload exist.
@@ -944,6 +951,10 @@ def publish_dataset(
         all_good = error is None
 
     if not all_good:
+        publish_response, error = discard_deposit(
+            zenodo_metadata=zenodo_metadata, resources=resources
+        )
+        print("Issue with publication process - draft deposit discarded.")
         raise RuntimeError(error)
 
     # Return the new publication ID and link
