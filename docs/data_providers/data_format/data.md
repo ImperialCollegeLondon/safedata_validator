@@ -293,7 +293,7 @@ are two possible formats:
     _Example: Observation counts in separate columns for each taxon_
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'abundances_1', keep_default_na = False, headers = ['field_type', 'Abundance', 'Abundance'], tablefmt = 'github') }}
+{{ read_excel('Example.xlsx', sheet_name = 'abundances_1', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github') }}
 <!-- markdownlint-enable MD013 -->
 
 * Two: Different rows in the column refer to **different taxa**: in this case, you must
@@ -303,7 +303,7 @@ are two possible formats:
     _Example: Observation counts with different taxa in rows_
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'abundances_2', keep_default_na = False, tablefmt = 'github') }}
+{{ read_excel('Example.xlsx', sheet_name = 'abundances_2', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github') }}
 <!-- markdownlint-enable MD013 -->
 
 It is an error to provide both `taxon_name` and `taxon_field` descriptors for an
@@ -377,7 +377,7 @@ possibilities exist.
     _Example: Interacting taxa identified in separate columns_
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'interactions_1') }}
+{{ read_excel('Example.xlsx', sheet_name = 'interactions_1', keep_default_na = False, tablefmt = 'github', header = None, names = ["A", "B", "C", "D"]) }}
 <!-- markdownlint-enable MD013 -->
 
 * Two: Alternatively, all of the data might refer to the same two taxa, so the taxon
@@ -386,7 +386,7 @@ possibilities exist.
     _Example: Interacting taxa constant_
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'interactions_2', keep_default_na = False, tablefmt = 'github') }}
+{{ read_excel('Example.xlsx', sheet_name = 'interactions_2', keep_default_na = False, tablefmt = 'github', header = None, names = ["A", "B"]) }}
 <!-- markdownlint-enable MD013 -->
 
 * Three: Finally, one side of the interaction might vary from row to row but the other
@@ -395,7 +395,7 @@ possibilities exist.
     _Example: Interacting taxa identified by name and by column_
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'interactions_3', keep_default_na = False, tablefmt = 'github') }}
+{{ read_excel('Example.xlsx', sheet_name = 'interactions_3', keep_default_na = False, tablefmt = 'github', header = None, names = ["A", "B", "C"]) }}
 <!-- markdownlint-enable MD013 -->
 
 You must provide at least two taxon names or fields, but you can provide more if
@@ -430,7 +430,7 @@ It can be used in two ways:
   includes an external file row with `My_raster_1.tiff` and `My_raster_2,tiff`:
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'external_1', keep_default_na = False, tablefmt = 'github') }}
+{{ read_excel('Example.xlsx', sheet_name = 'external_1', keep_default_na = False, tablefmt = 'github', header = None, names = ["A", "B", "C"]) }}
 <!-- markdownlint-enable MD013 -->
 
 * Two: The values in the data are files contained within an external file. In this
@@ -438,7 +438,7 @@ It can be used in two ways:
   but the values in the field are not checked. For example:
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'external_2', keep_default_na = False, tablefmt = 'github') }}
+{{ read_excel('Example.xlsx', sheet_name = 'external_2', keep_default_na = False, tablefmt = 'github', header = None, names = ["A", "B", "C"]) }}
 <!-- markdownlint-enable MD013 -->
 
 ### Comments
