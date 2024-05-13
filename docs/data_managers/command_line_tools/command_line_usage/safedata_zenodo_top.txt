@@ -55,6 +55,8 @@ positional arguments:
                 Generate an HTML dataset description
     generate_xml
                 Create INSPIRE compliant metadata XML
+    publish_dataset
+                Publish a validated dataset
 
 options:
   -h, --help    show this help message and exit

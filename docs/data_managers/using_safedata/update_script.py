@@ -1,5 +1,7 @@
 """Example script to publish a dataset using safedata_validator from within Python."""
 
+from pathlib import Path
+
 import simplejson
 
 from safedata_validator.field import Dataset
@@ -52,7 +54,7 @@ with open(xml_file, "w") as xml_out:
 for file in [dataset, extra_file]:
     if all_good:
         file_upload_response, error = upload_file(
-            metadata=zenodo_metadata, filepath=file, resources=resources
+            metadata=zenodo_metadata, filepath=Path(file), resources=resources
         )
         all_good = error is None
 

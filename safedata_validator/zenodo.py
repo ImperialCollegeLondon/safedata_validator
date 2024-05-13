@@ -13,7 +13,6 @@ from __future__ import annotations
 import copy
 import decimal
 import hashlib
-import os
 import shutil
 from datetime import datetime as dt
 from importlib import resources as il_resources  # avoid confusion with sdv.resources
@@ -35,6 +34,8 @@ from safedata_validator.resources import Resources
 from safedata_validator.taxa import taxon_index_to_text
 
 # Constant definition of zenodo action function response type
+# TODO - should all of these functions just Raise? Then we could just use try
+# blocks rather than using the this approach.
 ZenodoFunctionResponseType = tuple[dict, Optional[str]]
 """Function return value
 
@@ -120,7 +121,7 @@ def _resources_to_zenodo_api(resources: Resources | None = None) -> dict:
     }
 
 
-def _compute_md5(fname: str) -> str:
+def _compute_md5(fname: Path) -> str:
     """Calculate the md5 hash for a local file."""
     hash_md5 = hashlib.md5()
     with open(fname, "rb") as fname_obj:
@@ -389,7 +390,7 @@ def update_published_metadata(
 
 def upload_file(
     metadata: dict,
-    filepath: str,
+    filepath: Path,
     zenodo_filename: str | None = None,
     progress_bar: bool = True,
     resources: Resources | None = None,
@@ -417,18 +418,18 @@ def upload_file(
     params = zres["ztoken"]
 
     # Check the file and get the filename if an alternative is not provided
-    filepath = os.path.abspath(filepath)
-    if not (os.path.exists(filepath) and os.path.isfile(filepath)):
+    filepath = filepath.absolute()
+    if not (filepath.exists() and filepath.is_file()):
         raise OSError(f"The file path is either a directory or not found: {filepath} ")
 
     if zenodo_filename is None:
-        file_name = os.path.basename(filepath)
+        file_name = filepath.name
     else:
         file_name = zenodo_filename
 
     # upload the file
     # - https://gist.github.com/tyhoff/b757e6af83c1fd2b7b83057adf02c139
-    file_size = os.stat(filepath).st_size
+    file_size = filepath.stat().st_size
     api = f"{metadata['links']['bucket']}/{file_name}"
 
     with open(filepath, "rb") as file_io:
@@ -458,7 +459,7 @@ def upload_file(
 
 
 def discard_deposit(
-    metadata: dict, resources: Resources | None = None
+    zenodo_metadata: dict, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Discard a deposit.
 
@@ -467,7 +468,7 @@ def discard_deposit(
     be deleted via the API - contact the Zenodo team for help.
 
     Args:
-        metadata: The Zenodo metadata dictionary for a deposit
+        zenodo_metadata: The Zenodo metadata dictionary for a deposit
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -479,7 +480,7 @@ def discard_deposit(
     zres = _resources_to_zenodo_api(resources)
     params = zres["ztoken"]
 
-    delete = requests.delete(metadata["links"]["self"], params=params)
+    delete = requests.delete(zenodo_metadata["links"]["self"], params=params)
 
     if delete.status_code == 204:
         return {"result": "success"}, None
@@ -601,8 +602,8 @@ def dataset_description(
             "description_template.html"
         )
     else:
-        user_template = Path(resources.zenodo.html_template)
-        if not user_template.exists():
+        template_path = Path(resources.zenodo.html_template)
+        if not template_path.exists():
             raise FileNotFoundError(
                 f"Configured html template not found: {resources.zenodo.html_template}"
             )
@@ -843,8 +844,131 @@ def generate_inspire_xml(
     return xml
 
 
+def publish_dataset(
+    resources: Resources,
+    dataset: Path,
+    dataset_metadata: dict,
+    external_files: list[Path],
+    concept_id: int | None,
+    no_xml: bool = False,
+) -> tuple[int, str]:
+    """Publish a validated dataset.
+
+    This function takes a dataset and its validated metadata, along with any additional
+    files named in the dataset, and publishes them to a new Zenodo record. It merges
+    several of the :mod:`~safedata_validator.zenodo` functions to provide a single
+    interface to carry out the complete publication process. The function checks that
+    the set of provided files (dataset and external files) matches the files documented
+    in the dataset.
+
+    It returns the URL of the resulting published datset. If the publication process
+    fails, the partly completed deposit is deleted to avoid cluttering the Zenodo
+    deposit list.
+
+    Args:
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
+        dataset: A path to the dataset file.
+        external_files: A list of paths to external files named in the dataset.
+        dataset_metadata: The dataset metadata.
+        concept_id: An optional Zenodo concept ID, used to publish the dataset as a new
+            version of an existing dataset.
+        no_xml: A flag to suppress the automatic inclusion of Gemini XML metadata.
+
+    Returns:
+        A tuple containing the id number and URL of the new record.
+
+    Raises:
+        FileNotFoundError: dataset or external files not found.
+        ValueError: provided files do not match documented files.
+        RuntimeError: issues with Zenodo API.
+    """
+
+    # Check the files to upload exist.
+    files_to_upload = [dataset] + external_files
+    not_found = [str(f) for f in files_to_upload if not f.exists()]
+
+    if not_found:
+        raise FileNotFoundError(f"Files not found: {', '.join(not_found)}")
+
+    # Are all external files listed in the dataset provided
+    metadata_ext_files = {val["file"] for val in dataset_metadata["external_files"]}
+    provided_ext_files = {val.name for val in external_files}
+
+    if metadata_ext_files != provided_ext_files:
+        raise ValueError(
+            "External file names in dataset do not match provided "
+            f"external file names: {', '.join(metadata_ext_files)}"
+        )
+
+    # Create the new deposit to publish the dataset
+    zenodo_metadata, error = create_deposit(resources=resources, concept_id=concept_id)
+
+    # Monitor the success of individual steps
+    if error is None:
+        zenodo_id = zenodo_metadata["id"]
+        all_good = True
+        print(f"Deposit created: {zenodo_id}")
+    else:
+        all_good = False
+
+    # Generate XML
+    if all_good and not no_xml:
+        xml_content = generate_inspire_xml(
+            dataset_metadata=dataset_metadata,
+            zenodo_metadata=zenodo_metadata,
+            resources=resources,
+        )
+
+        xml_file = dataset.parent / f"{zenodo_id}_GEMINI.xml"
+        with open(xml_file, "w") as xml_out:
+            xml_out.write(xml_content)
+        files_to_upload.append(xml_file)
+        print(f"XML created: {xml_file}")
+
+    # Post the files
+    for file in files_to_upload:
+        if all_good:
+            print(f"Uploading file: {file}")
+            file_upload_response, error = upload_file(
+                metadata=zenodo_metadata, filepath=file, resources=resources
+            )
+            all_good = error is None
+
+    # Post the metadata
+    if all_good:
+        print("Uploading deposit metadata")
+        md_upload_response, error = upload_metadata(
+            metadata=dataset_metadata, zenodo=zenodo_metadata, resources=resources
+        )
+        all_good = error is None
+
+    # Publish the deposit
+    if all_good:
+        publish_response, error = publish_deposit(
+            zenodo=zenodo_metadata, resources=resources
+        )
+        all_good = error is None
+
+    if not all_good:
+        publish_response, error = discard_deposit(
+            zenodo_metadata=zenodo_metadata, resources=resources
+        )
+        print("Issue with publication process - draft deposit discarded.")
+        raise RuntimeError(error)
+
+    # Return the new publication ID and link
+    zenodo_url = publish_response["links"]["html"]
+    print(f"Dataset published: {zenodo_url}")
+
+    return (zenodo_id, zenodo_url)
+
+
+# Bibliographic and local database functions
+
+
 def download_ris_data(
-    resources: Resources | None = None, ris_file: str | None = None
+    resources: Resources | None = None, ris_file: Path | None = None
 ) -> None:
     """Downloads Zenodo records into a RIS format bibliography file.
 
@@ -873,7 +997,7 @@ def download_ris_data(
     known_recids = []
     new_doi = []
 
-    if ris_file and os.path.exists(ris_file):
+    if ris_file is not None and ris_file.exists():
         with open(ris_file) as bibliography_file:
             entries = rispy.load(bibliography_file)
             for entry in entries:
@@ -949,7 +1073,7 @@ def download_ris_data(
 
     # Writing only occurs if a ris file path has actually been provided
     if ris_file:
-        if os.path.exists(ris_file):
+        if ris_file.exists():
             LOGGER.info(f"Appending RIS data for {len(data)} new records to {ris_file}")
             write_mode = "a"
         else:
@@ -962,7 +1086,7 @@ def download_ris_data(
 
 
 def sync_local_dir(
-    datadir: str,
+    datadir: Path,
     xlsx_only: bool = True,
     replace_modified: bool = False,
     resources: Resources | None = None,
@@ -992,7 +1116,7 @@ def sync_local_dir(
     """
 
     # Private helper functions
-    def _get_file(url: str, outf: str, params: dict | None = None) -> None:
+    def _get_file(url: str, outf: Path, params: dict | None = None) -> None:
         """Download a file from a URL."""
         resource = requests.get(url, params=params, stream=True)
 
@@ -1005,16 +1129,16 @@ def sync_local_dir(
     params = zres["ztoken"]
 
     # The dir argument should be an existing path
-    if not (os.path.exists(datadir) and os.path.isdir(datadir)):
+    if not (datadir.exists() and datadir.is_dir()):
         raise OSError(f"{datadir} is not an existing directory")
 
     # Get the configured metadata api
     api = zres["mdapi"]
 
     # Check for an existing API url file and check it is congruent with config
-    url_file = os.path.join(datadir, "url.json")
+    url_file = datadir / "url.json"
 
-    if os.path.exists(url_file):
+    if url_file.exists():
         with open(url_file) as urlf:
             dir_api = simplejson.load(urlf)["url"][0]
 
@@ -1029,11 +1153,9 @@ def sync_local_dir(
     # Download index files - don't bother to check for updates, this isn't
     # a frequent thing to do
     LOGGER.info("Downloading index files")
-    _get_file(f"{api}/api/index", os.path.join(datadir, "index.json"))
-    _get_file(f"{api}/api/gazetteer", os.path.join(datadir, "gazetteer.geojson"))
-    _get_file(
-        f"{api}/api/location_aliases", os.path.join(datadir, "location_aliases.csv")
-    )
+    _get_file(f"{api}/api/index", datadir / "index.json")
+    _get_file(f"{api}/api/gazetteer", datadir / "gazetteer.geojson")
+    _get_file(f"{api}/api/location_aliases", datadir / "location_aliases.csv")
 
     # Get the deposits associated with the account, which includes a list of download
     # links
@@ -1074,10 +1196,10 @@ def sync_local_dir(
         FORMATTER.push()
 
         # Create the directory structure if needed
-        rec_dir = os.path.join(datadir, con_rec_id, rec_id)
-        if not os.path.exists(rec_dir):
+        rec_dir = datadir / con_rec_id / rec_id
+        if not rec_dir.exists():
             LOGGER.info("Creating directory")
-            os.makedirs(rec_dir)
+            rec_dir.mkdir()
         else:
             LOGGER.info("Directory found")
 
@@ -1090,8 +1212,8 @@ def sync_local_dir(
             LOGGER.info(f"Processing {this_file['filename']}")
             FORMATTER.push()
 
-            outf = os.path.join(rec_dir, this_file["filename"])
-            local_copy = os.path.exists(outf)
+            outf = rec_dir / this_file["filename"]
+            local_copy = outf.exists()
 
             if not local_copy:
                 LOGGER.info("Downloading")
@@ -1108,8 +1230,8 @@ def sync_local_dir(
             FORMATTER.pop()
 
         # Get the metadata json
-        metadata = os.path.join(rec_dir, f"{rec_id}.json")
-        if os.path.exists(metadata):
+        metadata = rec_dir / f"{rec_id}.json"
+        if metadata.exists():
             LOGGER.info("JSON Metadata found")
         else:
             LOGGER.info("Downloading JSON metadata ")

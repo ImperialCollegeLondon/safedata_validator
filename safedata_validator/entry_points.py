@@ -46,6 +46,7 @@ from safedata_validator.zenodo import (
     download_ris_data,
     generate_inspire_xml,
     get_deposit,
+    publish_dataset,
     publish_deposit,
     sync_local_dir,
     update_published_metadata,
@@ -252,8 +253,8 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     The safedata_zenodo command is used by providing subcommands for the
     different actions required to publish a validated dataset. The list of
-    subcommands (with aliases) is shown below and individual help is
-    available for each of the subcommands:
+    subcommands is shown below and individual help is available for each
+    of the subcommands:
 
         safedata_zenodo subcommand -h
 
@@ -353,6 +354,10 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     When successful, the function downloads and saves a JSON file containing the
     resulting Zenodo deposit metadata. This file is used as an input to other
     subcommands that work with an existing deposit.
+
+    The --id-to-stdout option can be provided to explicitly return the new
+    deposit ID to stdout, where it can be captured for use in shell scripts.
+    All other logging is written to stderr.
     """
     create_deposit_parser = subparsers.add_parser(
         "create_deposit",
@@ -367,6 +372,14 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         type=int,
         default=None,
         help="A Zenodo concept ID",
+    )
+
+    create_deposit_parser.add_argument(
+        "-i",
+        "--id-to-stdout",
+        action="store_true",
+        default=False,
+        help="Write the deposit record ID to stdout.",
     )
 
     # DISCARD DEPOSIT subcommand
@@ -623,6 +636,52 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         help="Output path for the XML file",
     )
 
+    # PUBLISH DATASET subcommand
+    publish_dataset_desc = """
+    This subcommand runs through the complete publication process for a validated
+    dataset and any external files. It does not provide all of the options of the
+    subcommands for individual steps but covers the main common usage of the
+    safedata_zenodo command. If the publication process fails, the resulting partial
+    deposit is discarded.
+    """
+    publish_dataset_parser = subparsers.add_parser(
+        "publish_dataset",
+        description=textwrap.dedent(publish_dataset_desc),
+        help="Publish a validated dataset",
+        formatter_class=_desc_formatter,
+        parents=[parse_dataset_metadata],
+    )
+
+    publish_dataset_parser.add_argument(
+        "dataset",
+        type=Path,
+        help="Path to the Excel file to be published",
+    )
+
+    publish_dataset_parser.add_argument(
+        "-c",
+        "--concept_id",
+        type=int,
+        default=None,
+        help="A Zenodo concept ID",
+    )
+
+    publish_dataset_parser.add_argument(
+        "--no-xml",
+        action="store_true",
+        default=False,
+        help="Do not include metadata XML in the published record",
+    )
+
+    publish_dataset_parser.add_argument(
+        "-e",
+        "--external-files",
+        default=[],
+        type=Path,
+        nargs="*",
+        help="A set of external files documented in the dataset to be included.",
+    )
+
     # ------------------------------------------------------
     # Parser definition complete - now handle the inputs
     # ------------------------------------------------------
@@ -651,7 +710,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         handler.setLevel("DEBUG")
 
     # Handle the remaining subcommands
-    if args.subcommand in ["create_deposit", "cdep"]:
+    if args.subcommand == "create_deposit":
         # Run the command
         response, error = create_deposit(
             concept_id=args.concept_id, resources=resources
@@ -670,13 +729,17 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             simplejson.dump(response, outf)
             LOGGER.info(f"Zenodo deposit metadata downloaded to: {outfile}")
 
-    elif args.subcommand in ["discard_deposit", "ddep"]:
+        # If requested, write the record ID to standard out for capture in scripts
+        if args.id_to_stdout:
+            sys.stdout.write(str(rec_id))
+
+    elif args.subcommand == "discard_deposit":
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Run the command
-        response, error = discard_deposit(metadata=metadata, resources=resources)
+        response, error = discard_deposit(zenodo_metadata=metadata, resources=resources)
 
         # Report on the outcome.
         if error is not None:
@@ -685,7 +748,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
         LOGGER.info("Deposit discarded")
 
-    elif args.subcommand in ["get_deposit", "gdep"]:
+    elif args.subcommand == "get_deposit":
         # Run the command
         response, error = get_deposit(deposit_id=args.zenodo_id, resources=resources)
 
@@ -720,7 +783,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
         LOGGER.info(f"Metadata downloaded to: {outfile}")
 
-    elif args.subcommand in ["publish_deposit", "pdep"]:
+    elif args.subcommand == "publish_deposit":
         with open(args.zenodo_json) as zn_json:
             zenodo_json_data = simplejson.load(zn_json)
 
@@ -738,7 +801,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             simplejson.dump(response, zn_json)
             LOGGER.info("Zenodo metadata updated")
 
-    elif args.subcommand in ["upload_file", "ufile"]:
+    elif args.subcommand == "upload_file":
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
@@ -768,7 +831,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         else:
             LOGGER.info("File uploaded")
 
-    elif args.subcommand in ["delete_file", "dfile"]:
+    elif args.subcommand == "delete_file":
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
@@ -784,7 +847,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         else:
             LOGGER.info("File deleted")
 
-    elif args.subcommand in ["upload_metadata", "umeta"]:
+    elif args.subcommand == "upload_metadata":
         # Open the two JSON files
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -803,7 +866,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         else:
             LOGGER.info("Metadata uploaded")
 
-    elif args.subcommand in ["amend_metadata", "ameta"]:
+    elif args.subcommand == "amend_metadata":
         with open(args.deposit_json_update) as zn_json_update:
             zenodo_json_update = simplejson.load(zn_json_update)
 
@@ -819,7 +882,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         else:
             LOGGER.info("Metadata updated")
 
-    elif args.subcommand in ["sync_local_dir", "sync"]:
+    elif args.subcommand == "sync_local_dir":
         sync_local_dir(
             datadir=args.datadir,
             xlsx_only=not args.not_just_xlsx,
@@ -827,11 +890,11 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             replace_modified=args.replace_modified,
         )
 
-    elif args.subcommand in ["maintain_ris", "ris"]:
+    elif args.subcommand == "maintain_ris":
         # Run the download RIS data function
         download_ris_data(ris_file=args.ris_file, resources=resources)
 
-    elif args.subcommand in ["generate_html", "html"]:
+    elif args.subcommand == "generate_html":
         # Run the download RIS data function
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -850,7 +913,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
         LOGGER.info("HTML generated")
 
-    elif args.subcommand in ["generate_xml", "xml"]:
+    elif args.subcommand == "generate_xml":
         # Open the two JSON files
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -881,6 +944,25 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             outf.write(generated_xml)
 
         LOGGER.info("Inspire XML generated")
+
+    elif args.subcommand == "publish_dataset":
+
+        with open(args.dataset_json) as ds_json:
+            dataset_json = simplejson.load(ds_json)
+
+        # Publish the dataset, trapping the possible exceptions to simply print a
+        # message and return a failure exit code.
+        try:
+            publish_id, publish_url = publish_dataset(
+                resources=resources,
+                dataset=args.dataset,
+                dataset_metadata=dataset_json,
+                external_files=args.external_files,
+                concept_id=args.concept_id,
+            )
+        except (FileNotFoundError, ValueError, RuntimeError) as excep:
+            print(excep)
+            return 1
 
     return 0
 
@@ -1023,7 +1105,7 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
     resources = Resources(args.resources)
 
     # Handle the remaining subcommands
-    if args.subcommand in ["post_metadata", "post_md"]:
+    if args.subcommand == "post_metadata":
         # Open the two JSON files
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
@@ -1043,7 +1125,7 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
 
         LOGGER.info("Metadata posted")
 
-    if args.subcommand in ["update_resources"]:
+    if args.subcommand == "update_resources":
         # Run the function
         response, error = update_resources(resources=resources)
 
