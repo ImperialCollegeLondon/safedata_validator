@@ -87,7 +87,7 @@ def nested_set(dic, keys, value):
             None,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -102,7 +102,7 @@ def nested_set(dic, keys, value):
             RuntimeError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (CRITICAL, "Gazetteer file missing in configuration"),
             ),
             id="Gazetteer not set",
@@ -113,7 +113,7 @@ def nested_set(dic, keys, value):
             OSError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (CRITICAL, "Gazetteer file not found"),
             ),
@@ -125,7 +125,7 @@ def nested_set(dic, keys, value):
             OSError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (CRITICAL, "Gazetteer file not valid JSON"),
             ),
@@ -137,7 +137,7 @@ def nested_set(dic, keys, value):
             RuntimeError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (CRITICAL, "Gazetteer data not a GeoJSON Feature Collection"),
             ),
@@ -149,7 +149,7 @@ def nested_set(dic, keys, value):
             RuntimeError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (CRITICAL, "Location aliases file missing in configuration"),
             ),
@@ -161,7 +161,7 @@ def nested_set(dic, keys, value):
             OSError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (CRITICAL, "Location aliases file not found"),
@@ -174,7 +174,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (
@@ -191,7 +191,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (
@@ -208,7 +208,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (CRITICAL, "Location aliases file is empty"),
@@ -221,7 +221,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -235,7 +235,7 @@ def nested_set(dic, keys, value):
             FileNotFoundError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -249,7 +249,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -263,7 +263,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -277,7 +277,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -292,7 +292,7 @@ def nested_set(dic, keys, value):
             FileNotFoundError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -307,7 +307,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -322,7 +322,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -337,7 +337,7 @@ def nested_set(dic, keys, value):
             None,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -352,7 +352,7 @@ def nested_set(dic, keys, value):
             OSError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -368,7 +368,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -388,7 +388,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -408,7 +408,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -424,7 +424,7 @@ def nested_set(dic, keys, value):
             ValueError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -443,7 +443,7 @@ def nested_set(dic, keys, value):
             RuntimeError,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (CRITICAL, "Configuration issues"),
                 (CRITICAL, "In config 'extents.latitudinal_hard_extent':"),
             ),
@@ -496,7 +496,7 @@ def test_load_resources_by_arg(
             FIXTURE_FILES.vf.fix_config,
             (
                 (INFO, "Configuring Resources"),
-                (INFO, "Configuring resources from init "),
+                (INFO, "Configuring resources from init"),
                 (INFO, "Validating gazetteer: "),
                 (INFO, "Validating location aliases: "),
                 (INFO, "Validating GBIF database: "),
@@ -543,7 +543,7 @@ def test_load_resources_from_missing_config(config_filesystem, caplog, expected_
     [
         (
             (INFO, "Configuring Resources"),
-            (INFO, "Configuring resources from user "),
+            (INFO, "Configuring resources from user"),
             (INFO, "Validating gazetteer: "),
             (INFO, "Validating location aliases: "),
             (INFO, "Validating GBIF database: "),
@@ -565,7 +565,7 @@ def test_load_resources_from_user_config(user_config_file, caplog, expected_log)
     [
         (
             (INFO, "Configuring Resources"),
-            (INFO, "Configuring resources from site "),
+            (INFO, "Configuring resources from site"),
             (INFO, "Validating gazetteer: "),
             (INFO, "Validating location aliases: "),
             (INFO, "Validating GBIF database: "),
@@ -580,3 +580,30 @@ def test_load_resources_from_site_config(site_config_file, caplog, expected_log)
     Resources()
 
     log_check(caplog, expected_log)
+
+
+@pytest.mark.parametrize(
+    "expected_log",
+    [
+        (
+            (INFO, "Configuring Resources"),
+            (INFO, "Configuring resources from env_var"),
+            (INFO, "Validating gazetteer: "),
+            (INFO, "Validating location aliases: "),
+            (INFO, "Validating GBIF database: "),
+            (INFO, "Validating NCBI database: "),
+            (INFO, "Validating project database: "),
+        ),
+    ],
+)
+def test_load_resources_from_env_var(user_config_file, caplog, expected_log):
+    """This test uses the ability to set the config from a environment variable."""
+
+    # Override the user config file by setting an environment variable.
+    os.environ["SAFEDATA_VALIDATOR_CONFIG"] = FIXTURE_FILES["vf"]["fix_config"]
+
+    Resources()
+
+    log_check(caplog, expected_log)
+
+    del os.environ["SAFEDATA_VALIDATOR_CONFIG"]
