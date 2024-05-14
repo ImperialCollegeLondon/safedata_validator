@@ -66,6 +66,12 @@ def fixture_files():
         "safedata_validator.templates"
     ).joinpath("description_template.html")
 
+    # Now handle the special case of the example file (stored in documentation)
+    example_dir = os.path.join(
+        os.path.dirname(__file__), "../docs/data_providers/data_format"
+    )
+    example_file = {"example_file": os.path.join(example_dir, "Example.xlsx")}
+
     # Virtual file paths for the locations of config files.
     virtual_files = {
         "user_config": os.path.join(
@@ -82,7 +88,7 @@ def fixture_files():
 
     return DotMap(
         dict(
-            rf=real_files,
+            rf=real_files | example_file,
             vf=virtual_files,
             mf=os.path.join(fixture_dir, "thisfiledoesnotexist"),
         )
