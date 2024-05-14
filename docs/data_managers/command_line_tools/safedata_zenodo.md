@@ -6,9 +6,9 @@ the metadata server.
 
 ## Data publication process
 
-The process of publishing a dataset involves both the `safedata_validate` tool
-and the various subcommands of the `safedata_zenodo` tool. These commands make
-use of two _different_ JSON metadata files.
+The process of publishing a dataset involves both the `safedata_validate` tool and the
+subcommands of the `safedata_zenodo` tool. These commands potentially require two
+_different_ JSON metadata files.
 
 ### Dataset metadata
 
@@ -50,8 +50,8 @@ include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_top
 
 ### Simple publication process
 
-As an initial example, the process for publishing a simple dataset
-(without any external data files) would be:
+As an initial example, the process for publishing a dataset with a documented external
+file would be:
 
 ```sh
 # Validate the file, creating the Test_format_good.json metadata file
@@ -63,6 +63,7 @@ safedata_zenodo create_deposit
 
 # Upload the file
 safedata_zenodo upload_file zenodo_1059375.json Test_format_good.xlsx
+safedata_zenodo upload_file zenodo_1059375.json 
 
 # Populate the Zenodo deposit metadata from the dataset metadata
 safedata_zenodo upload_metadata zenodo_1059375.json Test_format_good.json
@@ -75,9 +76,30 @@ safedata_zenodo post_metadata zenodo_1059375.json Test_format_good.json
 
 ```
 
+In practice, the steps above have been bundled up into the `publish_dataset` subcommand,
+which streamlines the publication process. You may need to use the individual commands
+on occasion but the `publish_dataset` covers the most common use cases.
+
+```sh
+# Validate the file, creating the Test_format_good.json metadata file
+safedata_validate Test_format_good.xlsx
+
+# Publish the dataset
+safedata_zenodo publish_dataset zenodo_1059375.json Test_format_good.xlsx \
+    --external-file External_file.zip
+```
+
 ### The `safedata_zenodo` subcommands
 
 The command line help for each of the various subcommands is shown below:
+
+#### The `publish_dataset` subcommand
+
+```sh
+{%
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_publish_dataset.txt"
+%}
+```
 
 #### The `create_deposit` subcommand
 

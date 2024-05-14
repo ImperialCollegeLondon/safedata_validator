@@ -57,10 +57,14 @@ def fixture_files():
     # Need to provide the path to the certifi CA bundle or requests breaks!
     real_files["certifi"] = certifi.where()
 
-    # Provide a path to the XML template location
+    # Provide a path to the XML and HTML template locations
     real_files["xml_template"] = il_resources.files(
         "safedata_validator.templates"
     ).joinpath("gemini_xml_template.xml")
+
+    real_files["html_template"] = il_resources.files(
+        "safedata_validator.templates"
+    ).joinpath("description_template.html")
 
     # Virtual file paths for the locations of config files.
     virtual_files = {

@@ -1,13 +1,12 @@
 cl_prompt $ safedata_zenodo generate_html -h
-usage: safedata_zenodo generate_html [-h] zenodo_json dataset_json html_out
+usage: safedata_zenodo generate_html [-h] dataset_json html_out
 
 Generates an html file containing a standard description of a dataset from the
 JSON metadata. Usually this will be generated and uploaded as part of the
 dataset publication process, but this subcommand can be used for local
-checking of the resulting HTML.
+checking of the resulting HTML and developing custom templates.
 
 positional arguments:
-  zenodo_json   Path to a Zenodo JSON file for a deposit
   dataset_json  Path to a JSON metadata file for a dataset
   html_out      Output path for the HTML file
 

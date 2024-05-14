@@ -71,6 +71,7 @@ CONFIGSPEC = {
         "contact_name": "string(default=None)",
         "contact_affiliation": "string(default=None)",
         "contact_orcid": "string(default=None)",
+        "html_template": "string(default=None)",
     },
     "metadata": {
         "api": "string(default=None)",
@@ -142,8 +143,18 @@ class Resources:
     """Load and check validation resources.
 
     Creating an instance of this class locates and validate resources for using the
-    `safedata_validator` package, either from the provided configuration details or from
-    the user and then site config locations defined by the appdirs package.
+    `safedata_validator` package. The resources can be located in several ways, which
+    use the following order of priority:
+
+    * configuration details provided directly via the ``config`` argument (see below),
+    * a path to a configuration file set in the ``SAFEDATA_VALIDATOR_CONFIG``
+      environment variable,
+    * a configuration file in the standard user location, or
+    * a configuration file in the standard system wide location.
+
+    The standard locations follow the implementation of the ``appdirs`` package.
+    Typically, end users will rely on the last two options, but the first two options
+    are useful for testing and validation.
 
     Args:
         config:
@@ -154,7 +165,8 @@ class Resources:
 
     Attributes:
         config_type: The method used to specify the resources. One of
-            'init_dict', 'init_list', 'init_file', 'user_config' or 'site_config'.
+            'init_dict', 'init_list', 'init_path', 'env_var_path', 'user_path' or
+            'site_path'.
         gazetteer: The path to the gazetteer file
         location_aliases: The path to the location_aliases file
         gbif_database: The path to the GBIF database file
@@ -167,7 +179,8 @@ class Resources:
     """
 
     def __init__(self, config: str | list | dict | None = None) -> None:
-        # User and site config paths
+
+        # Get the standard user and site config paths for the platform
         user_cfg_file = os.path.join(
             appdirs.user_config_dir(), "safedata_validator", "safedata_validator.cfg"
         )
@@ -175,24 +188,30 @@ class Resources:
             appdirs.site_config_dir(), "safedata_validator", "safedata_validator.cfg"
         )
 
-        # First try and populate from a config file.
+        # Look for a config path as an environment variable
+        config_env_path = os.getenv("SAFEDATA_VALIDATOR_CONFIG")
+
+        # Now resolve what to use in order of priority
         if config is not None:
             if isinstance(config, str):
                 if os.path.exists(config) and os.path.isfile(config):
-                    config_type = "init file"
+                    config_type = "init_path"
                 else:
                     log_and_raise(f"Config file path not found: {config}", RuntimeError)
                     return
             elif isinstance(config, list):
-                config_type = "init list"
+                config_type = "init_list"
             elif isinstance(config, dict):
-                config_type = "init dict"
+                config_type = "init_dict"
+        elif config_env_path is not None:
+            config = config_env_path
+            config_type = "env_var_path"
         elif os.path.exists(user_cfg_file) and os.path.isfile(user_cfg_file):
             config = user_cfg_file
-            config_type = "user file"
+            config_type = "user_path"
         elif os.path.exists(site_cfg_file) and os.path.isfile(site_cfg_file):
             config = site_cfg_file
-            config_type = "site file"
+            config_type = "site_path"
         else:
             LOGGER.critical(f"No user config in {user_cfg_file}")
             LOGGER.critical(f"No site config in {site_cfg_file}")
@@ -201,7 +220,7 @@ class Resources:
 
         # Report resource config location and type
         msg = f"Configuring resources from {config_type}"
-        if "file" in config_type:
+        if config_type.endswith("path"):
             msg += f": {config}"
         LOGGER.info(msg)
 

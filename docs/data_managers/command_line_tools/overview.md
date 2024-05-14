@@ -13,12 +13,18 @@ files are described in the [configuration](../install/configuration.md) page and
 normally all of the commands on this page will automatically load your configuration
 data from the locations given on that page.
 
-However, all three of the commands below also accept a manual path to a resource
-configuration file using `--resources /path/to/file.cfg` or `-r /path/to/file.cfg`. This
-can be useful, for example, if you want to have a separate configuration set up to use
-the Zenodo sandbox for checking your publication process. If you want to check the
-contents of a resources file, then all three commands also accept the `--show-resources`
-or `-s` option, which will validate the resources and then print a summary to screen.
+However, it can sometimes be useful to use a different configuration. Example use cases
+might be if you want to have a separate configuration set up to use the Zenodo sandbox
+for checking your publication process, or if you want to add datasets to more than one
+project. To support this, all three of the commands below also accept a manual path to a
+resource configuration file using `--resources /path/to/file.cfg` or `-r
+/path/to/file.cfg`. Alternatively, the tools all check if the environment variable
+`SAFEDATA_VALIDATOR_CONFIG` has been set - this avoids having to use the `-r` flag with
+every command.
+
+If you want to verify the contents of a resources file, then you can obviously just open
+and read the file, but all three commands also accept the `--show-resources` or `-s`
+option, which will validate the resources and then print a summary to screen.
 
 ## `safedata_validate`
 
@@ -32,7 +38,9 @@ For more details, see [here](safedata_validate.md).
 
 These tools are used to manage the process of publishing a validated dataset to Zenodo.
 The configuration is a little more complex, as it requires the setup of a Zenodo
-community account and access tokens.
+community account and access tokens and you may also want to edit the default
+[HTML description](../install/configuration.md#html-description-template) used on Zenodo
+and provide additional information to include XML summary metadata.
 
 For more details, see [here](safedata_zenodo.md).
 

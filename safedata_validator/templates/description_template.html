@@ -1,0 +1,142 @@
+<div>
+
+  <h1>Description</h1>
+
+  <p>{{description}}</p>
+
+  <!-- Conditional display of funding information -->
+  {% if funders %}
+  <h1>Funding</h1>
+  <p>
+    These data were collected as part of research funded by:
+  </p>
+  <ul>
+    {% for fnd in funders %}
+    <li>{{ fnd.body}} ({{ fnd.type }} {{ ', ' ~ fnd.ref if fnd.ref }}
+      {% if fnd.url %}
+      , <a href="{{ fnd.url }}">{{ fnd.url }}</a>
+      {% endif %})
+    </li>
+    {% endfor %}
+  </ul>
+  </p>
+  <p>This dataset is released under the CC-BY 4.0 licence, requiring that you cite the dataset in any outputs, but has
+    the additional condition that you acknowledge the contribution of these funders in any
+    outputs.</p>
+  {% endif %}
+
+  <!-- Condition display of permit information -->
+  {% if permits %}
+  <h1>Permits</h1>
+
+  <p>These data were collected under permit from the following authorities:</p>
+
+  <ul>
+    {% for pmt in permits %}
+    <li>{{ pmt.authority }} ( {{ pmt.type }} licence {{ pmt.number }})</li>
+    {% endfor %}
+  </ul>
+  </p>
+  {% endif %}
+
+  <!-- File information section -->
+  <h1>Files</h1>
+
+  <p>This dataset consists of {{ all_filenames | length}} {{ 'file' if all_filenames |length == 1
+    else 'files' }}:
+    {{ all_filenames | join(', ') }}</p>
+
+  <!-- Report on main dataset contents -->
+  <h2>{{ dataset_filename }}</h2>
+
+  {% if internal_tables %}
+  <p>This file contains dataset metadata and {{ internal_tables | length}} data tables:</p>
+  {% for tab in internal_tables %}
+  <h3>{{ tab.title }}</h3>
+  <ul>
+    <li>Worksheet: {{ tab.name }}</li>
+    <li>Description: {{ tab.description }}</li>
+    <li>Number of fields: {{ tab.max_col }}</li>
+    <li>Number of data rows: {{ 'Unavailable (table metadata description only).' if
+      tab.n_data_row == 0 else tab.n_data_row }}</li>
+    <ul>
+      {% for fld in tab.fields %}
+      <li>{{ fld.field_name }}: {{ fld.description }} (type: {{ fld.field_type }})</li>
+      {% endfor %}
+    </ul>
+  </ul>
+  {% endfor %}
+  {% else %}
+  <p>This file only contains dataset metadata.</p>
+  {% endif %}
+
+  <!-- Report on external files -->
+  {% for external_filename , external_data in external_file_data.items() %}
+  <h2>{{ external_filename }}</h2>
+
+  <p>{{ external_data['description'] }}</p>
+
+  {% if external_data['tables'] %}
+  <p>This file contains {{ external_data['tables'] | length}} data tables:</p>
+
+  {% for tab in external_data['tables'] %}
+  <h3>{{ tab.title }}</h3>
+  <ul>
+    <li>Worksheet: {{ tab.name }}</li>
+    <li>Description: {{ tab.description }}</li>
+    <li>Number of fields: {{ tab.max_col }}</li>
+    <li>Number of data rows: {{ 'Unavailable (table metadata description only).' if
+      tab.n_data_row == 0 else tab.n_data_row }}</li>
+    <ul>
+      {% for fld in tab.fields %}
+      <li>{{ fld.field_name }}: {{ fld.description }} (type: {{ fld.field_type }})</li>
+      {% endfor %}
+    </ul>
+  </ul>
+  {% endfor %}
+  {% endif %}
+  {% endfor %}
+
+  <!-- Temporal and geographic extents -->
+  <h1>Extents</h1>
+  <ul>
+    <li>Date range: {{ temporal_extent | join(' to ') }}</li>
+    <li>Latitudinal extent: {{ latitudinal_extent[0] | round(3) }}° to {{ latitudinal_extent[1] | round(3) }}°</li>
+    <li>Longitudinal extent: {{ longitudinal_extent[0] | round(3) }}° to {{ longitudinal_extent[1] | round(3) }}°</li>
+  </ul>
+
+  <!-- Conditional display of taxonomic information -->
+  {% if gbif_taxa or ncbi_taxa %}
+  <h1>Taxonomic coverage</h1>
+
+  <p>This dataset contains data associated with taxa and these have been validated
+    against appropriate taxonomic authority databases.
+  </p>
+  {% if gbif_taxa %}
+  <h2>GBIF taxa details</h2>
+
+  <p>The following taxa were validated against the GBIF backbone dataset (version {{
+    gbif_timestamp }}). If a dataset uses a synonym, the accepted usage is shown followed
+    by the dataset usage in brackets. Taxa that cannot be validated, including new species
+    and other unknown taxa, morphospecies, functional groups and taxonomic levels not used
+    in the GBIF backbone are shown in square brackets.
+  </p>
+  {{ gbif_taxa }}
+  {% endif %}
+
+  {% if ncbi_taxa %}
+  <h2>NCBI taxa details</h2>
+
+  <p>The following taxa were validated against the NCBI taxonomy dataset (version {{
+    ncbi_timestamp }}). If a dataset uses a synonym, the accepted usage is shown followed
+    by the dataset usage in brackets. Taxa that cannot be validated, e.g. new or unknown
+    species are shown in square brackets. Non-backbone taxonomic ranks (e.g. strains or
+    subphyla) can be validated using the NCBI database. However, they will only be shown
+    if the user explicitly provided a non-backbone taxon. When they are shown they will be
+    accompanied by an message stating their rank.
+  </p>
+  {{ ncbi_taxa }}
+  {% endif %}
+
+  {% endif %}
+</div>
