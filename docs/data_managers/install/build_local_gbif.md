@@ -26,10 +26,10 @@ include "data_managers/command_line_tools/command_line_usage/safedata_build_loca
 %}
 ```
 
-You will need to provide an output directory for the database and then use the command:
+You will need to provide an output file path for the database and then use the command:
 
 ```sh
-safedata_build_local_gbif outdir
+safedata_build_local_gbif outfile
 ```
 
 This should result in the following output:
