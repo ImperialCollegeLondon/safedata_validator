@@ -105,18 +105,23 @@ In general, we follow the GBIF 'accepted usage' of a taxon name and this include
 following when GBIF say a taxon is a synonym. We include your taxon name in our
 taxonomic indices, but under the taxonomic hierarchy suggested by GBIF.
 
-In the example in the table, GBIF asserts that _Microcopris hidakai_ is a synonym of
-[_Onthophagus hidakai_](https://www.gbif.org/species/1090433) and so our taxonomic
-index will include both those names under the parent genus _Onthophagus_. The taxon
-validation of your dataset does warn about this in the output:
-
-> ? Row 7 (micr_hid): considered a homotypic_synonym of Onthophagus hidakai (1090433)
-> in GBIF backbone
-
 If you strongly disagree with that accepted usage, then you can use the **Ignore ID**
 field to explicitly ignore the GBIF match. You will need to insert the GBIF ID number of
 the accepted usage (reported in the warning message) in this field. You will then need
 to provide a **parent taxon** (see below)
+
+In the example in the table, a (fictional) recently discovered species of gannet
+([_Morus_](https://www.gbif.org/species/2480962)) has been included. Unfortunately, this
+species shares a scientific name ([_Morus rubra_](https://www.gbif.org/species/5361886))
+with a species of mulberry ([_Morus_](https://www.gbif.org/species/2984545)). This
+results in information about the mulberry species being incorrectly included in the
+taxonomic hierarchy. To stop this from happening, information on the correct parent
+genus must be included, and the incorrect species match must be explicitly ignored using
+the **Ignore ID** field.
+
+The example in the table is made up, but similar situations have arisen in previous
+datasets published using the `safedata` system. That said conflicts of this type are
+rare, so you are unlikely to have to ever use **Ignore ID**.
 
 ## Parent taxon details
 
@@ -172,8 +177,10 @@ isn't one of the backbone taxonomic levels.
 
 If you have set an **Ignore ID** value for a taxon, then that is explicitly rejecting
 the parent taxon that we would naturally use from GBIF and so you will need to provide a
-replacement. The example in the table is explicitly saying that _Microcopris hidakai_ is
-not a synonym but is a separate taxon that belongs in _Microcopris_.
+replacement. The example in the table is explicitly saying that _Morus rubra_ is not a
+species of mulberry (genus [_Morus_](https://www.gbif.org/species/2984545)) but is a
+species of gannet that belongs in the _Animalia_ genus
+[_Morus_](https://www.gbif.org/species/2480962).
 
 ## Deleted taxa
 
