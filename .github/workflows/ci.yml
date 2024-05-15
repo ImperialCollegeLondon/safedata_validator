@@ -68,12 +68,9 @@ jobs:
       - name: Build docs using mkdocs
         run: poetry run mkdocs build --strict
 
-      - name: Check for File Modifications
+      - name: Check for file modifications due to docs build
         run: |
-          git status
           if git status | grep -q "modified"; then
-            echo "Files have been modified."
+            echo "Docs build process has resulted in file changes."
             exit 1
-          else
-            echo "No modifications found."
           fi
