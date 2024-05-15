@@ -111,3 +111,12 @@ gbif_id,parent_id,taxon_name,taxon_rank,status
 8531298,5219404,Felis imperialis,species,synonym
 2684241,3925,Pinus,genus,accepted
 3367489,10240218,Acladium atrum,species,deleted
+# ------------------------------------------------------------------------
+# Taxa from Example.xlsx
+# ------------------------------------------------------------------------
+5219531,5483,Pongo,genus,accepted
+798,359,Primates,order,accepted
+5483,798,Hominidae,family,accepted
+4334,1457,Apidae,family,accepted
+5840,1470,Scarabaeidae,family,accepted
+5361886,2984545,Morus rubra,species,accepted
