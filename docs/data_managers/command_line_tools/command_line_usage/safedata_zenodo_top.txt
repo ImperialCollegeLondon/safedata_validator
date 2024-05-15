@@ -10,8 +10,8 @@ Publish validated datasets to Zenodo using a command line interface.
 
     The safedata_zenodo command is used by providing subcommands for the
     different actions required to publish a validated dataset. The list of
-    subcommands (with aliases) is shown below and individual help is
-    available for each of the subcommands:
+    subcommands is shown below and individual help is available for each
+    of the subcommands:
 
         safedata_zenodo subcommand -h
 
