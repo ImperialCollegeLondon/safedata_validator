@@ -67,3 +67,13 @@ jobs:
           
       - name: Build docs using mkdocs
         run: poetry run mkdocs build --strict
+
+      - name: Check for File Modifications
+        run: |
+          git status
+          if git status | grep -q "modified"; then
+            echo "Files have been modified."
+            exit 1
+          else
+            echo "No modifications found."
+          fi
