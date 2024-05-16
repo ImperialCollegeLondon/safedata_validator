@@ -120,3 +120,22 @@ gbif_id,parent_id,taxon_name,taxon_rank,status
 4334,1457,Apidae,family,accepted
 5840,1470,Scarabaeidae,family,accepted
 5361886,2984545,Morus rubra,species,accepted
+8997397,4810276,Haemadipsa zeylanica,species,accepted
+9065333,4810276,Haemadipsa picta,species,accepted
+4810276,7292,Haemadipsa,genus,accepted
+7292,1077,Haemadipsidae,family,accepted
+1077,255,Arhynchobdellida,order,accepted
+255,42,Clitellata,class,accepted
+42,1,Annelida,phylum,accepted
+2435079,2435078,Neofelis nebulosa,species,accepted
+2435078,9703,Neofelis,genus,accepted
+2434917,2434894,Prionailurus planiceps,species,accepted
+2434894,9703,Prionailurus,genus,accepted
+2439261,2439223,Rattus norvegicus,species,accepted
+2439223,5510,Rattus,genus,accepted
+5510,1459,Muridae,family,accepted
+1459,359,Rodentia,order,accepted
+2437114,2437113,Echinosorex gymnura,species,accepted
+2437113,5722,Echinosorex,genus,accepted
+5722,829,Erinaceidae,family,accepted
+829,359,Erinaceomorpha,order,accepted
