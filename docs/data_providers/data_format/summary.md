@@ -66,7 +66,7 @@ a single value for each field.
   to insert a carriage return.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B"], tablefmt = 'github', nrows = 2) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', nrows = 2, usecols=["A", "B"]) }}
 <!-- markdownlint-enable MD013 -->
 
 ## The Project ID block
@@ -83,7 +83,7 @@ This simple block provides project ID codes for the dataset.
   Project ID` but this is deprecated.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B"], tablefmt = 'github', skiprows = 2, nrows = 1) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 2, nrows = 1, usecols=["A", "B"]) }}
 <!-- markdownlint-enable MD013 -->
 
 ## The access block
@@ -110,7 +110,7 @@ single value for each field.
   date - restricted datasets are permanently restricted.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B"], tablefmt = 'github', skiprows = 3, nrows = 3) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 3, nrows = 3, usecols=["A", "B"]) }}
 <!-- markdownlint-enable MD013 -->
 
 ## The author block
@@ -134,7 +134,7 @@ Orme". Please provide just the numeric part of the ORCIDs, as shown below, not t
 URL `http://orcid.org/0000-0002-7005-1394`.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B"], tablefmt = 'github', skiprows = 6, nrows = 4) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 6, nrows = 4, usecols=["A", "B"]) }}
 <!-- markdownlint-enable MD013 -->
 
 !!! Important
@@ -167,7 +167,7 @@ multiple sheets in adjacent columns.
   block.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github', skiprows = 10, nrows = 4) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 10, nrows = 4) }}
 <!-- markdownlint-enable MD013 -->
 
 ## Keywords block
@@ -180,7 +180,7 @@ cells and provide one set of keywords for the whole dataset, not one per data
 worksheet.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github', skiprows = 14, nrows = 1) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 14, nrows = 1, usecols=["A", "B"]) }}
 <!-- markdownlint-enable MD013 -->
 
 ## External files block
@@ -198,7 +198,7 @@ For each file you must provided the exact filename, which **must not** contain
 spaces, and a description of the file.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github', skiprows = 15, nrows = 2) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 15, nrows = 2, usecols=["A", "B", "C"]) }}
 <!-- markdownlint-enable MD013 -->
 
 ## Publication DOI block
@@ -213,7 +213,7 @@ also accept `http://doi.org/`, `http://dx.doi.org/` and `https://dx.doi.org/` as
 the root of the URL.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github', skiprows = 17, nrows = 1) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 17, nrows = 1, usecols=["A", "B", "C"]) }}
 <!-- markdownlint-enable MD013 -->
 
 ## Funders block
@@ -239,7 +239,7 @@ Authors and Worksheets, you can use multiple columns to acknowledge more than
 one funder.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github', skiprows = 18, nrows = 4) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 18, nrows = 4, usecols=["A", "B"]) }}
 <!-- markdownlint-enable MD013 -->
 
 ## Permits block
@@ -252,7 +252,7 @@ permits used to collect this data. The permit type value must be one of `researc
 `export` or `ethics`. Again, you can use multiple columns to record multiple permits.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github', skiprows = 22, nrows = 3) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 22, nrows = 3, usecols=["A", "B"]) }}
 <!-- markdownlint-enable MD013 -->
 
 !!! Note "Unknown permit numbers"
@@ -295,7 +295,7 @@ in your Summary worksheet that provide extent metadata as described below.
 The start and end date values must be provided as an Excel date formatted cell.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github', skiprows = 25, nrows = 2) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 25, nrows = 2, usecols=["A", "B"]) }}
 <!-- markdownlint-enable MD013 -->
 
 ### Geographic extents
@@ -308,7 +308,7 @@ The geographic extents must be provided as decimal degrees (16.75) not degrees,
 minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github', skiprows = 27, nrows = 4) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 27, nrows = 4, usecols=["A", "B"]) }}
 <!-- markdownlint-enable MD013 -->
 
 !!! Note "`safedata` at the SAFE Project"
@@ -317,5 +317,5 @@ minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
 ## Complete example summary table
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github') }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github') }}
 <!-- markdownlint-enable MD013 -->
