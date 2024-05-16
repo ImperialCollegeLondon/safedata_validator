@@ -734,10 +734,11 @@ class Summary:
             )
 
         # 3. Look to see what data is available:
-        #    - No worksheets or external files: no data to document.
+        #    - No worksheets or external files: no data to document is an error.
         #    - Only external files: no tabular description of external files, just
         #      descriptions of the files themselves.
-        #    -
+        #    - Named worksheets must exist and any external files linked must also
+        #      exist.
 
         if not data_worksheets and self.external_files is None:
             LOGGER.error("No data worksheets or external files provided - no data.")
@@ -764,7 +765,7 @@ class Summary:
             ):
                 # Worksheet points to unknown external file
                 LOGGER.error(
-                    f"Data worksheet  {each_ws['name']} linked to unknown "
+                    f"Data worksheet {each_ws['name']} linked to unknown "
                     f"external files: {each_ws['external']}",
                 )
             else:

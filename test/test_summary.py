@@ -955,7 +955,8 @@ def test_external_files(
             None,
             dict(),
             True,
-            "Worksheet descriptions refer to unreported external files",
+            "Data worksheet Transects linked to unknown "
+            "external files: Amissingfile.dat",
         ),
         (
             {
@@ -967,8 +968,7 @@ def test_external_files(
             None,
             dict(),
             True,
-            "Do not include Taxa or Locations metadata sheets in Data worksheet "
-            "details",
+            "Do not include standard metadata sheets in data worksheet details",
         ),
         (
             {
@@ -982,8 +982,7 @@ def test_external_files(
             None,
             dict(),
             True,
-            "Do not include Taxa or Locations metadata sheets in Data worksheet"
-            " details",
+            "Do not include standard metadata sheets in data worksheet details",
         ),
         (
             {
