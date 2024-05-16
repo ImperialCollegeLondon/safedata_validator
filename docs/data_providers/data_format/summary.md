@@ -198,7 +198,7 @@ For each file you must provided the exact filename, which **must not** contain
 spaces, and a description of the file.
 
 <!-- markdownlint-disable MD013 -->
-{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 15, nrows = 2, usecols=["A", "B", "C"]) }}
+{{ read_excel('Example.xlsx', sheet_name = 'Summary', keep_default_na = False, header = None, names = ["A", "B", "C", "D", "E", "F", "G", "H"], tablefmt = 'github', skiprows = 15, nrows = 2, usecols=["A", "B", "C", "D"]) }}
 <!-- markdownlint-enable MD013 -->
 
 ## Publication DOI block
