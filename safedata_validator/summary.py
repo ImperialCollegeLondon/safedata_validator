@@ -698,79 +698,77 @@ class Summary:
     def _load_data_worksheets(self, sheetnames):
         """Load the worksheets block.
 
-        Provides summary validation specific to the worksheets block.
+        Provides summary validation specific to the worksheets block. The main things to
+        be checked here are:
+
+        1. Are there any standard worksheets incorrectly included in the data worksheets
+           block?
+        2. Are all the data worksheets present in the workbook documented?
+        3. Do any worksheets linked to external files used documented external files?
         """
+
+        # Load data worksheet data and convert an empty block from None to an empty list
         data_worksheets = self._read_block(self.fields["worksheet"])
+        data_worksheets = [] if data_worksheets is None else data_worksheets
 
-        # Strip out faulty inclusion of Taxa and Location worksheets in
-        # data worksheets before considering combinations of WS and external files
-        if data_worksheets is not None:
-            cited_sheets = [ws["name"] for ws in data_worksheets]
+        # 1. Strip out faulty inclusion of standard worksheets
+        cited_sheets = {ws["name"] for ws in data_worksheets}
+        standard_sheets = {"Summary", "GBIFTaxa", "NCBITaxa", "Taxa", "Locations"}
+        cited_standard_sheets = cited_sheets.intersection(standard_sheets)
 
-            if ("Locations" in cited_sheets) or ("Taxa" in cited_sheets):
-                LOGGER.error(
-                    "Do not include Taxa or Locations metadata sheets in "
-                    "Data worksheet details"
-                )
+        if cited_standard_sheets:
+            LOGGER.error(
+                "Do not include standard metadata sheets in data worksheet details: ",
+                extra={"join": cited_standard_sheets},
+            )
 
-                data_worksheets = [
-                    ws
-                    for ws in data_worksheets
-                    if ws["name"] not in ("Locations", "Taxa")
-                ] or None
+            data_worksheets = [
+                ws for ws in data_worksheets if ws["name"] in standard_sheets
+            ]
 
-        # Look to see what data is available - must be one or both of data worksheets
-        # or external files and validate worksheets if present.
-        cited_sheets = set()
+        # 2. Check for existing sheets without description
+        extra_names = set(sheetnames) - standard_sheets - cited_sheets
+        if extra_names:
+            LOGGER.error(
+                "Undocumented sheets found in workbook: ", extra={"join": extra_names}
+            )
 
-        if data_worksheets is None and self.external_files is None:
+        # 3. Look to see what data is available:
+        #    - No worksheets or external files: no data to document.
+        #    - Only external files: no tabular description of external files, just
+        #      descriptions of the files themselves.
+        #    -
+
+        if not data_worksheets and self.external_files is None:
             LOGGER.error("No data worksheets or external files provided - no data.")
             return
-        elif data_worksheets is None:
+        elif not data_worksheets:
             LOGGER.info("Only external file descriptions provided")
             return
 
-        # Check sheet names in list of sheets
-        cited_sheets = {ws["name"] for ws in data_worksheets}
-
-        # Names not in list of sheets
-        for each_ws in data_worksheets:
-            # Now match to sheet names
-            if each_ws["name"] not in sheetnames:
-                if each_ws["external"] is not None:
-                    LOGGER.info(
-                        f"Worksheet summary {each_ws['name']} recognized as placeholder"
-                        f" for external file {each_ws['external']}"
-                    )
-                else:
-                    LOGGER.error(f"Data worksheet {each_ws['name']} not found")
-
-        # bad external files
-        external_in_sheet = {
-            ws["external"] for ws in data_worksheets if ws["external"] is not None
-        }
+        # Get external file names
         if self.external_files is not None:
             external_names = {ex["file"] for ex in self.external_files}
         else:
             external_names = set()
 
-        bad_externals = external_in_sheet - external_names
-        if bad_externals:
-            LOGGER.error(
-                "Worksheet descriptions refer to unreported external files: ",
-                extra={"join": bad_externals},
-            )
+        # Check provided data worksheets
+        for each_ws in data_worksheets:
 
-        # Check for existing sheets without description
-        extra_names = (
-            set(sheetnames)
-            - {"Summary", "Taxa", "GBIFTaxa", "NCBITaxa", "Locations"}
-            - cited_sheets
-        )
-        if extra_names:
-            LOGGER.error(
-                "Undocumented sheets found in workbook: ", extra={"join": extra_names}
-            )
+            if each_ws["name"] not in sheetnames:
+                # Unknown worksheet
+                LOGGER.error(f"Data worksheet {each_ws['name']} not found")
+            elif (
+                each_ws["external"] is not None
+                and each_ws["external"] not in external_names
+            ):
+                # Worksheet points to unknown external file
+                LOGGER.error(
+                    f"Data worksheet  {each_ws['name']} linked to unknown "
+                    f"external files: {each_ws['external']}",
+                )
+            else:
+                LOGGER.info(f"Data worksheet  {each_ws['name']} found.")
 
         self.data_worksheets = data_worksheets
 
