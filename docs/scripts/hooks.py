@@ -6,7 +6,8 @@ to automatically generate the files used to document the command line usage of
 `safedata_validator`, and to generate a `.csv` file containing the information from the
 Summary sheet of the Example.xlsx but with correctly formatted dates.
 
-TODO - MENTION THE DELETING HOOK ONCE IT'S ADDED
+The `on_post_build` hook is then used to delete the `.csv` file once it has been used in
+the docs build process.
 """
 
 import os
@@ -55,6 +56,8 @@ def on_pre_build(config, **kwargs) -> None:
     df.to_csv("Summary.csv", index=False, header=False)
 
 
-# TODO - Use post_build hook to delete the file
-# def on_post_build(config, **kwargs) -> None:
-#     """"""
+def on_post_build(config, **kwargs) -> None:
+    """Delete temporary csv file that pre_build hook output."""
+
+    # Delete the temporary csv file
+    os.remove("Summary.csv")
