@@ -942,7 +942,7 @@ def test_external_files(
             {"DF", "Incidence", "Transects", "Summary", "Taxa", "Locations", "NotUsed"},
             dict(),
             True,
-            " Undocumented sheets found in workbook",
+            "Undocumented sheets found in workbook",
         ),
         (
             {
@@ -1008,6 +1008,18 @@ def test_external_files(
             False,
             "Only external file descriptions provided",
         ),
+        (
+            {
+                "worksheet title": (None,),
+                "worksheet name": (None,),
+                "worksheet description": (None,),
+                "worksheet external file": (None,),
+            },
+            None,
+            dict(),
+            True,
+            "Undocumented sheets found in workbook",
+        ),  # No worksheets at all provided
     ],
 )
 def test_data_worksheets(
@@ -1034,25 +1046,30 @@ def test_data_worksheets(
         "Locations",
     }
 
-    # Valid set of information
-    input = {
-        "worksheet title": (
-            "My shiny dataset",
-            "My incidence matrix",
-            "Bait trap transect lines",
-        ),
-        "worksheet name": ("DF", "Incidence", "Transects"),
-        "worksheet description": (
-            "This is a test dataset",
-            "A test dataset too",
-            "Attribute table for transect GIS",
-        ),
-        "worksheet external file": (None, None, "BaitTrapTransects.geojson"),
-    }
+    # Valid set of information - slightly hacky switch to move between updating a basic
+    # example and simply providing no data worksheet information at all.
+    if alterations is None:
+        input = dict()
+    else:
+        input = {
+            "worksheet title": (
+                "My shiny dataset",
+                "My incidence matrix",
+                "Bait trap transect lines",
+            ),
+            "worksheet name": ("DF", "Incidence", "Transects"),
+            "worksheet description": (
+                "This is a test dataset",
+                "A test dataset too",
+                "Attribute table for transect GIS",
+            ),
+            "worksheet external file": (None, None, "BaitTrapTransects.geojson"),
+        }
 
-    # Update valid to test error conditions and populate _rows
-    # directly (bypassing .load() and need to pack in worksheet object
-    input.update(alterations)
+        # Update valid to test error conditions and populate _rows
+        # directly (bypassing .load() and need to pack in worksheet object
+        input.update(alterations)
+
     fixture_summary._rows = input
 
     # Populate the external files
