@@ -70,3 +70,45 @@ mkdocstrings-python = "^1.7.5"
 [build-system]
 requires = ["poetry-core>=1.2.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+addopts = """	
+  --mypy -p no:warnings
+  --cov=safedata_validator
+  --cov-report=html:htmlcov/coverage
+  # --doctest-modules
+  # --doctest-glob = safedata_validator
+  # --ignore=safedata_validator/__main__.py
+  """
+python_files = 'test_*.py'
+testpaths = ['test']
+
+[tool.ruff]
+target-version = "py310"
+
+
+[tool.ruff.lint]
+# Enable all `pydocstyle` rules, limiting to those that adhere to the
+# Google convention via `convention = "google"`, below.
+select = [
+  # "B", # flake8-bugbear
+  # "SIM", # flake8-simplify
+  "E", # pycodestyle
+  "F", # pyflakes
+  "D", # pydocstyle
+  "I", # isort
+  "UP", # pyupgrade
+]
+
+# On top of the Google convention, disable:
+ignore = [
+  "D202", # Blank line after docstring is ok
+  "D107", # Location of __init__ docstring in class not __init__"
+  "F401", # module imported but unused
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"test/test_*.py" = ["D103"] 
