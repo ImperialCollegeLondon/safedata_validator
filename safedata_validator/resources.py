@@ -179,7 +179,6 @@ class Resources:
     """
 
     def __init__(self, config: str | list | dict | None = None) -> None:
-
         # Get the standard user and site config paths for the platform
         user_cfg_file = os.path.join(
             appdirs.user_config_dir(), "safedata_validator", "safedata_validator.cfg"
