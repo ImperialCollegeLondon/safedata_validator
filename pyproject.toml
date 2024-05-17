@@ -73,12 +73,10 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 addopts = """	
+  -v
   --mypy -p no:warnings
   --cov=safedata_validator
   --cov-report=html:htmlcov/coverage
-  # --doctest-modules
-  # --doctest-glob = safedata_validator
-  # --ignore=safedata_validator/__main__.py
   """
 python_files = 'test_*.py'
 testpaths = ['test']
