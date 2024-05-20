@@ -122,35 +122,35 @@ if you want to use `Crbe` in your data worksheets, rather than typing out
 
 ### Kingdom or Superkingdom
 
- NCBI defines a taxonomic rank above kingdom, which it terms a superkingdom. Bacteria is
- defined as a superkingdom as is Eukaryota. Within the NCBI database Bacterial taxa have
- no kingdom defined, but Eukaryotes generally have kingdom information provided. As
- such, we allow Bacteria (and Archaea) to be entered as **either** a superkingdom **or**
- a kingdom, but Eukaryota can **only** be entered as a superkingdom. It is, however, a
- perfectly valid option to not enter superkingdom information at all and just enter
- kingdom information for Eukaryotes (e.g. Fungi, Metazoa, etc) and phylum information
- for Prokaryotes (Bacteria and Archaea).
+NCBI defines a taxonomic rank above kingdom, which it terms a superkingdom. Bacteria is
+defined as a superkingdom as is Eukaryota. Within the NCBI database Bacterial taxa have
+no kingdom defined, but Eukaryotes generally have kingdom information provided. As such,
+we allow Bacteria (and Archaea) to be entered as **either** a superkingdom **or** a
+kingdom, but Eukaryota can **only** be entered as a superkingdom. It is, however, a
+perfectly valid option to not enter superkingdom information at all and just enter
+kingdom information for Eukaryotes (e.g. Fungi, Metazoa, etc) and phylum information for
+Prokaryotes (Bacteria and Archaea).
 
 ### Non-canon NCBI taxonomy
 
- The NCBI taxonomy database is regularly updated (particularly for microbial taxa). This
- means that taxa names can become synonymised or superseded. Generally, the current
- canonical name for taxa can be found based on superseded information and this will
- generate a warning like this:
+The NCBI taxonomy database is regularly updated (particularly for microbial taxa). This
+means that taxa names can become synonymised or superseded. Generally, the current
+canonical name for taxa can be found based on superseded information and this will
+generate a warning like this:
 
     ? Non-canon name Enterococcus coli at rank species: synonym for Escherichia coli
 
- Then, both the superseded taxa information and the up to date information will be added
- to the taxon index. If you don't want both to be recorded, simply replace the
- superseded taxa information with the up to date information.
+Then, both the superseded taxa information and the up to date information will be added
+to the taxon index. If you don't want both to be recorded, simply replace the
+superseded taxa information with the up to date information.
 
 ### Non-backbone ranks
 
- We consider backbone ranks to be those of the GBIF backbone (e.g. kingdom, phylum, ...,
- subspecies) with the addition of superkingdom. It is also fine to include non-backbone
- ranks such as strain or superorder. However, when the lineage of each taxa is found,
- only backbone ranks will be included, i.e. non-backbone ranks will only be recorded if
- they are the least nested taxonomic level for a specific taxon.
+We consider backbone ranks to be those of the GBIF backbone (e.g. kingdom, phylum, ...,
+subspecies) with the addition of superkingdom. It is also fine to include non-backbone
+ranks such as strain or superorder. However, when the lineage of each taxa is found,
+only backbone ranks will be included, i.e. non-backbone ranks will only be recorded if
+they are the least nested taxonomic level for a specific taxon.
 
 ## My data is not sequencing data, and is hard to convert to NCBI taxonomy
 
