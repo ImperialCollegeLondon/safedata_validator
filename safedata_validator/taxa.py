@@ -648,7 +648,7 @@ class NCBIValidator:
 
     @staticmethod
     def _canon_to_backbone_hierarchy(
-        canon_hier: list[tuple[Any, ...]]
+        canon_hier: list[tuple[Any, ...]],
     ) -> list[tuple[Any, ...]]:
         """Reduce a canonical NCBI hierarchy to the backbone ranks.
 
@@ -729,12 +729,10 @@ class NCBIValidator:
 
             # If not, is there a matching alternative name at the same rank and id?
             row = self.ncbi_conn.execute(
-                """select name_class
-                    from names join nodes using (tax_id)
-                    where name_txt = '{}' and rank = '{}' and tax_id = '{}';
-                """.format(
-                    provided_name, rank, tax_id
-                )
+                f"select name_class\n"
+                f"from names join nodes using (tax_id)\n"
+                f"where name_txt = '{provided_name}' and rank = '{rank}' and tax_id = "
+                f"'{tax_id}';"
             ).fetchone()
 
             if row is None:

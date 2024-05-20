@@ -11,7 +11,6 @@ from safedata_validator.validators import GetDataFrame, HasDuplicates, IsLower
 
 @pytest.fixture()
 def dummy_ws_with_extra():
-
     wb = openpyxl.Workbook()
     ws = wb.active
 
@@ -99,7 +98,6 @@ def test_getdataframe(dummy_ws_with_extra, hd_vals, nonstr, padded, duped, blank
 
     # Use sum to check contents
     def _times_table(v, to):
-
         return [v * (r + 1) for r in range(to)]
 
     assert all(
@@ -139,7 +137,6 @@ def test_getdataframe(dummy_ws_with_extra, hd_vals, nonstr, padded, duped, blank
     ],
 )
 def test_hasduplicates(input_vals, duplicated, bool_val):
-
     out = HasDuplicates(input_vals)
 
     assert out.duplicated == duplicated
@@ -158,7 +155,6 @@ def test_hasduplicates(input_vals, duplicated, bool_val):
     ],
 )
 def test_islower(input_vals, output_vals):
-
     out = IsLower(input_vals)
 
     assert out.values == output_vals
