@@ -45,9 +45,9 @@ underscores to separate words.
 can't see the change in the docs that is why-->
 A spreadsheet template containing the required worksheets, labels and headers can be
 downloaded
-[here.](https://github.com/ImperialCollegeLondon/safedata_validator/blob/main/docs/data_providers/data_format/Template.xlsx)
+[here.](https://github.com/ImperialCollegeLondon/safedata_validator/raw/main/docs/data_providers/data_format/Template.xlsx)
 
-There is also an example file, which can be downloaded [here.](https://github.com/ImperialCollegeLondon/safedata_validator/blob/feature/example_file/docs/data_providers/data_format/Example.xlsx)
+There is also an example file, which can be downloaded [here.](https://github.com/ImperialCollegeLondon/safedata_validator/raw/feature/example_file/docs/data_providers/data_format/Example.xlsx)
 This file is intended to demonstrate how to correctly format a wide variety of different
 types of data. The data in this spreadsheet mirrors the example data showed later in
 this section of the documentation. We would strongly recommend reading the relevant
