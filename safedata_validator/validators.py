@@ -193,7 +193,7 @@ class IsNumber(Filter):
     @staticmethod
     def tfunc(val) -> bool:
         """Test for float or int values."""
-        return isinstance(val, (float, int))
+        return isinstance(val, float | int)
 
     @staticmethod
     def rfunc(val) -> Any:
@@ -238,7 +238,7 @@ class IsLocName(Filter):
     @staticmethod
     def tfunc(val) -> bool:
         """Test that a value is a string or integer."""
-        if isinstance(val, (str, int)) or (isinstance(val, float) and val.is_integer()):
+        if isinstance(val, str | int) or (isinstance(val, float) and val.is_integer()):
             return True
 
         return False

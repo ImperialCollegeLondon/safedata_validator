@@ -3,7 +3,7 @@ and to expose some global logging objects for use throughout the code.
 
 1. The `logging.LogRecordFactory` is updated so that new records include a custom
    `levelcode` attribute to visually indicate log record severity in validation
-   reports. 
+   reports.
 
 2. The [IndentFormatter][safedata_validator.logger.IndentFormatter] class then extends
    :class:`logging.Formatter` to provide compact messages with variable indentation to
@@ -202,6 +202,7 @@ def use_file_logging(filename: Path, level: int = logging.DEBUG) -> None:
 
     Args:
         filename: The path to a file to use for logging.
+        level: The lowest logging level to be recorded in the file.
 
     Raises:
         RuntimeError: If the file handler already exists. If the logging is to move to a

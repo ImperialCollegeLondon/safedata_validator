@@ -946,7 +946,6 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         LOGGER.info("Inspire XML generated")
 
     elif args.subcommand == "publish_dataset":
-
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
 
