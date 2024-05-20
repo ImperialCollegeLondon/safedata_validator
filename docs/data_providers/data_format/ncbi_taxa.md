@@ -84,26 +84,27 @@ if you want to use `Crbe` in your data worksheets, rather than typing out
   can be duplicated within a taxon hierarchy.
   
     You are only required to provide the taxonomic name for the specific rank that you
-  are trying to match and can leave other fields empty. However it is probably more
-  useful to provide a more complete taxonomy! If you do provide higher taxonomic
-  information then it must be congruent with the hierarchy for the focal taxon. For
-  example, specifying Family Anatidae is sufficient to identify waterfowl, but providing
-  Order Carnivora (rather than Order Anseriformes) would result in an error.
+    are trying to match and can leave other fields empty. However it is probably more
+    useful to provide a more complete taxonomy! If you do provide higher taxonomic
+    information then it must be congruent with the hierarchy for the focal taxon. For
+    example, specifying Family Anatidae is sufficient to identify waterfowl, but
+    providing Order Carnivora (rather than Order Anseriformes) would result in an error.
 
     Names can be provided in plain text, or alternatively in a commonly used notation,
-  where the rank is indicated by a lower case first letter and the name follows after
-  two underscores (e.g. `k__Bacteria` for Kingdom Bacteria). Notation of this type
-  should be placed in the correct rank columns, and validation is carried out to check
-  that the rank implied by the notation matches the column rank.
+    where the rank is indicated by a lower case first letter and the name follows after
+    two underscores (e.g. `k__Bacteria` for Kingdom Bacteria). Notation of this type
+    should be placed in the correct rank columns, and validation is carried out to check
+    that the rank implied by the notation matches the column rank.
 
     Two special cases are that NCBI outputs typically separate out the components of
-  binomial and trinomial names: for example, they might return `g__Escherichia` and
-  `s__coli`. In order to be able to match _complete_ species and subspecies names
-  against the database, you must provide field information for genus, species and
-  subspecies ranks. This information is used to assemble complete names for validation
-  against the NCBI names. Note that if you have already compiled complete names, so that
-  your genus field contains `Escherichia` and your species field contains `Escherichia
-  coli` then this will also be accepted, as long as the parts are compatible.
+    binomial and trinomial names: for example, they might return `g__Escherichia` and
+    `s__coli`. In order to be able to match _complete_ species and subspecies names
+    against the database, you must provide field information for genus, species and
+    subspecies ranks. This information is used to assemble complete names for validation
+    against the NCBI names. Note that if you have already compiled complete names, so
+    that your genus field contains `Escherichia` and your species field contains
+    `Escherichia coli` then this will also be accepted, as long as the parts are
+    compatible.
   
     !!! Note
 
