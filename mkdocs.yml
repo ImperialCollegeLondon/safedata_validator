@@ -15,6 +15,9 @@ plugins:
   - search
   - mkdocstrings
   - include-markdown
+  - table-reader
+hooks:
+  - docs/scripts/hooks.py
 extra_css:
   - custom.css
 use_directory_urls: false
@@ -63,5 +66,6 @@ nav:
       - 'Zenodo': 'developers/api/zenodo.md'
       - 'Server': 'developers/api/server.md'
     - 'Package development': developers/package_development.md
+    - 'Strange problems': developers/strange_problems.md
   - 'safedata at the SAFE project': 'safedata_at_SAFE.md'
 

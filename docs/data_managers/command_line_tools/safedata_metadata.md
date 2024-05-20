@@ -3,8 +3,8 @@
 
 !!! info
     The subcommands of the `safedata_metadata` tools require that the `metadata`
-    section of the [resources configuration](../install/configuration.md#zenodo) be
-    completed. This is not required for simply validating datasets.
+    section of the [resources configuration](../install/configuration.md#metadata-configuration)
+    be completed. This is not required for simply validating datasets.
 
 The `safedata_metadata` command line tool provides the following subcommands which
 are used to update a server running the safedata server API.

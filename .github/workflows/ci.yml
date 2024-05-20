@@ -15,7 +15,7 @@ jobs:
 
 
   test:
-    # needs: qa
+    needs: qa
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -49,7 +49,7 @@ jobs:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   docs_build:
-    # needs: qa
+    needs: qa
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,3 +67,10 @@ jobs:
           
       - name: Build docs using mkdocs
         run: poetry run mkdocs build --strict
+
+      - name: Check for file modifications due to docs build
+        run: |
+          if git status | grep -q "modified"; then
+            echo "Docs build process has resulted in file changes."
+            exit 1
+          fi
