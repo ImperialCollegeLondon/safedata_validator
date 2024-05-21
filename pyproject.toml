@@ -30,7 +30,7 @@ ignore_missing_imports = true
 [tool.poetry.dependencies]
 python = "^3.10"
 openpyxl = "^3.0.10"
-requests = "^2.31.0"
+requests = "^2.32.0"
 simplejson = "^3.17.6"
 appdirs = "^1.4.4"
 python-dateutil = "^2.8.2"
@@ -48,8 +48,6 @@ jinja2 = "^3.1.3"
 pyfakefs = "^4.5.6"
 pytest = "^7.0"
 pytest-cov = "^3.0.0"
-pytest-flake8 = "^1.1.1"
-pytest-mypy = "^0.9.1"
 pytest-mock = "^3.7.0"
 
 [tool.poetry.group.devenv.dependencies]
@@ -75,7 +73,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 addopts = """	
   -v
-  --mypy -p no:warnings
+  -p no:warnings
   --cov=safedata_validator
   --cov-report=html:htmlcov/coverage
   """
