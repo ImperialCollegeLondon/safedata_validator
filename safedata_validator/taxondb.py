@@ -198,6 +198,14 @@ def download_gbif_backbone(outdir: str, timestamp: str, url: str) -> dict:
                 int(deleted_head.headers["Content-Length"]),
             )
         ]
+    else:
+        # Warn the user that deleted taxa information cannot be found, most likely
+        # because the database snapshot is too old
+        LOGGER.warning(
+            "Information on deleted taxa could not be found. This is likely because you"
+            "are building a database version older than 2021-11-26. The database will"
+            "be built without any information on deleted taxa."
+        )
 
     for key, file, fsize in targets:
         # Download the file with a TQDM progress bar

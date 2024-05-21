@@ -36,7 +36,7 @@ from safedata_validator.taxa import taxon_index_to_text
 # Constant definition of zenodo action function response type
 # TODO - should all of these functions just Raise? Then we could just use try
 # blocks rather than using the this approach.
-ZenodoFunctionResponseType = tuple[dict, Optional[str]]
+ZenodoFunctionResponseType = tuple[dict, str | None]
 """Function return value
 
 The functions interacting with Zenodo all return a common format of tuple of length 2:

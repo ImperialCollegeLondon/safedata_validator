@@ -32,8 +32,8 @@ used to provide file details.
 
 !!! info
     The subcommands of the `safedata_zenodo` tools require that the `zenodo`
-    section of the [resources configuration](../install/configuration.md#zenodo) be
-    completed. This is not required for simply validating datasets.
+    section of the [resources configuration](../install/configuration.md#publication-configuration)
+    be completed. This is not required for simply validating datasets.
 
 The `safedata_zenodo` command line tool provides the following subcommands which
 are used to publish data, post metadata and help maintain and document published

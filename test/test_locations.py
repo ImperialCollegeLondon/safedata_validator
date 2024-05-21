@@ -75,7 +75,6 @@ def locations_inst(fixture_resources):
     ],
 )
 def test_add_known_locations(caplog, locations_inst, known_loc_names, expected_log):
-
     # Preload site names for testing duplicate capture and remove
     # repeated "Checking known locations" across all test outputs
     locations_inst.add_known_locations(["E_197"])
@@ -349,7 +348,6 @@ def test_add_known_locations(caplog, locations_inst, known_loc_names, expected_l
     ],
 )
 def test_add_new_locations(caplog, locations_inst, new_loc_dicts, expected_log):
-
     # Preload site names for testing duplicate capture and remove
     # repeated "Checking known locations" across all test outputs
     locations_inst.add_new_locations(
@@ -449,7 +447,6 @@ def test_add_new_locations(caplog, locations_inst, new_loc_dicts, expected_log):
     ],
 )
 def test_load_from_instance(caplog, locations_inst, headers, rows, expected_log):
-
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.append(headers)
@@ -468,6 +465,5 @@ def test_load_from_instance(caplog, locations_inst, headers, rows, expected_log)
     indirect=["example_excel_files"],  # take actual params from fixture
 )
 def test_load_from_file(locations_inst, example_excel_files, n_errors):
-
     locations_inst.load(example_excel_files["Locations"])
     assert locations_inst.n_errors == n_errors
