@@ -755,7 +755,6 @@ class Summary:
 
         # Check provided data worksheets
         for each_ws in data_worksheets:
-
             if each_ws["name"] not in sheetnames:
                 # Unknown worksheet
                 LOGGER.error(f"Data worksheet {each_ws['name']} not found")
