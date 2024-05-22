@@ -1,4 +1,4 @@
-# Creating a gazetteer
+# The gazetteer
 
 Datasets can [use their own unique
 locations](../../data_providers/data_format/locations.md), but it is more generally
@@ -6,7 +6,9 @@ useful to have a centrally curated set of shared locations. These curated locati
 provided using **gazetteer** and **location alias** files, and known locations  in
 datasets are then validated against these resources. The data resources providing this
 information are set with the `gazetteer` and `location_aliases` [configuration
-options](configuration.md).
+options](configuration.md). This page exists to explains the purpose and contents of
+these two files. See [here](gazetteer_creation.md) for a guide explaining how to create a
+gazetteer.
 
 ## The gazetteer file
 
