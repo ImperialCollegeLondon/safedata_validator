@@ -1,27 +1,50 @@
 # Gazetteer creation guide
 
-TODO - Basic GIS overview, link names to GIS features (points, lines, polygons)
+The basic reason that a gazetteer needs to be created is so that locations can be
+referred to in datasets by name rather than having to provide the coordinates for every
+single location. These locations can be any simple GIS feature, i.e. they can be a
+simple point (for a sampling point), a line (for a transect), or a polygon (for large
+plots/subplots). This gazetteer should be maintained by the data manager, this is to
+prevent data providers from renaming existing points etc. If data providers sample from
+genuinely new points they can either request that the data manager adds them to the
+gazetteer or alternatively they can just add them to their datasets as [unique
+locations](../../data_providers/data_format/locations.md).
 
-TODO - Explain Data managers need to curate this list (in a gazetteer), so people can
-use names
+The gazetteer file must be a [GeoJSON](https://geojson.org/) file. This file has to be
+defined using the [WGS84 coordinate
+system](https://en.wikipedia.org/wiki/World_Geodetic_System#WGS_84), with a local
+transformation defined so that distances between points can be calculated. Each GIS
+feature needs to have a name attribute specified. Other attributes can also be populated
+if required, but it is important to note that these **will not** be searchable using the
+metadata server. The metadata server can however provide an up to date copy of the
+gazetteer that scripts or applications written by the data manager can make use of.
 
-TODO - Explain that Geojson file made by data manager, can use any GIS provided they can
-export geojson.
+The gazetteer can either be generated using GIS software, or can be generated
+programmatically. Guides for both approaches are provided below.
 
-TODO - They need to make a GIS file containing shapes plus names (and other feature
-attributes if they want, SAFE example of fractal order)
+## Creation using GIS software
 
-TODO - Mention that additional attributes aren't currently searchable through the
-safedata system, can point an app at the server
+This can be done using whatever GIS software you like provided that the software can
+export the final map as a GeoJSON file. The developers of the `safedata` system use
+[QGIS](https://www.qgis.org/), but if you have a preferred GIS software already you
+should stick with that. Sampling locations (i.e. points, lines and polygons) can all be
+described by hand drawing in the software. However, if possible we would advise against
+doing this, as hand drawing locations introduces the possibility of mis-drawing plots
+(or transects etc). Instead we would recommend loading in existing shapes files for the
+sampling locations, and then using the GIS software to verify that the locations are
+correct and to add the relevant attributes. If shape files do not already exist they can
+be generated from the `.gpx` files used in GPS units.
 
-TODO - 1st approach: QGIS + hand drawing, combine existing shape files
+## Programmatic generation
 
-TODO - Mention somewhere that Geojson file has to be in WGS84 coordinate system, then
-setup to use a local transformation for distances
+TODO - Explain general advantages
 
-TODO - Second approach: Programmatic generation, explain general advantages
+### Generation using `R`
+
 TODO - Option 1 - R + sf package
 TODO - Simple example R script adding a point, line, and shape
+
+### Generation using `python`
 
 TODO - Option 2 - Python + shapely
 TODO - Simple example python script adding a point, line, and shape
