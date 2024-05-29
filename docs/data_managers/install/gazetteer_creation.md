@@ -37,7 +37,17 @@ be generated from the `.gpx` files used in GPS units.
 
 ## Programmatic generation
 
-TODO - Explain general advantages
+If shape files either exist already or GPS points are available (in some format)
+describing the locations, then the gazetteer can be generated programmatically (using
+code). If you have the relevant files (or details of the points) and have at least some
+familiarity with coding we would strongly advise taking this approach. This is to ensure
+that the procedure used to create your gazetteer is reproducible, which makes it easier
+to track down any errors that get introduced, as well as reducing the chance of entering
+erroneous information to begin with.
+
+We provide examples for `R` and `python` below as they are both highly popular
+scientific programming languages. However, if you have a different preferred language
+it's completely fine to use that instead.
 
 ### Generation using `R`
 
@@ -46,5 +56,20 @@ TODO - Simple example R script adding a point, line, and shape
 
 ### Generation using `python`
 
-TODO - Option 2 - Python + shapely
-TODO - Simple example python script adding a point, line, and shape
+In python, we recommend that you use the [`shapely`
+package](https://pypi.org/project/shapely/) to define your locations, the [`geopandas`
+package](https://geopandas.org/en/stable/) to load in existing shape files and the
+[`geojson` package](https://pypi.org/project/geojson/) to combine and export the
+gazetteer.
+
+The example below demonstrates how to manually create points, lines and polygons
+manually using coordinates, how to load in shape files, and finally how to export
+everything as combined `GeoJSON` file.
+
+=== "python"
+
+    ```python
+    {%
+    include "data_managers/install/create_gazetteer.py"
+    %}
+    ```
