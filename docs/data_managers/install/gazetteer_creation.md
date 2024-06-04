@@ -51,8 +51,22 @@ it's completely fine to use that instead.
 
 ### Generation using `R`
 
-TODO - Option 1 - R + sf package
-TODO - Simple example R script adding a point, line, and shape
+In R, we recommend that you use the [`sf`
+package](https://cran.r-project.org/package=sf) to define your locations and the
+[`geojsonio` package](https://cran.r-project.org/package=geojsonio) to combine and
+export the gazetteer.
+
+The example below demonstrates how to manually create points, lines and polygons
+manually using coordinates, how to load in shape files, and finally how to export
+everything as combined `GeoJSON` file.
+
+=== "R"
+
+    ```R
+    {%
+    include "data_managers/install/create_gazetteer.R"
+    %}
+    ```
 
 ### Generation using `python`
 
