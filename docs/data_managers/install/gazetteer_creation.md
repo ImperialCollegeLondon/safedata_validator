@@ -64,7 +64,7 @@ everything as combined `GeoJSON` file.
 
     ```R
     {%
-    include "data_managers/install/create_gazetteer.R"
+    include "data_managers/install/create_gazetteer.r"
     %}
     ```
 
