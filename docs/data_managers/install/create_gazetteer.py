@@ -15,7 +15,9 @@ transect = LineString(
 )
 
 # A sampling area (plot) is created by specifying a point for each corner
-plot = Polygon([(4.250, 117.900), (4.255, 117.900), (4.255, 117.855), (4.250, 117.855)])
+sampling_area = Polygon(
+    [(4.250, 117.900), (4.255, 117.900), (4.255, 117.855), (4.250, 117.855)]
+)
 
 # Now convert the shapely points into GeoJSON features
 feature_sampling_point = geojson.Feature(
@@ -24,11 +26,13 @@ feature_sampling_point = geojson.Feature(
 feature_transect = geojson.Feature(
     geometry=mapping(transect), properties={"name": "transect_B57"}
 )
-feature_plot = geojson.Feature(geometry=mapping(plot), properties={"name": "plot_C324"})
+feature_sampling_area = geojson.Feature(
+    geometry=mapping(sampling_area), properties={"name": "plot_C324"}
+)
 
 # Then combine them all the manually defined points into a single feature collection
 manual_points = geojson.FeatureCollection(
-    [feature_sampling_point, feature_transect, feature_plot]
+    [feature_sampling_point, feature_transect, feature_sampling_area]
 )
 
 # We can also load in an existing shapefile
