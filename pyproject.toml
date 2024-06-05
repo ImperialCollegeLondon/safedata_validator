@@ -1,48 +1,47 @@
 [tool.poetry]
-name = "safedata_validator"
-version = "3.0.1rc1"
-description = "\"Validator for data files in the SAFE data submission format.\""
-readme = "README.md"
-homepage = "https://safedata-validator.readthedocs.io/"
-repository = "https://github.com/imperial_college_london/safedata_validator"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-]
 authors = [
-    "David Orme <d.orme@imperial.ac.uk>",
-    "Jacob Cook <j.cook17@imperial.ac.uk>",
+  "David Orme <d.orme@imperial.ac.uk>",
+  "Jacob Cook <j.cook17@imperial.ac.uk>",
 ]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+description = "\"Validator for data files in the SAFE data submission format.\""
+homepage = "https://safedata-validator.readthedocs.io/"
 license = "MIT"
+name = "safedata_validator"
+readme = "README.md"
+repository = "https://github.com/imperial_college_london/safedata_validator"
+version = "3.0.1rc1"
 
 [tool.poetry.scripts]
-safedata_validate = "safedata_validator.entry_points:_safedata_validate_cli"
-safedata_zenodo = "safedata_validator.entry_points:_safedata_zenodo_cli"
-safedata_metadata = "safedata_validator.entry_points:_safedata_metadata_cli"
 safedata_build_local_gbif = "safedata_validator.entry_points:_build_local_gbif_cli"
 safedata_build_local_ncbi = "safedata_validator.entry_points:_build_local_ncbi_cli"
-
+safedata_metadata = "safedata_validator.entry_points:_safedata_metadata_cli"
+safedata_validate = "safedata_validator.entry_points:_safedata_validate_cli"
+safedata_zenodo = "safedata_validator.entry_points:_safedata_zenodo_cli"
 
 [tool.mypy]
 ignore_missing_imports = true
 
 [tool.poetry.dependencies]
-python = "^3.10"
-openpyxl = "^3.0.10"
-requests = "^2.32.0"
-simplejson = "^3.17.6"
 appdirs = "^1.4.4"
-python-dateutil = "^2.8.2"
-dotmap = "^1.3.30"
 configobj = "^5.0.6"
-sympy = "^1.10.1"
-rispy = "^0.7.1"
 dominate = "^2.6.0"
+dotmap = "^1.3.30"
+jinja2 = "^3.1.3"
+openpyxl = "^3.0.10"
+python = "^3.10"
+python-dateutil = "^2.8.2"
+requests = "^2.32.3"
+rispy = "^0.7.1"
+shapely = "^2.0.4"
+simplejson = "^3.17.6"
+sympy = "^1.10.1"
 tqdm = "^4.64.0"
 typing-extensions = "^4.8.0"
-shapely = "^2.0.4"
-jinja2 = "^3.1.3"
 
 [tool.poetry.group.test.dependencies]
 pyfakefs = "^4.5.6"
@@ -51,24 +50,24 @@ pytest-cov = "^3.0.0"
 pytest-mock = "^3.7.0"
 
 [tool.poetry.group.devenv.dependencies]
-pre-commit = "^2.18.1"
 mypy = "^1.9.0"
-types-simplejson = "^3.19.0.0"
+pre-commit = "^2.18.1"
+ruff = "^0.4.4"
 types-python-dateutil = "^2.8.19.12"
 types-requests = "^2.28.11.17"
-ruff = "^0.4.4"
+types-simplejson = "^3.19.0.0"
 
 [tool.poetry.group.docs.dependencies]
 mkdocs = "^1.4.3"
 mkdocs-include-markdown-plugin = "^6.0.4"
 mkdocs-material = "^8.3.9"
+mkdocs-table-reader-plugin = "^2.1.0"
 mkdocstrings = "^0.24.0"
 mkdocstrings-python = "^1.7.5"
-mkdocs-table-reader-plugin = "^2.1.0"
 
 [build-system]
-requires = ["poetry-core>=1.2.0"]
 build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.2.0"]
 
 [tool.pytest.ini_options]
 addopts = """	
@@ -82,7 +81,6 @@ testpaths = ['test']
 
 [tool.ruff]
 target-version = "py310"
-
 
 [tool.ruff.lint]
 # Enable all `pydocstyle` rules, limiting to those that adhere to the
@@ -108,4 +106,4 @@ ignore = [
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"test/test_*.py" = ["D103"] 
+"test/test_*.py" = ["D103"]
