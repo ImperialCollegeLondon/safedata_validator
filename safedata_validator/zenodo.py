@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import copy
 import decimal
 import hashlib
 import shutil
@@ -18,13 +17,11 @@ from datetime import datetime as dt
 from importlib import resources as il_resources  # avoid confusion with sdv.resources
 from itertools import groupby
 from pathlib import Path
-from typing import Optional
 
 import requests  # type: ignore
 import rispy
 import simplejson
 from dominate import tags
-from dominate.util import raw
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from tqdm import tqdm
 from tqdm.utils import CallbackIOWrapper
@@ -694,9 +691,10 @@ def dataset_description(
     context_dict["external_file_data"] = external_files
 
     # Populate a list of filenames
-    context_dict["all_filenames"] = [context_dict["dataset_filename"]] + list(
-        external_files.keys()
-    )
+    context_dict["all_filenames"] = [
+        context_dict["dataset_filename"],
+        *list(external_files.keys()),
+    ]
 
     # Add extents if populated
     context_dict["temporal_extent"] = dataset_metadata["temporal_extent"]
@@ -885,7 +883,7 @@ def publish_dataset(
     """
 
     # Check the files to upload exist.
-    files_to_upload = [dataset] + external_files
+    files_to_upload = [dataset, *external_files]
     not_found = [str(f) for f in files_to_upload if not f.exists()]
 
     if not_found:

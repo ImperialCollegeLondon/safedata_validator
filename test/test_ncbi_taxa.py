@@ -1,6 +1,5 @@
 """Tests checking that the NCBI specific classes work as intended."""
 
-import copy
 from contextlib import nullcontext as does_not_raise
 from logging import CRITICAL, ERROR, INFO, WARNING
 

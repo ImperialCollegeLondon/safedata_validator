@@ -6,7 +6,6 @@ from logging import ERROR, INFO, WARNING
 import pytest
 from openpyxl import Workbook
 
-from safedata_validator.logger import LOGGER
 from safedata_validator.resources import Resources
 from safedata_validator.summary import Summary
 

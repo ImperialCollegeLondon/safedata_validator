@@ -511,7 +511,7 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
 
         # Check the required tables against found tables
         db_tables_set = {rw[0] for rw in db_tables.fetchall()}
-        required_tables = set(tables + ["timestamp"])
+        required_tables = set([*tables, "timestamp"])
         missing = required_tables.difference(db_tables_set)
 
         if missing:

@@ -2,7 +2,7 @@
 
 import os
 from contextlib import contextmanager
-from logging import CRITICAL, ERROR, INFO, WARNING
+from logging import CRITICAL, INFO
 
 import pytest
 

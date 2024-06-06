@@ -2,13 +2,12 @@
 
 1. send new dataset metadata to the server
 2. update the resources on the server to match the local versions.
-"""  # noqa D415
+"""  # D415
 
 from __future__ import annotations
 
 import requests  # type: ignore
 
-from safedata_validator.logger import FORMATTER, LOGGER
 from safedata_validator.resources import Resources
 from safedata_validator.zenodo import (
     ZenodoFunctionResponseType,
