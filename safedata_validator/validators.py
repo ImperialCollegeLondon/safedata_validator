@@ -18,7 +18,7 @@ RE_CONTAINS_WSPACE = re.compile(r"\s")
 RE_CONTAINS_PUNC = re.compile(r"[,;:]")
 
 RE_WSPACE_AT_ENDS = re.compile(r"^\s+.+|.+\s+$")
-RE_DMS = re.compile(r'[°\'"dms’”]+')
+RE_DMS = re.compile(r'[°\'"dms’”]+')  # noqa: RUF001
 
 RE_R_ELLIPSIS = re.compile(r"^\\.{2}[0-9]+$|^\\.{3}$")
 RE_R_NAME_CHARS = re.compile(r"^[\w\.]+$")
