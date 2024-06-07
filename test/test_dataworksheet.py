@@ -808,7 +808,7 @@ def test_DataWorksheet_load_from_worksheet(
     ws = wb.active
 
     # Add field meta rows
-    field_meta = [[ky] + vl for ky, vl in fixture_field_meta.items()]
+    field_meta = [[ky, *vl] for ky, vl in fixture_field_meta.items()]
     for rw in field_meta:
         ws.append(rw)
 

@@ -30,7 +30,7 @@ import re
 import sqlite3
 from collections import Counter
 from io import StringIO
-from itertools import compress, groupby
+from itertools import compress, groupby, pairwise
 from typing import Any, Optional
 
 from dominate import tags
@@ -64,7 +64,7 @@ GBIF_BACKBONE_RANKS = [
 ]
 
 # Extended version of backbone ranks to capture superkingdoms
-NCBI_BACKBONE_RANKS = ["superkingdom"] + GBIF_BACKBONE_RANKS
+NCBI_BACKBONE_RANKS = ["superkingdom", *GBIF_BACKBONE_RANKS]
 
 # NBCI name regex
 NCBI_prefix_re = re.compile("^[a-z]__")
@@ -670,7 +670,7 @@ class NCBIValidator:
         if len(bb_elements) > 1:
             bb_hierarchy = []
 
-            for child, parent in zip(bb_elements, bb_elements[1:]):
+            for child, parent in pairwise(bb_elements):
                 bb_hierarchy.append(tuple(list(child[:3]) + list([parent[2]])))
 
             bb_hierarchy.append(tuple(list(parent[:3]) + list([None])))
@@ -1147,7 +1147,7 @@ class GBIFTaxa:
         if m_name is None or not isinstance(m_name, str) or m_name.isspace():
             LOGGER.error("Worksheet name missing, whitespace only or not text")
         elif m_name != m_name.strip():
-            LOGGER.error(f"Worksheet name has whitespace padding: {repr(m_name)}")
+            LOGGER.error(f"Worksheet name has whitespace padding: {m_name!r}")
             m_name = m_name.strip()
             self.taxon_names.add(m_name)
         else:
@@ -1165,7 +1165,7 @@ class GBIFTaxa:
                     LOGGER.error(f"{idx_name} missing or not text")
                     p_fail = True
                 elif val != val.strip():
-                    LOGGER.error(f"{idx_name} has whitespace padding: {repr(val)}")
+                    LOGGER.error(f"{idx_name} has whitespace padding: {val!r}")
                     parent_info[idx] = val.strip()
 
             # ID can be None or an integer (openpyxl loads all values as float)
@@ -1189,7 +1189,7 @@ class GBIFTaxa:
                 LOGGER.error(f"{idx_name} missing, whitespace only or not text")
                 mfail = True
             elif val != val.strip():
-                LOGGER.error(f"{idx_name} has whitespace padding: {repr(val)}")
+                LOGGER.error(f"{idx_name} has whitespace padding: {val!r}")
                 taxon_info[idx] = val.strip()
 
         # GBIF ID and Ignore ID can be None or an integer (openpyxl loads all values as
@@ -1638,7 +1638,7 @@ class NCBITaxa:
             return
 
         # The set of possible data fields is name, new and the NCBI ranks
-        data_fields = ["name", "new"] + self.validator.ncbi_ranks_root_to_leaf
+        data_fields = ["name", "new", *self.validator.ncbi_ranks_root_to_leaf]
 
         # Now report extra fields
         extra_fields = set(headers).difference(data_fields)
@@ -1699,14 +1699,12 @@ class NCBITaxa:
             m_name = row["name"]
 
             if not isinstance(m_name, str):
-                LOGGER.error(f"Worksheet name is not a string: {repr(m_name)}")
+                LOGGER.error(f"Worksheet name is not a string: {m_name!r}")
                 m_name = str(m_name)
             else:
                 m_name_strip = m_name.strip()
                 if m_name != m_name_strip:
-                    LOGGER.error(
-                        f"Worksheet name has whitespace padding: {repr(m_name)}"
-                    )
+                    LOGGER.error(f"Worksheet name has whitespace padding: {m_name!r}")
                     m_name = m_name_strip
 
             # Standardise blank and NA values to None
@@ -1737,7 +1735,7 @@ class NCBITaxa:
                 if not isinstance(value, str) or value.isspace():
                     LOGGER.error(
                         f"Rank {rnk} has non-string or empty "
-                        f"string value: {repr(value)}"
+                        f"string value: {value!r}"
                     )
                     validate = False
                     continue
@@ -1745,7 +1743,7 @@ class NCBITaxa:
                 # The value must not be padded but processing can continue
                 value_stripped = value.strip()
                 if value != value_stripped:
-                    LOGGER.error(f"Rank {rnk} has whitespace padding: {repr(value)}")
+                    LOGGER.error(f"Rank {rnk} has whitespace padding: {value!r}")
                     value = value_stripped
 
                 # Strip k__ notation to provide clean name_txt search input - dropping
@@ -1868,7 +1866,7 @@ class NCBITaxa:
         # Clean whitespace padding and warn
         m_name_strip = m_name.strip()
         if m_name != m_name_strip:
-            LOGGER.error(f"Worksheet name has whitespace padding: {repr(m_name)}")
+            LOGGER.error(f"Worksheet name has whitespace padding: {m_name!r}")
             m_name = m_name_strip
 
         # TODO  - validation at multiple levels. Make less paranoid? Here, an empty list
@@ -1900,7 +1898,7 @@ class NCBITaxa:
             if stripped != entry:
                 LOGGER.error(
                     "Hierarchy contains whitespace: "
-                    f"rank {repr(entry[0])}, name {repr(entry[1])}"
+                    f"rank {entry[0]!r}, name {entry[1]!r}"
                 )
                 taxon_hier[entry_idx] = stripped
 

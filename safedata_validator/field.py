@@ -45,7 +45,7 @@ from safedata_validator.validators import (
 
 # These are lists, not sets because lists preserve order for preserving logging
 # message order in unit testing.
-MANDATORY_DESCRIPTORS = ["field_type", "description", "field_name"]
+MANDATORY_DESCRIPTORS: tuple[str, ...] = ("field_type", "description", "field_name")
 OPTIONAL_DESCRIPTORS = [
     "levels",
     "method",
@@ -185,7 +185,7 @@ class Dataset:
             self.taxa.gbif_taxa.load(wb["GBIFTaxa"])
         # Otherwise populate gbif_taxa from the one that has been provided
         elif len(gbif_sheets) == 1:
-            self.taxa.gbif_taxa.load(wb[list(gbif_sheets)[0]])
+            self.taxa.gbif_taxa.load(wb[next(iter(gbif_sheets))])
 
         # Populate ncbi taxa
         ncbi_sheet = "NCBITaxa" in wb.sheetnames
@@ -1036,7 +1036,7 @@ class BaseField:
         # only test here for strings that fail.
         if isinstance(self.field_name, str) and not valid_r_name(self.field_name):
             self._log(
-                f"Field name is not valid: {repr(self.field_name)}. "
+                f"Field name is not valid: {self.field_name!r}. "
                 "Common errors are spaces and non-alphanumeric "
                 "characters other than underscore and full stop"
             )
@@ -1086,10 +1086,10 @@ class BaseField:
             self.meta[descriptor] = None  # standardise whitestring to None
             return False
         elif not isinstance(val, str):
-            self._log(f"{descriptor} descriptor is not a string: {repr(val)}")
+            self._log(f"{descriptor} descriptor is not a string: {val!r}")
             return False
         elif val != val.strip():
-            self._log(f"{descriptor} descriptor has whitespace padding: {repr(val)}")
+            self._log(f"{descriptor} descriptor has whitespace padding: {val!r}")
             self.meta[descriptor] = val.strip()
             return False
         else:
@@ -1540,7 +1540,7 @@ class NumericField(BaseField):
     """
 
     field_types: tuple[str, ...] = ("numeric",)
-    required_descriptors = MANDATORY_DESCRIPTORS + ["method", "units"]
+    required_descriptors = (*MANDATORY_DESCRIPTORS, "method", "units")
 
     def validate_data(self, data: list) -> None:
         """Validate numeric field data.
@@ -1566,7 +1566,7 @@ class CategoricalField(BaseField):
     """
 
     field_types: tuple[str, ...] = ("categorical", "ordered categorical")
-    required_descriptors = MANDATORY_DESCRIPTORS + ["levels"]
+    required_descriptors = (*MANDATORY_DESCRIPTORS, "levels")
 
     def __init__(
         self,
@@ -1819,12 +1819,12 @@ class GeoField(BaseField):
 
         if data_as_number.values:
             self.min = (
-                min(data_as_number.values + [self.min])
+                min([*data_as_number.values, self.min])
                 if self.min
                 else min(data_as_number.values)
             )
             self.max = (
-                max(data_as_number.values + [self.max])
+                max([*data_as_number.values, self.max])
                 if self.max
                 else max(data_as_number.values)
             )
@@ -2126,12 +2126,12 @@ class DatetimeField(BaseField):
             if self.min is None:
                 self.min = min(data)
             else:
-                self.min = min([self.min] + data)
+                self.min = min([self.min, *data])
 
             if self.max is None:
                 self.max = min(data)
             else:
-                self.max = max([self.max] + data)
+                self.max = max([self.max, *data])
 
     def report(self):
         """Report on field creation and data validation for date and datetime fields.
