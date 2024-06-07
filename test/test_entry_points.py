@@ -2,6 +2,7 @@
 
 import subprocess
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 
@@ -76,15 +77,18 @@ def test_sdv_zenodo_html(user_config_file, file_exists):
 
     from safedata_validator.entry_points import _safedata_zenodo_cli
 
+    ds_json = FIXTURE_FILES.rf.good_ncbi_file_dataset_json
+    output_path = str(Path(ds_json).parent / "test_sdv_zenodo_html.out")
+
     if file_exists:
-        with open("TMP", "w") as outfile:
+        with open(output_path, "w") as outfile:
             outfile.write("Don't overwrite me!")
 
     value = _safedata_zenodo_cli(
         args_list=[
             "generate_html",
             FIXTURE_FILES.rf.good_ncbi_file_dataset_json,
-            "TMP",
+            output_path,
         ]
     )
 
@@ -104,8 +108,11 @@ def test_sdv_zenodo_xml(user_config_file, file_exists):
 
     from safedata_validator.entry_points import _safedata_zenodo_cli
 
+    ds_json = FIXTURE_FILES.rf.good_ncbi_file_dataset_json
+    output_path = str(Path(ds_json).parent / "test_sdv_zenodo_xml.out")
+
     if file_exists:
-        with open("TMP", "w") as outfile:
+        with open(output_path, "w") as outfile:
             outfile.write("Don't overwrite me!")
 
     value = _safedata_zenodo_cli(
@@ -113,7 +120,7 @@ def test_sdv_zenodo_xml(user_config_file, file_exists):
             "generate_xml",
             FIXTURE_FILES.rf.good_ncbi_file_zenodo_json,
             FIXTURE_FILES.rf.good_ncbi_file_dataset_json,
-            "TMP",
+            output_path,
         ]
     )
 
