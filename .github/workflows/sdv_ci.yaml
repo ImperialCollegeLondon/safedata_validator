@@ -1,6 +1,12 @@
 name: Test and build
 
-on: [push, pull_request, release]
+# When does this run - new, reopened or updated PRs and when the workflow is called by
+# another workflow, such as the publishing actions.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_call:
+
 
 jobs:
 
