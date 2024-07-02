@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "safedata_validator"
-version = "3.0.1rc2"
+version = "3.0.1rc3"
 description = "\"Validator for data files in the SAFE data submission format.\""
 readme = "README.md"
 homepage = "https://safedata-validator.readthedocs.io/"
