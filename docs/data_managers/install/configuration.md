@@ -231,6 +231,12 @@ configuration elements:
 
 : When this element is `true`, all datasets will be published to the testing sandbox
   site. Set this to `false` when you are ready to actually start publishing datasets.
+  This configuration sets the default behaviour, but you can use the `--live` and
+  `--sandbox` options with the
+  [`safedata_zenodo`](../command_line_tools/safedata_zenodo.md) subcommands to switch
+  between these options without needing to edit the configured default. This can be
+  useful if a user wants to see a preview of the published dataset before commiting to a
+  published dataset.
 
 **The `html_template` element**
 
