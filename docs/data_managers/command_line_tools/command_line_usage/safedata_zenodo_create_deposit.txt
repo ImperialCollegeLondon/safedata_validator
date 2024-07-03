@@ -4,10 +4,11 @@ usage: safedata_zenodo create_deposit [-h] [--live | --sandbox]
 
 Create a new deposit draft. 
 
-The new version option takes the record ID of the most recent version of an existing
-dataset and creates a new deposit as a new version of that dataset. Versions of
-datasets are grouped under a single concept ID, which always redirects to the most
-recent version. Use the most recent version ID and _not_ the concept ID here.
+The new version option takes the record ID of the most recent version of an
+existing dataset and creates a new deposit as a new version of that dataset. 
+Versions of datasets are grouped under a single concept ID, which always 
+redirects to the most recent version. Use the most recent version ID and 
+_not_ the concept ID here.
 
 When successful, the function downloads and saves a JSON file containing the
 resulting Zenodo deposit metadata. This file is used as an input to other
