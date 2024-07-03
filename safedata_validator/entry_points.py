@@ -662,7 +662,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         help="Path to the Excel file to be published",
     )
 
-    create_deposit_parser.add_argument(
+    publish_dataset_parser.add_argument(
         "-n",
         "--new_version",
         type=int,

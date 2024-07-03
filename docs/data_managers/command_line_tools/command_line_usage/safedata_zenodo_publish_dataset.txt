@@ -1,5 +1,5 @@
 cl_prompt $ safedata_zenodo publish_dataset -h
-usage: safedata_zenodo publish_dataset [-h] [-c CONCEPT_ID] [--no-xml]
+usage: safedata_zenodo publish_dataset [-h] [-n NEW_VERSION] [--no-xml]
                                        [-e [EXTERNAL_FILES ...]]
                                        dataset_json dataset
 
@@ -15,8 +15,9 @@ positional arguments:
 
 options:
   -h, --help    show this help message and exit
-  -c CONCEPT_ID, --concept_id CONCEPT_ID
-                A Zenodo concept ID
+  -n NEW_VERSION, --new_version NEW_VERSION
+                Create a new version of the dataset with the provided Zenodo
+                ID.
   --no-xml      Do not include metadata XML in the published record
   -e [EXTERNAL_FILES ...], --external-files [EXTERNAL_FILES ...]
                 A set of external files documented in the dataset to be
