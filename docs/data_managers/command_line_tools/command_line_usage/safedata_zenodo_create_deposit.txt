@@ -1,5 +1,6 @@
 cl_prompt $ safedata_zenodo create_deposit -h
-usage: safedata_zenodo create_deposit [-h] [-n NEW_VERSION] [-i]
+usage: safedata_zenodo create_deposit [-h] [--live | --sandbox]
+                                      [-n NEW_VERSION] [-i]
 
 Create a new deposit draft. 
 
@@ -18,7 +19,9 @@ All other logging is written to stderr.
 
 options:
   -h, --help    show this help message and exit
-  -n NEW_VERSION, --new_version NEW_VERSION
+  --live        Use the Zenodo live site, overriding the configuration file
+  --sandbox     Use the Zenodo sandbox site, overriding the configuration file
+  -n NEW_VERSION, --new-version NEW_VERSION
                 Create a new version of the dataset with the provided Zenodo
                 ID.
   -i, --id-to-stdout

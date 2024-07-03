@@ -270,11 +270,11 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     * A Zenodo metadata file (`zenodo_json`), that describes the metadata
         associated with a Zenodo deposit or published record.
 
-    Many of the subcommands also accept the `--live` and `--sandbox` options which be
-    used to override the `use_sandbox` setting in the configuration file. If the
-    configuration is set to `true` then `--live` will use the live site and if the
-    configuration is set to `false` then the `--sandbox` can be used to use the sandbox
-    instead.
+    The subcommands that send and receive data from Zenodo also accept the `--live` and
+    `--sandbox` options which can be used to override the `use_sandbox` setting in the
+    configuration file. If the configuration is set to `true` then `--live` will use the
+    live site and if the configuration is set to `false` then the `--sandbox` can be
+    used to use the sandbox instead.
 
     Note that most of these actions are also available via the Zenodo website.
 

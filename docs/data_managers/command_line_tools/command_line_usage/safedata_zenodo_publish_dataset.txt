@@ -1,5 +1,6 @@
 cl_prompt $ safedata_zenodo publish_dataset -h
-usage: safedata_zenodo publish_dataset [-h] [-n NEW_VERSION] [--no-xml]
+usage: safedata_zenodo publish_dataset [-h] [--live | --sandbox]
+                                       [-n NEW_VERSION] [--no-xml]
                                        [-e [EXTERNAL_FILES ...]]
                                        dataset_json dataset
 
@@ -15,7 +16,9 @@ positional arguments:
 
 options:
   -h, --help    show this help message and exit
-  -n NEW_VERSION, --new_version NEW_VERSION
+  --live        Use the Zenodo live site, overriding the configuration file
+  --sandbox     Use the Zenodo sandbox site, overriding the configuration file
+  -n NEW_VERSION, --new-version NEW_VERSION
                 Create a new version of the dataset with the provided Zenodo
                 ID.
   --no-xml      Do not include metadata XML in the published record
