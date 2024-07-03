@@ -182,7 +182,8 @@ def get_deposit(
 
 
 def create_deposit(
-    concept_id: int | None = None, resources: Resources | None = None
+    new_version: int | None = None,
+    resources: Resources | None = None,
 ) -> ZenodoFunctionResponseType:
     """Create a new deposit.
 
@@ -190,8 +191,8 @@ def create_deposit(
     record.
 
     Args:
-        concept_id: An optional concept id of a published record to create a new version
-            of an existing dataset.
+        new_version: Optionally, create a new version of the dataset with the provided
+            Zenodo ID. This must be the most recent version of the dataset concept.
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -205,10 +206,10 @@ def create_deposit(
     params = zres["ztoken"]
 
     # get the correct draft api
-    if concept_id is None:
+    if new_version is None:
         api = f"{zenodo_api}/deposit/depositions"
     else:
-        api = f"{zenodo_api}/deposit/depositions/{concept_id}/actions/newversion"
+        api = f"{zenodo_api}/deposit/depositions/{new_version}/actions/newversion"
 
     # Create the draft
     new_draft = requests.post(api, params=params, json={})
@@ -217,7 +218,7 @@ def create_deposit(
     if new_draft.status_code != 201:
         return {}, _zenodo_error_message(new_draft)
 
-    if concept_id is None:
+    if new_version is None:
         return new_draft.json(), None
 
     # For new versions, the response is an update to the existing copy,
@@ -847,7 +848,7 @@ def publish_dataset(
     dataset: Path,
     dataset_metadata: dict,
     external_files: list[Path],
-    concept_id: int | None,
+    new_version: int | None,
     no_xml: bool = False,
 ) -> tuple[int, str]:
     """Publish a validated dataset.
@@ -869,8 +870,8 @@ def publish_dataset(
         dataset: A path to the dataset file.
         external_files: A list of paths to external files named in the dataset.
         dataset_metadata: The dataset metadata.
-        concept_id: An optional Zenodo concept ID, used to publish the dataset as a new
-            version of an existing dataset.
+        new_version: Optionally, create a new version of the dataset with the provided
+            Zenodo ID. This must be the most recent version of the dataset concept.
         no_xml: A flag to suppress the automatic inclusion of Gemini XML metadata.
 
     Returns:
@@ -900,7 +901,9 @@ def publish_dataset(
         )
 
     # Create the new deposit to publish the dataset
-    zenodo_metadata, error = create_deposit(resources=resources, concept_id=concept_id)
+    zenodo_metadata, error = create_deposit(
+        resources=resources, new_version=new_version
+    )
 
     # Monitor the success of individual steps
     if error is None:

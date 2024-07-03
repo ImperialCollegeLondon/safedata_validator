@@ -348,8 +348,12 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     # CREATE DEPOSIT subcommand
     create_deposit_desc = """
-    Create a new deposit draft. The concept_id option uses a provided Zenodo
-    concept ID to creates a draft as a new version of an existing data set.
+    Create a new deposit draft. 
+    
+    The new version option takes the record ID of the most recent version of an existing
+    dataset and creates a new deposit as a new version of that dataset. Versions of
+    datasets are grouped under a single concept ID, which always redirects to the most
+    recent version. Use the most recent version ID and _not_ the concept ID here.
 
     When successful, the function downloads and saves a JSON file containing the
     resulting Zenodo deposit metadata. This file is used as an input to other
@@ -367,11 +371,11 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     )
 
     create_deposit_parser.add_argument(
-        "-c",
-        "--concept_id",
+        "-n",
+        "--new_version",
         type=int,
         default=None,
-        help="A Zenodo concept ID",
+        help="Create a new version of the dataset with the provided Zenodo ID.",
     )
 
     create_deposit_parser.add_argument(
@@ -658,12 +662,12 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         help="Path to the Excel file to be published",
     )
 
-    publish_dataset_parser.add_argument(
-        "-c",
-        "--concept_id",
+    create_deposit_parser.add_argument(
+        "-n",
+        "--new_version",
         type=int,
         default=None,
-        help="A Zenodo concept ID",
+        help="Create a new version of the dataset with the provided Zenodo ID.",
     )
 
     publish_dataset_parser.add_argument(
@@ -713,7 +717,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     if args.subcommand == "create_deposit":
         # Run the command
         response, error = create_deposit(
-            concept_id=args.concept_id, resources=resources
+            new_version=args.new_version, resources=resources
         )
         # Trap errors
         if error is not None:
@@ -957,7 +961,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
                 dataset=args.dataset,
                 dataset_metadata=dataset_json,
                 external_files=args.external_files,
-                concept_id=args.concept_id,
+                new_version=args.new_version,
             )
         except (FileNotFoundError, ValueError, RuntimeError) as excep:
             print(excep)
