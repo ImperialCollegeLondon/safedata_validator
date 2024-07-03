@@ -129,7 +129,16 @@ def _compute_md5(fname: Path) -> str:
 
 def _zenodo_error_message(response) -> str:
     """Format a Zenodo JSON error response as a string."""
-    return f"{response.json()['message']} ({response.json()['status']})"
+
+    response_json = response.json()
+    return_string = f"{response.json()['message']} ({response.json()['status']})\n"
+
+    errors = response_json.get("errors", [])
+    for e in errors:
+        messages = "\n  ".join(e["messages"])
+        return_string += f"Messages for field {e['field']}:\n {messages}"
+
+    return return_string
 
 
 def _min_dp(val: float, min_digits: int = 2) -> str:

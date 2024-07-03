@@ -372,7 +372,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     create_deposit_parser.add_argument(
         "-n",
-        "--new_version",
+        "--new-version",
         type=int,
         default=None,
         help="Create a new version of the dataset with the provided Zenodo ID.",
@@ -664,7 +664,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     publish_dataset_parser.add_argument(
         "-n",
-        "--new_version",
+        "--new-version",
         type=int,
         default=None,
         help="Create a new version of the dataset with the provided Zenodo ID.",

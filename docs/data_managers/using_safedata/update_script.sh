@@ -10,9 +10,10 @@
 safedata_validate SAFE_dataset.xlsx
 
 # Publish the dataset to Zenodo
-# 1) Create a new deposit as a new version of an existing record. Again this will
-#    generate a deposit metadata file called something like zenodo_1156212.json
-safedata_zenodo create_deposit -c 1143713
+# 1) Create a new deposit as a new version of the most recent version of an existing
+#    record. Again this will generate a deposit metadata file called something like
+#    zenodo_1156212.json
+safedata_zenodo create_deposit --new-version 1143713
 
 # 2) Generate a GEMINI XML metadata file for the deposit
 safedata_zenodo generate_xml zenodo_1156212.json SAFE_dataset.json 1156212_GEMINI.xml
