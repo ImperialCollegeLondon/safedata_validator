@@ -30,9 +30,7 @@ contact_name = The SAFE Project
 contact_affiliation = Imperial College London
 contact_orcid = 0000-0003-3378-2814
 use_sandbox = true
-zenodo_api = https://api.zenodo.org
 zenodo_token = abc
-zenodo_sandbox_api = https://sandbox.zenodo.org
 zenodo_sandbox_token = xyz
 html_template = /path/to/html_jinja_template.html
 

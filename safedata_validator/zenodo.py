@@ -18,7 +18,7 @@ from importlib import resources as il_resources  # avoid confusion with sdv.reso
 from itertools import groupby
 from pathlib import Path
 
-import requests  # type: ignore
+import requests
 import rispy
 import simplejson
 from dominate import tags
@@ -77,10 +77,10 @@ def _resources_to_zenodo_api(resources: Resources | None = None) -> dict:
     if resources.zenodo.use_sandbox is None:
         config_fail = True
     elif resources.zenodo.use_sandbox:
-        zenodo_api = resources.zenodo.zenodo_sandbox_api
+        zenodo_api = "https://sandbox.zenodo.org/api"
         token = resources.zenodo.zenodo_sandbox_token
     else:
-        zenodo_api = resources.zenodo.zenodo_api
+        zenodo_api = "https://zenodo.org/api"
         token = resources.zenodo.zenodo_token
 
     if zenodo_api is None or token is None:

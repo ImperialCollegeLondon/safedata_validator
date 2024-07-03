@@ -64,9 +64,7 @@ CONFIGSPEC = {
     "zenodo": {
         "community_name": "string(default=safe)",
         "use_sandbox": "boolean(default=None)",
-        "zenodo_sandbox_api": "string(default=None)",
         "zenodo_sandbox_token": "string(default=None)",
-        "zenodo_api": "string(default=None)",
         "zenodo_token": "string(default=None)",
         "contact_name": "string(default=None)",
         "contact_affiliation": "string(default=None)",
