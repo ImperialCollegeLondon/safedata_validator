@@ -133,10 +133,14 @@ def _zenodo_error_message(response) -> str:
     response_json = response.json()
     return_string = f"{response.json()['message']} ({response.json()['status']})\n"
 
+    # Report on error messages in response object
     errors = response_json.get("errors", [])
-    for e in errors:
-        messages = "\n  ".join(e["messages"])
-        return_string += f"Messages for field {e['field']}:\n {messages}"
+    if errors:
+        return_string += "\nAdditional error information:\n"
+        for e in errors:
+            messages = "\n    - ".join(e["messages"])
+            return_string += f" * Messages for field {e['field']}:\n    - {messages}"
+        return_string += "\n"
 
     return return_string
 
