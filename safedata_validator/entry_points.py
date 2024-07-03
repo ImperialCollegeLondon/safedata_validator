@@ -270,6 +270,12 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     * A Zenodo metadata file (`zenodo_json`), that describes the metadata
         associated with a Zenodo deposit or published record.
 
+    Many of the subcommands also accept the `--live` and `--sandbox` options which be
+    used to override the `use_sandbox` setting in the configuration file. If the
+    configuration is set to `true` then `--live` will use the live site and if the
+    configuration is set to `false` then the `--sandbox` can be used to use the sandbox
+    instead.
+
     Note that most of these actions are also available via the Zenodo website.
 
     Args:
@@ -326,6 +332,25 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         help="Suppress normal information messages. ",
     )
 
+    # Add a shared mutually exclusive switch between the sandbox and live Zenodo sites,
+    # which will override the values set in the configuration
+    sandbox_switches = argparse.ArgumentParser(add_help=False)
+    switch_group = sandbox_switches.add_mutually_exclusive_group()
+    switch_group.add_argument(
+        "--live",
+        dest="sandbox",
+        action="store_false",
+        default=None,
+        help="Use the Zenodo live site, overriding the configuration file",
+    )
+    switch_group.add_argument(
+        "--sandbox",
+        dest="sandbox",
+        action="store_true",
+        default=None,
+        help="Use the Zenodo sandbox site, overriding the configuration file",
+    )
+
     # Create subparsers to add shared positional arguments across actions - these can be
     # added to individual actions via the parents argument
     parse_zenodo_metadata = argparse.ArgumentParser(add_help=False)
@@ -368,6 +393,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(create_deposit_desc),
         help="Create a new Zenodo draft deposit",
         formatter_class=_desc_formatter,
+        parents=[sandbox_switches],
     )
 
     create_deposit_parser.add_argument(
@@ -397,7 +423,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(discard_deposit_desc),
         help="Discard an unpublished deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
     # GET DEPOSIT subcommand
@@ -409,6 +435,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         "get_deposit",
         description=textwrap.dedent(get_deposit_desc),
         help="Download and display deposit metadata",
+        parents=[sandbox_switches],
     )
     get_deposit_parser.add_argument(
         "zenodo_id",
@@ -432,7 +459,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(publish_deposit_desc),
         help="Publish a draft deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
     # UPLOAD FILE subcommand
@@ -447,7 +474,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(upload_file_desc),
         help="Upload a file to an unpublished deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
     upload_file_parser.add_argument(
@@ -471,7 +498,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(delete_file_desc),
         help="Delete a file from an unpublished deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
     delete_file_parser.add_argument(
@@ -489,7 +516,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(upload_metadata_desc),
         help="Populate the Zenodo metadata",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata, parse_dataset_metadata],
+        parents=[parse_zenodo_metadata, parse_dataset_metadata, sandbox_switches],
     )
 
     # AMEND METADATA subcommand
@@ -508,6 +535,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(amend_metadata_desc),
         help="Update published Zenodo metadata",
         formatter_class=_desc_formatter,
+        parents=[sandbox_switches],
     )
 
     amend_metadata_parser.add_argument(
@@ -535,6 +563,8 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     downloaded, ignoring any additional files, which are often large.
     """
 
+    # This does not use the sandbox switches - doesn't make a great deal of sense to
+    # sync a sandbox collection.
     sync_local_dir_parser = subparsers.add_parser(
         "sync_local_dir",
         description=textwrap.dedent(sync_local_dir_desc),
@@ -573,6 +603,8 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     and the Datacite API to access machine readable bibliographic records.
     """
 
+    # This does not use the sandbox switches - doesn't make a great deal of sense to
+    # sync a sandbox collection.
     maintain_ris_parser = subparsers.add_parser(
         "maintain_ris",
         description=textwrap.dedent(maintain_ris_desc),
@@ -597,6 +629,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     resulting HTML and developing custom templates.
     """
 
+    # This does not use the sandbox switches - not applicable
     generate_html_parser = subparsers.add_parser(
         "generate_html",
         description=textwrap.dedent(generate_html_desc),
@@ -618,6 +651,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     details).
     """
 
+    # This does not use the sandbox switches - not applicable
     generate_xml_parser = subparsers.add_parser(
         "generate_xml",
         description=textwrap.dedent(generate_xml_desc),
@@ -653,7 +687,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(publish_dataset_desc),
         help="Publish a validated dataset",
         formatter_class=_desc_formatter,
-        parents=[parse_dataset_metadata],
+        parents=[parse_dataset_metadata, sandbox_switches],
     )
 
     publish_dataset_parser.add_argument(
@@ -704,6 +738,12 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     if args.subcommand is None:
         parser.print_usage()
         return 0
+
+    # Handle the sandbox switches:
+    # If the command parser provides the sandbox argument and one of the flags has been
+    # set (the default is None) then update the loaded resources
+    if "sandbox" in args and args.sandbox is not None:
+        resources.zenodo.use_sandbox = args.sandbox
 
     # Set the verbosity
     handler = get_handler()
