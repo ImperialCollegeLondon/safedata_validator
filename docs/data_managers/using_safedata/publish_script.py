@@ -1,4 +1,4 @@
-"""Example script to publish a dataset using safedata_validator from within Python."""
+"""Python script to publish a dataset using safedata_validator."""
 
 from pathlib import Path
 
@@ -17,7 +17,7 @@ from safedata_validator.zenodo import (
 dataset = "Example.xlsx"
 metadata_path = "Example.json"
 extra_file = "Supplementary_files.zip"
-xml_file = "SAFE_dataset_GEMINI.xml"
+xml_file = "Example_GEMINI.xml"
 
 # Create a Resources object from a configuration file in a standard location
 resources = Resources()

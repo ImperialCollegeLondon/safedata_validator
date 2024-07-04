@@ -1,10 +1,9 @@
-"""Example script to publish a dataset using safedata_validator from within Python."""
+"""Python script to publish a new version of a dataset using safedata_validator."""
 
 from pathlib import Path
 
 import simplejson
 
-from safedata_validator.field import Dataset
 from safedata_validator.resources import Resources
 from safedata_validator.server import post_metadata
 from safedata_validator.zenodo import (
@@ -15,22 +14,18 @@ from safedata_validator.zenodo import (
     upload_metadata,
 )
 
-# Local paths to the configuration file and the dataset to be validated
-config_path = "path/to/config.cfg"
-dataset = "SAFE_dataset.xlsx"
+# Local paths to the files to be published
+dataset = "Example.xlsx"
+metadata_path = "Example.json"
 extra_file = "Supplementary_files.zip"
-xml_file = "SAFE_dataset_GEMINI.xml"
+xml_file = "Example_GEMINI.xml"
 
-# Create a Resources object from the config file and then create a dataset
-# instance using those validation resources
-resources = Resources(config_path)
-ds = Dataset(resources)
-
-# Load the dataset from the Excel workbook, which validates the content
-ds.load_from_workbook(dataset)
+# Create a Resources object from a configuration file in a standard location
+resources = Resources()
 
 # Extract the validated dataset metadata
-data_metadata = simplejson.loads(ds.to_json())
+with open(metadata_path) as md_json:
+    data_metadata = simplejson.load(md_json)
 
 # Create a new version of an existing dataset using the record ID of the most recent
 # version

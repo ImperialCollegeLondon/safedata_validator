@@ -9,23 +9,19 @@ use functionality provided by the `safedata_validator` package.
    possible for data providers themselves to install and configure `safedata_validator`
    and this may be useful if you have a lot of data coming from few sources. However, it
    is more usual for the data manager to receive datasets and then go through a few
-   cycles of validation and checking before a dataset is ready.
-
-   See [here](./validating_datasets.md) for details.
+   cycles of validation and checking before a dataset is ready. See
+   [here](./validating_datasets.md) for details.
 
 2. **Publication of datasets** using the `safedata_zenodo` tool. Once a dataset has been
-   validated, then it is ready for publication to the project Zenodo community. This
-   involves creating a new Zenodo record, uploading the data files themselves and then
-   filling in the required Zenodo metadata.
-
-   See [here](./publishing_datasets.md) for details.
+    validated, then it is ready for publication to the project Zenodo community. This
+    involves creating a new Zenodo record, uploading the data files themselves and then
+    filling in the required Zenodo metadata. See [here](./publishing_datasets.md) for
+    details.
 
 3. **Uploading dataset metadata** using the `safedata_server` tool. If you are
-   maintaining a metadata server to support data discovery and use of the `safedata` R
-   package, then the metadata for the published dataset needs to be uploaded to the
-   server.
-
-    See [here](./posting_metadata.md) for details.
+    maintaining a metadata server to support data discovery and use of the `safedata` R
+    package, then the metadata for the published dataset needs to be uploaded to the
+    server. See [here](./posting_metadata.md) for details.
 
 The pages linked above provide examples of using the `safedata_validator` package.
 Typically, data managers will use the command line interface using a Unix-like shell
