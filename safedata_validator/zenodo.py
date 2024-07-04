@@ -214,11 +214,13 @@ def create_deposit(
     """Create a new deposit.
 
     Creates a new deposit draft, possibly as a new version of an existing published
-    record.
+    record. Creating a new version requires the Zenodo ID of an existing dataset: this
+    has to be the ID of the most recently published version of a dataset, not the
+    concept ID used to group datasets or any of the older versions.
 
     Args:
         new_version: Optionally, create a new version of the dataset with the provided
-            Zenodo ID. This must be the most recent version of the dataset concept.
+            Zenodo ID.
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 

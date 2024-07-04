@@ -24,12 +24,12 @@ publish a dataset and additional external files:
 safedata_zenodo publish_dataset Example.xlsx -e  Supplementary_files.zip
 ```
 
-That command packages up a set of operations needed to publish a dataset. The tabs
-examples below show the underlying workflow, either using the command line interface or
-working from within Python,  for publishing these data and accompanying metadata as a
-completely new dataset using `safedata_validator`. You would typically not need to use
-these individual commands: this information is here to show what is going on under the
-hood.
+That command packages up a set of operations needed to publish a dataset. The example
+code in the tabs below show the underlying workflow, either using the command line
+interface or working from within Python,  for publishing these data and accompanying
+metadata as a completely new dataset using `safedata_validator`. You would typically not
+need to use these individual commands: this information is here to show what is going on
+under the hood.
 
 === "bash"
 
@@ -57,11 +57,12 @@ concept record ID might be `1143713`. The concept record id is used to group ver
 a dataset and the associated DOI is used to redirect to the most recent version of the
 dataset.
 
-Releasing a new version generates a copy of the most recent version of a dataset,
-updates the files and metadata and creates a new record grouped under the same concept
-id. In order to do this, you can simply provide the record id of the most recent version
-to the data publication commands. Note that the required record id not the concept ID,
-but the most recent version of the dataset being updated.
+Releasing a new version generates a new record on Zenodo that is simply copied from the
+most recent version of a dataset, updates the files and metadata and creates a new
+record grouped under the same concept id. In order to do this, you can simply provide
+the record id of the most recent version to the data publication commands. Note that the
+required record id not the concept ID, but the most recent version of the dataset being
+updated.
 
 Again, the most straightforward approach is to use the `publish_dataset` subcommand and
 add the `--new-version` (or `-n`) argument.
