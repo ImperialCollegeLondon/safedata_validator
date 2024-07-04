@@ -32,9 +32,10 @@ ds.load_from_workbook(dataset)
 # Extract the validated dataset metadata
 data_metadata = simplejson.loads(ds.to_json())
 
-# Create a new version of an existing dataset.
+# Create a new version of an existing dataset using the record ID of the most recent
+# version
 zenodo_metadata, error = create_deposit(
-    new_version=1143713,
+    new_version=1143714,
     resources=resources,
 )
 

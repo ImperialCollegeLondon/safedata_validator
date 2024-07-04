@@ -4,9 +4,7 @@ from pathlib import Path
 
 import simplejson
 
-from safedata_validator.field import Dataset
 from safedata_validator.resources import Resources
-from safedata_validator.server import post_metadata
 from safedata_validator.zenodo import (
     create_deposit,
     generate_inspire_xml,
@@ -15,22 +13,18 @@ from safedata_validator.zenodo import (
     upload_metadata,
 )
 
-# Local paths to the configuration file and the dataset to be validated
-config_path = "config.cfg"
-dataset = "SAFE_dataset.xlsx"
+# Local paths to the dataset file
+dataset = "Example.xlsx"
+metadata_path = "Example.json"
 extra_file = "Supplementary_files.zip"
 xml_file = "SAFE_dataset_GEMINI.xml"
 
-# Create a Resources object from the config file and then create a dataset instance
-# using those validation resources
-resources = Resources(config_path)
-ds = Dataset(resources)
-
-# Load the dataset from the Excel workbook, which validates the content
-ds.load_from_workbook(dataset)
+# Create a Resources object from a configuration file in a standard location
+resources = Resources()
 
 # Extract the validated dataset metadata
-data_metadata = simplejson.loads(ds.to_json())
+with open(metadata_path) as md_json:
+    data_metadata = simplejson.load(md_json)
 
 # Create the new deposit to publish the dataset
 zenodo_metadata, error = create_deposit(resources=resources)
@@ -69,9 +63,3 @@ if all_good:
 
 # Show the new publication
 publish_response["links"]["html"]
-
-# Post the dataset metadata to the safedata server
-if all_good:
-    response, error = post_metadata(
-        zenodo=zenodo_metadata, metadata=data_metadata, resources=resources
-    )

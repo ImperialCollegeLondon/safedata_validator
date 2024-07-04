@@ -1,0 +1,904 @@
+{
+  "title": "Example data for the safedata system",
+  "description": "This is an example dataset",
+  "authors": [
+    {
+      "name": "Orme, David",
+      "affiliation": "Imperial College London",
+      "email": "d.orme@imperial.ac.uk",
+      "orcid": "0000-0002-7005-1394"
+    }
+  ],
+  "filename": "Example.xlsx",
+  "external_files": [
+    {
+      "file": "bait_trap_images.zip",
+      "description": "Zip file containing 5000 JPEG images of bait trap cards"
+    },
+    {
+      "file": "My_raster_1.tiff",
+      "description": "A second raster file containing altitudes"
+    },
+    {
+      "file": "My_raster_2.tiff",
+      "description": "A raster file containing altitudes"
+    }
+  ],
+  "access": "Embargo",
+  "embargo_date": "2026-05-14 00:00:00",
+  "access_conditions": null,
+  "funders": [
+    {
+      "body": "NERC",
+      "type": "Standard grant",
+      "ref": "NE/K006339/1",
+      "url": "https://gtr.ukri.org/projects?ref=NE%2FK006339%2F1"
+    }
+  ],
+  "permits": [
+    {
+      "type": "Research",
+      "authority": "Sabah Biodiversity Centre",
+      "number": "ABC-123-456"
+    }
+  ],
+  "keywords": [
+    "Keyword 1",
+    "Keyword 2"
+  ],
+  "dataworksheets": [
+    {
+      "taxa_fields": [],
+      "max_row": 8,
+      "max_col": 2,
+      "name": "abundances_1",
+      "title": "Abundances example 1",
+      "description": "Example worksheet showing the first method for recording species abundances",
+      "descriptors": [
+        "field_type",
+        "taxon_name",
+        "method",
+        "description",
+        "units",
+        "field_name"
+      ],
+      "external": null,
+      "fields": [
+        {
+          "field_name": "tiger_count",
+          "description": "quadrat count",
+          "field_type": "abundance",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 1
+        },
+        {
+          "field_name": "brown_count",
+          "description": "quadrat count",
+          "field_type": "abundance",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 2
+        }
+      ],
+      "field_name_row": 6,
+      "n_data_row": 2
+    },
+    {
+      "taxa_fields": [
+        "common_name"
+      ],
+      "max_row": 10,
+      "max_col": 2,
+      "name": "abundances_2",
+      "title": "Abundances example 2",
+      "description": "Example worksheet showing the second method for recording species abundances",
+      "descriptors": [
+        "field_type",
+        "taxon_field",
+        "method",
+        "description",
+        "units",
+        "field_name"
+      ],
+      "external": null,
+      "fields": [
+        {
+          "field_name": "common_name",
+          "description": "Species found",
+          "field_type": "taxa",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 1
+        },
+        {
+          "field_name": "leech_count",
+          "description": "Number found",
+          "field_type": "abundance",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 2
+        }
+      ],
+      "field_name_row": 6,
+      "n_data_row": 4
+    },
+    {
+      "taxa_fields": [
+        "predator",
+        "prey"
+      ],
+      "max_row": 8,
+      "max_col": 3,
+      "name": "interactions_1",
+      "title": "Interactions example 1",
+      "description": "Example worksheet showing the first method for recording species interactions",
+      "descriptors": [
+        "field_type",
+        "interaction_field",
+        "levels",
+        "method",
+        "description",
+        "field_name"
+      ],
+      "external": null,
+      "fields": [
+        {
+          "field_name": "predator",
+          "description": "Predator observed",
+          "field_type": "taxa",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 1
+        },
+        {
+          "field_name": "prey",
+          "description": "Prey observed",
+          "field_type": "taxa",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 2
+        },
+        {
+          "field_name": "outcome",
+          "description": "Outcome of predation event",
+          "field_type": "categorical interaction",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 3
+        }
+      ],
+      "field_name_row": 6,
+      "n_data_row": 2
+    },
+    {
+      "taxa_fields": [],
+      "max_row": 8,
+      "max_col": 1,
+      "name": "interactions_2",
+      "title": "Interactions example 2",
+      "description": "Example worksheet showing the second method for recording species interactions",
+      "descriptors": [
+        "field_type",
+        "interaction_name",
+        "levels",
+        "method",
+        "description",
+        "field_name"
+      ],
+      "external": null,
+      "fields": [
+        {
+          "field_name": "outcome",
+          "description": "Outcome of predation event",
+          "field_type": "categorical interaction",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 1
+        }
+      ],
+      "field_name_row": 6,
+      "n_data_row": 2
+    },
+    {
+      "taxa_fields": [
+        "prey"
+      ],
+      "max_row": 9,
+      "max_col": 2,
+      "name": "interactions_3",
+      "title": "Interactions example 3",
+      "description": "Example worksheet showing the third method for recording species interactions",
+      "descriptors": [
+        "field_type",
+        "interaction_name",
+        "interaction_field",
+        "levels",
+        "method",
+        "description",
+        "field_name"
+      ],
+      "external": null,
+      "fields": [
+        {
+          "field_name": "prey",
+          "description": "Prey observed",
+          "field_type": "taxa",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 1
+        },
+        {
+          "field_name": "outcome",
+          "description": "Outcome of predation event",
+          "field_type": "categorical interaction",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 2
+        }
+      ],
+      "field_name_row": 7,
+      "n_data_row": 2
+    },
+    {
+      "taxa_fields": [],
+      "max_row": 14,
+      "max_col": 2,
+      "name": "external_1",
+      "title": "External file example 1",
+      "description": "Example worksheet showing the secod method for including information from external files",
+      "descriptors": [
+        "field_type",
+        "description",
+        "method",
+        "taxon_name",
+        "units",
+        "field_name"
+      ],
+      "external": null,
+      "fields": [
+        {
+          "field_name": "Altitude",
+          "description": "Altitude in metres",
+          "field_type": "numeric",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 1
+        },
+        {
+          "field_name": "DEM",
+          "description": "DEM file used for altitude",
+          "field_type": "file",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 2
+        }
+      ],
+      "field_name_row": 6,
+      "n_data_row": 8
+    },
+    {
+      "taxa_fields": [],
+      "max_row": 15,
+      "max_col": 2,
+      "name": "external_2",
+      "title": "External file example 2",
+      "description": "Example worksheet showing the first method for including information from external files",
+      "descriptors": [
+        "field_type",
+        "description",
+        "method",
+        "taxon_name",
+        "units",
+        "file_container",
+        "field_name"
+      ],
+      "external": null,
+      "fields": [
+        {
+          "field_name": "Altitude",
+          "description": "Altitude in metres",
+          "field_type": "numeric",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 1
+        },
+        {
+          "field_name": "Bait_trap_image",
+          "description": "Image of bait trap card",
+          "field_type": "file",
+          "units": null,
+          "method": null,
+          "levels": null,
+          "taxon_field": null,
+          "taxon_name": null,
+          "interaction_field": null,
+          "interaction_name": null,
+          "range": null,
+          "col_idx": 2
+        }
+      ],
+      "field_name_row": 7,
+      "n_data_row": 8
+    }
+  ],
+  "gbif_timestamp": "2021-11-26",
+  "gbif_taxa": [
+    {
+      "worksheet_name": "crbo",
+      "taxon_id": 1324716,
+      "parent_id": 1324306,
+      "taxon_name": "Crematogaster borneensis",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "dolic_sp",
+      "taxon_id": 1314182,
+      "parent_id": 4342,
+      "taxon_name": "Dolichoderus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "gannets",
+      "taxon_id": 2480962,
+      "parent_id": 9351,
+      "taxon_name": "Morus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 5219531,
+      "parent_id": 5483,
+      "taxon_name": "Pongo",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "lost_orang",
+      "taxon_id": 9311132,
+      "parent_id": 5219531,
+      "taxon_name": "Pongo tapanuliensis",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 4342,
+      "parent_id": 1457,
+      "taxon_name": "Formicidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "morpho1",
+      "taxon_id": -1,
+      "parent_id": 4342,
+      "taxon_name": "NA",
+      "taxon_rank": "morphospecies",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 4334,
+      "parent_id": 1457,
+      "taxon_name": "Apidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "bombines",
+      "taxon_id": -1,
+      "parent_id": 4334,
+      "taxon_name": "Bombini",
+      "taxon_rank": "tribe",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2480962,
+      "parent_id": 9351,
+      "taxon_name": "Morus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "new_gannet",
+      "taxon_id": -1,
+      "parent_id": 2480962,
+      "taxon_name": "Morus rubra",
+      "taxon_rank": "species",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": "Tiger leech",
+      "taxon_id": 9065333,
+      "parent_id": 4810276,
+      "taxon_name": "Haemadipsa picta",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Brown leech",
+      "taxon_id": 8997397,
+      "parent_id": 4810276,
+      "taxon_name": "Haemadipsa zeylanica",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Clouded leopard",
+      "taxon_id": 2435079,
+      "parent_id": 2435078,
+      "taxon_name": "Neofelis nebulosa",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Flat headed cat",
+      "taxon_id": 2434917,
+      "parent_id": 2434894,
+      "taxon_name": "Prionailurus planiceps",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Brown rat",
+      "taxon_id": 2439261,
+      "parent_id": 2439223,
+      "taxon_name": "Rattus norvegicus",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Moon rat",
+      "taxon_id": 2437114,
+      "parent_id": 2437113,
+      "taxon_name": "Echinosorex gymnura",
+      "taxon_rank": "species",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1,
+      "parent_id": null,
+      "taxon_name": "Animalia",
+      "taxon_rank": "kingdom",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 44,
+      "parent_id": 1,
+      "taxon_name": "Chordata",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 42,
+      "parent_id": 1,
+      "taxon_name": "Annelida",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 54,
+      "parent_id": 1,
+      "taxon_name": "Arthropoda",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 359,
+      "parent_id": 44,
+      "taxon_name": "Mammalia",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 255,
+      "parent_id": 42,
+      "taxon_name": "Clitellata",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 212,
+      "parent_id": 44,
+      "taxon_name": "Aves",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 216,
+      "parent_id": 54,
+      "taxon_name": "Insecta",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 7192775,
+      "parent_id": 212,
+      "taxon_name": "Suliformes",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1459,
+      "parent_id": 359,
+      "taxon_name": "Rodentia",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1077,
+      "parent_id": 255,
+      "taxon_name": "Arhynchobdellida",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 732,
+      "parent_id": 359,
+      "taxon_name": "Carnivora",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 829,
+      "parent_id": 359,
+      "taxon_name": "Erinaceomorpha",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 798,
+      "parent_id": 359,
+      "taxon_name": "Primates",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1457,
+      "parent_id": 216,
+      "taxon_name": "Hymenoptera",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 5722,
+      "parent_id": 829,
+      "taxon_name": "Erinaceidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 9703,
+      "parent_id": 732,
+      "taxon_name": "Felidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 5483,
+      "parent_id": 798,
+      "taxon_name": "Hominidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 7292,
+      "parent_id": 1077,
+      "taxon_name": "Haemadipsidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 9351,
+      "parent_id": 7192775,
+      "taxon_name": "Sulidae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 5510,
+      "parent_id": 1459,
+      "taxon_name": "Muridae",
+      "taxon_rank": "family",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2439223,
+      "parent_id": 5510,
+      "taxon_name": "Rattus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2437113,
+      "parent_id": 5722,
+      "taxon_name": "Echinosorex",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2435078,
+      "parent_id": 9703,
+      "taxon_name": "Neofelis",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1324306,
+      "parent_id": 4342,
+      "taxon_name": "Crematogaster",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 4810276,
+      "parent_id": 7292,
+      "taxon_name": "Haemadipsa",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2434894,
+      "parent_id": 9703,
+      "taxon_name": "Prionailurus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    }
+  ],
+  "ncbi_timestamp": "2023-11-01",
+  "ncbi_taxa": [
+    {
+      "worksheet_name": "G_proteobacteria",
+      "taxon_id": 1236,
+      "parent_id": 1224,
+      "taxon_name": "Gammaproteobacteria",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "E_mycetes",
+      "taxon_id": 147545,
+      "parent_id": 4890,
+      "taxon_name": "Eurotiomycetes",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Dinophyceae",
+      "taxon_id": 2864,
+      "parent_id": 2759,
+      "taxon_name": "Dinophyceae",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Acidobact",
+      "taxon_id": 204432,
+      "parent_id": 57723,
+      "taxon_name": "Terriglobia",
+      "taxon_rank": "class",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": "Acidobact",
+      "taxon_id": 204432,
+      "parent_id": 57723,
+      "taxon_name": "Acidobacteriia",
+      "taxon_rank": "class",
+      "taxon_status": "synonym"
+    },
+    {
+      "worksheet_name": "New_fungus",
+      "taxon_id": -1,
+      "parent_id": 4890,
+      "taxon_name": "Mynewfungusetes",
+      "taxon_rank": "class",
+      "taxon_status": "user"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2,
+      "parent_id": null,
+      "taxon_name": "Bacteria",
+      "taxon_rank": "superkingdom",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2759,
+      "parent_id": null,
+      "taxon_name": "Eukaryota",
+      "taxon_rank": "superkingdom",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 4751,
+      "parent_id": 2759,
+      "taxon_name": "Fungi",
+      "taxon_rank": "kingdom",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 57723,
+      "parent_id": 2,
+      "taxon_name": "Acidobacteriota",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 4890,
+      "parent_id": 4751,
+      "taxon_name": "Ascomycota",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1224,
+      "parent_id": 2,
+      "taxon_name": "Pseudomonadota",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    }
+  ],
+  "locations": [
+    {
+      "name": "E_194",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "E_195",
+      "new_location": false,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "My_site_1",
+      "new_location": true,
+      "wkt_wgs84": "Point(117.776023 4.957721)"
+    },
+    {
+      "name": "My_site_2",
+      "new_location": true,
+      "wkt_wgs84": null
+    },
+    {
+      "name": "My_site_3",
+      "new_location": true,
+      "wkt_wgs84": "Point(117.7762 4.9576)"
+    },
+    {
+      "name": "My_transect_1",
+      "new_location": true,
+      "wkt_wgs84": "Linestring(117.7762 4.9576, 117.7862 4.9676)"
+    }
+  ],
+  "zenodo_concept_id": null,
+  "zenodo_record_id": null,
+  "zenodo_publication_date": null,
+  "temporal_extent": [
+    "2015-06-01",
+    "2015-07-11"
+  ],
+  "latitudinal_extent": [
+    4.5,
+    5.07
+  ],
+  "longitudinal_extent": [
+    116.75,
+    117.82
+  ]
+}

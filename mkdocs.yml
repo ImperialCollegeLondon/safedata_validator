@@ -47,6 +47,9 @@ nav:
       - 'Taxonomic validation details': 'data_managers/install/taxonomic_validation.md'
     - 'Using the safedata system':
       - 'Overview': 'data_managers/using_safedata/overview.md'
+      - 'Validating datasets': 'data_managers/using_safedata/validating_datasets.md'
+      - 'Publishing datasets': 'data_managers/using_safedata/publishing_datasets.md'
+      - 'Updating the metadata server': 'data_managers/using_safedata/posting_metadata.md'
     - 'Command line tools': 
       - 'Overview': 'data_managers/command_line_tools/overview.md'
       - 'safedata_validate': 'data_managers/command_line_tools/safedata_validate.md'
