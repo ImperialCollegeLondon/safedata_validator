@@ -12,8 +12,20 @@ the docs build process.
 
 import os
 import subprocess
+from contextlib import contextmanager
 
 import pandas as pd
+
+
+@contextmanager
+def work_in_dir(path):
+    """Context manager for changing directories."""
+    oldpwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(oldpwd)
 
 
 def on_pre_build(config, **kwargs) -> None:
@@ -27,37 +39,39 @@ def on_pre_build(config, **kwargs) -> None:
     file.
     """
 
-    # Change directory to command line usage folder
-    os.chdir("docs/data_managers/command_line_tools/command_line_usage/")
-    # Then run script to generate the command line usage text files
-    subprocess.run(["bash", "update_command_line_usage.sh"], stdout=subprocess.DEVNULL)
+    # Run the script to generate the command line usage text files
+    with work_in_dir("docs/data_managers/command_line_tools/command_line_usage/"):
+        subprocess.run(
+            ["bash", "update_command_line_usage.sh"], stdout=subprocess.DEVNULL
+        )
 
-    # Change directory to data_format folder
-    os.chdir("../../../data_providers/data_format")
+    # Generate tables for docs from the example Excel file.
+    with work_in_dir("docs/data_providers/data_format/"):
+        # Read in summary sheet as a pandas dataframe
+        df = pd.read_excel(
+            "Example.xlsx", sheet_name="Summary", header=None, keep_default_na=False
+        )
 
-    # Read in summary sheet as a pandas dataframe
-    df = pd.read_excel(
-        "Example.xlsx", sheet_name="Summary", header=None, keep_default_na=False
-    )
+        # Find rows that define dates and are not empty. Empty condition needed because
+        # embargo date doesn't have to be provided.
+        date_rows = df[
+            (df[0].str.contains("date", case=False))
+            & (~df[1].str.fullmatch("", na=False))
+        ].index.tolist()
 
-    # Find rows that define dates and are not empty. Empty condition needed because
-    # embargo date doesn't have to be provided.
-    date_rows = df[
-        (df[0].str.contains("date", case=False)) & (~df[1].str.fullmatch("", na=False))
-    ].index.tolist()
+        # Parse dates as explicit dates using pandas and convert to DD-MM-YYYY format
+        dates = pd.to_datetime(df.loc[date_rows, 1]).dt.strftime("%d-%m-%Y")
 
-    # Parse the dates as explicit dates using pandas and convert to DD-MM-YYYY format
-    dates = pd.to_datetime(df.loc[date_rows, 1]).dt.strftime("%d-%m-%Y")
+        # Replace the "dates" in the original dataframe with properly formatted dates
+        df.loc[date_rows, 1] = dates
 
-    # Then replace the "dates" in the original dataframe with properly formatted dates
-    df.loc[date_rows, 1] = dates
-
-    # Output summary table as a csv
-    df.to_csv("Summary.csv", index=False, header=False)
+        # Output summary table as a csv
+        df.to_csv("Summary.csv", index=False, header=False)
 
 
 def on_post_build(config, **kwargs) -> None:
     """Delete temporary csv file that pre_build hook output."""
 
     # Delete the temporary csv file
-    os.remove("Summary.csv")
+    with work_in_dir("docs/data_providers/data_format/"):
+        os.remove("Summary.csv")
