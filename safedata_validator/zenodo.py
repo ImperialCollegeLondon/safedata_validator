@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import decimal
 import hashlib
+import re
 import shutil
 from datetime import datetime as dt
 from importlib import resources as il_resources  # avoid confusion with sdv.resources
@@ -130,13 +131,25 @@ def _compute_md5(fname: Path) -> str:
 def _zenodo_error_message(response) -> str:
     """Format a Zenodo JSON error response as a string."""
 
-    response_json = response.json()
-    return_string = f"{response.json()['message']} ({response.json()['status']})\n"
+    # Report the immediate reason and code along with the URL endpoint with the access
+    # token redacted
+    url = re.sub("(?<=access_token=).*$", "<redacted>", response.url)
+    return_string = (
+        f"\n\nZenodo error: {response.reason} ({response.status_code})\nURL: {url}\n"
+    )
+
+    # Attempt to get any JSON data
+    try:
+        response_json = response.json()
+    except requests.exceptions.JSONDecodeError:
+        return return_string
+
+    return_string += f"Message: {response_json['message']}\n"
 
     # Report on error messages in response object
     errors = response_json.get("errors", [])
     if errors:
-        return_string += "\nAdditional error information:\n"
+        return_string += "Errors:\n"
         for e in errors:
             messages = "\n    - ".join(e["messages"])
             return_string += f" * Messages for field {e['field']}:\n    - {messages}"
