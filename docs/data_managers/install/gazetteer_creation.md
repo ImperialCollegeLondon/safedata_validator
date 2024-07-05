@@ -64,7 +64,9 @@ it's completely fine to use that instead.
 
 In R, we recommend that you use the [`sf`
 package](https://cran.r-project.org/package=sf) to define your locations, to combine
-files and to export the gazetteer.
+files and to export the gazetteer. If you want to load `GeoJSON` files into `R` we
+recommend using either the [`geojsonio`](https://cran.r-project.org/package=geojsonio)
+package or the [`jsonlite`](https://cran.r-project.org/package=jsonlite) package.
 
 The example below demonstrates how to manually create points, lines and polygons
 manually using coordinates, how to load in shape files, and finally how to export
