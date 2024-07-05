@@ -1,5 +1,4 @@
 library(sf)
-library(geojsonio)
 
 # Create points, lines, and polygon features
 sampling_point <- st_point(c(117.900, 4.250))
@@ -22,8 +21,9 @@ manual_locations <- st_sf(
 # Load features from an existing shapefile
 shape_file <- st_read("example_shape_file.shp")
 
-# Combine features from different sources
+# # Combine features from different sources
 all_locations <- rbind(manual_locations, shape_file)
 
-# Export as GeoJSON
-geojson_write(all_locations, file = "gazetteer.geojson", na = "null")
+# Export as GeoJSON file
+file <- "gazetteer.geojson"
+st_write(all_locations, file, driver = "GeoJSON")
