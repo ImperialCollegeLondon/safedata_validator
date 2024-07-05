@@ -47,7 +47,7 @@ under the hood.
     %}
     ```
 
-## Validating and publishing as an update
+## Validating and publishing an update to a dataset
 
 Zenodo can hold multiple versions of a dataset, allowing you to publish updates and
 corrections. When you create a new dataset, that dataset is assigned a record id but
@@ -62,7 +62,10 @@ most recent version of a dataset, updates the files and metadata and creates a n
 record grouped under the same concept id. In order to do this, you can simply provide
 the record id of the most recent version to the data publication commands. Note that the
 required record id not the concept ID, but the most recent version of the dataset being
-updated.
+updated. The process of creating the new record copies all of the existing files across
+into the new version: at the moment the `publish_dataset` subcommand simply deletes all
+of the previous files and replaces them with the new version, but future updates may
+simply replace new files.
 
 Again, the most straightforward approach is to use the `publish_dataset` subcommand and
 add the `--new-version` (or `-n`) argument.

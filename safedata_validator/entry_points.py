@@ -41,7 +41,7 @@ from safedata_validator.taxondb import (
 from safedata_validator.zenodo import (
     create_deposit,
     dataset_description,
-    delete_file,
+    delete_files,
     discard_deposit,
     download_ris_data,
     generate_inspire_xml,
@@ -50,7 +50,7 @@ from safedata_validator.zenodo import (
     publish_deposit,
     sync_local_dir,
     update_published_metadata,
-    upload_file,
+    upload_files,
     upload_metadata,
 )
 
@@ -463,47 +463,48 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
-    # UPLOAD FILE subcommand
-    upload_file_desc = """
-    Uploads the contents of a specified file to an _unpublished_ Zenodo deposit,
-    optionally using an alternative filename. If you upload a new file to the same
-    filename, it will replace the existing uploaded file.
+    # UPLOAD FILES subcommand
+    upload_files_desc = """
+    Uploads a set of files to an _unpublished_ Zenodo deposit. If you upload a new file
+    to the same filename, it will replace the existing uploaded file.
     """
 
-    upload_file_parser = subparsers.add_parser(
-        "upload_file",
-        description=textwrap.dedent(upload_file_desc),
+    upload_files_parser = subparsers.add_parser(
+        "upload_files",
+        description=textwrap.dedent(upload_files_desc),
         help="Upload a file to an unpublished deposit",
         formatter_class=_desc_formatter,
         parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
-    upload_file_parser.add_argument(
-        "filepath", type=str, default=None, help="The path to the file to be uploaded"
-    )
-    upload_file_parser.add_argument(
-        "--zenodo_filename",
+    upload_files_parser.add_argument(
+        "filepaths",
         type=str,
         default=None,
-        help="An optional alternative file name to be used on Zenodo",
+        help="The paths to the file to be uploaded",
+        nargs="*",
     )
 
     # DELETE FILE subcommand
-    delete_file_desc = """
-    Delete an uploaded file from an unpublished deposit. The deposit metadata will
-    be re-downloaded to ensure an up to date list of files in the deposit.
+    delete_files_desc = """
+    Delete an list of uploaded file from an unpublished deposit. The deposit metadata
+    will be re-downloaded to ensure an up to date list of files in the deposit.
     """
 
-    delete_file_parser = subparsers.add_parser(
-        "delete_file",
-        description=textwrap.dedent(delete_file_desc),
-        help="Delete a file from an unpublished deposit",
+    delete_files_parser = subparsers.add_parser(
+        "delete_files",
+        description=textwrap.dedent(delete_files_desc),
+        help="Delete files from an unpublished deposit",
         formatter_class=_desc_formatter,
         parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
-    delete_file_parser.add_argument(
-        "filename", type=str, default=None, help="The name of the file to delete"
+    delete_files_parser.add_argument(
+        "filenames",
+        type=str,
+        default=None,
+        help="The names of files to delete",
+        nargs="*",
     )
 
     # UPLOAD METADATA subcommand
@@ -681,7 +682,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     dataset and any external files. It does not provide all of the options of the
     subcommands for individual steps but covers the main common usage of the
     safedata_zenodo command. If the publication process fails, the resulting partial
-    deposit is discarded.
+    deposit is discarded. All of the files in the deposit must be replaced.
     """
     publish_dataset_parser = subparsers.add_parser(
         "publish_dataset",
@@ -846,51 +847,42 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             simplejson.dump(response, zn_json)
             LOGGER.info("Zenodo metadata updated")
 
-    elif args.subcommand == "upload_file":
+    elif args.subcommand == "upload_files":
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
 
-        # Report on proposed upload
-        if args.zenodo_filename is None:
-            LOGGER.info(f"Uploading: {os.path.basename(args.filepath)}")
-        else:
-            LOGGER.info(
-                f"Uploading: {os.path.basename(args.filepath)} as "
-                f"{args.zenodo_filename}"
-            )
-
-        # Run the command
-        response, error = upload_file(
+        # Run the command - the response here has a different type so use a different
+        # placeholder variable.
+        upload_response, error = upload_files(
             metadata=metadata,
-            filepath=args.filepath,
-            zenodo_filename=args.zenodo_filename,
+            filepaths=args.filepaths,
             resources=resources,
             progress_bar=not args.quiet,
         )
 
         # Report on the outcome.
         if error is not None:
-            LOGGER.error(f"Failed to upload file: {error}")
+            LOGGER.error(f"Failed to upload files: {error}")
             return 1
         else:
-            LOGGER.info("File uploaded")
+            LOGGER.info("Files uploaded")
 
-    elif args.subcommand == "delete_file":
+    elif args.subcommand == "delete_files":
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Run the command
-        response, error = delete_file(
-            metadata=metadata, filename=args.filename, resources=resources
+        response, error = delete_files(
+            metadata=metadata, filenames=args.filenames, resources=resources
         )
 
         # Report on the outcome.
         if error is not None:
-            LOGGER.error(f"Failed to delete file: {error}")
+            LOGGER.error(f"Failed to delete files: {error}")
         else:
-            LOGGER.info("File deleted")
+            LOGGER.info("Files deleted")
 
     elif args.subcommand == "upload_metadata":
         # Open the two JSON files
