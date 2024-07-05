@@ -9,7 +9,7 @@ from safedata_validator.zenodo import (
     create_deposit,
     generate_inspire_xml,
     publish_deposit,
-    upload_file,
+    upload_files,
     upload_metadata,
 )
 
@@ -40,12 +40,12 @@ with open(xml_file, "w") as xml_out:
     xml_out.write(xml_content)
 
 # Post the files
-for file in [dataset, extra_file, xml_file]:
-    if all_good:
-        file_upload_response, error = upload_file(
-            metadata=zenodo_metadata, filepath=Path(file), resources=resources
-        )
-        all_good = error is None
+files = [Path(f) for f in (dataset, extra_file, xml_file)]
+if all_good:
+    file_upload_response, error = upload_files(
+        metadata=zenodo_metadata, filepaths=files, resources=resources
+    )
+    all_good = error is None
 
 # Post the metadata
 if all_good:

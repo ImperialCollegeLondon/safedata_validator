@@ -45,10 +45,10 @@ positional arguments:
                 Download and display deposit metadata
     publish_deposit
                 Publish a draft deposit
-    upload_file
+    upload_files
                 Upload a file to an unpublished deposit
-    delete_file
-                Delete a file from an unpublished deposit
+    delete_files
+                Delete files from an unpublished deposit
     upload_metadata
                 Populate the Zenodo metadata
     amend_metadata

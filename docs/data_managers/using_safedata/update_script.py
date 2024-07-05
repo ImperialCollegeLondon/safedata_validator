@@ -8,9 +8,10 @@ from safedata_validator.resources import Resources
 from safedata_validator.server import post_metadata
 from safedata_validator.zenodo import (
     create_deposit,
+    delete_files,
     generate_inspire_xml,
     publish_deposit,
-    upload_file,
+    upload_files,
     upload_metadata,
 )
 
@@ -44,14 +45,24 @@ xml_content = generate_inspire_xml(
 with open(xml_file, "w") as xml_out:
     xml_out.write(xml_content)
 
+# Get the names of the existing files from the JSON metadata of the deposit and delete
+# them all before uploading the provided versions. Note that the publish_dataset
+# function does this in a much more sophisticated way.
+existing_online_files = [p["key"] for p in zenodo_metadata["files"]]
+if all_good:
+    file_delete_response, error = delete_files(
+        metadata=zenodo_metadata, filenames=existing_online_files, resources=resources
+    )
+    all_good = error is None
+
 
 # Post the files
-for file in [dataset, extra_file]:
-    if all_good:
-        file_upload_response, error = upload_file(
-            metadata=zenodo_metadata, filepath=Path(file), resources=resources
-        )
-        all_good = error is None
+files = [Path(f) for f in (dataset, extra_file, xml_file)]
+if all_good:
+    file_upload_response, error = upload_files(
+        metadata=zenodo_metadata, filepaths=files, resources=resources
+    )
+    all_good = error is None
 
 # Post the metadata
 if all_good:

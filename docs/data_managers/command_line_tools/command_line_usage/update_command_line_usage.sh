@@ -19,7 +19,7 @@ echo "cl_prompt $ safedata_zenodo -h" > safedata_zenodo_top.txt
 safedata_zenodo -h >> safedata_zenodo_top.txt
 
 subcommands=(create_deposit get_deposit discard_deposit publish_deposit \
-             upload_file delete_files upload_metadata amend_metadata \
+             upload_files delete_files upload_metadata amend_metadata \
              sync_local_dir maintain_ris generate_html generate_xml publish_dataset)
 
 for subc in "${subcommands[@]}";

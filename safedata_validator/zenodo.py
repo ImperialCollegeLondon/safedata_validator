@@ -1040,7 +1040,7 @@ def publish_dataset(
 
         # Reduce the upload paths to only the paths of new or updated files. Note the
         # earlier code checks that the filenames are unique.
-        files_to_upload = [p for p in paths_to_upload if p.name in new_or_updated_files]
+        paths_to_upload = [p for p in paths_to_upload if p.name in new_or_updated_files]
 
         # Report on update plan.
         print(f"Preparing new version of deposit {new_version}")
@@ -1090,7 +1090,7 @@ def publish_dataset(
         xml_file = dataset.parent / f"{zenodo_id}_GEMINI.xml"
         with open(xml_file, "w") as xml_out:
             xml_out.write(xml_content)
-        files_to_upload.append(xml_file)
+        paths_to_upload.append(xml_file)
         print(f"XML created: {xml_file}")
 
     # Remove any outdated files from deposits created as new versions
@@ -1118,7 +1118,7 @@ def publish_dataset(
     # Post the files
     print("Uploading files:")
     file_upload_response, error = upload_files(
-        metadata=zenodo_metadata, filepaths=files_to_upload, resources=resources
+        metadata=zenodo_metadata, filepaths=paths_to_upload, resources=resources
     )
     # Handle errors
     if error:

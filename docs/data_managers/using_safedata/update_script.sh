@@ -18,11 +18,20 @@ safedata_zenodo create_deposit --new-version 1143714
 # 2) Generate a GEMINI XML metadata file for the deposit
 safedata_zenodo generate_xml zenodo_1156212.json Example.json 1156212_GEMINI.xml
 
-# 3) Upload the dataset file, external files named in the dataset summary and the XML
-#    metadata. This uses the zenodo metadata file to confirm the upload destination.
-safedata_zenodo upload_file zenodo_1156212.json Example.xlsx
-safedata_zenodo upload_file zenodo_1156212.json Supplementary_files.zip
-safedata_zenodo upload_file zenodo_1156212.json 1156212_GEMINI.xml
+# 3) Delete the existing files on the deposit. This uses the zenodo metadata file to
+#    confirm the upload destination. 
+#
+#    Note that in this example, we do not check to see if any of the files are
+#    identical. The command below simple deletes all of the files and then reuploads the
+#    provided versions. The publish_dataset subcommand handles this in a much more
+#    sophisticated way.
+safedata_zenodo delete_files zenodo_1156212.json \
+    Example.xlsx  Supplementary_files.zip 1143714_GEMINI.xml
+
+# 4) Upload the dataset file, external files named in the dataset summary and the new
+#    XML metadata. This uses the zenodo metadata file to confirm the upload destination.
+safedata_zenodo upload_files zenodo_1156212.json \
+    Example.xlsx  Supplementary_files.zip 1156212_GEMINI.xml
 
 # 3) Update the Zenodo deposit webpage - this populates the deposit description
 #    on Zenodo from the dataset metadata
