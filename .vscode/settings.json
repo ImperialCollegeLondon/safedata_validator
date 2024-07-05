@@ -1,6 +1,4 @@
 {
-    "python.linting.mypyEnabled": true,
-    "python.linting.enabled": true,
     "[python]": {
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "charliermarsh.ruff"
@@ -14,9 +12,12 @@
         "-s",
         "test",
         // --no-cov needed so that breakpoints work: https://github.com/microsoft/vscode-python/issues/693
-        "--no-cov"
+        "--no-cov",
     ],
     "workbench.editorAssociations": {
         "*.ipynb": "jupyter-notebook"
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
     },
 }
