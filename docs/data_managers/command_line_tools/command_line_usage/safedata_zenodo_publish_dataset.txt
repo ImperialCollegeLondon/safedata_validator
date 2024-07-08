@@ -1,5 +1,6 @@
 cl_prompt $ safedata_zenodo publish_dataset -h
-usage: safedata_zenodo publish_dataset [-h] [-c CONCEPT_ID] [--no-xml]
+usage: safedata_zenodo publish_dataset [-h] [--live | --sandbox]
+                                       [-n NEW_VERSION] [--no-xml]
                                        [-e [EXTERNAL_FILES ...]]
                                        dataset_json dataset
 
@@ -7,7 +8,7 @@ This subcommand runs through the complete publication process for a validated
 dataset and any external files. It does not provide all of the options of the
 subcommands for individual steps but covers the main common usage of the
 safedata_zenodo command. If the publication process fails, the resulting partial
-deposit is discarded.
+deposit is discarded. All of the files in the deposit must be replaced.
 
 positional arguments:
   dataset_json  Path to a JSON metadata file for a dataset
@@ -15,8 +16,11 @@ positional arguments:
 
 options:
   -h, --help    show this help message and exit
-  -c CONCEPT_ID, --concept_id CONCEPT_ID
-                A Zenodo concept ID
+  --live        Use the Zenodo live site, overriding the configuration file
+  --sandbox     Use the Zenodo sandbox site, overriding the configuration file
+  -n NEW_VERSION, --new-version NEW_VERSION
+                Create a new version of the dataset with the provided Zenodo
+                ID.
   --no-xml      Do not include metadata XML in the published record
   -e [EXTERNAL_FILES ...], --external-files [EXTERNAL_FILES ...]
                 A set of external files documented in the dataset to be

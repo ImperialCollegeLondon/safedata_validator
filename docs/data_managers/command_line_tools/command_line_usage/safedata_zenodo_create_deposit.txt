@@ -1,8 +1,14 @@
 cl_prompt $ safedata_zenodo create_deposit -h
-usage: safedata_zenodo create_deposit [-h] [-c CONCEPT_ID] [-i]
+usage: safedata_zenodo create_deposit [-h] [--live | --sandbox]
+                                      [-n NEW_VERSION] [-i]
 
-Create a new deposit draft. The concept_id option uses a provided Zenodo
-concept ID to creates a draft as a new version of an existing data set.
+Create a new deposit draft. 
+
+The new version option takes the record ID of the most recent version of an
+existing dataset and creates a new deposit as a new version of that dataset. 
+Versions of datasets are grouped under a single concept ID, which always 
+redirects to the most recent version. Use the most recent version ID and 
+_not_ the concept ID here.
 
 When successful, the function downloads and saves a JSON file containing the
 resulting Zenodo deposit metadata. This file is used as an input to other
@@ -14,7 +20,10 @@ All other logging is written to stderr.
 
 options:
   -h, --help    show this help message and exit
-  -c CONCEPT_ID, --concept_id CONCEPT_ID
-                A Zenodo concept ID
+  --live        Use the Zenodo live site, overriding the configuration file
+  --sandbox     Use the Zenodo sandbox site, overriding the configuration file
+  -n NEW_VERSION, --new-version NEW_VERSION
+                Create a new version of the dataset with the provided Zenodo
+                ID.
   -i, --id-to-stdout
                 Write the deposit record ID to stdout.

@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import decimal
 import hashlib
+import re
 import shutil
 from datetime import datetime as dt
 from importlib import resources as il_resources  # avoid confusion with sdv.resources
 from itertools import groupby
 from pathlib import Path
 
-import requests  # type: ignore
+import requests
 import rispy
 import simplejson
 from dominate import tags
@@ -41,7 +42,8 @@ The functions interacting with Zenodo all return a common format of tuple of len
 * A dictionary containing the response content. For responses that do not generate a
   response content but just indicate success via HTTP status codes, an empty dictionary
   is returned. An empty dictionary is also returned when the function results in an
-  error.
+  error. For upload files, the response is a list of such dictionaries, one for each
+  file uploaded.
 * An error message on failure or None on success
 
 So, for example:
@@ -57,6 +59,20 @@ The expected use pattern is then:
 response, error = zenodo_function(args)
 ```
 """
+
+ZenodoFunctionResponseListType = tuple[list[dict], str | None]
+"""Function return value
+
+This follows the ZenodoFunctionResponseType but returns a list of response dictionaries.
+This is only used by the upload_files function, where each file upload has a response
+containing useful information.
+"""
+
+
+# TODO: would make a lot more sense, particularly given the integrated
+#       publish_dataset option to have functions take the output of
+#       _resources_to_zenodo_api rather than continually recreating it inside each
+#       function. Some functions need more resources, but most do not.
 
 
 def _resources_to_zenodo_api(resources: Resources | None = None) -> dict:
@@ -77,10 +93,10 @@ def _resources_to_zenodo_api(resources: Resources | None = None) -> dict:
     if resources.zenodo.use_sandbox is None:
         config_fail = True
     elif resources.zenodo.use_sandbox:
-        zenodo_api = resources.zenodo.zenodo_sandbox_api
+        zenodo_api = "https://sandbox.zenodo.org/api"
         token = resources.zenodo.zenodo_sandbox_token
     else:
-        zenodo_api = resources.zenodo.zenodo_api
+        zenodo_api = "https://zenodo.org/api"
         token = resources.zenodo.zenodo_token
 
     if zenodo_api is None or token is None:
@@ -129,7 +145,32 @@ def _compute_md5(fname: Path) -> str:
 
 def _zenodo_error_message(response) -> str:
     """Format a Zenodo JSON error response as a string."""
-    return f"{response.json()['message']} ({response.json()['status']})"
+
+    # Report the immediate reason and code along with the URL endpoint with the access
+    # token redacted
+    url = re.sub("(?<=access_token=).*$", "<redacted>", response.url)
+    return_string = (
+        f"\n\nZenodo error: {response.reason} ({response.status_code})\nURL: {url}\n"
+    )
+
+    # Attempt to get any JSON data
+    try:
+        response_json = response.json()
+    except requests.exceptions.JSONDecodeError:
+        return return_string
+
+    return_string += f"Message: {response_json['message']}\n"
+
+    # Report on error messages in response object
+    errors = response_json.get("errors", [])
+    if errors:
+        return_string += "Errors:\n"
+        for e in errors:
+            messages = "\n    - ".join(e["messages"])
+            return_string += f" * Messages for field {e['field']}:\n    - {messages}"
+        return_string += "\n"
+
+    return return_string
 
 
 def _min_dp(val: float, min_digits: int = 2) -> str:
@@ -182,16 +223,19 @@ def get_deposit(
 
 
 def create_deposit(
-    concept_id: int | None = None, resources: Resources | None = None
+    new_version: int | None = None,
+    resources: Resources | None = None,
 ) -> ZenodoFunctionResponseType:
     """Create a new deposit.
 
     Creates a new deposit draft, possibly as a new version of an existing published
-    record.
+    record. Creating a new version requires the Zenodo ID of an existing dataset: this
+    has to be the ID of the most recently published version of a dataset, not the
+    concept ID used to group datasets or any of the older versions.
 
     Args:
-        concept_id: An optional concept id of a published record to create a new version
-            of an existing dataset.
+        new_version: Optionally, create a new version of the dataset with the provided
+            Zenodo ID.
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -205,10 +249,10 @@ def create_deposit(
     params = zres["ztoken"]
 
     # get the correct draft api
-    if concept_id is None:
+    if new_version is None:
         api = f"{zenodo_api}/deposit/depositions"
     else:
-        api = f"{zenodo_api}/deposit/depositions/{concept_id}/actions/newversion"
+        api = f"{zenodo_api}/deposit/depositions/{new_version}/actions/newversion"
 
     # Create the draft
     new_draft = requests.post(api, params=params, json={})
@@ -217,7 +261,7 @@ def create_deposit(
     if new_draft.status_code != 201:
         return {}, _zenodo_error_message(new_draft)
 
-    if concept_id is None:
+    if new_version is None:
         return new_draft.json(), None
 
     # For new versions, the response is an update to the existing copy,
@@ -385,23 +429,20 @@ def update_published_metadata(
         return {}, ret
 
 
-def upload_file(
+def upload_files(
     metadata: dict,
-    filepath: Path,
-    zenodo_filename: str | None = None,
+    filepaths: list[Path],
     progress_bar: bool = True,
     resources: Resources | None = None,
-) -> ZenodoFunctionResponseType:
+) -> ZenodoFunctionResponseListType:
     """Upload a file to Zenodo.
 
-    Uploads the contents of a specified file to an unpublished Zenodo deposit,
-    optionally using an alternative filename. If the file already exists in the deposit,
-    it will be replaced.
+    Uploads the a list of files to an unpublished Zenodo deposit. If any filenames
+    already exists in the deposit, they will be replaced with the new content
 
     Args:
         metadata: The Zenodo metadata dictionary for a deposit
-        filepath: The path to the file to be uploaded
-        zenodo_filename: An optional alternative file name to be used on Zenodo
+        filepaths: The path to the file to be uploaded
         progress_bar: Should the upload progress be displayed
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
@@ -414,45 +455,54 @@ def upload_file(
     zres = _resources_to_zenodo_api(resources)
     params = zres["ztoken"]
 
-    # Check the file and get the filename if an alternative is not provided
-    filepath = filepath.absolute()
-    if not (filepath.exists() and filepath.is_file()):
-        raise OSError(f"The file path is either a directory or not found: {filepath} ")
+    # Resolve filepaths and check they are all existing files
+    filepaths = [f.resolve() for f in filepaths]
+    bad_paths = [str(f) for f in filepaths if not (f.exists() and f.is_file())]
 
-    if zenodo_filename is None:
-        file_name = filepath.name
-    else:
-        file_name = zenodo_filename
+    if bad_paths:
+        raise OSError(f"Filepaths unknown or not a file: {','.join(bad_paths)} ")
 
-    # upload the file
-    # - https://gist.github.com/tyhoff/b757e6af83c1fd2b7b83057adf02c139
-    file_size = filepath.stat().st_size
-    api = f"{metadata['links']['bucket']}/{file_name}"
+    # Collect response for each file
+    response_content = []
 
-    with open(filepath, "rb") as file_io:
-        if progress_bar:
-            with tqdm(
-                total=file_size, unit="B", unit_scale=True, unit_divisor=1024
-            ) as upload_monitor:
-                # Upload the wrapped file
-                wrapped_file = CallbackIOWrapper(upload_monitor.update, file_io, "read")
-                fls = requests.put(api, data=wrapped_file, params=params)
-        else:
-            fls = requests.put(api, data=file_io, params=params)
+    # Upload each file
+    for fpath in filepaths:
+        # upload the file
+        # - https://gist.github.com/tyhoff/b757e6af83c1fd2b7b83057adf02c139
+        file_size = fpath.stat().st_size
+        api = f"{metadata['links']['bucket']}/{fpath.name}"
 
-    # trap errors in uploading file
-    # - no success or mismatch in md5 checksums
-    if fls.status_code != 201:
-        return {}, _zenodo_error_message(fls)
+        with open(fpath, "rb") as file_io:
+            print(f"Uploading {fpath.name}")
+            if progress_bar:
+                with tqdm(
+                    total=file_size, unit="B", unit_scale=True, unit_divisor=1024
+                ) as upload_monitor:
+                    # Upload the wrapped file
+                    wrapped_file = CallbackIOWrapper(
+                        upload_monitor.update, file_io, "read"
+                    )
+                    fls = requests.put(api, data=wrapped_file, params=params)
+            else:
+                fls = requests.put(api, data=file_io, params=params)
 
-    # TODO - could this be inside with above? - both are looping over the file contents
-    # https://medium.com/codex/chunked-uploads-with-binary-files-in-python-f0c48e373a91
-    local_hash = _compute_md5(filepath)
+        # trap errors in uploading file
+        # - no success or mismatch in md5 checksums
+        if fls.status_code != 201:
+            return list({}), _zenodo_error_message(fls)
 
-    if fls.json()["checksum"] != f"md5:{local_hash}":
-        return {}, "Mismatch in local and uploaded MD5 hashes"
-    else:
-        return fls.json(), None
+        # TODO - could this be inside the tqdm with call?
+        #      - both are looping over the file contents
+        # https://medium.com/codex/chunked-uploads-with-binary-files-in-python-f0c48e373a91
+        local_hash = _compute_md5(fpath)
+
+        fls_json: dict = fls.json()
+        if fls_json["checksum"] != f"md5:{local_hash}":
+            return list({}), "Mismatch in local and uploaded MD5 hashes"
+
+        response_content.append(fls_json)
+
+    return response_content, None
 
 
 def discard_deposit(
@@ -513,14 +563,14 @@ def publish_deposit(
         return pub.json(), None
 
 
-def delete_file(
-    metadata: dict, filename: str, resources: Resources | None = None
+def delete_files(
+    metadata: dict, filenames: list[str], resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Delete an uploaded file from an unpublished Zenodo deposit.
 
     Args:
         metadata: The Zenodo metadata dictionary for a deposit
-        filename: The file to delete from the deposit
+        filenames: A list of files to delete from the deposit
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -541,20 +591,45 @@ def delete_file(
         # failed to get the files
         return {}, _zenodo_error_message(files)
 
-    # get a dictionary of file links
+    # Get a dictionary of the available file links
     files_dict = {f["filename"]: f["links"]["self"] for f in files.json()}
 
-    if filename not in files_dict:
-        return {}, f"{filename} is not a file in the deposit"
+    # Get matching files
+    unknown_files = []
+    delete_links = []
+    for file in filenames:
+        if file in files_dict:
+            delete_links.append(files_dict[file])
+        else:
+            unknown_files.append(file)
 
-    # get the delete link to the file and call
-    delete_api = files_dict[filename]
-    file_del = requests.delete(delete_api, params=params)
+    if unknown_files:
+        return {}, f"Files not found in the deposit: {','.join(unknown_files)}"
 
-    if file_del.status_code != 204:
-        return {}, _zenodo_error_message(file_del)
-    else:
-        return {"result": "success"}, None
+    return _delete_files_from_links(delete_links=delete_links, params=params)
+
+
+def _delete_files_from_links(delete_links: list[str], params: dict):
+    """Delete files from Zenodo deposit from a list of API links.
+
+    This private method is used to delete files from a deposit using a list of the
+    Zenodo file "self" links. This is following the API below, where the link text
+    provides the specific API link to the file to be deleted
+
+        DELETE /api/deposit/depositions/:id/files/:file_id
+
+    Args:
+        delete_links: A list of Zenodo deposit file 'self' links
+        params: A dictionary of authentication parameters for the Zenodo API
+    """
+
+    for link in delete_links:
+        file_del = requests.delete(link, params=params)
+
+        if file_del.status_code != 204:
+            return {}, _zenodo_error_message(file_del)
+
+    return {"result": "success"}, None
 
 
 """
@@ -847,7 +922,7 @@ def publish_dataset(
     dataset: Path,
     dataset_metadata: dict,
     external_files: list[Path],
-    concept_id: int | None,
+    new_version: int | None,
     no_xml: bool = False,
 ) -> tuple[int, str]:
     """Publish a validated dataset.
@@ -859,6 +934,12 @@ def publish_dataset(
     the set of provided files (dataset and external files) matches the files documented
     in the dataset.
 
+    When a new version of an existing database is created, the resulting Zenodo deposit
+    contains copies of the most recent files. At present, the publish dataset command
+    deletes all of these files and expects to upload the full set of replacement files.
+    This will be inefficient if only some files need to be changed, and this function
+    may be updated in the future to allow only new files to be updated.
+
     It returns the URL of the resulting published datset. If the publication process
     fails, the partly completed deposit is deleted to avoid cluttering the Zenodo
     deposit list.
@@ -869,8 +950,8 @@ def publish_dataset(
         dataset: A path to the dataset file.
         external_files: A list of paths to external files named in the dataset.
         dataset_metadata: The dataset metadata.
-        concept_id: An optional Zenodo concept ID, used to publish the dataset as a new
-            version of an existing dataset.
+        new_version: Optionally, create a new version of the dataset with the provided
+            Zenodo ID. This must be the most recent version of the dataset concept.
         no_xml: A flag to suppress the automatic inclusion of Gemini XML metadata.
 
     Returns:
@@ -883,14 +964,22 @@ def publish_dataset(
     """
 
     # Check the files to upload exist.
-    files_to_upload = [dataset, *external_files]
-    not_found = [str(f) for f in files_to_upload if not f.exists()]
+    paths_to_upload = [dataset, *external_files]
+    not_found = [str(f) for f in paths_to_upload if not f.exists()]
 
     if not_found:
         raise FileNotFoundError(f"Files not found: {', '.join(not_found)}")
 
+    # Check for duplicated filenames
+    filenames_only = [f.name for f in paths_to_upload]
+    if len(filenames_only) != len(set(filenames_only)):
+        raise ValueError("Files to be uploaded do not have unique names.")
+
     # Are all external files listed in the dataset provided
-    metadata_ext_files = {val["file"] for val in dataset_metadata["external_files"]}
+    if dataset_metadata["external_files"] is None:
+        metadata_ext_files = set()
+    else:
+        metadata_ext_files = {val["file"] for val in dataset_metadata["external_files"]}
     provided_ext_files = {val.name for val in external_files}
 
     if metadata_ext_files != provided_ext_files:
@@ -899,19 +988,99 @@ def publish_dataset(
             f"external file names: {', '.join(metadata_ext_files)}"
         )
 
-    # Create the new deposit to publish the dataset
-    zenodo_metadata, error = create_deposit(resources=resources, concept_id=concept_id)
+    # For new versions of an existing dataset, get the existing dataset metadata and
+    # figure out which files are being changed.
+    if new_version is not None:
+        # Get the requested version data
+        requested_version_metadata, error = get_deposit(
+            deposit_id=new_version, resources=resources
+        )
+        if error:
+            # Report on the failure to get the existing version data
+            raise RuntimeError(error)
 
-    # Monitor the success of individual steps
-    if error is None:
-        zenodo_id = zenodo_metadata["id"]
-        all_good = True
-        print(f"Deposit created: {zenodo_id}")
+        # Check if that is the latest version, because that is what is _actually_ cloned
+        # when a version is requested and we need to get the most recent file listing to
+        # update the files sanely.
+        latest_version_metadata = requests.get(
+            requested_version_metadata["links"]["latest"]
+        ).json()
+
+        latest_id = latest_version_metadata["id"]
+
+        if latest_id != new_version:
+            raise RuntimeError(
+                f"Provided version id ({new_version}) is not the "
+                f"most recent version id({latest_id})"
+            )
+
+        # Collect the name and md5 sum of the existing files and the incoming files to
+        # allow for checking of files with identical name and content
+        incoming_files = {(p.name, _compute_md5(p)) for p in paths_to_upload}
+        existing_files = {
+            (p["key"], p["checksum"].removeprefix("md5:"))
+            for p in latest_version_metadata["files"]
+        }
+
+        # Split files into files to be upload, files to be deleted from deposit and
+        # files that are not being changed
+        new_or_updated_files = [val[0] for val in (incoming_files - existing_files)]
+        files_to_remove = [val[0] for val in (existing_files - incoming_files)]
+        unchanged = [val[0] for val in (incoming_files & existing_files)]
+
+        # Trap updates with no differences - no new files or updates and only a
+        # GEMINI.xml file to remove
+        no_changes = (not new_or_updated_files) or (
+            len(files_to_remove) == 1 and files_to_remove[0].endswith("_GEMINI.xml")
+        )
+        if no_changes:
+            raise RuntimeError(
+                "No file changes: content identical to existing version."
+            )
+
+        # Reduce the upload paths to only the paths of new or updated files. Note the
+        # earlier code checks that the filenames are unique.
+        paths_to_upload = [p for p in paths_to_upload if p.name in new_or_updated_files]
+
+        # Report on update plan.
+        print(f"Preparing new version of deposit {new_version}")
+        if unchanged:
+            print(f" - Unchanged files: {', '.join(unchanged)}")
+        if files_to_remove:
+            print(f" - Removing outdated files: {', '.join(files_to_remove)}")
+        if new_or_updated_files:
+            print(
+                f" - Uploading new or updated files: {', '.join(new_or_updated_files)}"
+            )
+
     else:
-        all_good = False
+        # No files will need to be removed from completely new datasets.
+        files_to_remove = []
 
-    # Generate XML
-    if all_good and not no_xml:
+    # From here on, we need to trap failures and tidy up, so define an local function to
+    # handle the bail process
+    def _clean_up_and_bail(zenodo_metadata, resources) -> None:
+        """Handle the tidy up if the publication process fails."""
+        publish_response, error = discard_deposit(
+            zenodo_metadata=zenodo_metadata, resources=resources
+        )
+        print("Issue with publication process - draft deposit discarded.")
+        raise RuntimeError(error)
+
+    # Create the new deposit to publish the dataset
+    zenodo_metadata, error = create_deposit(
+        resources=resources, new_version=new_version
+    )
+
+    if error:
+        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
+
+    # Report success
+    zenodo_id = zenodo_metadata["id"]
+    print(f"Deposit created: {zenodo_id}")
+
+    # Generate XML if requested
+    if not no_xml:
         xml_content = generate_inspire_xml(
             dataset_metadata=dataset_metadata,
             zenodo_metadata=zenodo_metadata,
@@ -921,39 +1090,54 @@ def publish_dataset(
         xml_file = dataset.parent / f"{zenodo_id}_GEMINI.xml"
         with open(xml_file, "w") as xml_out:
             xml_out.write(xml_content)
-        files_to_upload.append(xml_file)
+        paths_to_upload.append(xml_file)
         print(f"XML created: {xml_file}")
 
+    # Remove any outdated files from deposits created as new versions
+    if files_to_remove:
+        # Get the authentication parameters - see TODO at top about passing zres around
+        zres = _resources_to_zenodo_api(resources)
+        params = zres["ztoken"]
+
+        # Get all of the file links returned by create_deposit and then delete them.
+        print(f"Removing outdated files: {','.join(files_to_remove)}")
+        removal_links = [
+            f["links"]["self"]
+            for f in zenodo_metadata["files"]
+            if f["filename"] in files_to_remove
+        ]
+
+        delete_result, error = _delete_files_from_links(
+            delete_links=removal_links, params=params
+        )
+
+        # Handle errors
+        if error:
+            _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
+
     # Post the files
-    for file in files_to_upload:
-        if all_good:
-            print(f"Uploading file: {file}")
-            file_upload_response, error = upload_file(
-                metadata=zenodo_metadata, filepath=file, resources=resources
-            )
-            all_good = error is None
+    print("Uploading files:")
+    file_upload_response, error = upload_files(
+        metadata=zenodo_metadata, filepaths=paths_to_upload, resources=resources
+    )
+    # Handle errors
+    if error:
+        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
 
     # Post the metadata
-    if all_good:
-        print("Uploading deposit metadata")
-        md_upload_response, error = upload_metadata(
-            metadata=dataset_metadata, zenodo=zenodo_metadata, resources=resources
-        )
-        all_good = error is None
+    print("Uploading deposit metadata")
+    md_upload_response, error = upload_metadata(
+        metadata=dataset_metadata, zenodo=zenodo_metadata, resources=resources
+    )
+    if error:
+        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
 
     # Publish the deposit
-    if all_good:
-        publish_response, error = publish_deposit(
-            zenodo=zenodo_metadata, resources=resources
-        )
-        all_good = error is None
-
-    if not all_good:
-        publish_response, error = discard_deposit(
-            zenodo_metadata=zenodo_metadata, resources=resources
-        )
-        print("Issue with publication process - draft deposit discarded.")
-        raise RuntimeError(error)
+    publish_response, error = publish_deposit(
+        zenodo=zenodo_metadata, resources=resources
+    )
+    if error:
+        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
 
     # Return the new publication ID and link
     zenodo_url = publish_response["links"]["html"]

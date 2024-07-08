@@ -1,0 +1,197 @@
+- Configuring Resources
+    - Configuring resources from init_path: local/config_files/sandbox_safeweb_gbif_2021_11_26.cfg
+    - Validating gazetteer: local/spatial_resources/gazetteer.geojson
+    - Validating location aliases: local/spatial_resources/location_aliases.csv
+    - Validating GBIF database: local/gbif_databases/gbif_backbone_2021-11-26.sqlite
+    - Validating NCBI database: local/ncbi_databases/ncbi_taxonomy_2023-11-01.sqlite
+    - Validating project database: local/project_databases/safe_projects.csv
+- Checking Summary worksheet
+    - Loading core metadata
+        - Metadata for Core fields found: 1 records
+    - Loading project id metadata
+        - Metadata for Project IDs found: 1 records
+        - Valid project ids provided: 1
+    - Loading access metadata
+        - Metadata for Access details found: 1 records
+        - Dataset access: embargoed until 2026-05-14 00:00:00
+    - Loading author metadata
+        - Metadata for Authors found: 1 records
+    - Loading keywords metadata
+        - Metadata for Keywords found: 2 records
+    - Loading DOI metadata
+        - Metadata for DOI found: 1 records
+    - Loading temporal extent metadata
+        - Metadata for Date Extents found: 1 records
+    - Loading geographic extent metadata
+        - Metadata for Geographic Extents found: 1 records
+    - Loading funding metadata
+        - Metadata for Funding Bodies found: 1 records
+    - Loading permit metadata
+        - Metadata for Permits found: 1 records
+    - Loading external file metadata
+        - Metadata for External Files found: 3 records
+    - Loading data worksheet metadata
+        - Metadata for Worksheets found: 7 records
+        - Data worksheet  abundances_1 found.
+        - Data worksheet  abundances_2 found.
+        - Data worksheet  interactions_1 found.
+        - Data worksheet  interactions_2 found.
+        - Data worksheet  interactions_3 found.
+        - Data worksheet  external_1 found.
+        - Data worksheet  external_2 found.
+    - Summary formatted correctly
+- Loading Locations worksheet
+    - Checking known locations
+    - Checking new locations
+        - Validating lat / long data
+        - Validating WKT data
+    - 6 locations loaded correctly
+- Loading GBIFTaxa worksheet
+    - Reading taxa data
+        - Additional fields provided: 'comments'
+        - Validating row 1: crbo
+            - Taxon found in GBIF backbone (accepted)
+        - Validating row 2: dolic_sp
+            - Taxon found in GBIF backbone (accepted)
+        - Validating row 3: gannets
+            - Taxon found in GBIF backbone (accepted)
+        - Validating row 4: lost_orang
+            - Parent taxon (Pongo) accepted
+            - Taxon in GBIF backbone (accepted) with compatible parent information
+        - Validating row 5: morpho1
+            - Parent taxon (Formicidae) accepted
+            - Taxon of type morphospecies has valid parent information
+        - Validating row 6: bombines
+            - Parent taxon (Apidae) accepted
+            - Taxon of type tribe has valid parent information
+        - Validating row 7: new_gannet
+            - Parent taxon (Morus) accepted
+            - Canon GBIF usage ignored
+            - Taxon with ignored canon usage has valid parent information.
+        - Validating row 8: Tiger leech
+            - Taxon found in GBIF backbone (accepted)
+        - Validating row 9: Brown leech
+            - Taxon found in GBIF backbone (accepted)
+        - Validating row 10: Clouded leopard
+            - Taxon found in GBIF backbone (accepted)
+        - Validating row 11: Flat headed cat
+            - Taxon found in GBIF backbone (accepted)
+        - Validating row 12: Brown rat
+            - Taxon found in GBIF backbone (accepted)
+        - Validating row 13: Moon rat
+            - Taxon found in GBIF backbone (accepted)
+        - Indexing taxonomic hierarchy
+            - Added kingdom Animalia
+            - Added phylum Chordata
+            - Added phylum Annelida
+            - Added phylum Arthropoda
+            - Added class Mammalia
+            - Added class Clitellata
+            - Added class Aves
+            - Added class Insecta
+            - Added order Suliformes
+            - Added order Rodentia
+            - Added order Arhynchobdellida
+            - Added order Carnivora
+            - Added order Erinaceomorpha
+            - Added order Primates
+            - Added order Hymenoptera
+            - Added family Erinaceidae
+            - Added family Felidae
+            - Added family Hominidae
+            - Added family Haemadipsidae
+            - Added family Sulidae
+            - Added family Muridae
+            - Added genus Rattus
+            - Added genus Echinosorex
+            - Added genus Neofelis
+            - Added genus Crematogaster
+            - Added genus Haemadipsa
+            - Added genus Prionailurus
+        - 13 taxa loaded correctly
+- Loading NCBITaxa worksheet
+    - Reading NCBI taxa data
+        - Additional fields provided: 'comments'
+        - 4 NCBI rank fields found: 'superkingdom', 'kingdom', 'phylum', 'class'
+    - Validating row 1: G_proteobacteria
+        - Match found for G_proteobacteria
+    - Validating row 2: E_mycetes
+        - Match found for E_mycetes
+    - Validating row 3: Dinophyceae
+        - Match found for Dinophyceae
+    - Validating row 4: Acidobact
+        ? NCBI records Bacteria as a superkingdom rather than a kingdom
+        ? Non-canon usage: Acidobacteriia is synonym for Terriglobia
+        ? Non-canon name Acidobacteria at rank phylum: synonym for Acidobacteriota
+        - Match found for Acidobact
+    - Validating row 5: New_fungus
+        - Mynewfungusetes marked as new taxon
+        - Match found for New_fungus
+- Indexing taxonomic hierarchy
+    - Added superkingdom Bacteria
+    - Added superkingdom Eukaryota
+    - Added kingdom Fungi
+    - Added phylum Acidobacteriota
+    - Added phylum Ascomycota
+    - Added phylum Pseudomonadota
+- 5 taxa loaded correctly
+- Checking worksheet 'abundances_1'
+    - Validating field metadata
+    - Validating field data
+        - Checking field tiger_count
+        - Checking field brown_count
+    - Worksheet 'abundances_1' contains 6 descriptors, 2 data rows and 2 fields
+    - Dataframe formatted correctly
+- Checking worksheet 'abundances_2'
+    - Validating field metadata
+    - Validating field data
+        - Checking field common_name
+        - Checking field leech_count
+    - Worksheet 'abundances_2' contains 6 descriptors, 4 data rows and 2 fields
+    - Dataframe formatted correctly
+- Checking worksheet 'interactions_1'
+    - Validating field metadata
+    - Validating field data
+        - Checking field predator
+        - Checking field prey
+        - Checking field outcome
+            ? Label descriptions for interacting taxa incomplete or missing
+    - Worksheet 'interactions_1' contains 6 descriptors, 2 data rows and 3 fields
+    - Dataframe formatted correctly
+- Checking worksheet 'interactions_2'
+    - Validating field metadata
+    - Validating field data
+        - Checking field outcome
+    - Worksheet 'interactions_2' contains 6 descriptors, 2 data rows and 1 fields
+    - Dataframe formatted correctly
+- Checking worksheet 'interactions_3'
+    - Validating field metadata
+    - Validating field data
+        - Checking field prey
+        - Checking field outcome
+    - Worksheet 'interactions_3' contains 7 descriptors, 2 data rows and 2 fields
+    - Dataframe formatted correctly
+- Checking worksheet 'external_1'
+    - Validating field metadata
+    - Validating field data
+        - Checking field Altitude
+        - Checking field DEM
+    - Worksheet 'external_1' contains 6 descriptors, 8 data rows and 2 fields
+    - Dataframe formatted correctly
+- Checking worksheet 'external_2'
+    - Validating field metadata
+    - Validating field data
+        - Checking field Altitude
+        - Checking field Bait_trap_image
+    - Worksheet 'external_2' contains 7 descriptors, 8 data rows and 2 fields
+    - Dataframe formatted correctly
+- Running final checking
+    - Checking provided locations and taxa all used in data worksheets
+        ? Location list cannot be validated when external data files are used
+        ? Taxon list cannot be validated when external data files are used
+    - Checking temporal and geographic extents
+        ? The Latitudinal extent is set in Summary but also is populated from the data - this may be deliberate!
+        ? The Longitudinal extent is set in Summary but also is populated from the data - this may be deliberate!
+- PASS: file formatted correctly but with 8 warnings
+File validation passed
+JSON metadata written to Example.json

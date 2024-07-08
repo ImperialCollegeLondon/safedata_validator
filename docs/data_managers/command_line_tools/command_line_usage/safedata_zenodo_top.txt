@@ -27,6 +27,12 @@ Publish validated datasets to Zenodo using a command line interface.
     * A Zenodo metadata file (`zenodo_json`), that describes the metadata
         associated with a Zenodo deposit or published record.
 
+    The subcommands that send and receive data from Zenodo also accept the
+    `--live` and `--sandbox` options which can be used to override the
+    `use_sandbox` setting in the configuration file. If the configuration is set
+    to `true` then `--live` will use the live site and if the configuration is set
+    to `false` then the `--sandbox` can be used to use the sandbox instead.
+
     Note that most of these actions are also available via the Zenodo website.
 
 positional arguments:
@@ -39,10 +45,10 @@ positional arguments:
                 Download and display deposit metadata
     publish_deposit
                 Publish a draft deposit
-    upload_file
+    upload_files
                 Upload a file to an unpublished deposit
-    delete_file
-                Delete a file from an unpublished deposit
+    delete_files
+                Delete files from an unpublished deposit
     upload_metadata
                 Populate the Zenodo metadata
     amend_metadata

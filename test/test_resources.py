@@ -34,9 +34,7 @@ def config_file_list():
         "[zenodo]",
         "community_name = safe",
         "use_sandbox = True",
-        "zenodo_sandbox_api = https://sandbox.zenodo.org",
         "zenodo_sandbox_token = xyz",
-        "zenodo_api = https://api.zenodo.org",
         "zenodo_token = xyz",
     ]
 
@@ -60,9 +58,7 @@ def config_file_dict():
         "zenodo": {
             "community_name": "safe",
             "use_sandbox": True,
-            "zenodo_sandbox_api": "https://sandbox.zenodo.org",
             "zenodo_sandbox_token": "xyz",
-            "zenodo_api": "https://api.zenodo.org",
             "zenodo_token": "xyz",
         },
     }

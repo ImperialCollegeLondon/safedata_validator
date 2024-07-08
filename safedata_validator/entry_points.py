@@ -41,7 +41,7 @@ from safedata_validator.taxondb import (
 from safedata_validator.zenodo import (
     create_deposit,
     dataset_description,
-    delete_file,
+    delete_files,
     discard_deposit,
     download_ris_data,
     generate_inspire_xml,
@@ -50,7 +50,7 @@ from safedata_validator.zenodo import (
     publish_deposit,
     sync_local_dir,
     update_published_metadata,
-    upload_file,
+    upload_files,
     upload_metadata,
 )
 
@@ -270,6 +270,12 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     * A Zenodo metadata file (`zenodo_json`), that describes the metadata
         associated with a Zenodo deposit or published record.
 
+    The subcommands that send and receive data from Zenodo also accept the
+    `--live` and `--sandbox` options which can be used to override the
+    `use_sandbox` setting in the configuration file. If the configuration is set
+    to `true` then `--live` will use the live site and if the configuration is set
+    to `false` then the `--sandbox` can be used to use the sandbox instead.
+
     Note that most of these actions are also available via the Zenodo website.
 
     Args:
@@ -326,6 +332,25 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         help="Suppress normal information messages. ",
     )
 
+    # Add a shared mutually exclusive switch between the sandbox and live Zenodo sites,
+    # which will override the values set in the configuration
+    sandbox_switches = argparse.ArgumentParser(add_help=False)
+    switch_group = sandbox_switches.add_mutually_exclusive_group()
+    switch_group.add_argument(
+        "--live",
+        dest="sandbox",
+        action="store_false",
+        default=None,
+        help="Use the Zenodo live site, overriding the configuration file",
+    )
+    switch_group.add_argument(
+        "--sandbox",
+        dest="sandbox",
+        action="store_true",
+        default=None,
+        help="Use the Zenodo sandbox site, overriding the configuration file",
+    )
+
     # Create subparsers to add shared positional arguments across actions - these can be
     # added to individual actions via the parents argument
     parse_zenodo_metadata = argparse.ArgumentParser(add_help=False)
@@ -348,8 +373,13 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     # CREATE DEPOSIT subcommand
     create_deposit_desc = """
-    Create a new deposit draft. The concept_id option uses a provided Zenodo
-    concept ID to creates a draft as a new version of an existing data set.
+    Create a new deposit draft. 
+    
+    The new version option takes the record ID of the most recent version of an
+    existing dataset and creates a new deposit as a new version of that dataset. 
+    Versions of datasets are grouped under a single concept ID, which always 
+    redirects to the most recent version. Use the most recent version ID and 
+    _not_ the concept ID here.
 
     When successful, the function downloads and saves a JSON file containing the
     resulting Zenodo deposit metadata. This file is used as an input to other
@@ -364,14 +394,15 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(create_deposit_desc),
         help="Create a new Zenodo draft deposit",
         formatter_class=_desc_formatter,
+        parents=[sandbox_switches],
     )
 
     create_deposit_parser.add_argument(
-        "-c",
-        "--concept_id",
+        "-n",
+        "--new-version",
         type=int,
         default=None,
-        help="A Zenodo concept ID",
+        help="Create a new version of the dataset with the provided Zenodo ID.",
     )
 
     create_deposit_parser.add_argument(
@@ -393,7 +424,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(discard_deposit_desc),
         help="Discard an unpublished deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
     # GET DEPOSIT subcommand
@@ -405,6 +436,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         "get_deposit",
         description=textwrap.dedent(get_deposit_desc),
         help="Download and display deposit metadata",
+        parents=[sandbox_switches],
     )
     get_deposit_parser.add_argument(
         "zenodo_id",
@@ -428,50 +460,51 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(publish_deposit_desc),
         help="Publish a draft deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
-    # UPLOAD FILE subcommand
-    upload_file_desc = """
-    Uploads the contents of a specified file to an _unpublished_ Zenodo deposit,
-    optionally using an alternative filename. If you upload a new file to the same
-    filename, it will replace the existing uploaded file.
+    # UPLOAD FILES subcommand
+    upload_files_desc = """
+    Uploads a set of files to an _unpublished_ Zenodo deposit. If you upload a new file
+    to the same filename, it will replace the existing uploaded file.
     """
 
-    upload_file_parser = subparsers.add_parser(
-        "upload_file",
-        description=textwrap.dedent(upload_file_desc),
+    upload_files_parser = subparsers.add_parser(
+        "upload_files",
+        description=textwrap.dedent(upload_files_desc),
         help="Upload a file to an unpublished deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
-    upload_file_parser.add_argument(
-        "filepath", type=str, default=None, help="The path to the file to be uploaded"
-    )
-    upload_file_parser.add_argument(
-        "--zenodo_filename",
+    upload_files_parser.add_argument(
+        "filepaths",
         type=str,
         default=None,
-        help="An optional alternative file name to be used on Zenodo",
+        help="The paths to the file to be uploaded",
+        nargs="*",
     )
 
     # DELETE FILE subcommand
-    delete_file_desc = """
-    Delete an uploaded file from an unpublished deposit. The deposit metadata will
-    be re-downloaded to ensure an up to date list of files in the deposit.
+    delete_files_desc = """
+    Delete an list of uploaded file from an unpublished deposit. The deposit metadata
+    will be re-downloaded to ensure an up to date list of files in the deposit.
     """
 
-    delete_file_parser = subparsers.add_parser(
-        "delete_file",
-        description=textwrap.dedent(delete_file_desc),
-        help="Delete a file from an unpublished deposit",
+    delete_files_parser = subparsers.add_parser(
+        "delete_files",
+        description=textwrap.dedent(delete_files_desc),
+        help="Delete files from an unpublished deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
-    delete_file_parser.add_argument(
-        "filename", type=str, default=None, help="The name of the file to delete"
+    delete_files_parser.add_argument(
+        "filenames",
+        type=str,
+        default=None,
+        help="The names of files to delete",
+        nargs="*",
     )
 
     # UPLOAD METADATA subcommand
@@ -485,7 +518,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(upload_metadata_desc),
         help="Populate the Zenodo metadata",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata, parse_dataset_metadata],
+        parents=[parse_zenodo_metadata, parse_dataset_metadata, sandbox_switches],
     )
 
     # AMEND METADATA subcommand
@@ -504,6 +537,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         description=textwrap.dedent(amend_metadata_desc),
         help="Update published Zenodo metadata",
         formatter_class=_desc_formatter,
+        parents=[sandbox_switches],
     )
 
     amend_metadata_parser.add_argument(
@@ -531,6 +565,8 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     downloaded, ignoring any additional files, which are often large.
     """
 
+    # This does not use the sandbox switches - doesn't make a great deal of sense to
+    # sync a sandbox collection.
     sync_local_dir_parser = subparsers.add_parser(
         "sync_local_dir",
         description=textwrap.dedent(sync_local_dir_desc),
@@ -569,6 +605,8 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     and the Datacite API to access machine readable bibliographic records.
     """
 
+    # This does not use the sandbox switches - doesn't make a great deal of sense to
+    # sync a sandbox collection.
     maintain_ris_parser = subparsers.add_parser(
         "maintain_ris",
         description=textwrap.dedent(maintain_ris_desc),
@@ -593,6 +631,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     resulting HTML and developing custom templates.
     """
 
+    # This does not use the sandbox switches - not applicable
     generate_html_parser = subparsers.add_parser(
         "generate_html",
         description=textwrap.dedent(generate_html_desc),
@@ -614,6 +653,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     details).
     """
 
+    # This does not use the sandbox switches - not applicable
     generate_xml_parser = subparsers.add_parser(
         "generate_xml",
         description=textwrap.dedent(generate_xml_desc),
@@ -642,14 +682,14 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     dataset and any external files. It does not provide all of the options of the
     subcommands for individual steps but covers the main common usage of the
     safedata_zenodo command. If the publication process fails, the resulting partial
-    deposit is discarded.
+    deposit is discarded. All of the files in the deposit must be replaced.
     """
     publish_dataset_parser = subparsers.add_parser(
         "publish_dataset",
         description=textwrap.dedent(publish_dataset_desc),
         help="Publish a validated dataset",
         formatter_class=_desc_formatter,
-        parents=[parse_dataset_metadata],
+        parents=[parse_dataset_metadata, sandbox_switches],
     )
 
     publish_dataset_parser.add_argument(
@@ -659,11 +699,11 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     )
 
     publish_dataset_parser.add_argument(
-        "-c",
-        "--concept_id",
+        "-n",
+        "--new-version",
         type=int,
         default=None,
-        help="A Zenodo concept ID",
+        help="Create a new version of the dataset with the provided Zenodo ID.",
     )
 
     publish_dataset_parser.add_argument(
@@ -701,6 +741,12 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         parser.print_usage()
         return 0
 
+    # Handle the sandbox switches:
+    # If the command parser provides the sandbox argument and one of the flags has been
+    # set (the default is None) then update the loaded resources
+    if "sandbox" in args and args.sandbox is not None:
+        resources.zenodo.use_sandbox = args.sandbox
+
     # Set the verbosity
     handler = get_handler()
     if args.quiet:
@@ -713,7 +759,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     if args.subcommand == "create_deposit":
         # Run the command
         response, error = create_deposit(
-            concept_id=args.concept_id, resources=resources
+            new_version=args.new_version, resources=resources
         )
         # Trap errors
         if error is not None:
@@ -801,51 +847,42 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             simplejson.dump(response, zn_json)
             LOGGER.info("Zenodo metadata updated")
 
-    elif args.subcommand == "upload_file":
+    elif args.subcommand == "upload_files":
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
 
-        # Report on proposed upload
-        if args.zenodo_filename is None:
-            LOGGER.info(f"Uploading: {os.path.basename(args.filepath)}")
-        else:
-            LOGGER.info(
-                f"Uploading: {os.path.basename(args.filepath)} as "
-                f"{args.zenodo_filename}"
-            )
-
-        # Run the command
-        response, error = upload_file(
+        # Run the command - the response here has a different type so use a different
+        # placeholder variable.
+        upload_response, error = upload_files(
             metadata=metadata,
-            filepath=args.filepath,
-            zenodo_filename=args.zenodo_filename,
+            filepaths=args.filepaths,
             resources=resources,
             progress_bar=not args.quiet,
         )
 
         # Report on the outcome.
         if error is not None:
-            LOGGER.error(f"Failed to upload file: {error}")
+            LOGGER.error(f"Failed to upload files: {error}")
             return 1
         else:
-            LOGGER.info("File uploaded")
+            LOGGER.info("Files uploaded")
 
-    elif args.subcommand == "delete_file":
+    elif args.subcommand == "delete_files":
         # Load the Zenodo deposit JSON, which contains API links
         with open(args.zenodo_json) as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Run the command
-        response, error = delete_file(
-            metadata=metadata, filename=args.filename, resources=resources
+        response, error = delete_files(
+            metadata=metadata, filenames=args.filenames, resources=resources
         )
 
         # Report on the outcome.
         if error is not None:
-            LOGGER.error(f"Failed to delete file: {error}")
+            LOGGER.error(f"Failed to delete files: {error}")
         else:
-            LOGGER.info("File deleted")
+            LOGGER.info("Files deleted")
 
     elif args.subcommand == "upload_metadata":
         # Open the two JSON files
@@ -957,7 +994,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
                 dataset=args.dataset,
                 dataset_metadata=dataset_json,
                 external_files=args.external_files,
-                concept_id=args.concept_id,
+                new_version=args.new_version,
             )
         except (FileNotFoundError, ValueError, RuntimeError) as excep:
             print(excep)

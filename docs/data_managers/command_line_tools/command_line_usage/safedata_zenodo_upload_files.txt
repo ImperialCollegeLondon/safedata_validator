@@ -1,0 +1,15 @@
+cl_prompt $ safedata_zenodo upload_files -h
+usage: safedata_zenodo upload_files [-h] [--live | --sandbox]
+                                    zenodo_json [filepaths ...]
+
+Uploads a set of files to an _unpublished_ Zenodo deposit. If you upload a new file
+to the same filename, it will replace the existing uploaded file.
+
+positional arguments:
+  zenodo_json  Path to a Zenodo JSON file for a deposit
+  filepaths    The paths to the file to be uploaded
+
+options:
+  -h, --help   show this help message and exit
+  --live       Use the Zenodo live site, overriding the configuration file
+  --sandbox    Use the Zenodo sandbox site, overriding the configuration file
