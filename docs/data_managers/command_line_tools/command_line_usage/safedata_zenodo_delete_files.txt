@@ -1,0 +1,15 @@
+cl_prompt $ safedata_zenodo delete_files -h
+usage: safedata_zenodo delete_files [-h] [--live | --sandbox]
+                                    zenodo_json [filenames ...]
+
+Delete an list of uploaded file from an unpublished deposit. The deposit metadata
+will be re-downloaded to ensure an up to date list of files in the deposit.
+
+positional arguments:
+  zenodo_json  Path to a Zenodo JSON file for a deposit
+  filenames    The names of files to delete
+
+options:
+  -h, --help   show this help message and exit
+  --live       Use the Zenodo live site, overriding the configuration file
+  --sandbox    Use the Zenodo sandbox site, overriding the configuration file
