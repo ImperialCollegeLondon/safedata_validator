@@ -1,5 +1,5 @@
 cl_prompt $ safedata_zenodo get_deposit -h
-usage: safedata_zenodo get_deposit [-h] zenodo_id
+usage: safedata_zenodo get_deposit [-h] [--live | --sandbox] zenodo_id
 
 Download the Zenodo metadata for a deposit and print out summary information.
 
@@ -8,3 +8,5 @@ positional arguments:
 
 options:
   -h, --help  show this help message and exit
+  --live      Use the Zenodo live site, overriding the configuration file
+  --sandbox   Use the Zenodo sandbox site, overriding the configuration file

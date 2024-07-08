@@ -1,5 +1,5 @@
 cl_prompt $ safedata_zenodo publish_deposit -h
-usage: safedata_zenodo publish_deposit [-h] zenodo_json
+usage: safedata_zenodo publish_deposit [-h] [--live | --sandbox] zenodo_json
 
 Publishes a Zenodo deposit. This is the final step in publishing a dataset and
 is not reversible. Once a dataset is published, the DOI associated with the
@@ -13,3 +13,5 @@ positional arguments:
 
 options:
   -h, --help   show this help message and exit
+  --live       Use the Zenodo live site, overriding the configuration file
+  --sandbox    Use the Zenodo sandbox site, overriding the configuration file

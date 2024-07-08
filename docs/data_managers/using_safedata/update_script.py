@@ -1,40 +1,37 @@
-"""Example script to publish a dataset using safedata_validator from within Python."""
+"""Python script to publish a new version of a dataset using safedata_validator."""
 
 from pathlib import Path
 
 import simplejson
 
-from safedata_validator.field import Dataset
 from safedata_validator.resources import Resources
 from safedata_validator.server import post_metadata
 from safedata_validator.zenodo import (
     create_deposit,
+    delete_files,
     generate_inspire_xml,
     publish_deposit,
-    upload_file,
+    upload_files,
     upload_metadata,
 )
 
-# Local paths to the configuration file and the dataset to be validated
-config_path = "path/to/config.cfg"
-dataset = "SAFE_dataset.xlsx"
+# Local paths to the files to be published
+dataset = "Example.xlsx"
+metadata_path = "Example.json"
 extra_file = "Supplementary_files.zip"
-xml_file = "SAFE_dataset_GEMINI.xml"
+xml_file = "Example_GEMINI.xml"
 
-# Create a Resources object from the config file and then create a dataset
-# instance using those validation resources
-resources = Resources(config_path)
-ds = Dataset(resources)
-
-# Load the dataset from the Excel workbook, which validates the content
-ds.load_from_workbook(dataset)
+# Create a Resources object from a configuration file in a standard location
+resources = Resources()
 
 # Extract the validated dataset metadata
-data_metadata = simplejson.loads(ds.to_json())
+with open(metadata_path) as md_json:
+    data_metadata = simplejson.load(md_json)
 
-# Create a new version of an existing dataset, using the concept ID.
+# Create a new version of an existing dataset using the record ID of the most recent
+# version
 zenodo_metadata, error = create_deposit(
-    concept_id=1143713,
+    new_version=1143714,
     resources=resources,
 )
 
@@ -48,14 +45,24 @@ xml_content = generate_inspire_xml(
 with open(xml_file, "w") as xml_out:
     xml_out.write(xml_content)
 
+# Get the names of the existing files from the JSON metadata of the deposit and delete
+# them all before uploading the provided versions. Note that the publish_dataset
+# function does this in a much more sophisticated way.
+existing_online_files = [p["key"] for p in zenodo_metadata["files"]]
+if all_good:
+    file_delete_response, error = delete_files(
+        metadata=zenodo_metadata, filenames=existing_online_files, resources=resources
+    )
+    all_good = error is None
+
 
 # Post the files
-for file in [dataset, extra_file]:
-    if all_good:
-        file_upload_response, error = upload_file(
-            metadata=zenodo_metadata, filepath=Path(file), resources=resources
-        )
-        all_good = error is None
+files = [Path(f) for f in (dataset, extra_file, xml_file)]
+if all_good:
+    file_upload_response, error = upload_files(
+        metadata=zenodo_metadata, filepaths=files, resources=resources
+    )
+    all_good = error is None
 
 # Post the metadata
 if all_good:

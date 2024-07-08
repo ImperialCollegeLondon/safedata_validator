@@ -5,6 +5,15 @@ the installation documentation for tools to build local copies of the
 [GBIF](../install/build_local_gbif.md) and [NCBI](../install/build_local_ncbi.md)
 taxonomic databases.
 
+!!! tip
+
+    These pages provides documentation on the details of the various command line tools
+    but for guidance on _using the tools_, see these examples of:
+
+    * [using the validator](../using_safedata/validating_datasets.md),
+    * [publishing validated datasets](../using_safedata/publishing_datasets.md), and
+    * [updating the metadata server](../using_safedata/posting_metadata.md).
+
 ## Resources
 
 All of the `safedata_validator` command line tools require access to a shared
