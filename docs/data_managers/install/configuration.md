@@ -141,8 +141,8 @@ provided to validate datasets.
 
 **The `gazetteer` and `location_aliases` elements**
 
-: These elements provide the paths to the [location database](gazetteer.md) for the
-  project.
+: These elements provide the paths to the [location database](gazetteer_files.md) for
+  the project.
 
 **The `project_database` element**
 
