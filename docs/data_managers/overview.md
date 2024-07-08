@@ -69,7 +69,7 @@ labels and headers, can be downloaded
 [here](https://github.com/ImperialCollegeLondon/safedata_validator/raw/main/docs/data_providers/data_format/Template.xlsx).
 An example dataset demonstrating how to correctly format a wide variety of different
 types of data can be downloaded
-[here](https://github.com/ImperialCollegeLondon/safedata_validator/raw/feature/example_file/docs/data_providers/data_format/Example.xlsx)
+[here](https://github.com/ImperialCollegeLondon/safedata_validator/raw/main/docs/data_providers/data_format/Example.xlsx)
 You can also look at existing published datasets, such as those from the SAFE Project,
 to see how the format is used:
 
