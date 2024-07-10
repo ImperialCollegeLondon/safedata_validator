@@ -906,6 +906,8 @@ def generate_inspire_xml(
             resources.zenodo.project_url.replace("PROJECT_ID", str(pid))
             for pid in dataset_metadata["project_ids"]
         ]
+    else:
+        project_urls = []
 
     # Now update it with information also needed by Zenodo and the file specific
     # elements from the zenodo and dataset metadata
