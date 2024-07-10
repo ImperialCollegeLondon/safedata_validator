@@ -692,12 +692,17 @@ def dataset_description(
 
     template = env.get_template(template_path.name)
 
-    # PROJECT Title and authors are added by Zenodo from zenodo metadata
-    # TODO - option to include here?
+    # Build the context dictionary that will be used to populate the Jinja templage
+    # - the dataset title and authors are populated in different fields by Zenodo from
+    #   zenodo metadata, where this function just maintains the dataset description
+    #   element of the Zenodo metadata
 
+    # Description from the summary table
     context_dict = dict(
         description=dataset_metadata["description"].replace("\n", "</br>")
     )
+
+    # Project details if available.
 
     # proj_url = URL('projects', 'project_view', args=[metadata['project_id']],
     #               scheme=True, host=True)
@@ -881,10 +886,14 @@ def generate_inspire_xml(
     else:
         access_statement = "There are no restrictions to public access."
 
-    # Get a copy of the project wide XML configuration from the resources and update it
-    # with the file specific elements from the zenodo and dataset metadata
+    # Get a copy of the project wide XML configuration from the resources. This provides
+    # the following elements:
+    # * languageCode, characterSet, contactCountry, contactEmail, epsgCode,
+    #   topicCategories, lineageStatement
     context_dict = resources.xml.copy()
 
+    # Now update it with information also needed by Zenodo and the file specific
+    # elements from the zenodo and dataset metadata
     context_dict.update(
         # Values also used on the Zenodo information or duplicated in the xml
         contactName=resources.zenodo.contact_name,
@@ -892,7 +901,7 @@ def generate_inspire_xml(
         pointofcontactName=resources.zenodo.contact_name,
         pointofcontactCountry=resources.xml.contactCountry,
         pointofcontactEmail=resources.xml.contactEmail,
-        pointofcontactOrcID=resources.zenodo.contact_name,
+        pointofcontactOrcID=resources.zenodo.contact_orcid,
         # Dataset specific information
         citationRSIdentifier=doi_url,
         dateStamp=pub_date.isoformat(),
