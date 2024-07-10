@@ -455,7 +455,8 @@ def upload_files(
     zres = _resources_to_zenodo_api(resources)
     params = zres["ztoken"]
 
-    # Resolve filepaths and check they are all existing files
+    # Ensure filepaths are paths, resolve them and check they are all existing files
+    filepaths = [Path(f) for f in filepaths]
     filepaths = [f.resolve() for f in filepaths]
     bad_paths = [str(f) for f in filepaths if not (f.exists() and f.is_file())]
 
