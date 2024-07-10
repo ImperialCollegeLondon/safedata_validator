@@ -353,6 +353,7 @@ class Dataset:
 
         json_dict = dict(
             # Summary information
+            project_ids=self.summary.project_ids,
             title=self.summary.title,
             description=self.summary.description,
             authors=self.summary.authors,
