@@ -99,7 +99,7 @@ def _resources_to_zenodo_api(resources: Resources | None = None) -> dict:
         zenodo_api = "https://zenodo.org/api"
         token = resources.zenodo.zenodo_token
 
-    if zenodo_api is None or token is None:
+    if token is None:
         config_fail = True
 
     # Get the contact details if used
@@ -828,6 +828,10 @@ def generate_inspire_xml(
         A string containing GEMINI compliant XML.
     """
 
+    # Do the resources provide complete XML information
+    if None in resources.xml.values():
+        raise ValueError("XML configuration section is incomplete.")
+
     template_path = il_resources.files("safedata_validator.templates").joinpath(
         "gemini_xml_template.xml"
     )
@@ -987,6 +991,11 @@ def publish_dataset(
             "External file names in dataset do not match provided "
             f"external file names: {', '.join(metadata_ext_files)}"
         )
+
+    # Check if the XML description can be created _before_ creating a deposit, although
+    # it can't actually be generated until the deposit details are available.
+    if not no_xml and (None in resources.xml.values()):
+        raise ValueError("XML requested and XML configuration section is incomplete.")
 
     # For new versions of an existing dataset, get the existing dataset metadata and
     # figure out which files are being changed.
