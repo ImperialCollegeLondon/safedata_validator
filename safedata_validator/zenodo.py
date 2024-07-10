@@ -703,6 +703,14 @@ def dataset_description(
     )
 
     # Project details if available.
+    # Generate project urls
+    if dataset_metadata["project_ids"] is not None:
+        context_dict["project_urls"] = [
+            resources.zenodo.project_url.replace("PROJECT_ID", str(pid))
+            for pid in dataset_metadata["project_ids"]
+        ]
+    else:
+        context_dict["project_urls"] = []
 
     # proj_url = URL('projects', 'project_view', args=[metadata['project_id']],
     #               scheme=True, host=True)
@@ -892,6 +900,13 @@ def generate_inspire_xml(
     #   topicCategories, lineageStatement
     context_dict = resources.xml.copy()
 
+    # Generate project urls
+    if dataset_metadata["project_ids"] is not None:
+        project_urls = [
+            resources.zenodo.project_url.replace("PROJECT_ID", str(pid))
+            for pid in dataset_metadata["project_ids"]
+        ]
+
     # Now update it with information also needed by Zenodo and the file specific
     # elements from the zenodo and dataset metadata
     context_dict.update(
@@ -903,6 +918,7 @@ def generate_inspire_xml(
         pointofcontactEmail=resources.xml.contactEmail,
         pointofcontactOrcID=resources.zenodo.contact_orcid,
         # Dataset specific information
+        projectURL=project_urls,
         citationRSIdentifier=doi_url,
         dateStamp=pub_date.isoformat(),
         publicationDate=pub_date.isoformat(),
