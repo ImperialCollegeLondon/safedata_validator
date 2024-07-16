@@ -15,6 +15,7 @@ ncbi_database = /path/to/local/ncbi_database.sqlite3
 gazetteer = /path/to/gazeteer.geojson
 location_aliases = /path/to/location_aliases.csv
 project_database = /path/to/project_database.csv
+maximum_embargo_months = 24
 
 [extents]
 temporal_soft_extent = 2002-02-02, 2030-01-31
@@ -160,6 +161,13 @@ provided to validate datasets.
         of whether or not to organise datasets into project. The data manager for a
         project will need to make this decision during the initial configuration of a
         data system.
+
+**The `maximum_embargo_months` element**
+
+: Data providers can set an embargo date on their datasets. Once published, the metadata
+  for the dataset can be seen on Zenodo but the data itself cannot be downloaded until
+  after the embargo has expired. This configuration element sets the maximum number of
+  months allowed for this embargo period: it defaults to 24 months.
 
 **The `extents` element**
 
