@@ -102,7 +102,7 @@ single value for each field.
   be open access: see the [discussion of data availability](../availability.md).
 * **Embargo date**: If you choose embargoed access status then you must also
   enter the date when the embargo will end. This must be an Excel date formatted
-  value and you cannot embargo data for more than two years. Do not provide
+  value and your organisation will set a maximum embargo length. Do not provide
   access conditions: embargoed datasets become freely available when the embargo
   ends.
 * **Access conditions**: If you choose restricted access status then you must
