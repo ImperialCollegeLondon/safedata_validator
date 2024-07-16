@@ -1,4 +1,7 @@
 {
+  "project_ids": [
+    1
+  ],
   "title": "Example data for the SAFE Project",
   "description": "This is an example dataset to demonstrate the formatting of tabular datasets for the SAFE project. \n\nPlease note that you can use carriage returns within a cell!",
   "authors": [
