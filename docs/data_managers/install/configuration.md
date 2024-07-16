@@ -172,11 +172,11 @@ provided to validate datasets.
   dataset specific feature set in the [summary
   metadata](../../data_providers/data_format/summary.md#the-access-block).
 
-  Allowing reasonable embargo lengths is important to allow time for publications from
-  datasets, but equally setting very long embargo lengths makes it hard to re-use data.
-  It may be more appropriate to allow the use of the [`restricted`
-  access](../../data_providers/data_format/summary.md#the-access-block) option for a
-  subset of datasets than to globally allow very long embargo periods.
+    Allowing reasonable embargo lengths is important to allow time for publications from
+    datasets, but equally setting very long embargo lengths makes it hard to re-use data.
+    It may be more appropriate to allow the use of the [`restricted`
+    access](../../data_providers/data_format/summary.md#the-access-block) option for a
+    subset of datasets than to globally allow very long embargo periods.
 
 **The `extents` element**
 
