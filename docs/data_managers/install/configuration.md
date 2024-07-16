@@ -15,6 +15,7 @@ ncbi_database = /path/to/local/ncbi_database.sqlite3
 gazetteer = /path/to/gazeteer.geojson
 location_aliases = /path/to/location_aliases.csv
 project_database = /path/to/project_database.csv
+maximum_embargo_months = 24
 
 [extents]
 temporal_soft_extent = 2002-02-02, 2030-01-31
@@ -32,6 +33,7 @@ contact_orcid = 0000-0003-3378-2814
 use_sandbox = true
 zenodo_token = abc
 zenodo_sandbox_token = xyz
+project_url = https://safeproject.net/projects/project_view/PROJECT_ID
 html_template = /path/to/html_jinja_template.html
 
 [metadata]
@@ -45,7 +47,6 @@ characterSet=utf8
 contactCountry=United Kingdom
 contactEmail=admin@safeproject.net
 epsgCode=4326
-projectURL=https://safeproject.net
 topicCategories=biota,environment,geoscientificInformation
 lineageStatement="""This dataset was collected as part of a research project
 based at The SAFE Project. For details of the project and data collection,
@@ -161,6 +162,22 @@ provided to validate datasets.
         project will need to make this decision during the initial configuration of a
         data system.
 
+**The `maximum_embargo_months` element**
+
+: If a data provider submits a dataset with embargoed access, they must provide a date
+  for the end of the embargo period. This configuration element restricts the maximum
+  allowable length of the embargo period within a project, with a default of 24 months.
+  This setting is _only_ used to cause validation failures for datasets that request an
+  overlong embargo period. It does not apply embargo dates to datasets: this is always a
+  dataset specific feature set in the [summary
+  metadata](../../data_providers/data_format/summary.md#the-access-block).
+
+    Allowing reasonable embargo lengths is important to allow time for publications from
+    datasets, but equally setting very long embargo lengths makes it hard to re-use data.
+    It may be more appropriate to allow the use of the [`restricted`
+    access](../../data_providers/data_format/summary.md#the-access-block) option for a
+    subset of datasets than to globally allow very long embargo periods.
+
 **The `extents` element**
 
 : The `safedata_validator` package tracks the geographic and temporal extents of
@@ -238,6 +255,15 @@ configuration elements:
   useful if a user wants to see a preview of the published dataset before commiting to a
   published dataset.
 
+**The `project_url` element**
+
+: If you are using project IDs, then this can be used to add a project URL to the
+  dataset description on the Zenodo website. It could be a single URL to a generic
+  projects website, but if the provided URL contains the text `PROJECT_ID`, this will be
+  replaced by the Project ID number provided in the dataset Summary metadata. This does
+  assume that your project websites are keyed by the Project ID codes. The project URL
+  will also be included in GEMINI XML for the dataset.
+
 **The `html_template` element**
 
 : An optional path to an alternative template for generating an HTML dataset description
@@ -265,7 +291,9 @@ The `safedata_zenodo generate_xml` tool can be used to generate a geo-spatial XM
 metadata file for a dataset. This is relatively high-level metadata that just includes
 the temporal and spatial bounds of the data, along with some contact and access details.
 We recommend that this file is included when datasets are published. If you want to do
-this, you will need to update this section with the details for your own project.
+this, you will need to update this section with the details for your own project. The
+elements in this section are the extra information that is uniquely needed to build the
+XML metadata and all elements must be provided.
 
 The generated XML uses a template that is filled in with using project wide and dataset
 specific elements. We have tested this template using the [INSPIRE validator
@@ -290,11 +318,6 @@ default value of 4326 is the code for the widely used WGS84 datum.
 a general point of contact. Some of these details (name and OrcID) are re-used from the
 Zenodo point of contact information above, but the XML validation requires a country and
 email, so these need to be provided here.
-
-**The `projectURL` element**
-
-: This is optional - if you want to include a link in the XML to a project site to give
-context for the dataset, then include it here.
 
 **The `topicCategories` element**
 

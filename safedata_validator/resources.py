@@ -53,6 +53,7 @@ CONFIGSPEC = {
     "gbif_database": "string()",
     "ncbi_database": "string()",
     "project_database": "string(default=None)",
+    "maximum_embargo_months": "integer(default=24)",
     "extents": {
         "temporal_soft_extent": "date_list(min=2, max=2, default=None)",
         "temporal_hard_extent": "date_list(min=2, max=2, default=None)",
@@ -69,6 +70,7 @@ CONFIGSPEC = {
         "contact_name": "string(default=None)",
         "contact_affiliation": "string(default=None)",
         "contact_orcid": "string(default=None)",
+        "project_url": "string(default=None)",
         "html_template": "string(default=None)",
     },
     "metadata": {
@@ -83,7 +85,6 @@ CONFIGSPEC = {
         "contactCountry": "string(default=None)",
         "contactEmail": "string(default=None)",
         "epsgCode": "integer(default=4326)",
-        "projectURL": "string(default=None)",
         "topicCategories": "string_list(default=None)",
         "lineageStatement": "string(default=None)",
     },
@@ -238,6 +239,7 @@ class Resources:
             if config_loaded.project_database == ""
             else config_loaded.project_database
         )
+        self.maximum_embargo_months = config_loaded.maximum_embargo_months
         self.config_type = config_loaded.config_type
         self.config_source = config_loaded.config_source
 

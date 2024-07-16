@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass
 
 import requests  # type: ignore
+from dateutil.relativedelta import relativedelta
 from openpyxl.worksheet.worksheet import Worksheet
 
 from safedata_validator.extent import Extent
@@ -83,6 +84,9 @@ class Summary:
     """
 
     def __init__(self, resources: Resources) -> None:
+        self.resources: Resources = resources
+        """The resources used to create the Summary object."""
+
         self.title: str
         """A string giving the dataset title."""
         self.description: str
@@ -133,7 +137,7 @@ class Summary:
         """The number of validation errors found in the summary."""
         self.projects: dict[int, str] = resources.projects
         """A dictionary of valid project data."""
-        self.project_id: list[int] | None = None
+        self.project_ids: list[int] | None = None
         """A list of project ID codes, if project IDs are configured."""
 
         self.validate_doi = False
@@ -798,12 +802,17 @@ class Summary:
                 if embargo_date is None:
                     LOGGER.error("Dataset embargoed but no embargo date provided")
                 elif isinstance(embargo_date, datetime.datetime):
+                    # Get the relevant test dates
                     now = datetime.datetime.now()
+                    maximum_embargo_date = now + relativedelta(
+                        months=self.resources.maximum_embargo_months
+                    )
 
+                    # Check the dates
                     if embargo_date < now:
                         LOGGER.error("Embargo date is in the past.")
-                    elif embargo_date > now + datetime.timedelta(days=2 * 365):
-                        LOGGER.error("Embargo date more than two years in the future.")
+                    elif embargo_date > maximum_embargo_date:
+                        LOGGER.error("Embargo date exceeds the maximum embargo length.")
                     else:
                         LOGGER.info(f"Dataset access: embargoed until {embargo_date}")
 
@@ -901,7 +910,7 @@ class Summary:
                 "Unknown project ids provided: ", extra={"join": invalid_proj_ids}
             )
 
-        self.project_id = valid_proj_ids
+        self.project_ids = valid_proj_ids
         LOGGER.info("Valid project ids provided: ", extra={"join": valid_proj_ids})
 
 

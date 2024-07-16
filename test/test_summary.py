@@ -212,7 +212,7 @@ def test_authors(caplog, fixture_summary, alterations, should_log_error, expecte
                 "access conditions": (None,),
             },
             True,
-            "Embargo date more than",
+            "Embargo date exceeds the maximum embargo length.",
         ),
         (
             {

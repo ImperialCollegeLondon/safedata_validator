@@ -99,7 +99,7 @@ def _resources_to_zenodo_api(resources: Resources | None = None) -> dict:
         zenodo_api = "https://zenodo.org/api"
         token = resources.zenodo.zenodo_token
 
-    if zenodo_api is None or token is None:
+    if token is None:
         config_fail = True
 
     # Get the contact details if used
@@ -455,7 +455,8 @@ def upload_files(
     zres = _resources_to_zenodo_api(resources)
     params = zres["ztoken"]
 
-    # Resolve filepaths and check they are all existing files
+    # Ensure filepaths are paths, resolve them and check they are all existing files
+    filepaths = [Path(f) for f in filepaths]
     filepaths = [f.resolve() for f in filepaths]
     bad_paths = [str(f) for f in filepaths if not (f.exists() and f.is_file())]
 
@@ -691,12 +692,25 @@ def dataset_description(
 
     template = env.get_template(template_path.name)
 
-    # PROJECT Title and authors are added by Zenodo from zenodo metadata
-    # TODO - option to include here?
+    # Build the context dictionary that will be used to populate the Jinja templage
+    # - the dataset title and authors are populated in different fields by Zenodo from
+    #   zenodo metadata, where this function just maintains the dataset description
+    #   element of the Zenodo metadata
 
+    # Description from the summary table
     context_dict = dict(
         description=dataset_metadata["description"].replace("\n", "</br>")
     )
+
+    # Project details if available.
+    # Generate project urls
+    if dataset_metadata["project_ids"] is not None:
+        context_dict["project_urls"] = [
+            resources.zenodo.project_url.replace("PROJECT_ID", str(pid))
+            for pid in dataset_metadata["project_ids"]
+        ]
+    else:
+        context_dict["project_urls"] = []
 
     # proj_url = URL('projects', 'project_view', args=[metadata['project_id']],
     #               scheme=True, host=True)
@@ -828,6 +842,10 @@ def generate_inspire_xml(
         A string containing GEMINI compliant XML.
     """
 
+    # Do the resources provide complete XML information
+    if None in resources.xml.values():
+        raise ValueError("XML configuration section is incomplete.")
+
     template_path = il_resources.files("safedata_validator.templates").joinpath(
         "gemini_xml_template.xml"
     )
@@ -876,10 +894,23 @@ def generate_inspire_xml(
     else:
         access_statement = "There are no restrictions to public access."
 
-    # Get a copy of the project wide XML configuration from the resources and update it
-    # with the file specific elements from the zenodo and dataset metadata
+    # Get a copy of the project wide XML configuration from the resources. This provides
+    # the following elements:
+    # * languageCode, characterSet, contactCountry, contactEmail, epsgCode,
+    #   topicCategories, lineageStatement
     context_dict = resources.xml.copy()
 
+    # Generate project urls
+    if dataset_metadata["project_ids"] is not None:
+        project_urls = [
+            resources.zenodo.project_url.replace("PROJECT_ID", str(pid))
+            for pid in dataset_metadata["project_ids"]
+        ]
+    else:
+        project_urls = []
+
+    # Now update it with information also needed by Zenodo and the file specific
+    # elements from the zenodo and dataset metadata
     context_dict.update(
         # Values also used on the Zenodo information or duplicated in the xml
         contactName=resources.zenodo.contact_name,
@@ -887,8 +918,9 @@ def generate_inspire_xml(
         pointofcontactName=resources.zenodo.contact_name,
         pointofcontactCountry=resources.xml.contactCountry,
         pointofcontactEmail=resources.xml.contactEmail,
-        pointofcontactOrcID=resources.zenodo.contact_name,
+        pointofcontactOrcID=resources.zenodo.contact_orcid,
         # Dataset specific information
+        projectURL=project_urls,
         citationRSIdentifier=doi_url,
         dateStamp=pub_date.isoformat(),
         publicationDate=pub_date.isoformat(),
@@ -987,6 +1019,11 @@ def publish_dataset(
             "External file names in dataset do not match provided "
             f"external file names: {', '.join(metadata_ext_files)}"
         )
+
+    # Check if the XML description can be created _before_ creating a deposit, although
+    # it can't actually be generated until the deposit details are available.
+    if not no_xml and (None in resources.xml.values()):
+        raise ValueError("XML requested and XML configuration section is incomplete.")
 
     # For new versions of an existing dataset, get the existing dataset metadata and
     # figure out which files are being changed.

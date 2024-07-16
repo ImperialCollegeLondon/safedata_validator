@@ -4,6 +4,20 @@
 
   <p>{{description}}</p>
 
+  <!-- Conditional display of project URLS -->
+  {% if project_urls %}
+  <h1>Projects</h1>
+  <p>
+    This dataset was collected as part of the following projects:
+  <ul>
+    {% for purl in project_urls %}
+    <li><a href="{{ purl}}">{{ purl }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+  </p>
+  {% endif %}
+
   <!-- Conditional display of funding information -->
   {% if funders %}
   <h1>Funding</h1>
