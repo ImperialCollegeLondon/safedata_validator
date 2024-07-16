@@ -353,6 +353,7 @@ class Dataset:
 
         json_dict = dict(
             # Summary information
+            project_ids=self.summary.project_ids,
             title=self.summary.title,
             description=self.summary.description,
             authors=self.summary.authors,
@@ -2001,13 +2002,9 @@ class TimeField(BaseField):
             LOGGER.error(
                 "Time data include values neither ISO string nor time formatted"
             )
-            return
-
-        if not self.consistent_class:
+        elif not self.consistent_class:
             LOGGER.error("Time data mixes ISO string and time formatted rows")
-            return
-
-        if self.bad_strings:
+        elif self.bad_strings:
             LOGGER.error(
                 "ISO time strings contain badly formatted values: e.g.",
                 extra={"join": self.bad_strings[:5]},
