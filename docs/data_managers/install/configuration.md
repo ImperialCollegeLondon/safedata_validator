@@ -164,10 +164,19 @@ provided to validate datasets.
 
 **The `maximum_embargo_months` element**
 
-: Data providers can set an embargo date on their datasets. Once published, the metadata
-  for the dataset can be seen on Zenodo but the data itself cannot be downloaded until
-  after the embargo has expired. This configuration element sets the maximum number of
-  months allowed for this embargo period: it defaults to 24 months.
+: If a data provider submits a dataset with embargoed access, they must provide a date
+  for the end of the embargo period. This configuration element restricts the maximum
+  allowable length of the embargo period within a project, with a default of 24 months.
+  This setting is _only_ used to cause validation failures for datasets that request an
+  overlong embargo period. It does not apply embargo dates to datasets: this is always a
+  dataset specific feature set in the [summary
+  metadata](../../data_providers/data_format/summary.md#the-access-block).
+
+  Allowing reasonable embargo lengths is important to allow time for publications from
+  datasets, but equally setting very long embargo lengths makes it hard to re-use data.
+  It may be more appropriate to allow the use of the [`restricted`
+  access](../../data_providers/data_format/summary.md#the-access-block) option for a
+  subset of datasets than to globally allow very long embargo periods.
 
 **The `extents` element**
 
