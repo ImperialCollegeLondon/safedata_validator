@@ -14,7 +14,7 @@ license = "MIT"
 name = "safedata_validator"
 readme = "README.md"
 repository = "https://github.com/imperial_college_london/safedata_validator"
-version = "3.0.1rc4"
+version = "3.0.1rc5"
 
 [tool.poetry.scripts]
 safedata_build_local_gbif = "safedata_validator.entry_points:_build_local_gbif_cli"
