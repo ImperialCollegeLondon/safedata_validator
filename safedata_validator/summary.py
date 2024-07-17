@@ -137,7 +137,7 @@ class Summary:
         """The number of validation errors found in the summary."""
         self.projects: dict[int, str] = resources.projects
         """A dictionary of valid project data."""
-        self.project_id: list[int] | None = None
+        self.project_ids: list[int] | None = None
         """A list of project ID codes, if project IDs are configured."""
 
         self.validate_doi = False
@@ -910,7 +910,7 @@ class Summary:
                 "Unknown project ids provided: ", extra={"join": invalid_proj_ids}
             )
 
-        self.project_id = valid_proj_ids
+        self.project_ids = valid_proj_ids
         LOGGER.info("Valid project ids provided: ", extra={"join": valid_proj_ids})
 
 

@@ -70,6 +70,7 @@ CONFIGSPEC = {
         "contact_name": "string(default=None)",
         "contact_affiliation": "string(default=None)",
         "contact_orcid": "string(default=None)",
+        "project_url": "string(default=None)",
         "html_template": "string(default=None)",
     },
     "metadata": {
@@ -84,7 +85,6 @@ CONFIGSPEC = {
         "contactCountry": "string(default=None)",
         "contactEmail": "string(default=None)",
         "epsgCode": "integer(default=4326)",
-        "projectURL": "string(default=None)",
         "topicCategories": "string_list(default=None)",
         "lineageStatement": "string(default=None)",
     },

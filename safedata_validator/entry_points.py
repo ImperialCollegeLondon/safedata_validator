@@ -479,8 +479,8 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     upload_files_parser.add_argument(
         "filepaths",
-        type=str,
-        default=None,
+        type=Path,
+        default=[],
         help="The paths to the file to be uploaded",
         nargs="*",
     )
