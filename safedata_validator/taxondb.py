@@ -626,9 +626,9 @@ def build_local_ncbi(
 
     # Check for any cases where child value is the same as the parent key (this happens
     # for superfamily and forma specialis in some database versions)
-    for parent in children_by_parents.keys():
-        if parent in children_by_parents[parent]:
-            children_by_parents[parent].remove(parent)
+    for parent, children in children_by_parents.items():
+        if parent in children:
+            children.remove(parent)
 
     # then find the static order through the graph
     sorter = graphlib.TopologicalSorter(children_by_parents)
