@@ -1720,11 +1720,22 @@ class NCBITaxa:
             # - Tackle in taxonomic order by iterating over ordered found_ranks
             # - Drop empty entries
             # - Validate non-empty entries as unpadded strings
+            # - Check if any names indicate that the rank in question is Incertae_sedis
             # - Strip any NCBI k__ notation to match entries in names.names_txt db
             #   field. Runs from root, so cleans genus, species, subspecies.
 
             taxon_dict: dict[str, str] = {}
             validate = True
+
+            # Find lowest rank with a value
+            rank_data = [row[key] for key in found_ranks]
+            ranks_with_names = [
+                index for index, element in enumerate(rank_data) if element is not None
+            ]
+            if ranks_with_names:
+                lowest_rank = found_ranks[ranks_with_names[-1]]
+            else:
+                lowest_rank = found_ranks[-1]
 
             for rnk in found_ranks:
                 # Get the name value associated with the rank
@@ -1749,11 +1760,31 @@ class NCBITaxa:
                     LOGGER.error(f"Rank {rnk} has whitespace padding: {value!r}")
                     value = value_stripped
 
-                # TODO - Need to avoid this check the lowest provided rank case?
+                # TODO - Also need to document this
                 # Check whether the taxon is incertae sedis (and should be ignored for
                 # validation purposes)
-                # TODO - Add this in to the function flow
-                # incertae_sedis = check_incertae_sedis()
+                try:
+                    # Find last certain taxon in tree based on what was last added to
+                    # the dictionary, if nothing has been added it should be left blank
+                    if taxon_dict:
+                        certain_parent = taxon_dict[list(taxon_dict.keys())[-1]]
+                    else:
+                        certain_parent = ""
+                    incertae_sedis = check_incertae_sedis(
+                        name=value,
+                        rank=rnk,
+                        last_certain_parent=certain_parent,
+                    )
+                    if incertae_sedis:
+                        if rnk is not lowest_rank:
+                            continue
+                        else:
+                            LOGGER.error(
+                                f"Incertae sedis provided for lowest taxon rank {rnk}!"
+                            )
+                            validate = False
+                except ValueError:
+                    validate = False
 
                 # Strip k__ notation to provide clean name_txt search input - dropping
                 # levels no taxonomic information is associated with the annotation (s__
@@ -2336,8 +2367,6 @@ def construct_bi_or_tri(higher_nm: str, lower_nm: str, tri: bool) -> str:
     return value
 
 
-# TODO - Add to function flow
-# TODO - and then document
 def check_incertae_sedis(name: str, rank: str, last_certain_parent: str) -> bool:
     """Check if rank name indicates that it is Incertae sedis.
 
@@ -2380,7 +2409,10 @@ def check_incertae_sedis(name: str, rank: str, last_certain_parent: str) -> bool
         if name == expected_name:
             return True
         else:
-            msg = f"Taxon {name} possibly Incertae sedis but does have correct pattern!"
+            msg = (
+                f"Taxon {name} possibly Incertae sedis but doesn't have correct "
+                "pattern!"
+            )
             LOGGER.error(msg)
             raise ValueError(msg)
 
