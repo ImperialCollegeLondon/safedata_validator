@@ -1866,3 +1866,70 @@ def test_taxa_load(fixture_resources, example_ncbi_files, n_errors, n_taxa, t_ta
     # Compare both named taxa and total taxa
     assert len(tx.taxon_names) == n_taxa
     assert len(tx.taxon_index) == t_taxa
+
+
+# Okay so want a straightforward false
+# a straightforward true
+# rank kingdom error
+# name doesn't match error
+@pytest.mark.parametrize(
+    "name,rank,is_incertae,raises,expected_log",
+    [
+        pytest.param(
+            "Vulpes vulpes",
+            "species",
+            False,
+            does_not_raise(),
+            "",
+            id="not incertae",
+        ),
+        pytest.param(
+            "f__Mucoromycotina_fam_Incertae_sedis",
+            "family",
+            True,
+            does_not_raise(),
+            "",
+            id="is incertae",
+        ),
+        pytest.param(
+            "k__Mucoromycotina_kin_Incertae_sedis",
+            "kingdom",
+            False,
+            pytest.raises(ValueError),
+            (
+                (
+                    ERROR,
+                    "The rank kingdom of taxon k__Mucoromycotina_kin_Incertae_sedis "
+                    "doesn't allow Incertae sedis taxa!",
+                ),
+            ),
+            id="invalid rank",
+        ),
+        pytest.param(
+            "f__Mucoromycotina_Incertae_sedis",
+            "family",
+            False,
+            pytest.raises(ValueError),
+            (
+                (
+                    ERROR,
+                    "Taxon f__Mucoromycotina_Incertae_sedis possibly Incertae sedis but"
+                    " does have correct pattern!",
+                ),
+            ),
+            id="wrong name pattern",
+        ),
+    ],
+)
+def test_check_incertae_sedis(caplog, name, rank, is_incertae, raises, expected_log):
+    """Test that the function to check for Incertae sedis names works correctly."""
+    from safedata_validator.taxa import check_incertae_sedis
+
+    with raises:
+        incertae_sedis = check_incertae_sedis(
+            name=name, rank=rank, last_certain_parent="Mucoromycotina"
+        )
+
+        assert incertae_sedis == is_incertae
+
+    log_check(caplog, expected_log)
