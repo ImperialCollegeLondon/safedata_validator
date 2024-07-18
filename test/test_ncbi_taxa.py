@@ -63,7 +63,7 @@ from .conftest import log_check
                 taxa_hier="test",
             ),
             pytest.raises(TypeError),
-            "Taxonomic hierarchy not a list",
+            "Taxon hierarchy not a list",
             id="string instead of list",
         ),
         pytest.param(
@@ -120,18 +120,6 @@ from .conftest import log_check
                 rank="species",
                 ncbi_id=37577,
                 parent_ncbi_id=30446,
-                taxa_hier=[("genus", "Morus", 37577, 30446)],
-            ),
-            pytest.raises(ValueError),
-            "Provided rank (species) not in hierarchy",
-            id="rank missing",
-        ),
-        pytest.param(
-            dict(
-                name="Morus",
-                rank="species",
-                ncbi_id=37577,
-                parent_ncbi_id=30446,
                 taxa_hier=[
                     ("genus", "Morus", 37577, 30446),
                     ("species", "Morus bassanus", 1, 37578),
@@ -170,7 +158,7 @@ from .conftest import log_check
             dict(
                 name="Morus",
                 rank="genus",
-                ncbi_id=27,
+                ncbi_id=37577,
                 parent_ncbi_id=666,
                 taxa_hier=[("genus", "Morus", 37577, 30446)],
             ),
@@ -199,8 +187,8 @@ def test_taxon_init_errors(test_input, raises, message):
     with raises as excep:
         _ = taxa.NCBITaxon(**test_input)
 
-        if not isinstance(raises, does_not_raise):
-            assert excep.value == message
+    if not isinstance(raises, does_not_raise):
+        assert str(excep.value) == message
 
 
 # ------------------------------------------
@@ -1794,6 +1782,133 @@ def test_index_higher_taxa(
             DotMap(
                 {
                     "data_columns": [
+                        ("Acremonium",),
+                        ("o__Hypocreales",),
+                        ("f__Hypocreales_fam_Incertae_sedis",),
+                        ("g__Acremonium",),
+                    ],
+                    "headers": ["name", "order", "family", "genus"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "3 NCBI rank fields found:"),
+                (INFO, "Validating row 1:"),
+                (INFO, "Match found for Acremonium"),
+                (INFO, "Indexing taxonomic hierarchy"),
+                (INFO, "Added superkingdom Eukaryota"),
+                (INFO, "Added kingdom Fungi"),
+                (INFO, "Added phylum Ascomycota"),
+                (INFO, "Added class Sordariomycetes"),
+                (INFO, "Added order Hypocreales"),
+                (INFO, "1 taxa loaded correctly"),
+            ),
+            id="valid Incertae sedis",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("Acremonium",),
+                        ("o__Hypocreales",),
+                        ("f__Hypocreales_fam_Incertae_sedis",),
+                    ],
+                    "headers": ["name", "order", "family"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "2 NCBI rank fields found:"),
+                (INFO, "Validating row 1:"),
+                (ERROR, "Incertae sedis provided for lowest taxon rank family!"),
+                (INFO, "NCBITaxa contains 1 errors"),
+            ),
+            id="Incertae sedis last rank",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("Acremonium_furcatum",),
+                        ("f__Hypocreales_fam_Incertae_sedis",),
+                        ("g__Acremonium",),
+                        ("s__furcatum",),
+                    ],
+                    "headers": ["name", "family", "genus", "species"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "3 NCBI rank fields found:"),
+                (INFO, "Validating row 1:"),
+                (
+                    ERROR,
+                    "Taxon f__Hypocreales_fam_Incertae_sedis possibly Incertae sedis "
+                    "but doesn't have correct pattern!",
+                ),
+                (INFO, "NCBITaxa contains 1 errors"),
+            ),
+            id="Incertae sedis first rank",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("Acremonium",),
+                        ("o__Hypocreales",),
+                        ("f__Hypocreales_ord_Incertae_sedis",),
+                        ("g__Acremonium",),
+                    ],
+                    "headers": ["name", "order", "family", "genus"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "3 NCBI rank fields found:"),
+                (INFO, "Validating row 1:"),
+                (
+                    ERROR,
+                    "Taxon f__Hypocreales_ord_Incertae_sedis possibly Incertae sedis "
+                    "but doesn't have correct pattern!",
+                ),
+                (INFO, "NCBITaxa contains 1 errors"),
+            ),
+            id="Incertae sedis incorrect rank",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("Acremonium",),
+                        ("o__Hypocreales",),
+                        ("f__Mytophis_fam_Incertae_sedis",),
+                        ("g__Acremonium",),
+                    ],
+                    "headers": ["name", "order", "family", "genus"],
+                }
+            ),
+            (
+                (INFO, "Loading NCBITaxa worksheet"),
+                (INFO, "Reading NCBI taxa data"),
+                (INFO, "3 NCBI rank fields found:"),
+                (INFO, "Validating row 1:"),
+                (
+                    ERROR,
+                    "Taxon f__Mytophis_fam_Incertae_sedis possibly Incertae sedis "
+                    "but doesn't have correct pattern!",
+                ),
+                (INFO, "NCBITaxa contains 1 errors"),
+            ),
+            id="Incertae sedis incorrect parent",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
                         ("E coli",),
                         ("Enterobacteriaceae",),
                         ("Escherichia ",),
@@ -1866,3 +1981,66 @@ def test_taxa_load(fixture_resources, example_ncbi_files, n_errors, n_taxa, t_ta
     # Compare both named taxa and total taxa
     assert len(tx.taxon_names) == n_taxa
     assert len(tx.taxon_index) == t_taxa
+
+
+@pytest.mark.parametrize(
+    "name,rank,is_incertae,raises,expected_log",
+    [
+        pytest.param(
+            "Vulpes vulpes",
+            "species",
+            False,
+            does_not_raise(),
+            "",
+            id="not incertae",
+        ),
+        pytest.param(
+            "f__Mucoromycotina_fam_Incertae_sedis",
+            "family",
+            True,
+            does_not_raise(),
+            "",
+            id="is incertae",
+        ),
+        pytest.param(
+            "k__Mucoromycotina_kin_Incertae_sedis",
+            "kingdom",
+            False,
+            pytest.raises(ValueError),
+            (
+                (
+                    ERROR,
+                    "The rank kingdom of taxon k__Mucoromycotina_kin_Incertae_sedis "
+                    "doesn't allow Incertae sedis taxa!",
+                ),
+            ),
+            id="invalid rank",
+        ),
+        pytest.param(
+            "f__Mucoromycotina_Incertae_sedis",
+            "family",
+            False,
+            pytest.raises(ValueError),
+            (
+                (
+                    ERROR,
+                    "Taxon f__Mucoromycotina_Incertae_sedis possibly Incertae sedis but"
+                    " doesn't have correct pattern!",
+                ),
+            ),
+            id="wrong name pattern",
+        ),
+    ],
+)
+def test_check_incertae_sedis(caplog, name, rank, is_incertae, raises, expected_log):
+    """Test that the function to check for Incertae sedis names works correctly."""
+    from safedata_validator.taxa import check_incertae_sedis
+
+    with raises:
+        incertae_sedis = check_incertae_sedis(
+            name=name, rank=rank, last_certain_parent="Mucoromycotina"
+        )
+
+        assert incertae_sedis == is_incertae
+
+    log_check(caplog, expected_log)

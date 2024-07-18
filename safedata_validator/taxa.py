@@ -69,6 +69,9 @@ NCBI_BACKBONE_RANKS = ["superkingdom", *GBIF_BACKBONE_RANKS]
 # NBCI name regex
 NCBI_prefix_re = re.compile("^[a-z]__")
 
+# Mapping of rank names onto shorten versions used in Incertae sedis naming
+NCBI_incertae_sedis_mapping = {"class": "cls", "order": "ord", "family": "fam"}
+
 
 class GBIFError(Exception):
     """Exception class for GBIF errors.
@@ -278,13 +281,13 @@ class NCBITaxon:
 
         if self.ncbi_id != leaf_ncbi_id:
             raise ValueError(
-                f"Provided NCBI ID ({self.ncbi_id}) not does not match "
+                f"Provided NCBI ID ({self.ncbi_id}) does not match "
                 f"first ID in hierarchy ({leaf_ncbi_id})"
             )
 
         if self.parent_ncbi_id != parent_ncbi_id:
             raise ValueError(
-                f"Provided parent NCBI ID ({self.parent_ncbi_id}) not does not match "
+                f"Provided parent NCBI ID ({self.parent_ncbi_id}) does not match "
                 f"first parent ID in hierarchy ({parent_ncbi_id})"
             )
 
@@ -1717,11 +1720,22 @@ class NCBITaxa:
             # - Tackle in taxonomic order by iterating over ordered found_ranks
             # - Drop empty entries
             # - Validate non-empty entries as unpadded strings
+            # - Check if any names indicate that the rank in question is Incertae_sedis
             # - Strip any NCBI k__ notation to match entries in names.names_txt db
             #   field. Runs from root, so cleans genus, species, subspecies.
 
             taxon_dict: dict[str, str] = {}
             validate = True
+
+            # Find lowest rank with a value
+            rank_data = [row[key] for key in found_ranks]
+            ranks_with_names = [
+                index for index, element in enumerate(rank_data) if element is not None
+            ]
+            if ranks_with_names:
+                lowest_rank = found_ranks[ranks_with_names[-1]]
+            else:
+                lowest_rank = found_ranks[-1]
 
             for rnk in found_ranks:
                 # Get the name value associated with the rank
@@ -1745,6 +1759,31 @@ class NCBITaxa:
                 if value != value_stripped:
                     LOGGER.error(f"Rank {rnk} has whitespace padding: {value!r}")
                     value = value_stripped
+
+                # Check whether the taxon is incertae sedis (and should be ignored for
+                # validation purposes)
+                try:
+                    # Find last certain taxon in tree based on what was last added to
+                    # the dictionary, if nothing has been added it should be left blank
+                    if taxon_dict:
+                        certain_parent = taxon_dict[list(taxon_dict.keys())[-1]]
+                    else:
+                        certain_parent = ""
+                    incertae_sedis = check_incertae_sedis(
+                        name=value,
+                        rank=rnk,
+                        last_certain_parent=certain_parent,
+                    )
+                    if incertae_sedis:
+                        if rnk is not lowest_rank:
+                            continue
+                        else:
+                            LOGGER.error(
+                                f"Incertae sedis provided for lowest taxon rank {rnk}!"
+                            )
+                            validate = False
+                except ValueError:
+                    validate = False
 
                 # Strip k__ notation to provide clean name_txt search input - dropping
                 # levels no taxonomic information is associated with the annotation (s__
@@ -2325,3 +2364,56 @@ def construct_bi_or_tri(higher_nm: str, lower_nm: str, tri: bool) -> str:
         raise ValueError(msg)
 
     return value
+
+
+def check_incertae_sedis(name: str, rank: str, last_certain_parent: str) -> bool:
+    """Check if rank name indicates that it is Incertae sedis.
+
+    These ranks are not sensible validation targets, so this function identifies them so
+    they can be excluded from validation.
+
+    At the moment, only a single pattern is checked. This function may have to be
+    extended in future to catch other patterns which indicate Incertae sedis taxa.
+
+    The following patterns are checked for:
+        {first_letter_of_rank}__{last_certain_parent_name}_{rank}_Incertae_sedis
+
+    Args:
+        name: The name of the taxon
+        rank: The rank of the taxon
+        last_certain_parent: The name of the lowest ranked taxon which is definitely
+            parent of this taxon
+
+    Raises:
+        ValueError: If the provided name ends with Incertae_sedis but either the rank
+        isn't one for which we expect Incertae sedis taxa, or the name doesn't follow
+        the expected pattern.
+
+    Returns:
+        A bool indicating whether the taxa is incertae sedis.
+    """
+
+    if name.endswith("Incertae_sedis"):
+        # If this isn't a rank we accept incertae sedis for raise an error
+        if rank.lower() not in NCBI_incertae_sedis_mapping.keys():
+            msg = f"The rank {rank} of taxon {name} doesn't allow Incertae sedis taxa!"
+            LOGGER.error(msg)
+            raise ValueError(msg)
+
+        # Construct expected name and check whether it matches
+        expected_name = (
+            f"{rank[0].lower()}__{last_certain_parent}_"
+            f"{NCBI_incertae_sedis_mapping[rank]}_Incertae_sedis"
+        )
+        if name == expected_name:
+            return True
+        else:
+            msg = (
+                f"Taxon {name} possibly Incertae sedis but doesn't have correct "
+                "pattern!"
+            )
+            LOGGER.error(msg)
+            raise ValueError(msg)
+
+    else:
+        return False
