@@ -1760,7 +1760,6 @@ class NCBITaxa:
                     LOGGER.error(f"Rank {rnk} has whitespace padding: {value!r}")
                     value = value_stripped
 
-                # TODO - Also need to document this
                 # Check whether the taxon is incertae sedis (and should be ignored for
                 # validation purposes)
                 try:

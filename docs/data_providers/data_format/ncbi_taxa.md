@@ -96,6 +96,14 @@ if you want to use `Crbe` in your data worksheets, rather than typing out
     should be placed in the correct rank columns, and validation is carried out to check
     that the rank implied by the notation matches the column rank.
 
+    When intermediate ranks are unknown they can be left blank. However, as some common
+    taxonomic resolution packages assign these as _Incertae sedis_ we also support this.
+    These ranks will be ignored in the validation process, unless they are the highest
+    or lowest rank provided for the taxon, in which case the validation will fail. At
+    present, we only check for _Incertae sedis_ output matching that of the DADA2
+    package. This pattern is as follows
+    "{first_letter_of_rank}__{last_certain_parent_name}_{rank}_Incertae_sedis".
+
     Two special cases are that NCBI outputs typically separate out the components of
     binomial and trinomial names: for example, they might return `g__Escherichia` and
     `s__coli`. In order to be able to match _complete_ species and subspecies names
