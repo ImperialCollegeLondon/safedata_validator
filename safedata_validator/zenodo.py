@@ -348,11 +348,11 @@ def upload_metadata(
     )
 
     # attach the metadata to the deposit resource
-    mtd = requests.put(zenodo["links"]["self"], params=zres["ztoken"], json=zen_md)
+    response = requests.put(zenodo["links"]["self"], params=zres["ztoken"], json=zen_md)
 
     # trap errors in uploading metadata and tidy up
-    if mtd.status_code != 200:
-        return {}, mtd.reason
+    if response.status_code != 200:
+        return {}, _zenodo_error_message(response=response)
     else:
         return {}, None
 
@@ -383,10 +383,10 @@ def update_published_metadata(
     links = zenodo["links"]
 
     # Unlock the published deposit for editing
-    edt = requests.post(links["edit"], params=zres["ztoken"])
+    response = requests.post(links["edit"], params=zres["ztoken"])
 
-    if edt.status_code != 201:
-        return {}, edt.json()
+    if response.status_code != 201:
+        return {}, _zenodo_error_message(response=response)
 
     # # Amend the metadata
     # for key, val in new_values.items():
@@ -555,13 +555,13 @@ def publish_deposit(
     params = zres["ztoken"]
 
     # publish
-    pub = requests.post(zenodo["links"]["publish"], params=params)
+    response = requests.post(zenodo["links"]["publish"], params=params)
 
     # trap errors in publishing, otherwise return the publication metadata
-    if pub.status_code != 202:
-        return {}, pub.json()
+    if response.status_code != 202:
+        return {}, _zenodo_error_message(response=response)
     else:
-        return pub.json(), None
+        return response.json(), None
 
 
 def delete_files(

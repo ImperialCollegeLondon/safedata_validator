@@ -995,6 +995,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
                 dataset_metadata=dataset_json,
                 external_files=args.external_files,
                 new_version=args.new_version,
+                no_xml=args.no_xml,
             )
         except (FileNotFoundError, ValueError, RuntimeError) as excep:
             print(excep)

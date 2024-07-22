@@ -199,8 +199,8 @@ def test_taxon_init_errors(test_input, raises, message):
     with raises as excep:
         _ = taxa.NCBITaxon(**test_input)
 
-        if not isinstance(raises, does_not_raise):
-            assert excep.value == message
+    if not isinstance(raises, does_not_raise):
+        assert str(excep.value) == message
 
 
 # ------------------------------------------
