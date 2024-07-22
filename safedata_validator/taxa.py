@@ -63,6 +63,17 @@ GBIF_BACKBONE_RANKS = [
     "subspecies",
 ]
 
+# TODO - think about this - do we want to add superkingdom and sub species level?
+SEQ_BACKBONE_RANKS = [
+    "kingdom",
+    "phylum",
+    "class",
+    "order",
+    "family",
+    "genus",
+    "species",
+]
+
 # Extended version of backbone ranks to capture superkingdoms
 NCBI_BACKBONE_RANKS = ["superkingdom", *GBIF_BACKBONE_RANKS]
 
@@ -1991,27 +2002,314 @@ class NCBITaxa:
         return len(self.taxon_names) == 0
 
 
-class Taxa:
-    """Manage combined NCBITaxa and GBIFTaxa instances.
+class SeqTaxa:
+    """Manage a set of taxon data derived from a sequencing workflow.
 
-    This class wraps parallel instances of GBIFTaxa and NCBITaxa and provides shared
-    properties across the two instances.
+    This is a prototype class to manage the generation of a taxon index from taxon
+    tables generated through bioinformatics pipelines. It is a high-trust taxon table
+    implementation that accepts a typically machine-generated taxon table and simply
+    compiles a taxon hierarchy from the table.
+
+    i)  the taxon_names attribute of the dataset, which is just a set of
+        names used as a validation list for taxon names used in data worksheets.
+    ii) the taxon_index attribute of the dataset, which contains a set
+        of lists structured as:
+
+            [worksheet_name (str),
+            ncbi_id (int),
+            ncbi_parent_id (int),
+            canonical_name (str),
+            taxonomic_rank (str),
+            ncbi_status (str)]
+
+    TODO - we have no persistent ID codes for this taxonomy parsing - currently using
+           arbitrary per dataset integer codes.
+
+    The index can then be used:
+
+    a) to generate the taxonomic coverage section of the dataset description, and
+    b) to populate a database table to index the taxonomic coverage of datasets.
+
+    Args:
+        resources: A Resources instance.
+
+    Attributes:
+        taxon_index: A list containing taxon index lists
+        taxon_names: A set of worksheet names
+        hierarchy: A set of lists containing the complete taxonomic hierarchy for taxa
+            in the GBIFTaxa instance.
+        taxon_names_used: A set used to track which taxon names have been used in data
+            worksheets
+    """
+
+    def __init__(self, resources: Resources) -> None:
+        self.taxon_index: list[tuple] = []
+        self.taxon_names: set[str] = set()
+        self.hierarchy: set[tuple] = set()
+        self.n_errors: int = 0
+
+    @loggerinfo_push_pop("Loading SeqTaxa worksheet")
+    def load(self, worksheet: worksheet) -> None:
+        """Populate an SeqTaxa instance from an Excel worksheet.
+
+        This method loads a set of taxa from the rows of a `safedata` formatted SeqTaxa
+        worksheet and populates the taxonomic hierarchy for those rows.
+
+        Args:
+            worksheet: An openpyxl worksheet instance using the SeqTaxa formatting
+        """
+        handler = get_handler()
+        start_errors = handler.counters["ERROR"]
+
+        # Get the data read in, handling header issues like whitespace padding
+        LOGGER.info("Reading bioinformatics taxon data")
+        FORMATTER.push()
+        dframe = GetDataFrame(worksheet)
+
+        if not dframe.data_columns:
+            LOGGER.error("No data or only headers in Taxa worksheet")
+            FORMATTER.pop()
+            return
+
+        # Dupe headers likely cause serious issues, so stop
+        if "duplicated" in dframe.bad_headers:
+            LOGGER.error("Cannot parse taxa with duplicated headers")
+            FORMATTER.pop()
+            return
+
+        # Get the headers
+        headers = IsLower(dframe.headers).values
+
+        # Only the name field is indispensible
+        if "name" not in headers:
+            LOGGER.error("NCBI taxa sheet is missing the name fields")
+            FORMATTER.pop()
+            return
+
+        # Check for backbone rank fields
+        missing_ranks = set(SEQ_BACKBONE_RANKS).difference(headers)
+        if missing_ranks:
+            LOGGER.error(
+                "SeqTaxa missing some taxon rank fields: ",
+                extra={"join": missing_ranks},
+            )
+            FORMATTER.pop()
+            return
+
+        # Now report extra fields
+        # TODO - this is now informational rather than anything about taxonomy.
+        extra_fields = set(headers).difference(headers)
+        if extra_fields:
+            LOGGER.info("Additional fields provided: ", extra={"join": extra_fields})
+
+        # Get dictionaries of the taxa
+        taxa = [dict(zip(headers, rw)) for rw in zip(*dframe.data_columns)]
+        FORMATTER.pop()
+
+        # check number of taxa found
+        if len(taxa) == 0:
+            LOGGER.info("No taxon rows found")
+            return
+
+        # Store cleaned information as lists of taxon tuple - this is used to provide a
+        # clean indexing system to build internally consistent parent child taxon ids
+        # for the table.
+        # TODO - not sure about this, but we need some kind of linkage to hold the
+        # taxonomy together. We could just use names, but the current metadata server
+        # setup is to use an integer code.
+        cleaned_taxa: dict[str, list[tuple[str, str]]] = {}
+
+        # Clean and validate each taxon row
+        for idx, row in enumerate(taxa):
+            # Start validating the row
+            LOGGER.info(f"Loading row {idx + 1}: {row['name']}")
+            FORMATTER.push()
+
+            # Get the worksheet row name
+            worksheet_name = row["name"]
+
+            if not isinstance(worksheet_name, str):
+                LOGGER.error(f"Worksheet name is not a string: {worksheet_name!r}")
+                worksheet_name = str(worksheet_name)
+            else:
+                worksheet_name_strip = worksheet_name.strip()
+                if worksheet_name != worksheet_name_strip:
+                    LOGGER.error(
+                        f"Worksheet name has whitespace padding: {worksheet_name!r}"
+                    )
+                    worksheet_name = worksheet_name_strip
+
+            self.taxon_names.add(worksheet_name)
+
+            # Standardise blank and NA values to None
+            row = {
+                ky: None if blank_value(vl) or vl == "NA" else vl
+                for ky, vl in row.items()
+            }
+
+            # Loop over rank fields to populate a cleaned taxon hierarchy:
+            # - Tackle in taxonomic order by iterating over required ranks
+            # - Drop empty entries
+            # - Validate non-empty entries as unpadded strings
+            # - Strip any NCBI k__ notation to match entries in names.names_txt db
+            #   field. Runs from root, so cleans genus, species, subspecies.
+
+            taxon_rank_tuple: list[tuple[str, str]] = []
+
+            for rnk in SEQ_BACKBONE_RANKS:
+                # Get the name value associated with the rank
+                value = row[rnk]
+
+                # Don't copy empty entries
+                if value is None:
+                    continue
+
+                # The value must be an unpadded and not empty string
+                if not isinstance(value, str) or value.isspace():
+                    LOGGER.error(
+                        f"Rank {rnk} has non-string or empty "
+                        f"string value: {value!r}"
+                    )
+                    continue
+
+                # The value must not be padded but processing can continue
+                value_stripped = value.strip()
+                if value != value_stripped:
+                    LOGGER.error(f"Rank {rnk} has whitespace padding: {value!r}")
+                    value = value_stripped
+
+                # Strip k__ notation to provide clean name_txt search input - dropping
+                # levels no taxonomic information is associated with the annotation (s__
+                # etc. entries)
+                value = taxa_strip(value, rnk)
+                if value is None:
+                    continue
+
+                # Hang on to the genus and insert it if there is a subsequent species
+                # rank pair.
+                # TODO - I don't think this can wrap around to the next taxon.
+                if rnk == "genus":
+                    last_genus = value
+
+                if rnk == "species":
+                    taxon_rank_tuple.append((rnk, f"{last_genus} {value}"))
+                else:
+                    taxon_rank_tuple.append((rnk, value))
+
+            # Add cleaned taxon tuples to list and report
+            cleaned_taxa[worksheet_name] = taxon_rank_tuple
+            leaf = taxon_rank_tuple[-1]
+            LOGGER.info(f"Loaded {leaf[0]}: {leaf[1]}")
+
+            FORMATTER.pop()
+
+        # Build the taxon index
+
+        # Assign an arbitrary ID number to each unique pair of taxon rank and name
+        # across the dataset
+        all_ranks = set([rank_pair for tx in cleaned_taxa.values() for rank_pair in tx])
+        all_ranks_index: dict[tuple[str, str], int] = {
+            rank_pair: val for val, rank_pair in enumerate(all_ranks)
+        }
+
+        # Now need to add a taxon index entry for each worksheet name but also keep
+        # track of other ranks needed to complete the hierarchy.
+        taxon_index: list[list[str | int | None]] = []
+        parent_taxa: list[list[str | int | None]] = []
+
+        for ws_name, taxon_details in cleaned_taxa.items():
+            # Pop off the leaf taxon
+            leaf_pair = taxon_details.pop(-1)
+
+            # Add the parent taxa to that list
+            lower_index = -1
+            for taxon_pair in taxon_details:
+                this_index = all_ranks_index[taxon_pair]
+                parent_taxa.append(
+                    [None, lower_index, this_index, *taxon_pair, "loaded"]
+                )
+                lower_index = this_index
+
+            # Add the leaf taxon to the index
+            this_index = all_ranks_index[leaf_pair]
+            taxon_index.append([ws_name, lower_index, this_index, *leaf_pair, "loaded"])
+
+        # Get the required extra parent entries
+        LOGGER.info("Indexing taxonomic hierarchy")
+
+        # Reduce the possibly required parent taxa to a list of unique combinations
+        unique_parents = set(tuple(v) for v in parent_taxa)
+        unique_parents_list = [list(v) for v in unique_parents]
+
+        # Strip back the parents to only those whose taxon details do not already appear
+        # under a worksheet name and then sort
+        already_in_taxon_index = [tx[1:] for tx in taxon_index]
+        required_parents = [
+            v for v in unique_parents_list if v[1:] not in already_in_taxon_index
+        ]
+
+        # Sort the required parents into taxon and alphabetic order - cosmetic in some
+        # ways but easier to read in the log
+        required_parents.sort(key=lambda x: x[3])  # type: ignore [return-value, arg-type]
+        required_parents_by_rank = {
+            k: list(g) for k, g in groupby(required_parents, key=lambda x: x[3])
+        }
+
+        required_parents_sorted = [
+            sorted(required_parents_by_rank[rnk], key=lambda x: x[4])  # type: ignore [return-value, arg-type]
+            for rnk in SEQ_BACKBONE_RANKS
+            if rnk in required_parents_by_rank
+        ]
+        required_parents = [entry for rank in required_parents_sorted for entry in rank]
+
+        # Report the required parents, add them to worksheet taxa and then convert the
+        # whole lot to tuples to populate the taxon_index attribute.
+        FORMATTER.push()
+        for parent in required_parents:
+            LOGGER.info(f"Added {parent[3]} {parent[4]}")
+
+        taxon_index.extend(required_parents)
+
+        self.taxon_index = list(tuple(v) for v in taxon_index)
+
+        FORMATTER.pop()
+
+        # summary of processing
+        self.n_errors = handler.counters["ERROR"] - start_errors
+        if self.n_errors is None:
+            LOGGER.critical("NCBITaxa error logging has broken!")
+        elif self.n_errors > 0:
+            LOGGER.info(f"NCBITaxa contains {self.n_errors} errors")
+        else:
+            LOGGER.info(f"{len(self.taxon_names)} taxa loaded correctly")
+
+        FORMATTER.pop()
+
+    @property
+    def is_empty(self) -> bool:
+        """Check if an NCBITaxa instance contains any taxa."""
+        return len(self.taxon_names) == 0
+
+
+class Taxa:
+    """Manage combined taxon sheet instances.
+
+    This class wraps taxon sheets and provides shared properties across the instances
 
     Args:
         resources: A Resources instance
 
 
-    We are interested in checking that no worksheet
-    names are reused when both Taxa sheets are provided, that every worksheet
-    name is used somewhere in the Data worksheets, and that every taxon name
-    used across the Data worksheets is defined in a Taxa worksheet.
+    We are interested in checking that:
+    * no worksheet names are reused when more than one taxon sheet are provided,
+    * every worksheet name is used somewhere in the Data worksheets, and
+    * every taxon name used across the Data worksheets is defined in a Taxa worksheet.
 
-    This overarching class stores instances of the two lower level classes
-    (GBIFTaxa, NCBITaxa). It can also store (as `taxon_names_used`) the set
-    of all names used across the Data worksheets. The property `is_empty` can
-    be used to check whether both of the lower level classes are empty, and
-    the property `taxon_names` can be used to find the set of all taxon names
-    defined in either GBIFTaxa or NCBITaxa. Finally, the property `repeat_names`
+    This overarching class stores instances of the lower level taxon sheet handler
+    classes. It can also store (as `taxon_names_used`) the set of all names used across
+    Data worksheets. The property `is_empty` can be used to check whether lower level
+    classes are empty, and the property `taxon_names` can be used to find the set of all
+    taxon names defined across taxon handlers. Finally, the property `repeat_names`
     can be used to find if any names are used in both GBIFTaxa and NCBITaxa
     worksheets.
     """
@@ -2019,22 +2317,49 @@ class Taxa:
     def __init__(self, resources: Resources):
         self.gbif_taxa = GBIFTaxa(resources)
         self.ncbi_taxa = NCBITaxa(resources)
+        self.seq_taxa = SeqTaxa(resources)
         self.taxon_names_used: set[str] = set()
 
     @property
     def is_empty(self) -> bool:
         """Reports if neither GBIF nor NCBI taxa any taxa loaded."""
-        return self.gbif_taxa.is_empty and self.ncbi_taxa.is_empty
+        return (
+            self.gbif_taxa.is_empty
+            and self.ncbi_taxa.is_empty
+            and self.seq_taxa.is_empty
+        )
 
     @property
     def taxon_names(self) -> set[str]:
-        """Provides loaded taxon names from both NCBI and GBIF taxa."""
-        return self.gbif_taxa.taxon_names.union(self.ncbi_taxa.taxon_names)
+        """Provides loaded taxon names from all taxon handlers."""
+        return set(
+            [
+                *self.gbif_taxa.taxon_names,
+                *self.ncbi_taxa.taxon_names,
+                *self.seq_taxa.taxon_names,
+            ]
+        )
 
     @property
     def repeat_names(self) -> set[str]:
-        """Reports taxon names duplicated between NCBI and GBIF taxa."""
-        return self.gbif_taxa.taxon_names.intersection(self.ncbi_taxa.taxon_names)
+        """Reports taxon names duplicated between taxon handlers."""
+
+        seen = set()
+        duplicated = set()
+
+        all_names = [
+            *self.gbif_taxa.taxon_names,
+            *self.ncbi_taxa.taxon_names,
+            *self.seq_taxa.taxon_names,
+        ]
+
+        for this_name in all_names:
+            if this_name not in seen:
+                seen.add(this_name)
+            else:
+                duplicated.add(this_name)
+
+        return duplicated
 
 
 def taxon_index_to_text(
