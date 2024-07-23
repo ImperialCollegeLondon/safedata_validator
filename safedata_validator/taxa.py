@@ -2249,7 +2249,11 @@ class SeqTaxa:
         ]
 
         # Sort the required parents into taxon and alphabetic order - cosmetic in some
-        # ways but easier to read in the log
+        # ways but easier to read in the log.
+        # The type: ignore statements here are because the list typing doesn't clarify
+        # that the 3rd and 4th entries are suitable sort values. Would probably be
+        # better to use a data structure here? NamedTuple maybe?
+
         required_parents.sort(key=lambda x: x[3])  # type: ignore [return-value, arg-type]
         required_parents_by_rank = {
             k: list(g) for k, g in groupby(required_parents, key=lambda x: x[3])

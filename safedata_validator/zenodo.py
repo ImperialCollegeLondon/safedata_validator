@@ -797,6 +797,7 @@ def dataset_description(
 
     gbif_taxon_index = dataset_metadata["gbif_taxa"]
     ncbi_taxon_index = dataset_metadata["ncbi_taxa"]
+    seq_taxon_index = dataset_metadata["seq_taxa"]
 
     context_dict["gbif_taxa"] = (
         taxon_index_to_text(taxa=gbif_taxon_index, html=True, auth="GBIF")
@@ -808,6 +809,11 @@ def dataset_description(
         taxon_index_to_text(taxa=ncbi_taxon_index, html=True, auth="NCBI")
         if ncbi_taxon_index
         else None
+    )
+
+    # TODO - generate a tree here after deciding what to do about repeat taxa.
+    context_dict["seq_taxa"] = (
+        "Sequence taxon table not yet implemented" if seq_taxon_index else None
     )
 
     html = template.render(context_dict)

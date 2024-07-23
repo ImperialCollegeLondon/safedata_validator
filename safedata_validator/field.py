@@ -197,7 +197,7 @@ class Dataset:
         if seq_sheet:
             self.taxa.seq_taxa.load(wb["SeqTaxa"])
 
-        if not (len(gbif_sheets) > 0 & ncbi_sheet & seq_sheet):
+        if not (len(gbif_sheets) > 0 or ncbi_sheet or seq_sheet):
             # Leave the default empty Taxa object
             LOGGER.warning("No taxon worksheet found - moving on")
 
@@ -407,6 +407,24 @@ class Dataset:
                     )
                 )
                 for tx in self.taxa.ncbi_taxa.taxon_index
+            ],
+            # Sequence taxa if they exist
+            # TODO - add reference database information
+            seq_taxa=[
+                dict(
+                    zip(
+                        (
+                            "worksheet_name",
+                            "taxon_id",
+                            "parent_id",
+                            "taxon_name",
+                            "taxon_rank",
+                            "taxon_status",
+                        ),
+                        tx,
+                    )
+                )
+                for tx in self.taxa.seq_taxa.taxon_index
             ],
             # Locations
             locations=[
