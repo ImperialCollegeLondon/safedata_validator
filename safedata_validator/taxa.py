@@ -2114,9 +2114,9 @@ class SeqTaxa:
         # Store cleaned information as lists of taxon tuple - this is used to provide a
         # clean indexing system to build internally consistent parent child taxon ids
         # for the table.
-        # TODO - not sure about this, but we need some kind of linkage to hold the
-        # taxonomy together. We could just use names, but the current metadata server
-        # setup is to use an integer code.
+        # TODO - not sure about using arbitrary numbers, but we need some kind of
+        # linkage to hold the taxonomy together. We could just use names, but the
+        # current metadata server setup is to use an integer code.
         cleaned_taxa: dict[str, list[tuple[str, str]]] = {}
 
         # Clean and validate each taxon row
@@ -2187,14 +2187,15 @@ class SeqTaxa:
 
                 # Hang on to the genus and insert it if there is a subsequent species
                 # rank pair.
-                # TODO - I don't think this can wrap around to the next taxon.
+                # TODO - I don't think the genus value can wrap around to the next
+                #        taxon being processed but maybe explicitly set it to None.
                 if rnk == "genus":
                     last_genus = value
 
                 if rnk == "species":
-                    taxon_rank_tuple.append((rnk, f"{last_genus} {value}"))
-                else:
-                    taxon_rank_tuple.append((rnk, value))
+                    value = f"{last_genus} {value}"
+
+                taxon_rank_tuple.append((rnk, value))
 
             # Add cleaned taxon tuples to list and report
             cleaned_taxa[worksheet_name] = taxon_rank_tuple
@@ -2212,69 +2213,121 @@ class SeqTaxa:
             rank_pair: val for val, rank_pair in enumerate(all_ranks)
         }
 
-        # Now need to add a taxon index entry for each worksheet name but also keep
-        # track of other ranks needed to complete the hierarchy.
-        taxon_index: list[list[str | int | None]] = []
-        parent_taxa: list[list[str | int | None]] = []
+        # Temporary switching to check versions of this taxon index that represent each
+        # worksheet name (as in GBIF) versus just capturing unique nodes. The issue here
+        # is that multiple worksheet names commonly map onto the same node - different
+        # sequences that have resolved to the same taxon - and so this leads to a very
+        # repetitive taxon index.
 
-        for ws_name, taxon_details in cleaned_taxa.items():
-            # Pop off the leaf taxon
-            leaf_pair = taxon_details.pop(-1)
+        # TODO all sorts of imprecise typing in here.
 
-            # Add the parent taxa to that list
-            lower_index = -1
-            for taxon_pair in taxon_details:
-                this_index = all_ranks_index[taxon_pair]
-                parent_taxa.append(
-                    [None, lower_index, this_index, *taxon_pair, "loaded"]
+        capture_worksheet_usage = False
+
+        if capture_worksheet_usage:
+            # Now need to add a taxon index entry for each worksheet name but also keep
+            # track of other ranks needed to complete the hierarchy.
+            taxon_index: list[list[str | int | None]] = []
+            parent_taxa: list[list[str | int | None]] = []
+
+            for ws_name, taxon_details in cleaned_taxa.items():
+                # Pop off the leaf taxon
+                leaf_pair = taxon_details.pop(-1)
+
+                # Add the parent taxa to that list
+                lower_index = None
+                for taxon_pair in taxon_details:
+                    this_index = all_ranks_index[taxon_pair]
+                    parent_taxa.append(
+                        [
+                            None,
+                            this_index,
+                            lower_index,
+                            taxon_pair[1],
+                            taxon_pair[0],
+                            "loaded",
+                        ]
+                    )
+                    lower_index = this_index
+
+                # Add the leaf taxon to the index
+                this_index = all_ranks_index[leaf_pair]
+                taxon_index.append(
+                    [
+                        ws_name,
+                        this_index,
+                        lower_index,
+                        leaf_pair[1],
+                        leaf_pair[0],
+                        "loaded",
+                    ]
                 )
-                lower_index = this_index
 
-            # Add the leaf taxon to the index
-            this_index = all_ranks_index[leaf_pair]
-            taxon_index.append([ws_name, lower_index, this_index, *leaf_pair, "loaded"])
+            # Get the required extra parent entries
+            LOGGER.info("Indexing taxonomic hierarchy")
 
-        # Get the required extra parent entries
-        LOGGER.info("Indexing taxonomic hierarchy")
+            # Reduce the possibly required parent taxa to a list of unique combinations
+            unique_parents = set(tuple(v) for v in parent_taxa)
+            unique_parents_list = [list(v) for v in unique_parents]
 
-        # Reduce the possibly required parent taxa to a list of unique combinations
-        unique_parents = set(tuple(v) for v in parent_taxa)
-        unique_parents_list = [list(v) for v in unique_parents]
+            # Strip back the parents to only those whose taxon details do not already
+            # appear under a worksheet name and then sort
+            already_in_taxon_index = [tx[1:] for tx in taxon_index]
+            required_parents = [
+                v for v in unique_parents_list if v[1:] not in already_in_taxon_index
+            ]
 
-        # Strip back the parents to only those whose taxon details do not already appear
-        # under a worksheet name and then sort
-        already_in_taxon_index = [tx[1:] for tx in taxon_index]
-        required_parents = [
-            v for v in unique_parents_list if v[1:] not in already_in_taxon_index
-        ]
+            # Sort the required parents into taxon and alphabetic order - cosmetic in
+            # some ways but easier to read in the log. The type: ignore statements here
+            # are because the list typing doesn't clarify that the 3rd and 4th entries
+            # are suitable sort values. Would probably be better to use a data structure
+            # here? NamedTuple maybe?
 
-        # Sort the required parents into taxon and alphabetic order - cosmetic in some
-        # ways but easier to read in the log.
-        # The type: ignore statements here are because the list typing doesn't clarify
-        # that the 3rd and 4th entries are suitable sort values. Would probably be
-        # better to use a data structure here? NamedTuple maybe?
+            required_parents.sort(key=lambda x: x[3])  # type: ignore [return-value, arg-type]
+            required_parents_by_rank = {
+                k: list(g) for k, g in groupby(required_parents, key=lambda x: x[3])
+            }
 
-        required_parents.sort(key=lambda x: x[3])  # type: ignore [return-value, arg-type]
-        required_parents_by_rank = {
-            k: list(g) for k, g in groupby(required_parents, key=lambda x: x[3])
-        }
+            required_parents_sorted = [
+                sorted(required_parents_by_rank[rnk], key=lambda x: x[4])  # type: ignore [return-value, arg-type]
+                for rnk in SEQ_BACKBONE_RANKS
+                if rnk in required_parents_by_rank
+            ]
+            required_parents = [
+                entry for rank in required_parents_sorted for entry in rank
+            ]
 
-        required_parents_sorted = [
-            sorted(required_parents_by_rank[rnk], key=lambda x: x[4])  # type: ignore [return-value, arg-type]
-            for rnk in SEQ_BACKBONE_RANKS
-            if rnk in required_parents_by_rank
-        ]
-        required_parents = [entry for rank in required_parents_sorted for entry in rank]
+            # Report the required parents, add them to worksheet taxa and then convert
+            # the whole lot to tuples to populate the taxon_index attribute.
+            FORMATTER.push()
+            for parent in required_parents:
+                LOGGER.info(f"Added {parent[3]} {parent[4]}")
 
-        # Report the required parents, add them to worksheet taxa and then convert the
-        # whole lot to tuples to populate the taxon_index attribute.
-        FORMATTER.push()
-        for parent in required_parents:
-            LOGGER.info(f"Added {parent[3]} {parent[4]}")
+            taxon_index.extend(required_parents)
 
-        taxon_index.extend(required_parents)
+            self.taxon_index = list(tuple(v) for v in taxon_index)
 
-        self.taxon_index = list(tuple(v) for v in taxon_index)
+        else:
+            unique_taxa: set[tuple[None, int, int | None, str, str, str]] = set()
+
+            for ws_name, taxon_details in cleaned_taxa.items():
+                # Add taxa from the root to the tip, maintaining the chain of internal
+                # ID values, and using the None index to represent the root node.
+                lower_index = None
+                for taxon_pair in taxon_details:
+                    this_index = all_ranks_index[taxon_pair]
+                    unique_taxa.add(
+                        (
+                            None,
+                            this_index,
+                            lower_index,
+                            taxon_pair[1],
+                            taxon_pair[0],
+                            "loaded",
+                        )
+                    )
+                    lower_index = this_index
+
+            self.taxon_index = list(unique_taxa)
 
         FORMATTER.pop()
 

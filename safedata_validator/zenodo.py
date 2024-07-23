@@ -811,9 +811,10 @@ def dataset_description(
         else None
     )
 
-    # TODO - generate a tree here after deciding what to do about repeat taxa.
     context_dict["seq_taxa"] = (
-        "Sequence taxon table not yet implemented" if seq_taxon_index else None
+        taxon_index_to_text(taxa=seq_taxon_index, html=True, auth="NCBI")
+        if seq_taxon_index
+        else None
     )
 
     html = template.render(context_dict)
