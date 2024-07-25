@@ -192,9 +192,14 @@ class Dataset:
         if ncbi_sheet:
             self.taxa.ncbi_taxa.load(wb["NCBITaxa"])
 
-        if not gbif_sheets and not ncbi_sheet:
+        # Populate Seq taxa
+        seq_sheet = "SeqTaxa" in wb.sheetnames
+        if seq_sheet:
+            self.taxa.seq_taxa.load(wb["SeqTaxa"])
+
+        if not (len(gbif_sheets) > 0 or ncbi_sheet or seq_sheet):
             # Leave the default empty Taxa object
-            LOGGER.warning("Neither Taxa worksheet found - moving on")
+            LOGGER.warning("No taxon worksheet found - moving on")
 
         # Load data worksheets
         for sheet_meta in self.summary.data_worksheets:
@@ -402,6 +407,24 @@ class Dataset:
                     )
                 )
                 for tx in self.taxa.ncbi_taxa.taxon_index
+            ],
+            # Sequence taxa if they exist
+            # TODO - add reference database information
+            seq_taxa=[
+                dict(
+                    zip(
+                        (
+                            "worksheet_name",
+                            "taxon_id",
+                            "parent_id",
+                            "taxon_name",
+                            "taxon_rank",
+                            "taxon_status",
+                        ),
+                        tx,
+                    )
+                )
+                for tx in self.taxa.seq_taxa.taxon_index
             ],
             # Locations
             locations=[
