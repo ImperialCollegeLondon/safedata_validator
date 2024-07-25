@@ -59,10 +59,16 @@ class ZenodoResponse:
         # Basic status
         self.ok = response.ok
         self.status_code = response.status_code
-        # Now either populate json data or the error message
-        if self.ok:
+
+        # Try and handle the response content as JSON data, but not all successful
+        # responses (e.g. file deletion) provide any data payload
+        try:
             self.json_data = response.json()
-        else:
+        except requests.exceptions.JSONDecodeError:
+            self.json_data = {}
+
+        # Build the error message on failure
+        if not self.ok:
             self.build_error_message(response)
 
     def build_error_message(self, response) -> None:
@@ -76,15 +82,12 @@ class ZenodoResponse:
             f"({response.status_code})\nURL: {url}\n"
         )
 
-        # Attempt to get any JSON data, which may contain non JSON data
-        try:
-            response_json = response.json()
-            return_string += f"Message: {response_json['message']}\n"
-        except requests.exceptions.JSONDecodeError:
-            pass
+        # Add the message entry from the JSON payload if present
+        if "message" in self.json_data:
+            return_string += f"Message: {self.json_data['message']}\n"
 
-        # Report on error messages in response object
-        errors = response_json.get("errors", [])
+        # Add any error entries from the JSON payload
+        errors = self.json_data.get("errors", [])
         if errors:
             return_string += "Errors:\n"
             for e in errors:
