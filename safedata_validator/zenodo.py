@@ -19,6 +19,7 @@ from datetime import datetime as dt
 from importlib import resources as il_resources  # avoid confusion with sdv.resources
 from itertools import groupby
 from pathlib import Path
+from typing import Any
 
 import requests
 import rispy
@@ -96,15 +97,6 @@ class ZenodoResponse:
         self.error_message = return_string
 
 
-ZenodoFunctionResponseListType = tuple[list[dict], str | None]
-"""Function return value
-
-This follows the ZenodoResponse but returns a list of response dictionaries.
-This is only used by the upload_files function, where each file upload has a response
-containing useful information.
-"""
-
-
 @dataclass
 class ZenodoResources:
     """Packaging for Zenodo specific resources.
@@ -117,13 +109,14 @@ class ZenodoResources:
     """
 
     # TODO - Hmm. the resolution could be done when Resources is created, removing the
-    # need for this extra class.
+    # need for this extra class. But that does then assume that all Resources will set
+    # require the API and params. So maybe keep.
 
     resources: Resources | None = None
     """A safedata_validator resources instance."""
     api: str = field(init=False)
     """The configured Zenodo API to be used."""
-    token: dict[str, str] = field(init=False)
+    token: dict[str, Any] = field(init=False)
     """A dictionary providing the authentication token for the API."""
     community: str = field(init=False)
     """The community name to be used to publish datasets."""
@@ -338,8 +331,7 @@ def update_published_metadata(zenodo: dict, zen_res: ZenodoResources) -> ZenodoR
 
     Args:
         zenodo: A Zenodo metadata dictionary, with an updated metadata section
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        zen_res: The zenodo resources from the safedata_validator configuration.
 
     Returns:
         See [here][safedata_validator.zenodo.ZenodoResponse].
@@ -398,18 +390,18 @@ def update_published_metadata(zenodo: dict, zen_res: ZenodoResources) -> ZenodoR
 
 
 def upload_files(
-    metadata: dict,
+    zenodo: dict,
     filepaths: list[Path],
     zen_res: ZenodoResources,
     progress_bar: bool = True,
-) -> ZenodoFunctionResponseListType:
-    """Upload a file to Zenodo.
+) -> ZenodoResponse:
+    """Upload file to Zenodo.
 
-    Uploads the a list of files to an unpublished Zenodo deposit. If any filenames
-    already exists in the deposit, they will be replaced with the new content
+    Uploads a list of files to an unpublished Zenodo deposit. If any filenames already
+    exists in the deposit, they will be replaced with the new content
 
     Args:
-        metadata: The Zenodo metadata dictionary for a deposit
+        zenodo: The Zenodo metadata dictionary for a deposit
         filepaths: The path to the file to be uploaded
         progress_bar: Should the upload progress be displayed
         zen_res: The zenodo resources from the safedata_validator configuration.
@@ -435,7 +427,7 @@ def upload_files(
         # upload the file
         # - https://gist.github.com/tyhoff/b757e6af83c1fd2b7b83057adf02c139
         file_size = fpath.stat().st_size
-        api = f"{metadata['links']['bucket']}/{fpath.name}"
+        api = f"{zenodo['links']['bucket']}/{fpath.name}"
 
         with open(fpath, "rb") as file_io:
             print(f"Uploading {fpath.name}")
@@ -458,7 +450,7 @@ def upload_files(
         # trap errors in uploading file
         # - no success or mismatch in md5 checksums
         if not file_response.ok:
-            return list({}), file_response.error_message
+            return file_response
 
         # TODO - could this be inside the tqdm with call?
         #      - both are looping over the file contents
@@ -466,14 +458,17 @@ def upload_files(
         local_hash = _compute_md5(fpath)
 
         if file_response.json_data["checksum"] != f"md5:{local_hash}":
-            return list({}), "Mismatch in local and uploaded MD5 hashes"
+            # TODO - this is a bit of a hack - not really a response failure
+            file_response.ok = False
+            file_response.error_message = "Mismatch in local and uploaded MD5 hashes"
+            return file_response
 
         response_content.append(file_response.json_data)
 
-    return response_content, None
+    return file_response
 
 
-def discard_deposit(zenodo_metadata: dict, zen_res: ZenodoResources) -> ZenodoResponse:
+def discard_deposit(zenodo: dict, zen_res: ZenodoResources) -> ZenodoResponse:
     """Discard a deposit.
 
     Deposits can be discarded - the associated files and metadata will be deleted and
@@ -481,7 +476,7 @@ def discard_deposit(zenodo_metadata: dict, zen_res: ZenodoResources) -> ZenodoRe
     be deleted via the API - contact the Zenodo team for help.
 
     Args:
-        zenodo_metadata: The Zenodo metadata dictionary for a deposit
+        zenodo: The Zenodo metadata dictionary for a deposit
         zen_res: The zenodo resources from the safedata_validator configuration.
 
     Returns:
@@ -489,7 +484,7 @@ def discard_deposit(zenodo_metadata: dict, zen_res: ZenodoResources) -> ZenodoRe
     """
 
     return ZenodoResponse(
-        requests.delete(zenodo_metadata["links"]["self"], params=zen_res.token)
+        requests.delete(zenodo["links"]["self"], params=zen_res.token)
     )
 
 
@@ -498,8 +493,7 @@ def publish_deposit(zenodo: dict, zen_res: ZenodoResources) -> ZenodoResponse:
 
     Args:
         zenodo: The dataset metadata dictionary for a deposit
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        zen_res: The zenodo resources from the safedata_validator configuration..
 
     Returns:
         See [here][safedata_validator.zenodo.ZenodoResponse].
@@ -897,6 +891,35 @@ def generate_inspire_xml(
     return xml
 
 
+@dataclass
+class _CleanUpDeposit:
+    """Delete an unpublished deposit.
+
+    This is a helper class for the publication workflow that can be initialised when a
+    deposit is created and then the run method can be used to delete the unpublished
+    deposit if failures occur in the workflow.
+    """
+
+    deposit_link: str
+    "The deposit link."
+    params: dict[str, Any]
+    "The authnetication parameters for the request"
+
+    def run(self) -> None:
+        """Run the deposit deletion request and report back."""
+
+        delete_response = ZenodoResponse(
+            requests.delete(self.deposit_link, params=self.params)
+        )
+
+        if not delete_response.ok:
+            print("Issue with publication process - could not discard draft deposit.")
+            return
+
+        print("Issue with publication process - draft deposit discarded.")
+        return
+
+
 def publish_dataset(
     resources: Resources,
     dataset: Path,
@@ -1044,25 +1067,19 @@ def publish_dataset(
         # No files will need to be removed from completely new datasets.
         files_to_remove = []
 
-    # From here on, we need to trap failures and tidy up, so define an local function to
-    # handle the bail process
-    def _clean_up_and_bail(zenodo_metadata, resources) -> None:
-        """Handle the tidy up if the publication process fails."""
-        publish_response, error = discard_deposit(
-            zenodo_metadata=zenodo_metadata, resources=resources
-        )
-        print("Issue with publication process - draft deposit discarded.")
-        raise RuntimeError(error)
-
     # Create the new deposit to publish the dataset
     deposit_response = create_deposit(zen_res=zen_res, new_version=new_version)
 
+    # No need to clean up if this fails - no deposit created
     if not deposit_response.ok:
-        _clean_up_and_bail(zenodo_metadata=deposit_response, resources=resources)
+        raise RuntimeError(deposit_response.error_message)
 
-    # Report success
+    # Report success and now create the clean up instance
     zenodo_id = deposit_response.json_data["id"]
     print(f"Deposit created: {zenodo_id}")
+    clean_up_instance = _CleanUpDeposit(
+        deposit_link=deposit_response.json_data["links"]["self"], params=zen_res.token
+    )
 
     # Generate XML if requested
     if not no_xml:
@@ -1088,37 +1105,41 @@ def publish_dataset(
             if f["filename"] in files_to_remove
         ]
 
-        delete_result, error = _delete_files_from_links(
-            delete_links=removal_links, zen_res=zen_res
+        delete_files_response = _delete_files_from_links(
+            delete_links=removal_links, params=zen_res.token
         )
 
         # Handle errors
-        if error:
-            _clean_up_and_bail(
-                zenodo_metadata=deposit_response.json_data, resources=resources
-            )
+        if not delete_files_response.ok:
+            clean_up_instance.run()
+            raise RuntimeError(delete_files_response.error_message)
 
     # Post the files
     print("Uploading files:")
     upload_response = upload_files(
-        metadata=zenodo_metadata.json_data, filepaths=paths_to_upload, zen_res=zen_res
+        zenodo=deposit_response.json_data, filepaths=paths_to_upload, zen_res=zen_res
     )
     # Handle errors
     if not upload_response.ok:
-        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
+        clean_up_instance.run()
+        raise RuntimeError(upload_response.error_message)
 
     # Post the metadata
     print("Uploading deposit metadata")
     md_upload_response = upload_metadata(
-        metadata=dataset_metadata, zenodo=zenodo_metadata, zen_res=zen_res
+        metadata=dataset_metadata, zenodo=deposit_response.json_data, zen_res=zen_res
     )
     if not md_upload_response.ok:
-        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
+        clean_up_instance.run()
+        raise RuntimeError(md_upload_response.error_message)
 
     # Publish the deposit
-    publish_response = publish_deposit(zenodo=zenodo_metadata, zen_res=zen_res)
+    publish_response = publish_deposit(
+        zenodo=deposit_response.json_data, zen_res=zen_res
+    )
     if not publish_response.ok:
-        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
+        clean_up_instance.run()
+        raise RuntimeError(publish_response.error_message)
 
     # Return the new publication ID and link
     zenodo_url = publish_response.json_data["links"]["html"]
@@ -1130,9 +1151,7 @@ def publish_dataset(
 # Bibliographic and local database functions
 
 
-def download_ris_data(
-    resources: Resources | None = None, ris_file: Path | None = None
-) -> None:
+def download_ris_data(zen_res: ZenodoResources, ris_file: Path | None = None) -> None:
     """Downloads Zenodo records into a RIS format bibliography file.
 
     This function is used to maintain a bibliography file of the records
@@ -1143,17 +1162,13 @@ def download_ris_data(
     datacite.org.
 
     Args:
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        zen_res: The zenodo resources from the safedata_validator configuration.
         ris_file: The path to an existing RIS format file containing previously
             downloaded records.
 
     Returns:
         A list of strings containing RIS formatted citation data.
     """
-
-    if resources is None:
-        resources = Resources()
 
     # Get a list of known DOI records from an existing RIS file if one is
     # provided
@@ -1168,11 +1183,8 @@ def download_ris_data(
                 known_recids.append(record_id)
 
     # Zenodo API call to return the records associated with the SAFE community
-    zres = _resources_to_zenodo_api(resources)
-    z_api = zres["zapi"]
-    z_cname = zres["zcomm"]
 
-    api = f"{z_api}/records/?q=communities:{z_cname}"
+    api = f"{zen_res.api}/records/?q=communities:{zen_res.community}"
 
     # Provide feedback on DOI collection
     LOGGER.info(f"Fetching record DOIs from {api}:")
@@ -1250,9 +1262,10 @@ def download_ris_data(
 
 def sync_local_dir(
     datadir: Path,
+    zen_res: ZenodoResources,
     xlsx_only: bool = True,
     replace_modified: bool = False,
-    resources: Resources | None = None,
+    dry_run: bool = False,
 ) -> None:
     """Synchronise a local data directory with a Zenodo community.
 
@@ -1270,12 +1283,13 @@ def sync_local_dir(
     Args:
         datadir: The path to a local directory containing an existing safedata
             directory or an empty folder in which to create one.
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        zen_res: The zenodo resources from the safedata_validator configuration.
         xlsx_only: Should the download ignore large non-xlsx files, defaulting
             to True.
         replace_modified: Should the synchronisation replace locally modified files with
             the archived version. By default, modified local files are left alone.
+        dry_run: Only report on the actions to be taken, without actually making any
+            changes.
     """
 
     # Private helper functions
@@ -1286,17 +1300,12 @@ def sync_local_dir(
         with open(outf, "wb") as outf_obj:
             shutil.copyfileobj(resource.raw, outf_obj)
 
-    # Get resource configuration
-    zres = _resources_to_zenodo_api(resources)
-    zenodo_api = zres["zapi"]
-    params = zres["ztoken"]
-
     # The dir argument should be an existing path
     if not (datadir.exists() and datadir.is_dir()):
         raise OSError(f"{datadir} is not an existing directory")
 
     # Get the configured metadata api
-    api = zres["mdapi"]
+    api = zen_res.api
 
     # Check for an existing API url file and check it is congruent with config
     url_file = datadir / "url.json"
@@ -1321,24 +1330,27 @@ def sync_local_dir(
     _get_file(f"{api}/api/location_aliases", datadir / "location_aliases.csv")
 
     # Get the deposits associated with the account, which includes a list of download
-    # links
+    # links. Need to set the page parameter to the API to track paginated results.
+    params = zen_res.token.copy()
     params["page"] = 1
-    deposits = []
+    deposits: list = []
 
     LOGGER.info("Scanning Zenodo deposits")
     while True:
-        this_page = requests.get(
-            zenodo_api + "/deposit/depositions",
-            params=params,
-            json={},
-            headers={"Content-Type": "application/json"},
+        this_page = ZenodoResponse(
+            requests.get(
+                f"{zen_res.api}/deposit/depositions",
+                params=params,
+                json={},
+                headers={"Content-Type": "application/json"},
+            )
         )
 
         if not this_page.ok:
-            raise RuntimeError("Could not connect to Zenodo API. Invalid token?")
+            raise RuntimeError(this_page.error_message)
 
-        if this_page.json():
-            deposits += this_page.json()
+        if this_page.json_data:
+            deposits += this_page.json_data
             LOGGER.info(f"Page {params['page']}")
             params["page"] += 1
         else:
@@ -1362,7 +1374,8 @@ def sync_local_dir(
         rec_dir = datadir / con_rec_id / rec_id
         if not rec_dir.exists():
             LOGGER.info("Creating directory")
-            rec_dir.mkdir()
+            if not dry_run:
+                rec_dir.mkdir()
         else:
             LOGGER.info("Directory found")
 
@@ -1380,11 +1393,13 @@ def sync_local_dir(
 
             if not local_copy:
                 LOGGER.info("Downloading")
-                _get_file(this_file["links"]["download"], outf, params=params)
+                if not dry_run:
+                    _get_file(this_file["links"]["download"], outf, params=params)
             elif local_copy and _compute_md5(outf) != this_file["checksum"]:
                 if replace_modified:
                     LOGGER.info("Replacing locally modified file")
-                    _get_file(this_file["links"]["download"], outf, params=params)
+                    if not dry_run:
+                        _get_file(this_file["links"]["download"], outf, params=params)
                 else:
                     LOGGER.warning("Local copy modified")
             else:
@@ -1398,6 +1413,7 @@ def sync_local_dir(
             LOGGER.info("JSON Metadata found")
         else:
             LOGGER.info("Downloading JSON metadata ")
-            _get_file(f"{api}/api/record/{rec_id}", metadata)
+            if not dry_run:
+                _get_file(f"{api}/api/record/{rec_id}", metadata)
 
         FORMATTER.pop()
