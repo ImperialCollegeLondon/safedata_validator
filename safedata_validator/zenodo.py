@@ -14,6 +14,7 @@ import decimal
 import hashlib
 import re
 import shutil
+from dataclasses import InitVar, dataclass, field
 from datetime import datetime as dt
 from importlib import resources as il_resources  # avoid confusion with sdv.resources
 from itertools import groupby
@@ -31,107 +32,139 @@ from safedata_validator.logger import FORMATTER, LOGGER
 from safedata_validator.resources import Resources
 from safedata_validator.taxa import taxon_index_to_text
 
-# Constant definition of zenodo action function response type
-# TODO - should all of these functions just Raise? Then we could just use try
-# blocks rather than using the this approach.
-ZenodoFunctionResponseType = tuple[dict, str | None]
-"""Function return value
 
-The functions interacting with Zenodo all return a common format of tuple of length 2:
+@dataclass
+class ZenodoResponse:
+    """Zenodo response processor.
 
-* A dictionary containing the response content. For responses that do not generate a
-  response content but just indicate success via HTTP status codes, an empty dictionary
-  is returned. An empty dictionary is also returned when the function results in an
-  error. For upload files, the response is a list of such dictionaries, one for each
-  file uploaded.
-* An error message on failure or None on success
+    This dataclass is a processor around `requests.Response` objects from Zenodo calls.
+    If the response is successful, it parses the returned data payload; otherwise it
+    formats as much information as possible into an error message.
+    """
 
-So, for example:
+    response: InitVar[requests.Response]
+    """The incoming response from a Zenodo API call."""
+    ok: bool = field(init=False)
+    """Was the response ok."""
+    status_code: int = field(init=False)
+    """The status code returned by the response."""
+    json_data: dict = field(init=False, default_factory=lambda: dict())
+    """The JSON data payload from a successful response."""
+    error_message: str | None = field(init=False, default=None)
+    """A formatted error message from a failed response."""
 
-```{python}
-({'key': 'value'}, None)
-({}, 'Something went wrong')
-```
+    def __post_init__(self, response: requests.Response) -> None:
+        """Populate the ZenodoResponse object."""
+        # Basic status
+        self.ok = response.ok
+        self.status_code = response.status_code
+        # Now either populate json data or the error message
+        if self.ok:
+            self.json_data = response.json()
+        else:
+            self.build_error_message(response)
 
-The expected use pattern is then:
+    def build_error_message(self, response) -> None:
+        """Format a Zenodo JSON error response as a string."""
 
-```{python}
-response, error = zenodo_function(args)
-```
-"""
+        # Report the immediate reason and code along with the URL endpoint with the
+        # access token redacted
+        url = re.sub("(?<=access_token=).*$", "<redacted>", response.url)
+        return_string = (
+            f"\n\nZenodo error: {response.reason} "
+            f"({response.status_code})\nURL: {url}\n"
+        )
+
+        # Attempt to get any JSON data, which may contain non JSON data
+        try:
+            response_json = response.json()
+            return_string += f"Message: {response_json['message']}\n"
+        except requests.exceptions.JSONDecodeError:
+            pass
+
+        # Report on error messages in response object
+        errors = response_json.get("errors", [])
+        if errors:
+            return_string += "Errors:\n"
+            for e in errors:
+                messages = "\n    - ".join(e["messages"])
+                return_string += (
+                    f" * Messages for field {e['field']}:\n    - {messages}"
+                )
+            return_string += "\n"
+
+        self.error_message = return_string
+
 
 ZenodoFunctionResponseListType = tuple[list[dict], str | None]
 """Function return value
 
-This follows the ZenodoFunctionResponseType but returns a list of response dictionaries.
+This follows the ZenodoResponse but returns a list of response dictionaries.
 This is only used by the upload_files function, where each file upload has a response
 containing useful information.
 """
 
 
-# TODO: would make a lot more sense, particularly given the integrated
-#       publish_dataset option to have functions take the output of
-#       _resources_to_zenodo_api rather than continually recreating it inside each
-#       function. Some functions need more resources, but most do not.
+@dataclass
+class ZenodoResources:
+    """Packaging for Zenodo specific resources.
 
-
-def _resources_to_zenodo_api(resources: Resources | None = None) -> dict:
-    """Get a dictionary of the Zenodo and Metadata config from Resources.
-
-    Args:
-        resources: An instance of Resources or the default None to search for a local
-            Resources configuration file.
+    This dataclass is used to package the Zenodo specific elements of the configuration.
+    It resolves the Zenodo API to use and provides top level attributes for the key
+    Zenodo configuration components. The instance still contains the full resource
+    configuration details as the `resources` attribute for pass through to functions
+    that need wider configuration details.
     """
 
-    # Get resource configuration
-    if resources is None:
-        resources = Resources()
+    # TODO - Hmm. the resolution could be done when Resources is created, removing the
+    # need for this extra class.
 
-    # Get the Zenodo API
-    config_fail = False
+    resources: Resources | None = None
+    """A safedata_validator resources instance."""
+    api: str = field(init=False)
+    """The configured Zenodo API to be used."""
+    token: dict[str, str] = field(init=False)
+    """A dictionary providing the authentication token for the API."""
+    community: str = field(init=False)
+    """The community name to be used to publish datasets."""
+    name: str = field(init=False)
+    """The configured name for the community data contact."""
+    affiliation: str | None = field(init=False)
+    """The configured affiliation for the community data contact."""
+    orcid: str | None = field(init=False)
+    """The configured OrcID for the community data contact."""
 
-    if resources.zenodo.use_sandbox is None:
-        config_fail = True
-    elif resources.zenodo.use_sandbox:
-        zenodo_api = "https://sandbox.zenodo.org/api"
-        token = resources.zenodo.zenodo_sandbox_token
-    else:
-        zenodo_api = "https://zenodo.org/api"
-        token = resources.zenodo.zenodo_token
+    def __post_init__(self) -> None:
+        """Populate the post init attributes."""
 
-    if token is None:
-        config_fail = True
+        # Get the configuration from file if not provided
+        if self.resources is None:
+            self.resources = Resources()
 
-    # Get the contact details if used
-    contact_name = resources.zenodo.contact_name
-    contact_affiliation = None
-    contact_orcid = None
+        # Check the sandbox setting
+        sandbox = self.resources.zenodo.use_sandbox
+        if sandbox is None:
+            raise RuntimeError("safedata_validator config does not set 'use_sandbox'")
 
-    if contact_name is not None:
-        contact_affiliation = resources.zenodo.contact_affiliation
-        contact_orcid = resources.zenodo.contact_orcid
+        # Get the appropriate API and token
+        if sandbox:
+            self.api = "https://sandbox.zenodo.org/api"
+            token_name = "zenodo_sandbox_token"
+        else:
+            self.api = "https://zenodo.org/api"
+            token_name = "zenodo_token"
 
-    # # Get the metadata api
-    # metadata_api = resources.metadata.api
-    # metadata_token = resources.metadata.token
-    # if metadata_api is None or metadata_token is None:
-    #     config_fail = True
-    # metadata_ssl = resources.metadata.ssl_verify
+        token = getattr(self.resources.zenodo, token_name)
+        if token is None:
+            raise RuntimeError(f"safedata_validator config does not set {token_name}")
 
-    if config_fail:
-        raise RuntimeError("safedata_validator not configured for Zenodo functions")
+        self.token = {"access_token": token}
 
-    return {
-        "zapi": zenodo_api,
-        "ztoken": {"access_token": token},
-        "zcomm": resources.zenodo.community_name,
-        "zcname": contact_name,
-        "zcaffil": contact_affiliation,
-        "zcorc": contact_orcid,
-        # "mdapi": metadata_api,
-        # "mdtoken": metadata_token,
-        # "mdssl": metadata_ssl,
-    }
+        # Get the contact details if used
+        self.community = self.resources.zenodo.community_name
+        self.name = self.resources.zenodo.contact_name
+        self.affiliation = self.resources.zenodo.contact_affiliation
+        self.orcid = self.resources.zenodo.contact_orcid
 
 
 def _compute_md5(fname: Path) -> str:
@@ -141,36 +174,6 @@ def _compute_md5(fname: Path) -> str:
         for chunk in iter(lambda: fname_obj.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
-
-
-def _zenodo_error_message(response) -> str:
-    """Format a Zenodo JSON error response as a string."""
-
-    # Report the immediate reason and code along with the URL endpoint with the access
-    # token redacted
-    url = re.sub("(?<=access_token=).*$", "<redacted>", response.url)
-    return_string = (
-        f"\n\nZenodo error: {response.reason} ({response.status_code})\nURL: {url}\n"
-    )
-
-    # Attempt to get any JSON data
-    try:
-        response_json = response.json()
-    except requests.exceptions.JSONDecodeError:
-        return return_string
-
-    return_string += f"Message: {response_json['message']}\n"
-
-    # Report on error messages in response object
-    errors = response_json.get("errors", [])
-    if errors:
-        return_string += "Errors:\n"
-        for e in errors:
-            messages = "\n    - ".join(e["messages"])
-            return_string += f" * Messages for field {e['field']}:\n    - {messages}"
-        return_string += "\n"
-
-    return return_string
 
 
 def _min_dp(val: float, min_digits: int = 2) -> str:
@@ -192,40 +195,31 @@ def _min_dp(val: float, min_digits: int = 2) -> str:
 # Zenodo action functions
 
 
-def get_deposit(
-    deposit_id: int, resources: Resources | None = None
-) -> ZenodoFunctionResponseType:
+def get_deposit(deposit_id: int, zen_res: ZenodoResources) -> ZenodoResponse:
     """Download the metadata of a Zenodo deposit.
 
     Args:
         deposit_id: The Zenodo record id of an existing dataset.
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        zen_res: The zenodo resources from the safedata_validator configuration.
 
     Returns:
-        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
+        See [here][safedata_validator.zenodo.ZenodoResponse].
     """
 
-    zres = _resources_to_zenodo_api(resources)
-    zenodo_api = zres["zapi"]
-    params = zres["ztoken"]
-
-    # request the deposit
-    dep = requests.get(
-        f"{zenodo_api}/deposit/depositions/{deposit_id}", params=params, json={}
+    # Return the processed response object
+    return ZenodoResponse(
+        requests.get(
+            f"{zen_res.api}/deposit/depositions/{deposit_id}",
+            params=zen_res.token,
+            json={},
+        )
     )
-
-    # check for success and return the information.
-    if dep.status_code == 200:
-        return dep.json(), None
-    else:
-        return {}, _zenodo_error_message(dep)
 
 
 def create_deposit(
+    zen_res: ZenodoResources,
     new_version: int | None = None,
-    resources: Resources | None = None,
-) -> ZenodoFunctionResponseType:
+) -> ZenodoResponse:
     """Create a new deposit.
 
     Creates a new deposit draft, possibly as a new version of an existing published
@@ -236,50 +230,35 @@ def create_deposit(
     Args:
         new_version: Optionally, create a new version of the dataset with the provided
             Zenodo ID.
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        zen_res: The zenodo resources from the safedata_validator configuration.
 
     Returns:
-        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
+        See [here][safedata_validator.zenodo.ZenodoResponse].
     """
-
-    # Get resource configuration
-    zres = _resources_to_zenodo_api(resources)
-    zenodo_api = zres["zapi"]
-    params = zres["ztoken"]
 
     # get the correct draft api
     if new_version is None:
-        api = f"{zenodo_api}/deposit/depositions"
+        api = f"{zen_res.api}/deposit/depositions"
     else:
-        api = f"{zenodo_api}/deposit/depositions/{new_version}/actions/newversion"
+        api = f"{zen_res.api}/deposit/depositions/{new_version}/actions/newversion"
 
     # Create the draft
-    new_draft = requests.post(api, params=params, json={})
+    create_response = ZenodoResponse(requests.post(api, params=zen_res.token, json={}))
 
-    # trap errors in creating the new version (not 201: created)
-    if new_draft.status_code != 201:
-        return {}, _zenodo_error_message(new_draft)
-
-    if new_version is None:
-        return new_draft.json(), None
+    # Return the reponse on failure or if the request is not for a new version
+    if not create_response.ok or new_version is None:
+        return create_response
 
     # For new versions, the response is an update to the existing copy,
-    # so need to separately retrieve the new draft
-    api = new_draft.json()["links"]["latest_draft"]
-    dep = requests.get(api, params=params, json={})
+    # so need to separately retrieve the new draft and return that
+    api = create_response.json_data["links"]["latest_draft"]
 
-    # trap errors in creating the resource - successful creation of new version
-    #  drafts returns 200
-    if dep.status_code != 200:
-        return {}, _zenodo_error_message(dep)
-    else:
-        return dep.json(), None
+    return ZenodoResponse(requests.get(api, params=zen_res.token, json={}))
 
 
 def upload_metadata(
-    metadata: dict, zenodo: dict, resources: Resources | None = None
-) -> ZenodoFunctionResponseType:
+    metadata: dict, zenodo: dict, zen_res: ZenodoResources
+) -> ZenodoResponse:
     """Upload dataset metadata.
 
     Takes a dictionary of dataset metadata, converts it to a JSON payload of Zenodo
@@ -288,15 +267,11 @@ def upload_metadata(
     Args:
         metadata: The metadata dictionary for a dataset
         zenodo: The zenodo metadata dictionary for a deposit
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        zen_res: The zenodo resources from the safedata_validator configuration.
 
     Returns:
-        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
+        See [here][safedata_validator.zenodo.ZenodoResponse].
     """
-
-    # Get resource configuration
-    zres = _resources_to_zenodo_api(resources)
 
     # basic contents
     zen_md = {
@@ -306,18 +281,18 @@ def upload_metadata(
             "title": metadata["title"],
             "keywords": metadata["keywords"],
             "license": "cc-by",
-            "communities": [{"identifier": zres["zcomm"]}],
+            "communities": [{"identifier": zen_res.community}],
         }
     }
 
     # Add a contact name to contributors if provided in config
-    if zres["zcname"] is not None:
+    if zen_res.name is not None:
         zen_md["metadata"]["contributors"] = [
             {
-                "name": zres["zcname"],
+                "name": zen_res.name,
                 "type": "ContactPerson",
-                "affiliation": zres["zcaffil"],
-                "orcid": zres["zcorc"],
+                "affiliation": zen_res.affiliation,
+                "orcid": zen_res.orcid,
             }
         ]
 
@@ -344,23 +319,16 @@ def upload_metadata(
 
     # Add the html description
     zen_md["metadata"]["description"] = dataset_description(
-        dataset_metadata=metadata, resources=resources
+        dataset_metadata=metadata, resources=zen_res.resources
     )
 
-    # attach the metadata to the deposit resource
-    mtd = requests.put(zenodo["links"]["self"], params=zres["ztoken"], json=zen_md)
-
-    # trap errors in uploading metadata and tidy up
-    if mtd.status_code != 200:
-        return {}, mtd.reason
-    else:
-        return {}, None
+    # Process the response from putting the metadata
+    return ZenodoResponse(
+        requests.put(zenodo["links"]["self"], params=zen_res.token, json=zen_md)
+    )
 
 
-def update_published_metadata(
-    zenodo: dict,
-    resources: Resources | None = None,
-) -> ZenodoFunctionResponseType:
+def update_published_metadata(zenodo: dict, zen_res: ZenodoResources) -> ZenodoResponse:
     """Update published deposit metadata.
 
     Updates the metadata on a published deposit, for example to modify the access status
@@ -374,66 +342,66 @@ def update_published_metadata(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
+        See [here][safedata_validator.zenodo.ZenodoResponse].
     """
 
-    # Get resource configuration
-    zres = _resources_to_zenodo_api(resources)
-
-    links = zenodo["links"]
-
-    # Unlock the published deposit for editing
-    edt = requests.post(links["edit"], params=zres["ztoken"])
-
-    if edt.status_code != 201:
-        return {}, edt.json()
-
-    # # Amend the metadata
-    # for key, val in new_values.items():
-    #     if val is not None:
-    #         metadata[key] = val
-    #     elif key in metadata:
-    #         metadata.pop(key)
-
-    # If any API calls from now fail, we need to tidy up the edit
-    # status of the record, or it will block subsequent attempts
-
-    upd = requests.put(
-        links["self"],
-        params=zres["ztoken"],
-        headers={"Content-Type": "application/json"},
-        data=simplejson.dumps({"metadata": zenodo["metadata"]}),
+    # Unlock the published deposit for editing - and simple fail if that doesn't work
+    edit_response = ZenodoResponse(
+        requests.post(zenodo["links"]["edit"], params=zen_res.token)
     )
 
-    success_so_far = 0 if upd.status_code != 200 else 1
-    ret = upd.json()
+    if not edit_response.ok:
+        return edit_response
+
+    # If any API calls from now fail, we need to tidy up the edit status of the record,
+    # or it will block subsequent attempts
+    failed = False
+
+    update_response = ZenodoResponse(
+        requests.put(
+            zenodo["links"]["self"],
+            params=zen_res.token,
+            headers={"Content-Type": "application/json"},
+            data=simplejson.dumps({"metadata": zenodo["metadata"]}),
+        )
+    )
+
+    if not update_response.ok:
+        failed = True
+        failed_response = update_response
 
     # Republish to save the changes
-    if success_so_far:
-        pub = requests.post(links["publish"], params=zres["ztoken"])
-        success_so_far = 0 if pub.status_code != 202 else 1
-        ret = pub.json()
+    if not failed:
+        publish_response = ZenodoResponse(
+            requests.post(zenodo["links"]["publish"], params=zen_res.token)
+        )
+
+        if not publish_response.ok:
+            failed = True
+            failed_response = publish_response
 
     # If all steps have been successful, return a 0 code, otherwise
     # try to discard the edits and return the most recent failure
     # notice
 
-    if success_so_far:
-        return ret, None
+    if not failed:
+        return publish_response
     else:
-        dsc = requests.post(links["discard"], params=zres["ztoken"])
-        success_so_far = 0 if dsc.status_code != 201 else 1
-        if not success_so_far:
-            ret = dsc.json()
+        discard_response = ZenodoResponse(
+            requests.post(zenodo["links"]["discard"], params=zen_res.token)
+        )
 
-        return {}, ret
+        if not discard_response.ok:
+            failed_response = discard_response
+
+        return failed_response
 
 
 def upload_files(
     metadata: dict,
     filepaths: list[Path],
+    zen_res: ZenodoResources,
     progress_bar: bool = True,
-    resources: Resources | None = None,
 ) -> ZenodoFunctionResponseListType:
     """Upload a file to Zenodo.
 
@@ -444,16 +412,12 @@ def upload_files(
         metadata: The Zenodo metadata dictionary for a deposit
         filepaths: The path to the file to be uploaded
         progress_bar: Should the upload progress be displayed
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        zen_res: The zenodo resources from the safedata_validator configuration.
+
 
     Returns:
-        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
+        See [here][safedata_validator.zenodo.ZenodoResponse].
     """
-
-    # Get resource configuration
-    zres = _resources_to_zenodo_api(resources)
-    params = zres["ztoken"]
 
     # Ensure filepaths are paths, resolve them and check they are all existing files
     filepaths = [Path(f) for f in filepaths]
@@ -483,32 +447,33 @@ def upload_files(
                     wrapped_file = CallbackIOWrapper(
                         upload_monitor.update, file_io, "read"
                     )
-                    fls = requests.put(api, data=wrapped_file, params=params)
+                    file_response = ZenodoResponse(
+                        requests.put(api, data=wrapped_file, params=zen_res.token)
+                    )
             else:
-                fls = requests.put(api, data=file_io, params=params)
+                file_response = ZenodoResponse(
+                    requests.put(api, data=file_io, params=zen_res.token)
+                )
 
         # trap errors in uploading file
         # - no success or mismatch in md5 checksums
-        if fls.status_code != 201:
-            return list({}), _zenodo_error_message(fls)
+        if not file_response.ok:
+            return list({}), file_response.error_message
 
         # TODO - could this be inside the tqdm with call?
         #      - both are looping over the file contents
         # https://medium.com/codex/chunked-uploads-with-binary-files-in-python-f0c48e373a91
         local_hash = _compute_md5(fpath)
 
-        fls_json: dict = fls.json()
-        if fls_json["checksum"] != f"md5:{local_hash}":
+        if file_response.json_data["checksum"] != f"md5:{local_hash}":
             return list({}), "Mismatch in local and uploaded MD5 hashes"
 
-        response_content.append(fls_json)
+        response_content.append(file_response.json_data)
 
     return response_content, None
 
 
-def discard_deposit(
-    zenodo_metadata: dict, resources: Resources | None = None
-) -> ZenodoFunctionResponseType:
+def discard_deposit(zenodo_metadata: dict, zen_res: ZenodoResources) -> ZenodoResponse:
     """Discard a deposit.
 
     Deposits can be discarded - the associated files and metadata will be deleted and
@@ -517,28 +482,18 @@ def discard_deposit(
 
     Args:
         zenodo_metadata: The Zenodo metadata dictionary for a deposit
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        zen_res: The zenodo resources from the safedata_validator configuration.
 
     Returns:
-        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
+        See [here][safedata_validator.zenodo.ZenodoResponse].
     """
 
-    # Get resource configuration
-    zres = _resources_to_zenodo_api(resources)
-    params = zres["ztoken"]
-
-    delete = requests.delete(zenodo_metadata["links"]["self"], params=params)
-
-    if delete.status_code == 204:
-        return {"result": "success"}, None
-    else:
-        return {}, _zenodo_error_message(delete)
+    return ZenodoResponse(
+        requests.delete(zenodo_metadata["links"]["self"], params=zen_res.token)
+    )
 
 
-def publish_deposit(
-    zenodo: dict, resources: Resources | None = None
-) -> ZenodoFunctionResponseType:
+def publish_deposit(zenodo: dict, zen_res: ZenodoResources) -> ZenodoResponse:
     """Publish a created deposit.
 
     Args:
@@ -547,53 +502,43 @@ def publish_deposit(
             none is provided, the standard locations are checked.
 
     Returns:
-        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
+        See [here][safedata_validator.zenodo.ZenodoResponse].
     """
 
-    # Get resource configuration
-    zres = _resources_to_zenodo_api(resources)
-    params = zres["ztoken"]
-
-    # publish
-    pub = requests.post(zenodo["links"]["publish"], params=params)
-
-    # trap errors in publishing, otherwise return the publication metadata
-    if pub.status_code != 202:
-        return {}, pub.json()
-    else:
-        return pub.json(), None
+    # Return the processed publish request
+    return ZenodoResponse(
+        requests.post(zenodo["links"]["publish"], params=zen_res.token)
+    )
 
 
 def delete_files(
-    metadata: dict, filenames: list[str], resources: Resources | None = None
-) -> ZenodoFunctionResponseType:
+    metadata: dict,
+    filenames: list[str],
+    zen_res: ZenodoResources,
+) -> ZenodoResponse:
     """Delete an uploaded file from an unpublished Zenodo deposit.
 
     Args:
         metadata: The Zenodo metadata dictionary for a deposit
         filenames: A list of files to delete from the deposit
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        zen_res: The zenodo resources from the safedata_validator configuration.
 
     Returns:
-        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
+        See [here][safedata_validator.zenodo.ZenodoResponse].
     """
 
-    # Get resource configuration
-    zres = _resources_to_zenodo_api(resources)
-    params = zres["ztoken"]
-
-    # get an up to date list of existing files (metadata
-    # might be outdated)
-    files = requests.get(metadata["links"]["files"], params=params)
+    # get an up to date list of existing files (metadata might be outdated)
+    files_response = ZenodoResponse(
+        requests.get(metadata["links"]["files"], params=zen_res.token)
+    )
 
     # check the result of the files request
-    if files.status_code != 200:
+    if not files_response.ok:
         # failed to get the files
-        return {}, _zenodo_error_message(files)
+        return files_response
 
     # Get a dictionary of the available file links
-    files_dict = {f["filename"]: f["links"]["self"] for f in files.json()}
+    files_dict = {f["filename"]: f["links"]["self"] for f in files_response.json_data}
 
     # Get matching files
     unknown_files = []
@@ -605,12 +550,15 @@ def delete_files(
             unknown_files.append(file)
 
     if unknown_files:
-        return {}, f"Files not found in the deposit: {','.join(unknown_files)}"
+        files_response.error_message = (
+            f"Files not found in the deposit: {','.join(unknown_files)}"
+        )
+        return files_response
 
-    return _delete_files_from_links(delete_links=delete_links, params=params)
+    return _delete_files_from_links(delete_links=delete_links, params=zen_res.token)
 
 
-def _delete_files_from_links(delete_links: list[str], params: dict):
+def _delete_files_from_links(delete_links: list[str], params: dict) -> ZenodoResponse:
     """Delete files from Zenodo deposit from a list of API links.
 
     This private method is used to delete files from a deposit using a list of the
@@ -625,12 +573,12 @@ def _delete_files_from_links(delete_links: list[str], params: dict):
     """
 
     for link in delete_links:
-        file_del = requests.delete(link, params=params)
+        file_del_response = ZenodoResponse(requests.delete(link, params=params))
 
-        if file_del.status_code != 204:
-            return {}, _zenodo_error_message(file_del)
+        if not file_del_response.ok:
+            return file_del_response
 
-    return {"result": "success"}, None
+    return file_del_response
 
 
 """
@@ -1025,25 +973,27 @@ def publish_dataset(
     if not no_xml and (None in resources.xml.values()):
         raise ValueError("XML requested and XML configuration section is incomplete.")
 
+    # Generate the ZenodoResources object
+    zen_res = ZenodoResources(resources=resources)
+
     # For new versions of an existing dataset, get the existing dataset metadata and
     # figure out which files are being changed.
     if new_version is not None:
         # Get the requested version data
-        requested_version_metadata, error = get_deposit(
-            deposit_id=new_version, resources=resources
-        )
-        if error:
-            # Report on the failure to get the existing version data
-            raise RuntimeError(error)
+        requested_version = get_deposit(deposit_id=new_version, zen_res=zen_res)
+
+        # Report on the failure to get the existing version data
+        if not requested_version.ok:
+            raise RuntimeError(requested_version.error_message)
 
         # Check if that is the latest version, because that is what is _actually_ cloned
         # when a version is requested and we need to get the most recent file listing to
         # update the files sanely.
-        latest_version_metadata = requests.get(
-            requested_version_metadata["links"]["latest"]
-        ).json()
+        latest_version = ZenodoResponse(
+            requests.get(requested_version.json_data["links"]["latest"])
+        )
 
-        latest_id = latest_version_metadata["id"]
+        latest_id = latest_version.json_data["id"]
 
         if latest_id != new_version:
             raise RuntimeError(
@@ -1056,7 +1006,7 @@ def publish_dataset(
         incoming_files = {(p.name, _compute_md5(p)) for p in paths_to_upload}
         existing_files = {
             (p["key"], p["checksum"].removeprefix("md5:"))
-            for p in latest_version_metadata["files"]
+            for p in latest_version.json_data["files"]
         }
 
         # Split files into files to be upload, files to be deleted from deposit and
@@ -1105,22 +1055,20 @@ def publish_dataset(
         raise RuntimeError(error)
 
     # Create the new deposit to publish the dataset
-    zenodo_metadata, error = create_deposit(
-        resources=resources, new_version=new_version
-    )
+    deposit_response = create_deposit(zen_res=zen_res, new_version=new_version)
 
-    if error:
-        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
+    if not deposit_response.ok:
+        _clean_up_and_bail(zenodo_metadata=deposit_response, resources=resources)
 
     # Report success
-    zenodo_id = zenodo_metadata["id"]
+    zenodo_id = deposit_response.json_data["id"]
     print(f"Deposit created: {zenodo_id}")
 
     # Generate XML if requested
     if not no_xml:
         xml_content = generate_inspire_xml(
             dataset_metadata=dataset_metadata,
-            zenodo_metadata=zenodo_metadata,
+            zenodo_metadata=deposit_response.json_data,
             resources=resources,
         )
 
@@ -1132,52 +1080,48 @@ def publish_dataset(
 
     # Remove any outdated files from deposits created as new versions
     if files_to_remove:
-        # Get the authentication parameters - see TODO at top about passing zres around
-        zres = _resources_to_zenodo_api(resources)
-        params = zres["ztoken"]
-
         # Get all of the file links returned by create_deposit and then delete them.
         print(f"Removing outdated files: {','.join(files_to_remove)}")
         removal_links = [
             f["links"]["self"]
-            for f in zenodo_metadata["files"]
+            for f in deposit_response.json_data["files"]
             if f["filename"] in files_to_remove
         ]
 
         delete_result, error = _delete_files_from_links(
-            delete_links=removal_links, params=params
+            delete_links=removal_links, zen_res=zen_res
         )
 
         # Handle errors
         if error:
-            _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
+            _clean_up_and_bail(
+                zenodo_metadata=deposit_response.json_data, resources=resources
+            )
 
     # Post the files
     print("Uploading files:")
-    file_upload_response, error = upload_files(
-        metadata=zenodo_metadata, filepaths=paths_to_upload, resources=resources
+    upload_response = upload_files(
+        metadata=zenodo_metadata.json_data, filepaths=paths_to_upload, zen_res=zen_res
     )
     # Handle errors
-    if error:
+    if not upload_response.ok:
         _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
 
     # Post the metadata
     print("Uploading deposit metadata")
-    md_upload_response, error = upload_metadata(
-        metadata=dataset_metadata, zenodo=zenodo_metadata, resources=resources
+    md_upload_response = upload_metadata(
+        metadata=dataset_metadata, zenodo=zenodo_metadata, zen_res=zen_res
     )
-    if error:
+    if not md_upload_response.ok:
         _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
 
     # Publish the deposit
-    publish_response, error = publish_deposit(
-        zenodo=zenodo_metadata, resources=resources
-    )
-    if error:
+    publish_response = publish_deposit(zenodo=zenodo_metadata, zen_res=zen_res)
+    if not publish_response.ok:
         _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
 
     # Return the new publication ID and link
-    zenodo_url = publish_response["links"]["html"]
+    zenodo_url = publish_response.json_data["links"]["html"]
     print(f"Dataset published: {zenodo_url}")
 
     return (zenodo_id, zenodo_url)
