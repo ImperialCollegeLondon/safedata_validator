@@ -781,7 +781,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     elif args.subcommand == "discard_deposit":
         # Load the Zenodo deposit JSON, which contains API links
-        with open(args.zenodo_json) as dep_json:
+        with open(args.zenodo_json, encoding="utf-8") as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Run the command
@@ -830,7 +830,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         LOGGER.info(f"Metadata downloaded to: {outfile}")
 
     elif args.subcommand == "publish_deposit":
-        with open(args.zenodo_json) as zn_json:
+        with open(args.zenodo_json, encoding="utf-8") as zn_json:
             zenodo_json_data = simplejson.load(zn_json)
 
         # Run the function
@@ -849,7 +849,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     elif args.subcommand == "upload_files":
         # Load the Zenodo deposit JSON, which contains API links
-        with open(args.zenodo_json) as dep_json:
+        with open(args.zenodo_json, encoding="utf-8") as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Run the command - the response here has a different type so use a different
@@ -870,7 +870,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     elif args.subcommand == "delete_files":
         # Load the Zenodo deposit JSON, which contains API links
-        with open(args.zenodo_json) as dep_json:
+        with open(args.zenodo_json, encoding="utf-8") as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Run the command
@@ -886,10 +886,10 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     elif args.subcommand == "upload_metadata":
         # Open the two JSON files
-        with open(args.dataset_json) as ds_json:
+        with open(args.dataset_json, encoding="utf-8") as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        with open(args.zenodo_json) as zn_json:
+        with open(args.zenodo_json, encoding="utf-8") as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
         # Run the function
@@ -904,7 +904,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             LOGGER.info("Metadata uploaded")
 
     elif args.subcommand == "amend_metadata":
-        with open(args.deposit_json_update) as zn_json_update:
+        with open(args.deposit_json_update, encoding="utf-8") as zn_json_update:
             zenodo_json_update = simplejson.load(zn_json_update)
 
         # Run the function
@@ -933,7 +933,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     elif args.subcommand == "generate_html":
         # Run the download RIS data function
-        with open(args.dataset_json) as ds_json:
+        with open(args.dataset_json, encoding="utf-8") as ds_json:
             dataset_json = simplejson.load(ds_json)
 
         generated_html = dataset_description(
@@ -952,10 +952,10 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     elif args.subcommand == "generate_xml":
         # Open the two JSON files
-        with open(args.dataset_json) as ds_json:
+        with open(args.dataset_json, encoding="utf-8") as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        with open(args.zenodo_json) as zn_json:
+        with open(args.zenodo_json, encoding="utf-8") as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
         if args.lineage_statement is not None:
@@ -983,7 +983,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         LOGGER.info("Inspire XML generated")
 
     elif args.subcommand == "publish_dataset":
-        with open(args.dataset_json) as ds_json:
+        with open(args.dataset_json, encoding="utf-8") as ds_json:
             dataset_json = simplejson.load(ds_json)
 
         # Publish the dataset, trapping the possible exceptions to simply print a
@@ -1144,10 +1144,10 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
     # Handle the remaining subcommands
     if args.subcommand == "post_metadata":
         # Open the two JSON files
-        with open(args.dataset_json) as ds_json:
+        with open(args.dataset_json, encoding="utf-8") as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        with open(args.zenodo_json) as zn_json:
+        with open(args.zenodo_json, encoding="utf-8") as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
         # Run the function
