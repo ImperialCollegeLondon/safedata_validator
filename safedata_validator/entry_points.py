@@ -235,7 +235,7 @@ def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
 
     # Output JSON file
     json_file = args.json or os.path.splitext(args.filename)[0] + ".json"
-    with open(json_file, "w") as json_out:
+    with open(json_file, "w", encoding="utf-8") as json_out:
         json_out.write(ds.to_json())
 
     sys.stdout.write("File validation passed\n")
@@ -771,7 +771,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         LOGGER.info(f"Created deposit: {rec_id}")
         outfile = os.path.join(os.getcwd(), f"zenodo_{rec_id}.json")
 
-        with open(outfile, "w") as outf:
+        with open(outfile, "w", encoding="utf-8") as outf:
             simplejson.dump(response, outf)
             LOGGER.info(f"Zenodo deposit metadata downloaded to: {outfile}")
 
@@ -804,7 +804,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
         # Dump the response to a JSON file
         outfile = os.path.join(os.getcwd(), f"zenodo_{args.zenodo_id}.json")
-        with open(outfile, "w") as outf:
+        with open(outfile, "w", encoding="utf-8") as outf:
             simplejson.dump(response, outf)
 
         # Print a short summary
@@ -843,7 +843,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
         # Update the Zenodo JSON file with publication details
         LOGGER.info(f"Published to: {response['links']['record']}")
-        with open(args.zenodo_json, "w") as zn_json:
+        with open(args.zenodo_json, "w", encoding="utf-8") as zn_json:
             simplejson.dump(response, zn_json)
             LOGGER.info("Zenodo metadata updated")
 
@@ -945,7 +945,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             LOGGER.error("HTML output file already exists")
             return 1
 
-        with open(out_path, "w") as outf:
+        with open(out_path, "w", encoding="utf-8") as outf:
             outf.write(generated_html)
 
         LOGGER.info("HTML generated")
