@@ -32,7 +32,7 @@ dest_db.commit()
 
 
 # Get unique, non-user GBIF IDs from the data
-ncbi_ids = set([int(d["ncbi_id"]) for d in data])
+ncbi_ids = {int(d["ncbi_id"]) for d in data}
 
 # Store user provided IDs to iterate over
 prov_ids = list(ncbi_ids)

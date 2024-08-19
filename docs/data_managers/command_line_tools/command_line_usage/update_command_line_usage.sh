@@ -1,3 +1,4 @@
+#!/bin/bash
 # This script echoes the command line usage for script tools to files in this
 # directory that can then be transcluded into markdown files using the 
 # mkdocs plugin include-markdown. The syntax is:
@@ -18,8 +19,8 @@ echo "cl_prompt $ safedata_zenodo -h" > safedata_zenodo_top.txt
 safedata_zenodo -h >> safedata_zenodo_top.txt
 
 subcommands=(create_deposit get_deposit discard_deposit publish_deposit \
-             upload_file delete_file upload_metadata amend_metadata \
-             sync_local_dir maintain_ris generate_html generate_xml show_resources)
+             upload_files delete_files upload_metadata amend_metadata \
+             sync_local_dir maintain_ris generate_html generate_xml publish_dataset)
 
 for subc in "${subcommands[@]}";
 do
@@ -31,7 +32,7 @@ done
 echo "cl_prompt $ safedata_metadata -h" > safedata_metadata_top.txt
 safedata_metadata -h >> safedata_metadata_top.txt
 
-subcommands=(post_metadata update_resources show_resources)
+subcommands=(post_metadata update_resources)
 
 for subc in "${subcommands[@]}";
 do

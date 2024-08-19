@@ -3,6 +3,7 @@
 import os
 import sys
 from collections import OrderedDict
+from importlib import resources as il_resources
 
 import appdirs
 import certifi
@@ -56,6 +57,21 @@ def fixture_files():
     # Need to provide the path to the certifi CA bundle or requests breaks!
     real_files["certifi"] = certifi.where()
 
+    # Provide a path to the XML and HTML template locations
+    real_files["xml_template"] = il_resources.files(
+        "safedata_validator.templates"
+    ).joinpath("gemini_xml_template.xml")
+
+    real_files["html_template"] = il_resources.files(
+        "safedata_validator.templates"
+    ).joinpath("description_template.html")
+
+    # Now handle the special case of the example file (stored in documentation)
+    example_dir = os.path.join(
+        os.path.dirname(__file__), "../docs/data_providers/data_format"
+    )
+    example_file = {"example_file": os.path.join(example_dir, "Example.xlsx")}
+
     # Virtual file paths for the locations of config files.
     virtual_files = {
         "user_config": os.path.join(
@@ -72,7 +88,7 @@ def fixture_files():
 
     return DotMap(
         dict(
-            rf=real_files,
+            rf=real_files | example_file,
             vf=virtual_files,
             mf=os.path.join(fixture_dir, "thisfiledoesnotexist"),
         )
@@ -135,10 +151,18 @@ def config_filesystem(fs):
         "[zenodo]",
         "community_name = safe",
         "use_sandbox = True",
-        "zenodo_sandbox_api = https://sandbox.zenodo.org",
         "zenodo_sandbox_token = xyz",
-        "zenodo_api = https://api.zenodo.org",
         "zenodo_token = xyz",
+        "project_url = https://safeproject.net/projects/project_view/PROJECT_ID",
+        "[xml]",
+        "languageCode=eng",
+        "characterSet=utf8",
+        "contactCountry=United Kingdom",
+        "contactEmail=admin@safeproject.net",
+        "epsgCode=4326",
+        "citationMDIdentifier=safe_project_dataset_website",
+        "topicCategories=biota,environment,geoscientificInformation",
+        "lineageStatement=A lineage statement",
     ]
 
     # Create config with local paths in the fixture directory

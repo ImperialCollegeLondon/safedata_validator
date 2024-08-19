@@ -4,8 +4,6 @@ then also be used to track which of the validated set of locations is used in th
 of the dataset.
 """  # noqa D415
 
-from typing import List, Optional
-
 from openpyxl.worksheet.worksheet import Worksheet
 from shapely import wkt
 from shapely.errors import WKTReadingError
@@ -58,8 +56,8 @@ class Locations:
     def __init__(
         self,
         resources: Resources,
-        latitudinal_extent: Optional[Extent] = None,
-        longitudinal_extent: Optional[Extent] = None,
+        latitudinal_extent: Extent | None = None,
+        longitudinal_extent: Extent | None = None,
     ) -> None:
         self.n_errors = 0
         self.locations: set = set()
@@ -176,12 +174,12 @@ class Locations:
         self.n_errors = handler.counters["ERROR"] - start_errors
 
         if self.n_errors > 0:
-            LOGGER.info("Locations contains {} errors".format(self.n_errors))
+            LOGGER.info(f"Locations contains {self.n_errors} errors")
         else:
-            LOGGER.info("{} locations loaded correctly".format(len(self.locations)))
+            LOGGER.info(f"{len(self.locations)} locations loaded correctly")
 
     @loggerinfo_push_pop("Checking new locations")
-    def add_new_locations(self, locs: List[dict]):
+    def add_new_locations(self, locs: list[dict]):
         """Add new locations to a Locations instance.
 
         This method takes a list of dictionaries giving the details of new locations to
@@ -203,7 +201,7 @@ class Locations:
         # Validation - TODO check locs is a list of dicts
 
         # - Do all the dicts have the same keys
-        loc_keys = set([tuple(k.keys()) for k in locs])
+        loc_keys = {tuple(k.keys()) for k in locs}
         if len(loc_keys) > 1:
             LOGGER.critical("Inconsistent keys in add_new_locations")
             return
@@ -452,7 +450,7 @@ class Locations:
             )
 
         # Enforce strings and check loc names exist
-        loc_names_as_str = set([str(v) for v in loc_names_standardised])
+        loc_names_as_str = {str(v) for v in loc_names_standardised}
         unknown = loc_names_as_str - self.known_loc_names
         if unknown:
             LOGGER.error(

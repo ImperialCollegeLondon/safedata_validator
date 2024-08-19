@@ -1,4 +1,5 @@
 """Test that Extent logs correctly."""
+
 from contextlib import contextmanager
 from logging import CRITICAL, ERROR, WARNING
 
@@ -42,9 +43,7 @@ def does_not_raise():
     ],
 )
 def test_extent_init(caplog, datatype, hbounds, sbounds, exp_exception, expected_log):
-
     with exp_exception:
-
         Extent(
             label="test", datatype=datatype, hard_bounds=hbounds, soft_bounds=sbounds
         )
@@ -70,7 +69,6 @@ def test_extent_init(caplog, datatype, hbounds, sbounds, exp_exception, expected
     ],
 )
 def test_extent_update(caplog, values, expected_log):
-
     ext = Extent(
         label="test", datatype=(int,), hard_bounds=(0, 120), soft_bounds=(45, 60)
     )

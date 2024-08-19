@@ -77,7 +77,7 @@ the datasets and provide dataset descriptions. As files in other formats are des
 within the formatted Excel files, they can be uploaded directly to Zenodo - this is
 likely to be much faster and much kinder to the metadata server.
 
-However, as we discuss [here](../availability.md#data-administration), all data
+However, as we discuss [here](../availability.md#data-curation), all data
 submitted to your project's Zenodo community must be published using its central
 administrative account. The process to include other file formats in a dataset is
 therefore:

@@ -3,7 +3,7 @@ and to expose some global logging objects for use throughout the code.
 
 1. The `logging.LogRecordFactory` is updated so that new records include a custom
    `levelcode` attribute to visually indicate log record severity in validation
-   reports. 
+   reports.
 
 2. The [IndentFormatter][safedata_validator.logger.IndentFormatter] class then extends
    :class:`logging.Formatter` to provide compact messages with variable indentation to
@@ -29,11 +29,10 @@ and to expose some global logging objects for use throughout the code.
 """  # noqa D415
 
 import logging
+from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Optional
-
-from typing_extensions import Type
+from typing import Any
 
 LOGGER_CODES = {
     "DEBUG": ">",
@@ -134,7 +133,7 @@ class IndentFormatter(logging.Formatter):
     def __init__(
         self,
         fmt: str = "%(levelcode)s %(message)s",
-        datefmt: Optional[str] = None,
+        datefmt: str | None = None,
         indent: str = "    ",
     ) -> None:
         logging.Formatter.__init__(self, fmt, datefmt)
@@ -203,6 +202,7 @@ def use_file_logging(filename: Path, level: int = logging.DEBUG) -> None:
 
     Args:
         filename: The path to a file to use for logging.
+        level: The lowest logging level to be recorded in the file.
 
     Raises:
         RuntimeError: If the file handler already exists. If the logging is to move to a
@@ -285,7 +285,7 @@ def get_handler():
 
 
 def log_and_raise(
-    msg: str, exception: Type[Exception], extra: Optional[dict] = None
+    msg: str, exception: type[Exception], extra: dict | None = None
 ) -> None:
     """Emit a critical error message and raise an Exception.
 

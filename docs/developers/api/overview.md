@@ -18,7 +18,9 @@ components of the validation process.
 * The [`resources` module](./resources.md) is used to load and validate the
   [configuration file](../../data_managers/install/configuration.md).
 * The [`extent` module](./extent.md) is used to configure and track the [temporal and
-  spatial extents](../../data_managers/install/configuration.md#extents) of a dataset.
+  spatial
+  extents](../../data_managers/install/configuration.md#validation-configuration) of a
+  dataset.
 * The [`logger` module](./logger.md) is used to set up logging of the validation
   process. Logging is a core component of the system, because the validation process is
   written to work through the whole file, logging issues as it goes, rather than exiting

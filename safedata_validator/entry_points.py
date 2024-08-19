@@ -10,12 +10,12 @@ This module provides functions exposed as command line entry points:
 """
 
 import argparse
+import datetime
 import os
 import sys
 import tempfile
 import textwrap
 from pathlib import Path
-from typing import Optional
 
 import simplejson
 
@@ -41,15 +41,16 @@ from safedata_validator.taxondb import (
 from safedata_validator.zenodo import (
     create_deposit,
     dataset_description,
-    delete_file,
+    delete_files,
     discard_deposit,
     download_ris_data,
     generate_inspire_xml,
     get_deposit,
+    publish_dataset,
     publish_deposit,
     sync_local_dir,
     update_published_metadata,
-    upload_file,
+    upload_files,
     upload_metadata,
 )
 
@@ -59,7 +60,24 @@ def _desc_formatter(prog):
     return argparse.RawDescriptionHelpFormatter(prog, max_help_position=16)
 
 
-def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
+def _show_resources(resources: Resources) -> None:
+    """Simple function to print out the resources to the display."""
+
+    print("\nValidation extents:")
+    for key, val in resources.extents.items():
+        # handle date formatting
+        if val is not None and isinstance(val[0], datetime.date):
+            val = [v.isoformat() for v in val]
+        print(f" - {key}: {val}")
+    print("\nZenodo configuration:")
+    for key, val in resources.zenodo.items():
+        print(f" - {key}: {val}")
+    print("\nMetadata server configuration:")
+    for key, val in resources.metadata.items():
+        print(f" - {key}: {val}")
+
+
+def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
     """Validate a dataset using a command line interface.
 
     This program validates an Excel file formatted as a `safedata` dataset.
@@ -88,8 +106,8 @@ def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
     Args:
         args_list: This is a developer option used to simulate command line usage by
             providing a list of command line argument strings to the entry point
-            function. For example, ``safedata_validate show_resources`` can be
-            replicated by calling ``_safedata_validate_cli(['show_resources'])``.
+            function. For example, ``safedata_validate --show-resources`` can be
+            replicated by calling ``_safedata_validate_cli(['--show-resources'])``.
 
     Returns:
         An integer code showing success (0) or failure (1).
@@ -115,15 +133,27 @@ def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
         formatter_class=_desc_formatter,
     )
 
-    parser.add_argument("filename", help="Path to the Excel file to be validated.")
+    # Filename is 'optional' in that show resources can run without a filename
+    parser.add_argument(
+        "filename", help="Path to the Excel file to be validated", nargs="?"
+    )
 
     parser.add_argument(
         "-r",
         "--resources",
         type=str,
         default=None,
-        help=("A path to a resources configuration file"),
+        help="A path to a resources configuration file",
     )
+
+    parser.add_argument(
+        "-s",
+        "--show-resources",
+        action="store_true",
+        default=False,
+        help="Validate and display the selected resources and exit",
+    )
+
     parser.add_argument(
         "--validate_doi",
         action="store_true",
@@ -133,6 +163,7 @@ def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
             "provided by the user. Requires a web connection."
         ),
     )
+
     parser.add_argument(
         "--chunk_size",
         default=1000,
@@ -142,12 +173,13 @@ def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
             "number of rows in a chunk is set by this argument"
         ),
     )
+
     parser.add_argument(
         "-l",
         "--log",
         default=None,
         type=Path,
-        help=("Save the validation log to a file, not print to the console."),
+        help="Save the validation log to a file, not print to the console.",
     )
 
     parser.add_argument(
@@ -155,16 +187,33 @@ def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
         "--json",
         default=None,
         type=Path,
-        help=("An optional output path for the validated dataset JSON."),
+        help="An optional output path for the validated dataset JSON.",
     )
 
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s {version}".format(version=__version__),
+        version=f"%(prog)s {__version__}",
     )
 
     args = parser.parse_args(args=args_list)
+
+    # Load resources
+    resources = Resources(args.resources)
+
+    # Show the resources and exit if requested
+    if args.show_resources:
+        _show_resources(resources)
+        return 0
+
+    # Catch the possibility that filename is empty, which is only allowed if
+    # --show-resources is specified
+    if args.filename is None:
+        parser.print_usage()
+        print(
+            "safedata_validate: error: the following arguments are required: filename"
+        )
+        return 1
 
     # Configure the logging location
     if args.log is None:
@@ -173,7 +222,7 @@ def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
         use_file_logging(args.log)
 
     # Create the dataset and load from workbook
-    ds = Dataset(resources=Resources(args.resources))
+    ds = Dataset(resources=resources)
     ds.load_from_workbook(
         filename=args.filename,
         validate_doi=args.validate_doi,
@@ -186,7 +235,7 @@ def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
 
     # Output JSON file
     json_file = args.json or os.path.splitext(args.filename)[0] + ".json"
-    with open(json_file, "w") as json_out:
+    with open(json_file, "w", encoding="utf-8") as json_out:
         json_out.write(ds.to_json())
 
     sys.stdout.write("File validation passed\n")
@@ -194,7 +243,7 @@ def _safedata_validate_cli(args_list: Optional[list[str]] = None) -> int:
     return 0
 
 
-def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
+def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     """Publish validated datasets to Zenodo using a command line interface.
 
     This is a the command line interface for publishing safedata validated
@@ -204,8 +253,8 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
 
     The safedata_zenodo command is used by providing subcommands for the
     different actions required to publish a validated dataset. The list of
-    subcommands (with aliases) is shown below and individual help is
-    available for each of the subcommands:
+    subcommands is shown below and individual help is available for each
+    of the subcommands:
 
         safedata_zenodo subcommand -h
 
@@ -220,6 +269,12 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
 
     * A Zenodo metadata file (`zenodo_json`), that describes the metadata
         associated with a Zenodo deposit or published record.
+
+    The subcommands that send and receive data from Zenodo also accept the
+    `--live` and `--sandbox` options which can be used to override the
+    `use_sandbox` setting in the configuration file. If the configuration is set
+    to `true` then `--live` will use the live site and if the configuration is set
+    to `false` then the `--sandbox` can be used to use the sandbox instead.
 
     Note that most of these actions are also available via the Zenodo website.
 
@@ -263,10 +318,37 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
     )
 
     parser.add_argument(
+        "-s",
+        "--show-resources",
+        action="store_true",
+        default=False,
+        help="Validate and display the selected resources and exit",
+    )
+
+    parser.add_argument(
         "-q",
         "--quiet",
         action="store_true",
         help="Suppress normal information messages. ",
+    )
+
+    # Add a shared mutually exclusive switch between the sandbox and live Zenodo sites,
+    # which will override the values set in the configuration
+    sandbox_switches = argparse.ArgumentParser(add_help=False)
+    switch_group = sandbox_switches.add_mutually_exclusive_group()
+    switch_group.add_argument(
+        "--live",
+        dest="sandbox",
+        action="store_false",
+        default=None,
+        help="Use the Zenodo live site, overriding the configuration file",
+    )
+    switch_group.add_argument(
+        "--sandbox",
+        dest="sandbox",
+        action="store_true",
+        default=None,
+        help="Use the Zenodo sandbox site, overriding the configuration file",
     )
 
     # Create subparsers to add shared positional arguments across actions - these can be
@@ -291,26 +373,44 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
 
     # CREATE DEPOSIT subcommand
     create_deposit_desc = """
-    Create a new deposit draft. The concept_id option uses a provided Zenodo
-    concept ID to creates a draft as a new version of an existing data set.
+    Create a new deposit draft. 
+    
+    The new version option takes the record ID of the most recent version of an
+    existing dataset and creates a new deposit as a new version of that dataset. 
+    Versions of datasets are grouped under a single concept ID, which always 
+    redirects to the most recent version. Use the most recent version ID and 
+    _not_ the concept ID here.
 
     When successful, the function downloads and saves a JSON file containing the
     resulting Zenodo deposit metadata. This file is used as an input to other
     subcommands that work with an existing deposit.
+
+    The --id-to-stdout option can be provided to explicitly return the new
+    deposit ID to stdout, where it can be captured for use in shell scripts.
+    All other logging is written to stderr.
     """
     create_deposit_parser = subparsers.add_parser(
         "create_deposit",
         description=textwrap.dedent(create_deposit_desc),
         help="Create a new Zenodo draft deposit",
         formatter_class=_desc_formatter,
+        parents=[sandbox_switches],
     )
 
     create_deposit_parser.add_argument(
-        "-c",
-        "--concept_id",
+        "-n",
+        "--new-version",
         type=int,
         default=None,
-        help="A Zenodo concept ID",
+        help="Create a new version of the dataset with the provided Zenodo ID.",
+    )
+
+    create_deposit_parser.add_argument(
+        "-i",
+        "--id-to-stdout",
+        action="store_true",
+        default=False,
+        help="Write the deposit record ID to stdout.",
     )
 
     # DISCARD DEPOSIT subcommand
@@ -324,7 +424,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
         description=textwrap.dedent(discard_deposit_desc),
         help="Discard an unpublished deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
     # GET DEPOSIT subcommand
@@ -336,6 +436,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
         "get_deposit",
         description=textwrap.dedent(get_deposit_desc),
         help="Download and display deposit metadata",
+        parents=[sandbox_switches],
     )
     get_deposit_parser.add_argument(
         "zenodo_id",
@@ -359,50 +460,51 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
         description=textwrap.dedent(publish_deposit_desc),
         help="Publish a draft deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
-    # UPLOAD FILE subcommand
-    upload_file_desc = """
-    Uploads the contents of a specified file to an _unpublished_ Zenodo deposit,
-    optionally using an alternative filename. If you upload a new file to the same
-    filename, it will replace the existing uploaded file.
+    # UPLOAD FILES subcommand
+    upload_files_desc = """
+    Uploads a set of files to an _unpublished_ Zenodo deposit. If you upload a new file
+    to the same filename, it will replace the existing uploaded file.
     """
 
-    upload_file_parser = subparsers.add_parser(
-        "upload_file",
-        description=textwrap.dedent(upload_file_desc),
+    upload_files_parser = subparsers.add_parser(
+        "upload_files",
+        description=textwrap.dedent(upload_files_desc),
         help="Upload a file to an unpublished deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
-    upload_file_parser.add_argument(
-        "filepath", type=str, default=None, help="The path to the file to be uploaded"
-    )
-    upload_file_parser.add_argument(
-        "--zenodo_filename",
-        type=str,
-        default=None,
-        help="An optional alternative file name to be used on Zenodo",
+    upload_files_parser.add_argument(
+        "filepaths",
+        type=Path,
+        default=[],
+        help="The paths to the file to be uploaded",
+        nargs="*",
     )
 
     # DELETE FILE subcommand
-    delete_file_desc = """
-    Delete an uploaded file from an unpublished deposit. The deposit metadata will
-    be re-downloaded to ensure an up to date list of files in the deposit.
+    delete_files_desc = """
+    Delete an list of uploaded file from an unpublished deposit. The deposit metadata
+    will be re-downloaded to ensure an up to date list of files in the deposit.
     """
 
-    delete_file_parser = subparsers.add_parser(
-        "delete_file",
-        description=textwrap.dedent(delete_file_desc),
-        help="Delete a file from an unpublished deposit",
+    delete_files_parser = subparsers.add_parser(
+        "delete_files",
+        description=textwrap.dedent(delete_files_desc),
+        help="Delete files from an unpublished deposit",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata],
+        parents=[parse_zenodo_metadata, sandbox_switches],
     )
 
-    delete_file_parser.add_argument(
-        "filename", type=str, default=None, help="The name of the file to delete"
+    delete_files_parser.add_argument(
+        "filenames",
+        type=str,
+        default=None,
+        help="The names of files to delete",
+        nargs="*",
     )
 
     # UPLOAD METADATA subcommand
@@ -416,7 +518,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
         description=textwrap.dedent(upload_metadata_desc),
         help="Populate the Zenodo metadata",
         formatter_class=_desc_formatter,
-        parents=[parse_zenodo_metadata, parse_dataset_metadata],
+        parents=[parse_zenodo_metadata, parse_dataset_metadata, sandbox_switches],
     )
 
     # AMEND METADATA subcommand
@@ -435,6 +537,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
         description=textwrap.dedent(amend_metadata_desc),
         help="Update published Zenodo metadata",
         formatter_class=_desc_formatter,
+        parents=[sandbox_switches],
     )
 
     amend_metadata_parser.add_argument(
@@ -462,6 +565,8 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
     downloaded, ignoring any additional files, which are often large.
     """
 
+    # This does not use the sandbox switches - doesn't make a great deal of sense to
+    # sync a sandbox collection.
     sync_local_dir_parser = subparsers.add_parser(
         "sync_local_dir",
         description=textwrap.dedent(sync_local_dir_desc),
@@ -500,6 +605,8 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
     and the Datacite API to access machine readable bibliographic records.
     """
 
+    # This does not use the sandbox switches - doesn't make a great deal of sense to
+    # sync a sandbox collection.
     maintain_ris_parser = subparsers.add_parser(
         "maintain_ris",
         description=textwrap.dedent(maintain_ris_desc),
@@ -521,14 +628,15 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
     Generates an html file containing a standard description of a dataset from the JSON
     metadata. Usually this will be generated and uploaded as part of the dataset
     publication process, but this subcommand can be used for local checking of the
-    resulting HTML.
+    resulting HTML and developing custom templates.
     """
 
+    # This does not use the sandbox switches - not applicable
     generate_html_parser = subparsers.add_parser(
         "generate_html",
         description=textwrap.dedent(generate_html_desc),
         help="Generate an HTML dataset description",
-        parents=[parse_zenodo_metadata, parse_dataset_metadata],
+        parents=[parse_dataset_metadata],
     )
 
     generate_html_parser.add_argument(
@@ -545,6 +653,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
     details).
     """
 
+    # This does not use the sandbox switches - not applicable
     generate_xml_parser = subparsers.add_parser(
         "generate_xml",
         description=textwrap.dedent(generate_xml_desc),
@@ -567,42 +676,78 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
         help="Output path for the XML file",
     )
 
-    # SHOW resources subcommand
-    show_resources_desc = """
-    Loads the safedata_validator resources file, displays the resources setup
-    being used for safedata_zenodo and then exits.
+    # PUBLISH DATASET subcommand
+    publish_dataset_desc = """
+    This subcommand runs through the complete publication process for a validated
+    dataset and any external files. It does not provide all of the options of the
+    subcommands for individual steps but covers the main common usage of the
+    safedata_zenodo command. If the publication process fails, the resulting partial
+    deposit is discarded. All of the files in the deposit must be replaced.
     """
-
-    # This has no arguments, so subparser object not needed
-    _ = subparsers.add_parser(
-        "show_resources",
-        description=textwrap.dedent(show_resources_desc),
-        help="Report the config being used and exit",
+    publish_dataset_parser = subparsers.add_parser(
+        "publish_dataset",
+        description=textwrap.dedent(publish_dataset_desc),
+        help="Publish a validated dataset",
         formatter_class=_desc_formatter,
+        parents=[parse_dataset_metadata, sandbox_switches],
+    )
+
+    publish_dataset_parser.add_argument(
+        "dataset",
+        type=Path,
+        help="Path to the Excel file to be published",
+    )
+
+    publish_dataset_parser.add_argument(
+        "-n",
+        "--new-version",
+        type=int,
+        default=None,
+        help="Create a new version of the dataset with the provided Zenodo ID.",
+    )
+
+    publish_dataset_parser.add_argument(
+        "--no-xml",
+        action="store_true",
+        default=False,
+        help="Do not include metadata XML in the published record",
+    )
+
+    publish_dataset_parser.add_argument(
+        "-e",
+        "--external-files",
+        default=[],
+        type=Path,
+        nargs="*",
+        help="A set of external files documented in the dataset to be included.",
     )
 
     # ------------------------------------------------------
     # Parser definition complete - now handle the inputs
     # ------------------------------------------------------
 
-    # Parse the arguments and set the verbosity
+    # Parse the arguments
     args = parser.parse_args(args=args_list)
+
+    # Load resources
+    resources = Resources(args.resources)
+
+    # Show the resources and exit if requested
+    if args.show_resources:
+        _show_resources(resources)
+        return 0
 
     if args.subcommand is None:
         parser.print_usage()
         return 0
 
-    # Show the package config and exit if requested
-    if args.subcommand == "show_resources":
-        resources = Resources(args.resources)
-        print("\nZenodo configuration:")
-        for key, val in resources.zenodo.items():
-            print(f" - {key}: {val}")
-        print("\nMetadata server configuration:")
-        for key, val in resources.metadata.items():
-            print(f" - {key}: {val}")
-        return 0
+    # Handle the sandbox switches:
+    # If the command parser provides the sandbox argument and one of the flags has been
+    # set (the default is None) then update the loaded resources
+    if "sandbox" in args and args.sandbox is not None:
+        resources.zenodo.use_sandbox = args.sandbox
 
+    # Set the verbosity
     handler = get_handler()
     if args.quiet:
         # Don't suppress error messages
@@ -610,13 +755,11 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
     else:
         handler.setLevel("DEBUG")
 
-    resources = Resources(args.resources)
-
     # Handle the remaining subcommands
-    if args.subcommand in ["create_deposit", "cdep"]:
+    if args.subcommand == "create_deposit":
         # Run the command
         response, error = create_deposit(
-            concept_id=args.concept_id, resources=resources
+            new_version=args.new_version, resources=resources
         )
         # Trap errors
         if error is not None:
@@ -628,17 +771,21 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
         LOGGER.info(f"Created deposit: {rec_id}")
         outfile = os.path.join(os.getcwd(), f"zenodo_{rec_id}.json")
 
-        with open(outfile, "w") as outf:
+        with open(outfile, "w", encoding="utf-8") as outf:
             simplejson.dump(response, outf)
             LOGGER.info(f"Zenodo deposit metadata downloaded to: {outfile}")
 
-    elif args.subcommand in ["discard_deposit", "ddep"]:
+        # If requested, write the record ID to standard out for capture in scripts
+        if args.id_to_stdout:
+            sys.stdout.write(str(rec_id))
+
+    elif args.subcommand == "discard_deposit":
         # Load the Zenodo deposit JSON, which contains API links
-        with open(args.zenodo_json) as dep_json:
+        with open(args.zenodo_json, encoding="utf-8") as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Run the command
-        response, error = discard_deposit(metadata=metadata, resources=resources)
+        response, error = discard_deposit(zenodo_metadata=metadata, resources=resources)
 
         # Report on the outcome.
         if error is not None:
@@ -647,7 +794,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
 
         LOGGER.info("Deposit discarded")
 
-    elif args.subcommand in ["get_deposit", "gdep"]:
+    elif args.subcommand == "get_deposit":
         # Run the command
         response, error = get_deposit(deposit_id=args.zenodo_id, resources=resources)
 
@@ -657,7 +804,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
 
         # Dump the response to a JSON file
         outfile = os.path.join(os.getcwd(), f"zenodo_{args.zenodo_id}.json")
-        with open(outfile, "w") as outf:
+        with open(outfile, "w", encoding="utf-8") as outf:
             simplejson.dump(response, outf)
 
         # Print a short summary
@@ -682,8 +829,8 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
 
         LOGGER.info(f"Metadata downloaded to: {outfile}")
 
-    elif args.subcommand in ["publish_deposit", "pdep"]:
-        with open(args.zenodo_json) as zn_json:
+    elif args.subcommand == "publish_deposit":
+        with open(args.zenodo_json, encoding="utf-8") as zn_json:
             zenodo_json_data = simplejson.load(zn_json)
 
         # Run the function
@@ -696,62 +843,53 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
 
         # Update the Zenodo JSON file with publication details
         LOGGER.info(f"Published to: {response['links']['record']}")
-        with open(args.zenodo_json, "w") as zn_json:
+        with open(args.zenodo_json, "w", encoding="utf-8") as zn_json:
             simplejson.dump(response, zn_json)
             LOGGER.info("Zenodo metadata updated")
 
-    elif args.subcommand in ["upload_file", "ufile"]:
+    elif args.subcommand == "upload_files":
         # Load the Zenodo deposit JSON, which contains API links
-        with open(args.zenodo_json) as dep_json:
+        with open(args.zenodo_json, encoding="utf-8") as dep_json:
             metadata = simplejson.load(dep_json)
 
-        # Report on proposed upload
-        if args.zenodo_filename is None:
-            LOGGER.info(f"Uploading: {os.path.basename(args.filepath)}")
-        else:
-            LOGGER.info(
-                f"Uploading: {os.path.basename(args.filepath)} as "
-                f"{args.zenodo_filename}"
-            )
-
-        # Run the command
-        response, error = upload_file(
+        # Run the command - the response here has a different type so use a different
+        # placeholder variable.
+        upload_response, error = upload_files(
             metadata=metadata,
-            filepath=args.filepath,
-            zenodo_filename=args.zenodo_filename,
+            filepaths=args.filepaths,
             resources=resources,
             progress_bar=not args.quiet,
         )
 
         # Report on the outcome.
         if error is not None:
-            LOGGER.error(f"Failed to upload file: {error}")
+            LOGGER.error(f"Failed to upload files: {error}")
             return 1
         else:
-            LOGGER.info("File uploaded")
+            LOGGER.info("Files uploaded")
 
-    elif args.subcommand in ["delete_file", "dfile"]:
+    elif args.subcommand == "delete_files":
         # Load the Zenodo deposit JSON, which contains API links
-        with open(args.zenodo_json) as dep_json:
+        with open(args.zenodo_json, encoding="utf-8") as dep_json:
             metadata = simplejson.load(dep_json)
 
         # Run the command
-        response, error = delete_file(
-            metadata=metadata, filename=args.filename, resources=resources
+        response, error = delete_files(
+            metadata=metadata, filenames=args.filenames, resources=resources
         )
 
         # Report on the outcome.
         if error is not None:
-            LOGGER.error(f"Failed to delete file: {error}")
+            LOGGER.error(f"Failed to delete files: {error}")
         else:
-            LOGGER.info("File deleted")
+            LOGGER.info("Files deleted")
 
-    elif args.subcommand in ["upload_metadata", "umeta"]:
+    elif args.subcommand == "upload_metadata":
         # Open the two JSON files
-        with open(args.dataset_json) as ds_json:
+        with open(args.dataset_json, encoding="utf-8") as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        with open(args.zenodo_json) as zn_json:
+        with open(args.zenodo_json, encoding="utf-8") as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
         # Run the function
@@ -765,8 +903,8 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
         else:
             LOGGER.info("Metadata uploaded")
 
-    elif args.subcommand in ["amend_metadata", "ameta"]:
-        with open(args.deposit_json_update) as zn_json_update:
+    elif args.subcommand == "amend_metadata":
+        with open(args.deposit_json_update, encoding="utf-8") as zn_json_update:
             zenodo_json_update = simplejson.load(zn_json_update)
 
         # Run the function
@@ -781,7 +919,7 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
         else:
             LOGGER.info("Metadata updated")
 
-    elif args.subcommand in ["sync_local_dir", "sync"]:
+    elif args.subcommand == "sync_local_dir":
         sync_local_dir(
             datadir=args.datadir,
             xlsx_only=not args.not_just_xlsx,
@@ -789,19 +927,17 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
             replace_modified=args.replace_modified,
         )
 
-    elif args.subcommand in ["maintain_ris", "ris"]:
+    elif args.subcommand == "maintain_ris":
         # Run the download RIS data function
         download_ris_data(ris_file=args.ris_file, resources=resources)
 
-    elif args.subcommand in ["generate_html", "html"]:
+    elif args.subcommand == "generate_html":
         # Run the download RIS data function
-        with open(args.dataset_json) as ds_json:
+        with open(args.dataset_json, encoding="utf-8") as ds_json:
             dataset_json = simplejson.load(ds_json)
-        with open(args.zenodo_json) as zn_json:
-            zenodo_json = simplejson.load(zn_json)
 
         generated_html = dataset_description(
-            dataset_metadata=dataset_json, zenodo_metadata=zenodo_json
+            dataset_metadata=dataset_json, resources=resources
         )
 
         out_path = Path(args.html_out)
@@ -809,17 +945,17 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
             LOGGER.error("HTML output file already exists")
             return 1
 
-        with open(out_path, "w") as outf:
+        with open(out_path, "w", encoding="utf-8") as outf:
             outf.write(generated_html)
 
         LOGGER.info("HTML generated")
 
-    elif args.subcommand in ["generate_xml", "xml"]:
+    elif args.subcommand == "generate_xml":
         # Open the two JSON files
-        with open(args.dataset_json) as ds_json:
+        with open(args.dataset_json, encoding="utf-8") as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        with open(args.zenodo_json) as zn_json:
+        with open(args.zenodo_json, encoding="utf-8") as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
         if args.lineage_statement is not None:
@@ -841,15 +977,34 @@ def _safedata_zenodo_cli(args_list: Optional[list[str]] = None) -> int:
             LOGGER.error("XML output file already exists")
             return 1
 
-        with open(out_path, "wb") as outf:
+        with open(out_path, "w") as outf:
             outf.write(generated_xml)
 
         LOGGER.info("Inspire XML generated")
 
+    elif args.subcommand == "publish_dataset":
+        with open(args.dataset_json, encoding="utf-8") as ds_json:
+            dataset_json = simplejson.load(ds_json)
+
+        # Publish the dataset, trapping the possible exceptions to simply print a
+        # message and return a failure exit code.
+        try:
+            publish_id, publish_url = publish_dataset(
+                resources=resources,
+                dataset=args.dataset,
+                dataset_metadata=dataset_json,
+                external_files=args.external_files,
+                new_version=args.new_version,
+                no_xml=args.no_xml,
+            )
+        except (FileNotFoundError, ValueError, RuntimeError) as excep:
+            print(excep)
+            return 1
+
     return 0
 
 
-def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> int:
+def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
     """Post updated information to a safedata server instance.
 
     This command line tool provides functions to update a web server running
@@ -896,6 +1051,14 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> int:
         type=str,
         default=None,
         help="Path to a safedata_validator resource configuration file",
+    )
+
+    parser.add_argument(
+        "-s",
+        "--show-resources",
+        action="store_true",
+        default=False,
+        help="Validate and display the selected resources and exit",
     )
 
     parser.add_argument(
@@ -949,43 +1112,26 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> int:
         formatter_class=_desc_formatter,
     )
 
-    # SHOW RESOURCES subcommand, which has no arguments
-
-    show_resources_desc = """
-    This subcommand simply shows the details of the resources being used and can
-    be used to simply display the Zenodo and metadata server details of the
-    default or specified resources file.
-    """
-
-    subparsers.add_parser(
-        "show_resources",
-        description=textwrap.dedent(show_resources_desc),
-        help="Show the current resources details",
-        formatter_class=_desc_formatter,
-    )
-
     # ------------------------------------------------------
     # Parser definition complete - now handle the inputs
     # ------------------------------------------------------
 
-    # Parse the arguments and set the verbosity
+    # Parse the arguments
     args = parser.parse_args(args=args_list)
+
+    # Load resources
+    resources = Resources(args.resources)
+
+    # Show the resources and exit if requested
+    if args.show_resources:
+        _show_resources(resources)
+        return 0
 
     if args.subcommand is None:
         parser.print_usage()
         return 0
 
-    # Show the package config and exit if requested
-    if args.subcommand == "show_resources":
-        resources = Resources(args.resources)
-        print("\nZenodo configuration:")
-        for key, val in resources.zenodo.items():
-            print(f" - {key}: {val}")
-        print("\nMetadata server configuration:")
-        for key, val in resources.metadata.items():
-            print(f" - {key}: {val}")
-        return 0
-
+    # Set the verbosity
     handler = get_handler()
     if args.quiet:
         # Don't suppress error messages
@@ -996,12 +1142,12 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> int:
     resources = Resources(args.resources)
 
     # Handle the remaining subcommands
-    if args.subcommand in ["post_metadata", "post_md"]:
+    if args.subcommand == "post_metadata":
         # Open the two JSON files
-        with open(args.dataset_json) as ds_json:
+        with open(args.dataset_json, encoding="utf-8") as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        with open(args.zenodo_json) as zn_json:
+        with open(args.zenodo_json, encoding="utf-8") as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
         # Run the function
@@ -1016,7 +1162,7 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> int:
 
         LOGGER.info("Metadata posted")
 
-    if args.subcommand in ["update_resources"]:
+    if args.subcommand == "update_resources":
         # Run the function
         response, error = update_resources(resources=resources)
 
@@ -1033,7 +1179,7 @@ def _safedata_metadata_cli(args_list: Optional[list[str]] = None) -> int:
 # Local Database building
 
 
-def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> int:
+def _build_local_gbif_cli(args_list: list[str] | None = None) -> int:
     """Build a local GBIF database.
 
     This tool builds an SQLite database of the GBIF backbone taxonomy to use
@@ -1117,7 +1263,7 @@ def _build_local_gbif_cli(args_list: Optional[list[str]] = None) -> int:
     return 0
 
 
-def _build_local_ncbi_cli(args_list: Optional[list[str]] = None) -> int:
+def _build_local_ncbi_cli(args_list: list[str] | None = None) -> int:
     """Build a local NCBI database.
 
     This tool builds an SQLite database of the NCBI  taxonomy to use in

@@ -8,5 +8,5 @@ CSV being used. The server then validates the file contents.
 The resource file being used sets both the metadata server instance IP address and
 provides the paths to the files to be uploaded.
 
-optional arguments:
+options:
   -h, --help  show this help message and exit

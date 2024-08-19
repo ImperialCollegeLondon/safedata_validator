@@ -27,7 +27,7 @@ data = list(rdr)
 fp.close()
 
 # Get unique, non-user GBIF IDs from the data
-gbif_ids = set([int(d["gbif_id"]) for d in data])
+gbif_ids = {int(d["gbif_id"]) for d in data}
 gbif_ids.discard(-1)
 
 # Copy truncated database from local non-git copy of full database

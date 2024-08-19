@@ -2,13 +2,12 @@
 
 1. send new dataset metadata to the server
 2. update the resources on the server to match the local versions.
-"""  # noqa D415
+"""  # D415
 
-from typing import Optional
+from __future__ import annotations
 
 import requests  # type: ignore
 
-from safedata_validator.logger import FORMATTER, LOGGER
 from safedata_validator.resources import Resources
 from safedata_validator.zenodo import (
     ZenodoFunctionResponseType,
@@ -17,7 +16,7 @@ from safedata_validator.zenodo import (
 
 
 def post_metadata(
-    metadata: dict, zenodo: dict, resources: Optional[Resources] = None
+    metadata: dict, zenodo: dict, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Post the dataset metadata and zenodo metadata to the metadata server.
 

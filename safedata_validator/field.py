@@ -10,7 +10,6 @@ import datetime
 import os
 from itertools import islice
 from logging import CRITICAL, ERROR, WARNING
-from typing import List, Optional, Union
 
 import simplejson
 from dateutil import parser
@@ -46,7 +45,7 @@ from safedata_validator.validators import (
 
 # These are lists, not sets because lists preserve order for preserving logging
 # message order in unit testing.
-MANDATORY_DESCRIPTORS = ["field_type", "description", "field_name"]
+MANDATORY_DESCRIPTORS: tuple[str, ...] = ("field_type", "description", "field_name")
 OPTIONAL_DESCRIPTORS = [
     "levels",
     "method",
@@ -70,12 +69,12 @@ class Dataset:
             dataset.
     """
 
-    def __init__(self, resources: Optional[Resources] = None) -> None:
+    def __init__(self, resources: Resources | None = None) -> None:
         # Try and load the default resources if None provided
         if resources is None:
             resources = Resources()
 
-        self.filename: Optional[str] = None
+        self.filename: str | None = None
         self.resources = resources
         self.summary = Summary(resources)
         self.taxa = Taxa(resources)
@@ -176,7 +175,7 @@ class Dataset:
             LOGGER.warning("No locations worksheet found - moving on")
 
         # Throw an error if both Taxa and GBIFTaxa have been given as worksheet names
-        gbif_sheets = set(["GBIFTaxa", "Taxa"]).intersection(wb.sheetnames)
+        gbif_sheets = {"GBIFTaxa", "Taxa"}.intersection(wb.sheetnames)
 
         if len(gbif_sheets) == 2:
             LOGGER.error(
@@ -186,7 +185,7 @@ class Dataset:
             self.taxa.gbif_taxa.load(wb["GBIFTaxa"])
         # Otherwise populate gbif_taxa from the one that has been provided
         elif len(gbif_sheets) == 1:
-            self.taxa.gbif_taxa.load(wb[list(gbif_sheets)[0]])
+            self.taxa.gbif_taxa.load(wb[next(iter(gbif_sheets))])
 
         # Populate ncbi taxa
         ncbi_sheet = "NCBITaxa" in wb.sheetnames
@@ -303,13 +302,19 @@ class Dataset:
             ):
                 LOGGER.error(
                     f"{label} extent values from the data fall outside the extents "
-                    f"set in the Summary sheet "
+                    "set in the Summary sheet "
                     f"({[str(x) for x in dataset_extent.extent]})"
                 )
             elif dataset_extent.populated and summary_extent.populated:
                 LOGGER.warning(
                     f"The {label} extent is set in Summary but also "
-                    f"is populated from the data - this may be deliberate!"
+                    "is populated from the data - this may be deliberate!"
+                )
+            elif dataset_extent.populated and not summary_extent.populated:
+                summary_extent = dataset_extent
+                LOGGER.info(
+                    f"The {label} extent in Summary is not set and has "
+                    "been populated from the data"
                 )
 
         # Dedent for final result
@@ -348,6 +353,7 @@ class Dataset:
 
         json_dict = dict(
             # Summary information
+            project_ids=self.summary.project_ids,
             title=self.summary.title,
             description=self.summary.description,
             authors=self.summary.authors,
@@ -411,11 +417,12 @@ class Dataset:
 
         # Extents - summary take priority over dataset.
         for ext in ("temporal_extent", "latitudinal_extent", "longitudinal_extent"):
-            sum_ext = getattr(self.summary, ext)
-            if sum_ext is not None:
-                json_dict[ext] = sum_ext.extent
+            summary_extent = getattr(self.summary, ext)
+            data_extent = getattr(self, ext)
+            if summary_extent.populated:
+                json_dict[ext] = summary_extent.extent
             else:
-                json_dict[ext] = self.extent
+                json_dict[ext] = data_extent.extent
 
         return simplejson.dumps(json_dict, default=str, indent=2)
 
@@ -464,7 +471,7 @@ class DataWorksheet:
     def __init__(
         self,
         sheet_meta: dict,
-        dataset: Optional[Dataset] = None,
+        dataset: Dataset | None = None,
     ) -> None:
         # Set initial values
 
@@ -487,7 +494,7 @@ class DataWorksheet:
         self.n_trailing_empty_fields: int = 0
         self.n_descriptors: int
         self.descriptors: list = []
-        self.fields: list[Union[EmptyField, BaseField]] = []
+        self.fields: list[EmptyField | BaseField] = []
         self.taxa_fields: list = []
 
         # Keep track of row numbering
@@ -536,8 +543,8 @@ class DataWorksheet:
 
         # Checking field_meta structure - should be an equal length and non-zero tuple
         # of values for each descriptor. If not, return without setting fields_loaded.
-        descriptor_tuple_lengths = set([len(tp) for tp in field_meta.values()])
-        if len(descriptor_tuple_lengths) > 1 or descriptor_tuple_lengths == set([0]):
+        descriptor_tuple_lengths = {len(tp) for tp in field_meta.values()}
+        if len(descriptor_tuple_lengths) > 1 or descriptor_tuple_lengths == {0}:
             LOGGER.error("Cannot load unequal length or empty field metadata")
             return
 
@@ -605,7 +612,7 @@ class DataWorksheet:
         #   trigger warnings about descriptors
 
         # Get logical flags for empty and trailing empty metadata
-        field_meta_empty = [set(vl.values()) == set([None]) for vl in self.field_meta]
+        field_meta_empty = [set(vl.values()) == {None} for vl in self.field_meta]
         trailing_empty = [
             all(field_meta_empty[-(n + 1) :]) for n in range(0, len(field_meta_empty))
         ]
@@ -664,7 +671,7 @@ class DataWorksheet:
             LOGGER.critical("Empty data_rows passed to validate_data_rows")
             return
 
-        row_lengths = set([len(rw) for rw in data_rows])
+        row_lengths = {len(rw) for rw in data_rows}
 
         if len(row_lengths) != 1:
             LOGGER.critical("Data rows of unequal length - cannot validate")
@@ -676,7 +683,7 @@ class DataWorksheet:
             return
 
         # Handle empty rows.
-        blank_set = set([None])
+        blank_set = {None}
         blank_row = [set(vals) == blank_set for vals in data_rows]
 
         trailing_blank_row = [
@@ -713,12 +720,12 @@ class DataWorksheet:
         row_numbers = data_cols.pop(0)
 
         # Check for bad values (blanks, non integers) in row numbers
-        row_numbers = IsNotBlank(row_numbers, keep_failed=False)
+        valid_row_numbers = IsNotBlank(row_numbers, keep_failed=False)
 
-        if not row_numbers:
+        if not valid_row_numbers:
             self.row_numbers_missing = True
 
-        row_numbers = row_numbers.values
+        row_numbers = valid_row_numbers.values
 
         if any([not isinstance(vl, int) for vl in row_numbers]):
             self.row_numbers_noninteger = True
@@ -740,7 +747,7 @@ class DataWorksheet:
 
         # Now feed the sets of values into the Field validation
         for data, field_inst in zip(data_cols, self.fields):
-            field_inst.validate_data(data)
+            field_inst.validate_data(list(data))
 
     def report(self) -> None:
         """Report data validation for a data table.
@@ -852,7 +859,7 @@ class DataWorksheet:
                 break
 
         # Convert field meta to dict and validate
-        field_meta_dict = dict(((rw[0], rw[1:]) for rw in field_meta))
+        field_meta_dict = {rw[0]: rw[1:] for rw in field_meta}
         self.validate_field_meta(field_meta_dict)
 
         if self.fields_loaded:
@@ -974,7 +981,7 @@ class BaseField:
     # required descriptors for those field_types. The no_validation attributes is used
     # to suppress data validation for use on e.g. comments fields.
 
-    field_types: Optional[tuple[str, ...]] = None
+    field_types: tuple[str, ...] | None = None
     required_descriptors = MANDATORY_DESCRIPTORS
     check_taxon_meta = False
     check_interaction_meta = False
@@ -982,13 +989,13 @@ class BaseField:
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         self.meta = meta
         self.dwsh = dwsh
 
-        self.taxa: Optional[Taxa] = None
+        self.taxa: Taxa | None = None
         self.locations = None
         self.summary = None
 
@@ -1030,7 +1037,7 @@ class BaseField:
         # only test here for strings that fail.
         if isinstance(self.field_name, str) and not valid_r_name(self.field_name):
             self._log(
-                f"Field name is not valid: {repr(self.field_name)}. "
+                f"Field name is not valid: {self.field_name!r}. "
                 "Common errors are spaces and non-alphanumeric "
                 "characters other than underscore and full stop"
             )
@@ -1043,7 +1050,7 @@ class BaseField:
         if self.check_interaction_meta:
             self._check_interaction_meta()
 
-    def _log(self, msg: str, level: int = ERROR, extra: Optional[dict] = None) -> None:
+    def _log(self, msg: str, level: int = ERROR, extra: dict | None = None) -> None:
         """Adds messages to the field log stack.
 
         Rather than directly emitting a log message, field processing accumulates a
@@ -1080,10 +1087,10 @@ class BaseField:
             self.meta[descriptor] = None  # standardise whitestring to None
             return False
         elif not isinstance(val, str):
-            self._log(f"{descriptor} descriptor is not a string: {repr(val)}")
+            self._log(f"{descriptor} descriptor is not a string: {val!r}")
             return False
         elif val != val.strip():
-            self._log(f"{descriptor} descriptor has whitespace padding: {repr(val)}")
+            self._log(f"{descriptor} descriptor has whitespace padding: {val!r}")
             self.meta[descriptor] = val.strip()
             return False
         else:
@@ -1252,7 +1259,7 @@ class BaseField:
         else:
             return False
 
-    def _parse_levels(self, txt: str) -> tuple[list[str], tuple[Optional[str], ...]]:
+    def _parse_levels(self, txt: str) -> tuple[list[str], tuple[str | None, ...]]:
         """Parse categorical variable level descriptions.
 
         Splits up category information formatted as label:desc;label:desc, which is used
@@ -1441,7 +1448,7 @@ class BaseField:
         FORMATTER.pop()
 
 
-def field_to_dict(fld: Union[EmptyField, BaseField], col_idx: int) -> dict:
+def field_to_dict(fld: EmptyField | BaseField, col_idx: int) -> dict:
     """Convert a object inheriting from BaseField into a dictionary.
 
     A function to return a dictionary representation of a field object. This would more
@@ -1534,7 +1541,7 @@ class NumericField(BaseField):
     """
 
     field_types: tuple[str, ...] = ("numeric",)
-    required_descriptors = MANDATORY_DESCRIPTORS + ["method", "units"]
+    required_descriptors = (*MANDATORY_DESCRIPTORS, "method", "units")
 
     def validate_data(self, data: list) -> None:
         """Validate numeric field data.
@@ -1560,13 +1567,13 @@ class CategoricalField(BaseField):
     """
 
     field_types: tuple[str, ...] = ("categorical", "ordered categorical")
-    required_descriptors = MANDATORY_DESCRIPTORS + ["levels"]
+    required_descriptors = (*MANDATORY_DESCRIPTORS, "levels")
 
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -1638,8 +1645,8 @@ class TaxaField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -1706,8 +1713,8 @@ class LocationsField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -1778,8 +1785,8 @@ class GeoField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -1813,12 +1820,12 @@ class GeoField(BaseField):
 
         if data_as_number.values:
             self.min = (
-                min(data_as_number.values + [self.min])
+                min([*data_as_number.values, self.min])
                 if self.min
                 else min(data_as_number.values)
             )
             self.max = (
-                max(data_as_number.values + [self.max])
+                max([*data_as_number.values, self.max])
                 if self.max
                 else max(data_as_number.values)
             )
@@ -1918,13 +1925,13 @@ class TimeField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
         # Defaults
-        self.first_data_class_set: Optional[set] = None
+        self.first_data_class_set: set | None = None
         self.consistent_class = True
         self.expected_class = True
 
@@ -1995,13 +2002,9 @@ class TimeField(BaseField):
             LOGGER.error(
                 "Time data include values neither ISO string nor time formatted"
             )
-            return
-
-        if not self.consistent_class:
+        elif not self.consistent_class:
             LOGGER.error("Time data mixes ISO string and time formatted rows")
-            return
-
-        if self.bad_strings:
+        elif self.bad_strings:
             LOGGER.error(
                 "ISO time strings contain badly formatted values: e.g.",
                 extra={"join": self.bad_strings[:5]},
@@ -2031,8 +2034,8 @@ class DatetimeField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 
@@ -2040,7 +2043,7 @@ class DatetimeField(BaseField):
             self._log("No dataset object provided - cannot update extents")
 
         # Defaults
-        self.first_data_class_set: Optional[set] = None
+        self.first_data_class_set: set | None = None
         self.consistent_class = True
         self.expected_class = True
         self.all_midnight = True
@@ -2120,12 +2123,12 @@ class DatetimeField(BaseField):
             if self.min is None:
                 self.min = min(data)
             else:
-                self.min = min([self.min] + data)
+                self.min = min([self.min, *data])
 
             if self.max is None:
                 self.max = min(data)
             else:
-                self.max = max([self.max] + data)
+                self.max = max([self.max, *data])
 
     def report(self):
         """Report on field creation and data validation for date and datetime fields.
@@ -2186,8 +2189,8 @@ class FileField(BaseField):
     def __init__(
         self,
         meta: dict,
-        dwsh: Optional[DataWorksheet] = None,
-        dataset: Optional[Dataset] = None,
+        dwsh: DataWorksheet | None = None,
+        dataset: Dataset | None = None,
     ) -> None:
         super().__init__(meta, dwsh=dwsh, dataset=dataset)
 

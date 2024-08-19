@@ -32,7 +32,7 @@ The following steps should allow you to install `safedata_validator`:
 * Once that has completed, you should now be able to run the following command, to
   verify that the command line tools have been installed correctly. See the
   [usage
-  instructions](../command_line_tools/safedata_validate.md#using-safedatavalidate) for
+  instructions](../command_line_tools/safedata_validate.md#using-safedata_validate) for
   more information on `safedata_validate`.
 
     ```term

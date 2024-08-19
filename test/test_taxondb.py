@@ -15,7 +15,6 @@ import pytest
     ],
 )
 def test_get_gbif_version(timestamp, raises):
-
     from safedata_validator.taxondb import get_gbif_version
 
     with raises:
@@ -35,7 +34,6 @@ def test_get_gbif_version(timestamp, raises):
     ],
 )
 def test_get_ncbi_version(timestamp, raises):
-
     from safedata_validator.taxondb import get_ncbi_version
 
     with raises:

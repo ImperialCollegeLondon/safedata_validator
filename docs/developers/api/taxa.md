@@ -19,6 +19,7 @@
     options:
         show_root_heading: True
         header_level: 3
+        members: true
         filters: ["!__del__"]
 
 ::: safedata_validator.taxa.GBIFError
@@ -37,6 +38,7 @@
     options:
         show_root_heading: True
         header_level: 3
+        members: true
         filters: ["!__del__"]
 
 ::: safedata_validator.taxa.NCBIError

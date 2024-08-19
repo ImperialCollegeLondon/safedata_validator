@@ -8,21 +8,22 @@
 3. compile a RIS format bibliographic file for published datasets.
 """  # noqa D415
 
-import copy
+from __future__ import annotations
+
+import decimal
 import hashlib
-import os
+import re
 import shutil
 from datetime import datetime as dt
+from importlib import resources as il_resources  # avoid confusion with sdv.resources
 from itertools import groupby
 from pathlib import Path
-from typing import Optional, Union
 
-import requests  # type: ignore
+import requests
 import rispy
 import simplejson
 from dominate import tags
-from dominate.util import raw
-from lxml import etree
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from tqdm import tqdm
 from tqdm.utils import CallbackIOWrapper
 
@@ -31,7 +32,9 @@ from safedata_validator.resources import Resources
 from safedata_validator.taxa import taxon_index_to_text
 
 # Constant definition of zenodo action function response type
-ZenodoFunctionResponseType = tuple[dict, Optional[str]]
+# TODO - should all of these functions just Raise? Then we could just use try
+# blocks rather than using the this approach.
+ZenodoFunctionResponseType = tuple[dict, str | None]
 """Function return value
 
 The functions interacting with Zenodo all return a common format of tuple of length 2:
@@ -39,7 +42,8 @@ The functions interacting with Zenodo all return a common format of tuple of len
 * A dictionary containing the response content. For responses that do not generate a
   response content but just indicate success via HTTP status codes, an empty dictionary
   is returned. An empty dictionary is also returned when the function results in an
-  error.
+  error. For upload files, the response is a list of such dictionaries, one for each
+  file uploaded.
 * An error message on failure or None on success
 
 So, for example:
@@ -56,8 +60,22 @@ response, error = zenodo_function(args)
 ```
 """
 
+ZenodoFunctionResponseListType = tuple[list[dict], str | None]
+"""Function return value
 
-def _resources_to_zenodo_api(resources: Optional[Resources] = None) -> dict:
+This follows the ZenodoFunctionResponseType but returns a list of response dictionaries.
+This is only used by the upload_files function, where each file upload has a response
+containing useful information.
+"""
+
+
+# TODO: would make a lot more sense, particularly given the integrated
+#       publish_dataset option to have functions take the output of
+#       _resources_to_zenodo_api rather than continually recreating it inside each
+#       function. Some functions need more resources, but most do not.
+
+
+def _resources_to_zenodo_api(resources: Resources | None = None) -> dict:
     """Get a dictionary of the Zenodo and Metadata config from Resources.
 
     Args:
@@ -75,13 +93,13 @@ def _resources_to_zenodo_api(resources: Optional[Resources] = None) -> dict:
     if resources.zenodo.use_sandbox is None:
         config_fail = True
     elif resources.zenodo.use_sandbox:
-        zenodo_api = resources.zenodo.zenodo_sandbox_api
+        zenodo_api = "https://sandbox.zenodo.org/api"
         token = resources.zenodo.zenodo_sandbox_token
     else:
-        zenodo_api = resources.zenodo.zenodo_api
+        zenodo_api = "https://zenodo.org/api"
         token = resources.zenodo.zenodo_token
 
-    if zenodo_api is None or token is None:
+    if token is None:
         config_fail = True
 
     # Get the contact details if used
@@ -116,7 +134,7 @@ def _resources_to_zenodo_api(resources: Optional[Resources] = None) -> dict:
     }
 
 
-def _compute_md5(fname: str) -> str:
+def _compute_md5(fname: Path) -> str:
     """Calculate the md5 hash for a local file."""
     hash_md5 = hashlib.md5()
     with open(fname, "rb") as fname_obj:
@@ -127,14 +145,55 @@ def _compute_md5(fname: str) -> str:
 
 def _zenodo_error_message(response) -> str:
     """Format a Zenodo JSON error response as a string."""
-    return f"{response.json()['message']} ({response.json()['status']})"
+
+    # Report the immediate reason and code along with the URL endpoint with the access
+    # token redacted
+    url = re.sub("(?<=access_token=).*$", "<redacted>", response.url)
+    return_string = (
+        f"\n\nZenodo error: {response.reason} ({response.status_code})\nURL: {url}\n"
+    )
+
+    # Attempt to get any JSON data
+    try:
+        response_json = response.json()
+    except requests.exceptions.JSONDecodeError:
+        return return_string
+
+    return_string += f"Message: {response_json['message']}\n"
+
+    # Report on error messages in response object
+    errors = response_json.get("errors", [])
+    if errors:
+        return_string += "Errors:\n"
+        for e in errors:
+            messages = "\n    - ".join(e["messages"])
+            return_string += f" * Messages for field {e['field']}:\n    - {messages}"
+        return_string += "\n"
+
+    return return_string
+
+
+def _min_dp(val: float, min_digits: int = 2) -> str:
+    """Display a number with a minimum number of decimal places.
+
+    INSPIRE/GEMINI XML requires a bounding box with at least two decimal places
+    provided, even if that is 4.50 rather than 4.5. This function tries to ensure that
+    representation.
+    """
+
+    decimal_val = decimal.Decimal(str(val))
+    round_precision = decimal_val.as_tuple().exponent
+    format_precision = max(abs(round_precision), min_digits)  # type: ignore [arg-type]
+    string_format = f"0.{format_precision}f"
+
+    return format(val, string_format)
 
 
 # Zenodo action functions
 
 
 def get_deposit(
-    deposit_id: int, resources: Optional[Resources] = None
+    deposit_id: int, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Download the metadata of a Zenodo deposit.
 
@@ -164,16 +223,19 @@ def get_deposit(
 
 
 def create_deposit(
-    concept_id: Optional[int] = None, resources: Optional[Resources] = None
+    new_version: int | None = None,
+    resources: Resources | None = None,
 ) -> ZenodoFunctionResponseType:
     """Create a new deposit.
 
     Creates a new deposit draft, possibly as a new version of an existing published
-    record.
+    record. Creating a new version requires the Zenodo ID of an existing dataset: this
+    has to be the ID of the most recently published version of a dataset, not the
+    concept ID used to group datasets or any of the older versions.
 
     Args:
-        concept_id: An optional concept id of a published record to create a new version
-            of an existing dataset.
+        new_version: Optionally, create a new version of the dataset with the provided
+            Zenodo ID.
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -187,10 +249,10 @@ def create_deposit(
     params = zres["ztoken"]
 
     # get the correct draft api
-    if concept_id is None:
+    if new_version is None:
         api = f"{zenodo_api}/deposit/depositions"
     else:
-        api = f"{zenodo_api}/deposit/depositions/{concept_id}/actions/newversion"
+        api = f"{zenodo_api}/deposit/depositions/{new_version}/actions/newversion"
 
     # Create the draft
     new_draft = requests.post(api, params=params, json={})
@@ -199,7 +261,7 @@ def create_deposit(
     if new_draft.status_code != 201:
         return {}, _zenodo_error_message(new_draft)
 
-    if concept_id is None:
+    if new_version is None:
         return new_draft.json(), None
 
     # For new versions, the response is an update to the existing copy,
@@ -216,7 +278,7 @@ def create_deposit(
 
 
 def upload_metadata(
-    metadata: dict, zenodo: dict, resources: Optional[Resources] = None
+    metadata: dict, zenodo: dict, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Upload dataset metadata.
 
@@ -280,23 +342,24 @@ def upload_metadata(
         for auth in metadata["authors"]
     ]
 
+    # Add the html description
     zen_md["metadata"]["description"] = dataset_description(
-        metadata, zenodo, render=True, resources=resources
+        dataset_metadata=metadata, resources=resources
     )
 
     # attach the metadata to the deposit resource
-    mtd = requests.put(zenodo["links"]["self"], params=zres["ztoken"], json=zen_md)
+    response = requests.put(zenodo["links"]["self"], params=zres["ztoken"], json=zen_md)
 
     # trap errors in uploading metadata and tidy up
-    if mtd.status_code != 200:
-        return {}, mtd.reason
+    if response.status_code != 200:
+        return {}, _zenodo_error_message(response=response)
     else:
         return {}, None
 
 
 def update_published_metadata(
     zenodo: dict,
-    resources: Optional[Resources] = None,
+    resources: Resources | None = None,
 ) -> ZenodoFunctionResponseType:
     """Update published deposit metadata.
 
@@ -320,10 +383,10 @@ def update_published_metadata(
     links = zenodo["links"]
 
     # Unlock the published deposit for editing
-    edt = requests.post(links["edit"], params=zres["ztoken"])
+    response = requests.post(links["edit"], params=zres["ztoken"])
 
-    if edt.status_code != 201:
-        return {}, edt.json()
+    if response.status_code != 201:
+        return {}, _zenodo_error_message(response=response)
 
     # # Amend the metadata
     # for key, val in new_values.items():
@@ -366,23 +429,20 @@ def update_published_metadata(
         return {}, ret
 
 
-def upload_file(
+def upload_files(
     metadata: dict,
-    filepath: str,
-    zenodo_filename: Optional[str] = None,
+    filepaths: list[Path],
     progress_bar: bool = True,
-    resources: Optional[Resources] = None,
-) -> ZenodoFunctionResponseType:
+    resources: Resources | None = None,
+) -> ZenodoFunctionResponseListType:
     """Upload a file to Zenodo.
 
-    Uploads the contents of a specified file to an unpublished Zenodo deposit,
-    optionally using an alternative filename. If the file already exists in the deposit,
-    it will be replaced.
+    Uploads the a list of files to an unpublished Zenodo deposit. If any filenames
+    already exists in the deposit, they will be replaced with the new content
 
     Args:
         metadata: The Zenodo metadata dictionary for a deposit
-        filepath: The path to the file to be uploaded
-        zenodo_filename: An optional alternative file name to be used on Zenodo
+        filepaths: The path to the file to be uploaded
         progress_bar: Should the upload progress be displayed
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
@@ -395,49 +455,59 @@ def upload_file(
     zres = _resources_to_zenodo_api(resources)
     params = zres["ztoken"]
 
-    # Check the file and get the filename if an alternative is not provided
-    filepath = os.path.abspath(filepath)
-    if not (os.path.exists(filepath) and os.path.isfile(filepath)):
-        raise IOError(f"The file path is either a directory or not found: {filepath} ")
+    # Ensure filepaths are paths, resolve them and check they are all existing files
+    filepaths = [Path(f) for f in filepaths]
+    filepaths = [f.resolve() for f in filepaths]
+    bad_paths = [str(f) for f in filepaths if not (f.exists() and f.is_file())]
 
-    if zenodo_filename is None:
-        file_name = os.path.basename(filepath)
-    else:
-        file_name = zenodo_filename
+    if bad_paths:
+        raise OSError(f"Filepaths unknown or not a file: {','.join(bad_paths)} ")
 
-    # upload the file
-    # - https://gist.github.com/tyhoff/b757e6af83c1fd2b7b83057adf02c139
-    file_size = os.stat(filepath).st_size
-    api = f"{metadata['links']['bucket']}/{file_name}"
+    # Collect response for each file
+    response_content = []
 
-    with open(filepath, "rb") as file_io:
-        if progress_bar:
-            with tqdm(
-                total=file_size, unit="B", unit_scale=True, unit_divisor=1024
-            ) as upload_monitor:
-                # Upload the wrapped file
-                wrapped_file = CallbackIOWrapper(upload_monitor.update, file_io, "read")
-                fls = requests.put(api, data=wrapped_file, params=params)
-        else:
-            fls = requests.put(api, data=file_io, params=params)
+    # Upload each file
+    for fpath in filepaths:
+        # upload the file
+        # - https://gist.github.com/tyhoff/b757e6af83c1fd2b7b83057adf02c139
+        file_size = fpath.stat().st_size
+        api = f"{metadata['links']['bucket']}/{fpath.name}"
 
-    # trap errors in uploading file
-    # - no success or mismatch in md5 checksums
-    if fls.status_code != 201:
-        return {}, _zenodo_error_message(fls)
+        with open(fpath, "rb") as file_io:
+            print(f"Uploading {fpath.name}")
+            if progress_bar:
+                with tqdm(
+                    total=file_size, unit="B", unit_scale=True, unit_divisor=1024
+                ) as upload_monitor:
+                    # Upload the wrapped file
+                    wrapped_file = CallbackIOWrapper(
+                        upload_monitor.update, file_io, "read"
+                    )
+                    fls = requests.put(api, data=wrapped_file, params=params)
+            else:
+                fls = requests.put(api, data=file_io, params=params)
 
-    # TODO - could this be inside with above? - both are looping over the file contents
-    # https://medium.com/codex/chunked-uploads-with-binary-files-in-python-f0c48e373a91
-    local_hash = _compute_md5(filepath)
+        # trap errors in uploading file
+        # - no success or mismatch in md5 checksums
+        if fls.status_code != 201:
+            return list({}), _zenodo_error_message(fls)
 
-    if fls.json()["checksum"] != f"md5:{local_hash}":
-        return {}, "Mismatch in local and uploaded MD5 hashes"
-    else:
-        return fls.json(), None
+        # TODO - could this be inside the tqdm with call?
+        #      - both are looping over the file contents
+        # https://medium.com/codex/chunked-uploads-with-binary-files-in-python-f0c48e373a91
+        local_hash = _compute_md5(fpath)
+
+        fls_json: dict = fls.json()
+        if fls_json["checksum"] != f"md5:{local_hash}":
+            return list({}), "Mismatch in local and uploaded MD5 hashes"
+
+        response_content.append(fls_json)
+
+    return response_content, None
 
 
 def discard_deposit(
-    metadata: dict, resources: Optional[Resources] = None
+    zenodo_metadata: dict, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Discard a deposit.
 
@@ -446,7 +516,7 @@ def discard_deposit(
     be deleted via the API - contact the Zenodo team for help.
 
     Args:
-        metadata: The Zenodo metadata dictionary for a deposit
+        zenodo_metadata: The Zenodo metadata dictionary for a deposit
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -458,7 +528,7 @@ def discard_deposit(
     zres = _resources_to_zenodo_api(resources)
     params = zres["ztoken"]
 
-    delete = requests.delete(metadata["links"]["self"], params=params)
+    delete = requests.delete(zenodo_metadata["links"]["self"], params=params)
 
     if delete.status_code == 204:
         return {"result": "success"}, None
@@ -467,7 +537,7 @@ def discard_deposit(
 
 
 def publish_deposit(
-    zenodo: dict, resources: Optional[Resources] = None
+    zenodo: dict, resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Publish a created deposit.
 
@@ -485,23 +555,23 @@ def publish_deposit(
     params = zres["ztoken"]
 
     # publish
-    pub = requests.post(zenodo["links"]["publish"], params=params)
+    response = requests.post(zenodo["links"]["publish"], params=params)
 
     # trap errors in publishing, otherwise return the publication metadata
-    if pub.status_code != 202:
-        return {}, pub.json()
+    if response.status_code != 202:
+        return {}, _zenodo_error_message(response=response)
     else:
-        return pub.json(), None
+        return response.json(), None
 
 
-def delete_file(
-    metadata: dict, filename: str, resources: Optional[Resources] = None
+def delete_files(
+    metadata: dict, filenames: list[str], resources: Resources | None = None
 ) -> ZenodoFunctionResponseType:
     """Delete an uploaded file from an unpublished Zenodo deposit.
 
     Args:
         metadata: The Zenodo metadata dictionary for a deposit
-        filename: The file to delete from the deposit
+        filenames: A list of files to delete from the deposit
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -522,20 +592,45 @@ def delete_file(
         # failed to get the files
         return {}, _zenodo_error_message(files)
 
-    # get a dictionary of file links
+    # Get a dictionary of the available file links
     files_dict = {f["filename"]: f["links"]["self"] for f in files.json()}
 
-    if filename not in files_dict:
-        return {}, f"{filename} is not a file in the deposit"
+    # Get matching files
+    unknown_files = []
+    delete_links = []
+    for file in filenames:
+        if file in files_dict:
+            delete_links.append(files_dict[file])
+        else:
+            unknown_files.append(file)
 
-    # get the delete link to the file and call
-    delete_api = files_dict[filename]
-    file_del = requests.delete(delete_api, params=params)
+    if unknown_files:
+        return {}, f"Files not found in the deposit: {','.join(unknown_files)}"
 
-    if file_del.status_code != 204:
-        return {}, _zenodo_error_message(file_del)
-    else:
-        return {"result": "success"}, None
+    return _delete_files_from_links(delete_links=delete_links, params=params)
+
+
+def _delete_files_from_links(delete_links: list[str], params: dict):
+    """Delete files from Zenodo deposit from a list of API links.
+
+    This private method is used to delete files from a deposit using a list of the
+    Zenodo file "self" links. This is following the API below, where the link text
+    provides the specific API link to the file to be deleted
+
+        DELETE /api/deposit/depositions/:id/files/:file_id
+
+    Args:
+        delete_links: A list of Zenodo deposit file 'self' links
+        params: A dictionary of authentication parameters for the Zenodo API
+    """
+
+    for link in delete_links:
+        file_del = requests.delete(link, params=params)
+
+        if file_del.status_code != 204:
+            return {}, _zenodo_error_message(file_del)
+
+    return {"result": "success"}, None
 
 
 """
@@ -545,32 +640,20 @@ Dataset description generation (HTML and GEMINI XML)
 
 def dataset_description(
     dataset_metadata: dict,
-    zenodo_metadata: dict,
-    render: bool = True,
-    extra: Optional[str] = None,
-    resources: Optional[Resources] = None,
-) -> Union[tags.div, str]:
+    resources: Resources | None = None,
+) -> tags.div | str:
     """Create an HTML dataset description.
 
-    This function turns a dataset metadata JSON into html for inclusion in
-    published datasets. This content is used to populate the dataset description
-    section in the Zenodo metadata. Zenodo has a limited set of permitted HTML
-    tags, so this is quite simple HTML.
+    This function takes the dataset metadata exported by safedata_validate and uses it
+    to populate an HTML template file. The resulting HTML can then be used to to provide
+    a summary description of the dataset, either for local use or to upload as the
+    description component of the Zenodo metadata,
 
-    The available tags are: a, p, br, blockquote, strong, b, u, i, em, ul, ol,
-    li, sub, sup, div, strike. Note that `<a>` is currently only available on
-    Zenodo when descriptions are uploaded programmatically as a bug in their
-    web interface strips links.
-
-    The description can be modified for specific uses by including HTML via the
-    extra argument. This content is inserted below the dataset description.
+    A default template is provided with the safedata_validator package, but users can
+    provide bespoke templates via the configuration file.
 
     Args:
         dataset_metadata: The dataset metadata
-        zenodo_metadata: The Zenodo deposit metadata
-        render: Should the html be returned as text or as the underlying
-            dominate.tags.div object.
-        extra: Additional HTML content to include in the description.
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
 
@@ -578,21 +661,56 @@ def dataset_description(
         Either a string of rendered HTML or a dominate.tags.div object.
     """
 
-    # zres = _resources_to_zenodo_api(resources)
-    # metadata_api = zres["mdapi"]
+    # NOTE - this could conceivably just pass the complete dataset metadata dictionary
+    #        straight to the Jinja template context. That would make the template more
+    #        complex but would also expose all of the metadata.
 
-    # PROJECT Title and authors are added by Zenodo from zenodo metadata
-    # TODO - option to include here?
+    # Load resources if needed
+    if resources is None:
+        resources = Resources()
 
-    desc = tags.div()
+    # Get the template path elements
+    if resources.zenodo.html_template is None:
+        template_path = il_resources.files("safedata_validator.templates").joinpath(
+            "description_template.html"
+        )
+    else:
+        template_path = Path(resources.zenodo.html_template)
+        if not template_path.exists():
+            raise FileNotFoundError(
+                f"Configured html template not found: {resources.zenodo.html_template}"
+            )
 
-    # Dataset summary
-    desc += tags.b("Description: ")
-    desc += tags.p(dataset_metadata["description"].replace("\n", "</br>"))
+    # Using autoescape=False is not generally recommended, but the title and taxa
+    # context elements contain HTML tags
+    # - mypy: importlib returns a Traversable, which is a protocol that Path complies
+    #         with, but the attribute isn't being recognized
+    env = Environment(
+        loader=FileSystemLoader(template_path.parent),  # type: ignore [attr-defined]
+        autoescape=False,
+    )
 
-    # Extra
-    if extra is not None:
-        desc += raw(extra)
+    template = env.get_template(template_path.name)
+
+    # Build the context dictionary that will be used to populate the Jinja templage
+    # - the dataset title and authors are populated in different fields by Zenodo from
+    #   zenodo metadata, where this function just maintains the dataset description
+    #   element of the Zenodo metadata
+
+    # Description from the summary table
+    context_dict = dict(
+        description=dataset_metadata["description"].replace("\n", "</br>")
+    )
+
+    # Project details if available.
+    # Generate project urls
+    if dataset_metadata["project_ids"] is not None:
+        context_dict["project_urls"] = [
+            resources.zenodo.project_url.replace("PROJECT_ID", str(pid))
+            for pid in dataset_metadata["project_ids"]
+        ]
+    else:
+        context_dict["project_urls"] = []
 
     # proj_url = URL('projects', 'project_view', args=[metadata['project_id']],
     #               scheme=True, host=True)
@@ -601,477 +719,475 @@ def dataset_description(
     ##
 
     # Funding information
-    if dataset_metadata["funders"]:
-        funder_info = []
+    context_dict["funders"] = dataset_metadata["funders"]
+    context_dict["permits"] = dataset_metadata["permits"]
 
-        for fnd in dataset_metadata["funders"]:
-            funder_details = [fnd["body"], "(", fnd["type"]]
-
-            if fnd["ref"]:
-                funder_details.append(str(fnd["ref"]))
-            if fnd["url"]:
-                funder_details.append(tags.a(fnd["url"], _href=fnd["url"]))
-
-            funder_details.append(")")
-            funder_info.append(tags.li(funder_details))
-
-        desc += [
-            tags.p(
-                tags.b("Funding: "),
-                "These data were collected as part of research funded by: ",
-                tags.ul(funder_info),
-            ),
-            tags.p(
-                "This dataset is released under the CC-BY 4.0 licence, requiring that "
-                "you cite the dataset in any outputs, but has the additional condition "
-                "that you acknowledge the contribution of these funders in any outputs."
-            ),
-        ]
-
-    # Permits
-    if dataset_metadata["permits"]:
-        desc += tags.p(
-            tags.b("Permits: "),
-            "These data were collected under permit from the following authorities:",
-            tags.ul(
-                [
-                    tags.li(
-                        f"{pmt['authority']} ({pmt['type']} licence {pmt['number']})"
-                    )
-                    for pmt in dataset_metadata["permits"]
-                ]
-            ),
-        )
-
-    # # XML link
-    # xml_url = f"{metadata_api}/xml/{zenodo['record_id']}"
-
-    # desc += tags.p(
-    #     tags.b("XML metadata: "),
-    #     "GEMINI compliant metadata for this dataset is available ",
-    #     tags.a("here", href=xml_url),
-    # )
-
-    # Present a description of the file or files including 'external' files
-    # (data files loaded directly to Zenodo).
-    ds_files = [dataset_metadata["filename"]]
-    n_ds_files = 1
-    ex_files = []
-
-    if dataset_metadata["external_files"]:
-        ex_files = dataset_metadata["external_files"]
-        ds_files += [f["file"] for f in ex_files]
-        n_ds_files += len(ex_files)
-
-    desc += tags.p(
-        tags.b("Files: "),
-        f"This dataset consists of {n_ds_files} files: ",
-        ", ".join(ds_files),
+    # Filenames associated with the dataset
+    context_dict["dataset_filename"] = dataset_metadata["filename"]
+    # TODO - the external file default in the metadata definition should be an
+    #        empty list, not None
+    context_dict["external_files"] = (
+        []
+        if dataset_metadata["external_files"] is None
+        else dataset_metadata["external_files"]
     )
 
-    # Group the sheets by their 'external' file - which is None for sheets
-    # in the submitted workbook - and collect them into a dictionary by source
-    # file. get() is used here for older data where external was not present.
+    context_dict["all_filenames"] = [context_dict["dataset_filename"]] + [
+        f["file"] for f in context_dict["external_files"]
+    ]
 
-    tables_by_source = dataset_metadata["dataworksheets"]
+    # Group the sheets by their 'external' file - which is None for sheets in the
+    # submitted workbook - and collect them into a dictionary by source file. Because
+    # you can't sort a mix of strings and None elements, this substitutes in
+    # '__internal__' to represent internal sheets.
+    tables_by_source = [
+        (sh["external"] or "__internal__", sh)
+        for sh in dataset_metadata["dataworksheets"]
+    ]
 
-    # Now group into a dictionary keyed by external source file - cannot sort
-    # None (no comparison operators) so use a substitute
-    tables_by_source.sort(key=lambda sh: sh.get("external") or False)
-    tables_by_source = groupby(
-        tables_by_source, key=lambda sh: sh.get("external") or False
-    )
-    tables_by_source = {g: list(v) for g, v in tables_by_source}
+    # Now group into a dictionary keyed by __internal__ or external file names
+    tables_by_source.sort(key=lambda sh: sh[0])
+    tables_grouped_by_source = groupby(tables_by_source, key=lambda sh: sh[0])
 
-    # We've now got a set of files (worksheet + externals) and a dictionary of table
-    # descriptions that might have an entry for each file.
+    # Convert to a list of table information, keyed by file.
+    tables_dict_by_source = {
+        ky: [val[1] for val in tpl] for ky, tpl in tables_grouped_by_source
+    }
 
-    # Report the worksheet first
-    desc += tags.p(tags.b(dataset_metadata["filename"]))
-
-    # Report internal tables
-    if False in tables_by_source:
-        int_tabs = tables_by_source[False]
-        desc += tags.p(
-            f"This file contains dataset metadata and {len(int_tabs)} data tables:"
-        )
-        desc += tags.ol([tags.li(table_description(tab)) for tab in int_tabs])
+    # We've now  a dictionary of table descriptions that might have an entry for each
+    # provided file. Get the internal tables separately in the context
+    if "__internal__" in tables_dict_by_source:
+        context_dict["internal_tables"] = tables_dict_by_source.pop("__internal__")
     else:
-        # No internal tables at all.
-        desc += tags.p("This file only contains metadata for the files below")
+        context_dict["internal_tables"] = []
 
-    # Report on the other files
-    for exf in ex_files:
-        desc += tags.p(
-            tags.b(exf["file"]), tags.p(f"Description: {exf['description']}")
-        )
+    # Now need to pair any external table metadata with the external file descriptions.
+    # TODO - the external file default in the metadata definition should be an
+    #        empty list, not None
+    if dataset_metadata["external_files"] is None:
+        external_files = dict()
+    else:
+        # Repackage external metadata to be keyed by file name and provide description
+        # and a default empty list of tables
+        external_files = {
+            vl["file"]: {"description": vl["description"], "tables": []}
+            for vl in dataset_metadata["external_files"]
+        }
+        # Add the remaining table descriptions to the appropriate files.
+        for extf_key, extf_tabs in tables_dict_by_source.items():
+            external_files[extf_key]["tables"] = extf_tabs
 
-        if exf["file"] in tables_by_source:
-            # Report table description
-            ext_tabs = tables_by_source[exf["file"]]
-            desc += tags.p(f"This file contains {len(ext_tabs)} data tables:")
-            desc += tags.ol([tags.li(table_description(tab)) for tab in ext_tabs])
+    context_dict["external_file_data"] = external_files
+
+    # Populate a list of filenames
+    context_dict["all_filenames"] = [
+        context_dict["dataset_filename"],
+        *list(external_files.keys()),
+    ]
 
     # Add extents if populated
-    if dataset_metadata["temporal_extent"] is not None:
-        desc += tags.p(
-            tags.b("Date range: "),
-            "{0[0]} to {0[1]}".format(
-                [x[:10] for x in dataset_metadata["temporal_extent"]]
-            ),
-        )
-    if dataset_metadata["latitudinal_extent"] is not None:
-        desc += tags.p(
-            tags.b("Latitudinal extent: "),
-            "{0[0]:.4f} to {0[1]:.4f}".format(dataset_metadata["latitudinal_extent"]),
-        )
-    if dataset_metadata["longitudinal_extent"] is not None:
-        desc += tags.p(
-            tags.b("Longitudinal extent: "),
-            "{0[0]:.4f} to {0[1]:.4f}".format(dataset_metadata["longitudinal_extent"]),
-        )
+    context_dict["temporal_extent"] = dataset_metadata["temporal_extent"]
+    context_dict["latitudinal_extent"] = dataset_metadata["latitudinal_extent"]
+    context_dict["longitudinal_extent"] = dataset_metadata["longitudinal_extent"]
 
-    # Find taxa data from each database (if they exist)
-    gbif_taxon_index = dataset_metadata.get("gbif_taxa")
-    ncbi_taxon_index = dataset_metadata.get("ncbi_taxa")
+    # Find taxa data from each database and convert to HTML representation. The metadata
+    # will be an empty list if the dataset does not contain any taxa.
+    context_dict["gbif_timestamp"] = dataset_metadata["gbif_timestamp"]
+    context_dict["ncbi_timestamp"] = dataset_metadata["ncbi_timestamp"]
 
-    # When NCBI is absent use the old format for backwards compatibility
-    if gbif_taxon_index or ncbi_taxon_index:
-        desc += tags.p(
-            tags.b("Taxonomic coverage: "),
-            tags.br(),
-            "This dataset contains data associated with taxa and these have been "
-            "validated against appropriate taxonomic authority databases.",
-        )
+    gbif_taxon_index = dataset_metadata["gbif_taxa"]
+    ncbi_taxon_index = dataset_metadata["ncbi_taxa"]
 
-    if gbif_taxon_index:
-        desc += tags.p(
-            tags.u("GBIF taxa details: "),
-            tags.br(),
-            tags.br(),
-            "The following taxa were validated against the GBIF backbone dataset."
-            "If a dataset uses a synonym, the accepted usage is shown followed by the "
-            "dataset usage in brackets. Taxa that cannot be validated, including new "
-            "species and other unknown taxa, morphospecies, functional groups and "
-            "taxonomic levels not used in the GBIF backbone are shown in square "
-            "brackets.",
-            taxon_index_to_text(gbif_taxon_index, True, auth="GBIF"),
-        )
-
-    if ncbi_taxon_index:
-        desc += tags.p(
-            tags.u("NCBI taxa details: "),
-            tags.br(),
-            tags.br(),
-            "The following taxa were validated against the NCBI taxonomy dataset."
-            " If a dataset uses a synonym, the accepted usage is shown followed by the "
-            "dataset usage in brackets. Taxa that cannot be validated, e.g. new or "
-            "unknown species are shown in square brackets. Non-backbone taxonomic "
-            "ranks (e.g. strains or subphyla) can be validated using the NCBI "
-            "database. However, they will only be shown if the user explicitly "
-            "provided a non-backbone taxon. When they are shown they will be "
-            "accompanied by an message stating their rank.",
-            taxon_index_to_text(ncbi_taxon_index, True, auth="NCBI"),
-        )
-
-    if render:
-        return desc.render()
-    else:
-        return desc
-
-
-def table_description(tab: dict) -> tags.div:
-    """Convert a dict containing table contents into an HTML table.
-
-    Function to return a description for an individual source file in a dataset.
-    Typically datasets only have a single source file - the Excel workbook that
-    also contains the metadata - but they may also report on external files loaded
-    directly to Zenodo, and which uses the same mechanism.
-
-    Args:
-        tab: A dict describing a data table
-
-    Returns:
-        A `dominate.tags.div` instance containing an HTML description of the table
-    """
-
-    # table summary
-    tab_desc = tags.div(
-        tags.p(tags.b(tab["title"]), f" (described in worksheet {tab['name']})"),
-        tags.p(f"Description: {tab['description']}"),
-        tags.p(f"Number of fields: {tab['max_col'] - 1}"),
+    context_dict["gbif_taxa"] = (
+        taxon_index_to_text(taxa=gbif_taxon_index, html=True, auth="GBIF")
+        if gbif_taxon_index
+        else None
     )
 
-    # The explicit n_data_row key isn't available for older records
-    if "n_data_row" in tab:
-        if tab["n_data_row"] == 0:
-            tab_desc += tags.p(
-                "Number of data rows: Unavailable (table metadata description only)."
-            )
-        else:
-            tab_desc += tags.p(f"Number of data rows: {tab['n_data_row']}")
-    else:
-        tab_desc += tags.p(
-            f"Number of data rows: {tab['max_row'] - len(tab['descriptors'])}"
-        )
+    context_dict["ncbi_taxa"] = (
+        taxon_index_to_text(taxa=ncbi_taxon_index, html=True, auth="NCBI")
+        if ncbi_taxon_index
+        else None
+    )
 
-    # add fields
-    tab_desc += tags.p("Fields: ")
+    html = template.render(context_dict)
 
-    # fields summary
-    flds = tags.ul()
-    for each_fld in tab["fields"]:
-        flds += tags.li(
-            tags.b(each_fld["field_name"]),
-            f": {each_fld['description']} (Field type: {each_fld['field_type']})",
-        )
-
-    tab_desc += flds
-
-    return tab_desc
+    return html
 
 
 def generate_inspire_xml(
     dataset_metadata: dict,
     zenodo_metadata: dict,
     resources: Resources,
-    lineage_statement: Optional[str] = None,
-) -> bytes:
+    lineage_statement: str | None = None,
+) -> str:
     """Convert dataset and zenodo metadata into GEMINI XML.
 
     Produces an INSPIRE/GEMINI formatted XML record from dataset metadata,
     and Zenodo record metadata using a template XML file. The dataset URL
     defaults to the Zenodo record but can be replaced if a separate URL (such as
     a project specific website) is used. The Gemini XML standard requires a
-    statement about the lineage of a dataset - if this is not provided to this
-    function it will appear as "Not provided".
+    statement about the lineage of a dataset - this is automatically taken from the
+    package configuration but can be overridden for individual datasets, for example to
+    add dataset specific links, using the `lineage_statement` argument.
 
     Args:
         dataset_metadata: A dictionary of the dataset metadata
         zenodo_metadata: A dictionary of the Zenodo record metadata
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
-        lineage_statement: An optional lineage statement about the data.
+        lineage_statement: An optional alternative lineage statement about the data.
 
     Returns:
         A string containing GEMINI compliant XML.
     """
 
-    # Get resource configuration
-    # zres = _resources_to_zenodo_api(resources)
+    # Do the resources provide complete XML information
+    if None in resources.xml.values():
+        raise ValueError("XML configuration section is incomplete.")
 
-    # parse the XML template and get the namespace map
-    template = Path(__file__).parent / "gemini_xml_template.xml"
-    tree = etree.parse(template)
-    root = tree.getroot()
-    nsmap = root.nsmap
-
-    pub_date = dt.fromisoformat(zenodo_metadata["metadata"]["publication_date"])
-
-    # Use find and XPATH to populate the template, working through from the top of the
-    # file
-
-    # file identifier
-    root.find("./gmd:fileIdentifier/gco:CharacterString", nsmap).text = "zenodo." + str(
-        zenodo_metadata["id"]
+    template_path = il_resources.files("safedata_validator.templates").joinpath(
+        "gemini_xml_template.xml"
     )
 
-    # date stamp (not clear what this is - taken as publication date)
-    root.find("./gmd:dateStamp/gco:DateTime", nsmap).text = pub_date.isoformat()
+    # Get the Jinja environment and load the template
+    # - mypy: importlib returns a Traversable, which is a protocol that Path complies
+    #         with, but the attribute isn't being recognized
+    env = Environment(
+        loader=FileSystemLoader(template_path.parent),  # type: ignore [attr-defined]
+        autoescape=select_autoescape(),
+    )
 
-    # Now zoom to the data identification section
-    data_id = root.find(".//gmd:MD_DataIdentification", nsmap)
+    template = env.get_template(template_path.name)
 
-    # CITATION
-    citation = data_id.find("gmd:citation/gmd:CI_Citation", nsmap)
-    citation.find("gmd:title/gco:CharacterString", nsmap).text = dataset_metadata[
-        "title"
-    ]
-    citation.find(
-        "gmd:date/gmd:CI_Date/gmd:date/gco:Date", nsmap
-    ).text = pub_date.date().isoformat()
+    # Build some reused values from the metadata
+    # URIs -  form the DOI URL from the prereserved DOI metadata
+    doi_url = f"https://doi.org/{zenodo_metadata['metadata']['prereserve_doi']['doi']}"
 
-    # URIs - a dataset URL and the DOI
-    # dataset_url = (
-    #     f"{zres['mdapi']}/datasets/view_dataset"
-    #     f"?id={dataset_metadata['zenodo_record_id']}"
-    # )
-    # citation.find(
-    #     "gmd:identifier/gmd:MD_Identifier/gmd:code/gco:CharacterString", nsmap
-    # ).text = dataset_url
-    citation.find(
-        "gmd:identifier/gmd:RS_Identifier/gmd:code/gco:CharacterString", nsmap
-    ).text = zenodo_metadata["doi_url"]
+    # A true "publication" date is not available until a record is published, so use the
+    # creation date of the deposit as a reasonable replacement, with the caveat that you
+    # should generate the XML and publish on the same day.
+    pub_date = dt.fromisoformat(zenodo_metadata["created"]).date()
 
-    # The citation string
+    # A citation string
     authors = [au["name"] for au in dataset_metadata["authors"]]
     author_string = ", ".join(authors)
     if len(authors) > 1:
         author_string = author_string.replace(", " + authors[-1], " & " + authors[-1])
 
-    cite_string = "{} ({}) {} [Dataset] {}".format(
-        author_string,
-        pub_date.year,
-        dataset_metadata["title"],
-        zenodo_metadata["doi_url"],
+    citation_string = (
+        f"{author_string} ({pub_date.year}) "
+        f"{dataset_metadata['title']} [Dataset] {doi_url}"
     )
 
-    citation.find(
-        "gmd:otherCitationDetails/gco:CharacterString", nsmap
-    ).text = cite_string
-
-    # ABSTRACT
-    data_id.find("gmd:abstract/gco:CharacterString", nsmap).text = dataset_metadata[
-        "description"
-    ]
-
-    # KEYWORDS
-    # - find the container node for the free keywords
-    keywords = data_id.find("./gmd:descriptiveKeywords/gmd:MD_Keywords", nsmap)
-    # - get the placeholder node
-    keywd_node = keywords.getchildren()[0]
-    # - duplicate it if needed
-    for new_keywd in range(len(dataset_metadata["keywords"]) - 1):
-        keywords.append(copy.deepcopy(keywd_node))
-    # populate the nodes
-    for key_node, val in zip(keywords.getchildren(), dataset_metadata["keywords"]):
-        key_node.find("./gco:CharacterString", nsmap).text = val
-
-    # AUTHORS - find the point of contact with author role from the template and its
-    # index using xpath() here to access full xpath predicate search.
-    au_xpath = (
-        "./gmd:pointOfContact[gmd:CI_ResponsibleParty/"
-        "gmd:role/gmd:CI_RoleCode='author']"
-    )
-    au_node = data_id.xpath(au_xpath, namespaces=nsmap)[0]
-    au_idx = data_id.index(au_node)
-
-    # - duplicate it if needed into the tree
-    for n in range(len(dataset_metadata["authors"]) - 1):
-        data_id.insert(au_idx, copy.deepcopy(au_node))
-
-    # now populate the author nodes, there should now be one for each author
-    au_ls_xpath = (
-        "./gmd:pointOfContact[gmd:CI_ResponsibleParty/"
-        "gmd:role/gmd:CI_RoleCode='author']"
-    )
-    au_node_list = data_id.xpath(au_ls_xpath, namespaces=nsmap)
-
-    for au_data, au_node in zip(dataset_metadata["authors"], au_node_list):
-        resp_party = au_node.find("gmd:CI_ResponsibleParty", nsmap)
-        resp_party.find("gmd:individualName/gco:CharacterString", nsmap).text = au_data[
-            "name"
-        ]
-        resp_party.find(
-            "gmd:organisationName/gco:CharacterString", nsmap
-        ).text = au_data["affiliation"]
-        contact_info = resp_party.find("gmd:contactInfo/gmd:CI_Contact", nsmap)
-        email_path = (
-            "gmd:address/gmd:CI_Address/gmd:electronicMailAddress/gco:CharacterString"
-        )
-        contact_info.find(email_path, nsmap).text = au_data["email"]
-
-        # handle orcid resource
-        orcid = contact_info.find("gmd:onlineResource", nsmap)
-        if au_data["orcid"] is None:
-            contact_info.remove(orcid)
-        else:
-            orcid.find("gmd:CI_OnlineResource/gmd:linkage/gmd:URL", nsmap).text = (
-                "http://orcid.org/" + au_data["orcid"]
-            )
-
-    # CONSTRAINTS
-    # update the citation information in the second md constraint
-    md_path = (
-        "gmd:resourceConstraints/gmd:MD_Constraints/"
-        "gmd:useLimitation/gco:CharacterString"
-    )
-    md_constraint = data_id.find(md_path, nsmap)
-    md_constraint.text += cite_string
-
-    # embargo or not?
-    embargo_path = (
-        "gmd:resourceConstraints/gmd:MD_LegalConstraints/"
-        "gmd:otherConstraints/gco:CharacterString"
-    )
+    # Resource constraints text
     if dataset_metadata["access"] == "embargo":
-        data_id.find(embargo_path, nsmap).text = (
+        access_statement = (
             f"This data is under embargo until {dataset_metadata['embargo_date']}."
             "After that date there are no restrictions to public access."
         )
     elif dataset_metadata["access"] == "restricted":
-        data_id.find(embargo_path, nsmap).text = (
+        access_statement = (
             "This dataset is currently not publicly available, please contact the "
             "Zenodo community owner to request access."
         )
     else:
-        data_id.find(
-            embargo_path, nsmap
-        ).text = "There are no restrictions to public access."
+        access_statement = "There are no restrictions to public access."
 
-    # EXTENTS
-    temp_extent = root.find(".//gmd:EX_TemporalExtent", nsmap)
-    temp_extent.find(".//gml:beginPosition", nsmap).text = dataset_metadata[
-        "temporal_extent"
-    ][0][:10]
-    temp_extent.find(".//gml:endPosition", nsmap).text = dataset_metadata[
-        "temporal_extent"
-    ][1][:10]
+    # Get a copy of the project wide XML configuration from the resources. This provides
+    # the following elements:
+    # * languageCode, characterSet, contactCountry, contactEmail, epsgCode,
+    #   topicCategories, lineageStatement
+    context_dict = resources.xml.copy()
 
-    geo_extent = root.find(".//gmd:EX_GeographicBoundingBox", nsmap)
-    geo_extent.find("./gmd:westBoundLongitude/gco:Decimal", nsmap).text = str(
-        dataset_metadata["longitudinal_extent"][0]
+    # Generate project urls
+    if dataset_metadata["project_ids"] is not None:
+        project_urls = [
+            resources.zenodo.project_url.replace("PROJECT_ID", str(pid))
+            for pid in dataset_metadata["project_ids"]
+        ]
+    else:
+        project_urls = []
+
+    # Now update it with information also needed by Zenodo and the file specific
+    # elements from the zenodo and dataset metadata
+    context_dict.update(
+        # Values also used on the Zenodo information or duplicated in the xml
+        contactName=resources.zenodo.contact_name,
+        contactOrcID=resources.zenodo.contact_orcid,
+        pointofcontactName=resources.zenodo.contact_name,
+        pointofcontactCountry=resources.xml.contactCountry,
+        pointofcontactEmail=resources.xml.contactEmail,
+        pointofcontactOrcID=resources.zenodo.contact_orcid,
+        # Dataset specific information
+        projectURL=project_urls,
+        citationRSIdentifier=doi_url,
+        dateStamp=pub_date.isoformat(),
+        publicationDate=pub_date.isoformat(),
+        fileIdentifier=str(zenodo_metadata["id"]),
+        title=dataset_metadata["title"],
+        authors=dataset_metadata["authors"],
+        abstract=dataset_metadata["description"],
+        keywords=dataset_metadata["keywords"],
+        citationString=citation_string,
+        embargoValue=access_statement,
+        startDate=dataset_metadata["temporal_extent"][0][:10],
+        endDate=dataset_metadata["temporal_extent"][1][:10],
+        westBoundLongitude=_min_dp(dataset_metadata["longitudinal_extent"][0], 2),
+        eastBoundLongitude=_min_dp(dataset_metadata["longitudinal_extent"][1], 2),
+        southBoundLatitude=_min_dp(dataset_metadata["latitudinal_extent"][0], 2),
+        northBoundLatitude=_min_dp(dataset_metadata["latitudinal_extent"][1], 2),
+        downloadLink=doi_url,
     )
-    geo_extent.find("./gmd:eastBoundLongitude/gco:Decimal", nsmap).text = str(
-        dataset_metadata["longitudinal_extent"][1]
+
+    # Override global lineage statement
+    if lineage_statement is not None:
+        context_dict["lineageStatement"] = lineage_statement
+
+    xml = template.render(context_dict)
+
+    return xml
+
+
+def publish_dataset(
+    resources: Resources,
+    dataset: Path,
+    dataset_metadata: dict,
+    external_files: list[Path],
+    new_version: int | None,
+    no_xml: bool = False,
+) -> tuple[int, str]:
+    """Publish a validated dataset.
+
+    This function takes a dataset and its validated metadata, along with any additional
+    files named in the dataset, and publishes them to a new Zenodo record. It merges
+    several of the :mod:`~safedata_validator.zenodo` functions to provide a single
+    interface to carry out the complete publication process. The function checks that
+    the set of provided files (dataset and external files) matches the files documented
+    in the dataset.
+
+    When a new version of an existing database is created, the resulting Zenodo deposit
+    contains copies of the most recent files. At present, the publish dataset command
+    deletes all of these files and expects to upload the full set of replacement files.
+    This will be inefficient if only some files need to be changed, and this function
+    may be updated in the future to allow only new files to be updated.
+
+    It returns the URL of the resulting published datset. If the publication process
+    fails, the partly completed deposit is deleted to avoid cluttering the Zenodo
+    deposit list.
+
+    Args:
+        resources: The safedata_validator resource configuration to be used. If
+            none is provided, the standard locations are checked.
+        dataset: A path to the dataset file.
+        external_files: A list of paths to external files named in the dataset.
+        dataset_metadata: The dataset metadata.
+        new_version: Optionally, create a new version of the dataset with the provided
+            Zenodo ID. This must be the most recent version of the dataset concept.
+        no_xml: A flag to suppress the automatic inclusion of Gemini XML metadata.
+
+    Returns:
+        A tuple containing the id number and URL of the new record.
+
+    Raises:
+        FileNotFoundError: dataset or external files not found.
+        ValueError: provided files do not match documented files.
+        RuntimeError: issues with Zenodo API.
+    """
+
+    # Check the files to upload exist.
+    paths_to_upload = [dataset, *external_files]
+    not_found = [str(f) for f in paths_to_upload if not f.exists()]
+
+    if not_found:
+        raise FileNotFoundError(f"Files not found: {', '.join(not_found)}")
+
+    # Check for duplicated filenames
+    filenames_only = [f.name for f in paths_to_upload]
+    if len(filenames_only) != len(set(filenames_only)):
+        raise ValueError("Files to be uploaded do not have unique names.")
+
+    # Are all external files listed in the dataset provided
+    if dataset_metadata["external_files"] is None:
+        metadata_ext_files = set()
+    else:
+        metadata_ext_files = {val["file"] for val in dataset_metadata["external_files"]}
+    provided_ext_files = {val.name for val in external_files}
+
+    if metadata_ext_files != provided_ext_files:
+        raise ValueError(
+            "External file names in dataset do not match provided "
+            f"external file names: {', '.join(metadata_ext_files)}"
+        )
+
+    # Check if the XML description can be created _before_ creating a deposit, although
+    # it can't actually be generated until the deposit details are available.
+    if not no_xml and (None in resources.xml.values()):
+        raise ValueError("XML requested and XML configuration section is incomplete.")
+
+    # For new versions of an existing dataset, get the existing dataset metadata and
+    # figure out which files are being changed.
+    if new_version is not None:
+        # Get the requested version data
+        requested_version_metadata, error = get_deposit(
+            deposit_id=new_version, resources=resources
+        )
+        if error:
+            # Report on the failure to get the existing version data
+            raise RuntimeError(error)
+
+        # Check if that is the latest version, because that is what is _actually_ cloned
+        # when a version is requested and we need to get the most recent file listing to
+        # update the files sanely.
+        latest_version_metadata = requests.get(
+            requested_version_metadata["links"]["latest"]
+        ).json()
+
+        latest_id = latest_version_metadata["id"]
+
+        if latest_id != new_version:
+            raise RuntimeError(
+                f"Provided version id ({new_version}) is not the "
+                f"most recent version id({latest_id})"
+            )
+
+        # Collect the name and md5 sum of the existing files and the incoming files to
+        # allow for checking of files with identical name and content
+        incoming_files = {(p.name, _compute_md5(p)) for p in paths_to_upload}
+        existing_files = {
+            (p["key"], p["checksum"].removeprefix("md5:"))
+            for p in latest_version_metadata["files"]
+        }
+
+        # Split files into files to be upload, files to be deleted from deposit and
+        # files that are not being changed
+        new_or_updated_files = [val[0] for val in (incoming_files - existing_files)]
+        files_to_remove = [val[0] for val in (existing_files - incoming_files)]
+        unchanged = [val[0] for val in (incoming_files & existing_files)]
+
+        # Trap updates with no differences - no new files or updates and only a
+        # GEMINI.xml file to remove
+        no_changes = (not new_or_updated_files) or (
+            len(files_to_remove) == 1 and files_to_remove[0].endswith("_GEMINI.xml")
+        )
+        if no_changes:
+            raise RuntimeError(
+                "No file changes: content identical to existing version."
+            )
+
+        # Reduce the upload paths to only the paths of new or updated files. Note the
+        # earlier code checks that the filenames are unique.
+        paths_to_upload = [p for p in paths_to_upload if p.name in new_or_updated_files]
+
+        # Report on update plan.
+        print(f"Preparing new version of deposit {new_version}")
+        if unchanged:
+            print(f" - Unchanged files: {', '.join(unchanged)}")
+        if files_to_remove:
+            print(f" - Removing outdated files: {', '.join(files_to_remove)}")
+        if new_or_updated_files:
+            print(
+                f" - Uploading new or updated files: {', '.join(new_or_updated_files)}"
+            )
+
+    else:
+        # No files will need to be removed from completely new datasets.
+        files_to_remove = []
+
+    # From here on, we need to trap failures and tidy up, so define an local function to
+    # handle the bail process
+    def _clean_up_and_bail(zenodo_metadata, resources) -> None:
+        """Handle the tidy up if the publication process fails."""
+        publish_response, error = discard_deposit(
+            zenodo_metadata=zenodo_metadata, resources=resources
+        )
+        print("Issue with publication process - draft deposit discarded.")
+        raise RuntimeError(error)
+
+    # Create the new deposit to publish the dataset
+    zenodo_metadata, error = create_deposit(
+        resources=resources, new_version=new_version
     )
-    geo_extent.find("./gmd:southBoundLatitude/gco:Decimal", nsmap).text = str(
-        dataset_metadata["latitudinal_extent"][0]
+
+    if error:
+        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
+
+    # Report success
+    zenodo_id = zenodo_metadata["id"]
+    print(f"Deposit created: {zenodo_id}")
+
+    # Generate XML if requested
+    if not no_xml:
+        xml_content = generate_inspire_xml(
+            dataset_metadata=dataset_metadata,
+            zenodo_metadata=zenodo_metadata,
+            resources=resources,
+        )
+
+        xml_file = dataset.parent / f"{zenodo_id}_GEMINI.xml"
+        with open(xml_file, "w") as xml_out:
+            xml_out.write(xml_content)
+        paths_to_upload.append(xml_file)
+        print(f"XML created: {xml_file}")
+
+    # Remove any outdated files from deposits created as new versions
+    if files_to_remove:
+        # Get the authentication parameters - see TODO at top about passing zres around
+        zres = _resources_to_zenodo_api(resources)
+        params = zres["ztoken"]
+
+        # Get all of the file links returned by create_deposit and then delete them.
+        print(f"Removing outdated files: {','.join(files_to_remove)}")
+        removal_links = [
+            f["links"]["self"]
+            for f in zenodo_metadata["files"]
+            if f["filename"] in files_to_remove
+        ]
+
+        delete_result, error = _delete_files_from_links(
+            delete_links=removal_links, params=params
+        )
+
+        # Handle errors
+        if error:
+            _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
+
+    # Post the files
+    print("Uploading files:")
+    file_upload_response, error = upload_files(
+        metadata=zenodo_metadata, filepaths=paths_to_upload, resources=resources
     )
-    geo_extent.find("./gmd:northBoundLatitude/gco:Decimal", nsmap).text = str(
-        dataset_metadata["latitudinal_extent"][1]
+    # Handle errors
+    if error:
+        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
+
+    # Post the metadata
+    print("Uploading deposit metadata")
+    md_upload_response, error = upload_metadata(
+        metadata=dataset_metadata, zenodo=zenodo_metadata, resources=resources
     )
+    if error:
+        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
 
-    # Dataset transfer options: direct download and dataset view on SAFE website
-    distrib = root.find("gmd:distributionInfo/gmd:MD_Distribution", nsmap)
-    distrib.find(
-        (
-            "gmd:transferOptions[1]/gmd:MD_DigitalTransferOptions/gmd:onLine/"
-            "gmd:CI_OnlineResource/gmd:linkage/gmd:URL"
-        ),
-        nsmap,
-    ).text = zenodo_metadata["files"][0]["links"]["download"]
-    distrib.find(
-        (
-            "gmd:transferOptions[2]/gmd:MD_DigitalTransferOptions/gmd:onLine/"
-            "gmd:CI_OnlineResource/gmd:linkage/gmd:URL"
-        ),
-        nsmap,
-    ).text += str(dataset_metadata["zenodo_record_id"])
+    # Publish the deposit
+    publish_response, error = publish_deposit(
+        zenodo=zenodo_metadata, resources=resources
+    )
+    if error:
+        _clean_up_and_bail(zenodo_metadata=zenodo_metadata, resources=resources)
 
-    # LINEAGE STATEMENT
-    # lineage = (
-    #     "This dataset was collected as part of a research project based at The"
-    #     " SAFE Project. For details of the project and data collection, see the "
-    #     "methods information contained within the datafile and the project "
-    #     "website: "
-    # ) + URL("projects", "view_project", args=record.project_id, scheme=True,
-    # host=True)
+    # Return the new publication ID and link
+    zenodo_url = publish_response["links"]["html"]
+    print(f"Dataset published: {zenodo_url}")
 
-    root.find(
-        (
-            "gmd:dataQualityInfo/gmd:DQ_DataQuality/gmd:lineage/gmd:LI_Lineage/"
-            "gmd:statement/gco:CharacterString"
-        ),
-        nsmap,
-    ).text = lineage_statement
+    return (zenodo_id, zenodo_url)
 
-    # return the string contents
-    return etree.tostring(tree)
+
+# Bibliographic and local database functions
 
 
 def download_ris_data(
-    resources: Optional[Resources] = None, ris_file: Optional[str] = None
+    resources: Resources | None = None, ris_file: Path | None = None
 ) -> None:
     """Downloads Zenodo records into a RIS format bibliography file.
 
@@ -1100,8 +1216,8 @@ def download_ris_data(
     known_recids = []
     new_doi = []
 
-    if ris_file and os.path.exists(ris_file):
-        with open(ris_file, "r") as bibliography_file:
+    if ris_file is not None and ris_file.exists():
+        with open(ris_file) as bibliography_file:
             entries = rispy.load(bibliography_file)
             for entry in entries:
                 record_id = int(entry["url"].split("/")[-1])
@@ -1126,7 +1242,7 @@ def download_ris_data(
         safe_data = requests.get(api)
 
         if safe_data.status_code != 200:
-            raise IOError("Cannot access Zenodo API")
+            raise OSError("Cannot access Zenodo API")
         else:
             # Retrieve the record data and store the DOI for each record
             safe_data_dict = safe_data.json()
@@ -1176,7 +1292,7 @@ def download_ris_data(
 
     # Writing only occurs if a ris file path has actually been provided
     if ris_file:
-        if os.path.exists(ris_file):
+        if ris_file.exists():
             LOGGER.info(f"Appending RIS data for {len(data)} new records to {ris_file}")
             write_mode = "a"
         else:
@@ -1189,10 +1305,10 @@ def download_ris_data(
 
 
 def sync_local_dir(
-    datadir: str,
+    datadir: Path,
     xlsx_only: bool = True,
     replace_modified: bool = False,
-    resources: Optional[Resources] = None,
+    resources: Resources | None = None,
 ) -> None:
     """Synchronise a local data directory with a Zenodo community.
 
@@ -1219,7 +1335,7 @@ def sync_local_dir(
     """
 
     # Private helper functions
-    def _get_file(url: str, outf: str, params: Optional[dict] = None) -> None:
+    def _get_file(url: str, outf: Path, params: dict | None = None) -> None:
         """Download a file from a URL."""
         resource = requests.get(url, params=params, stream=True)
 
@@ -1232,17 +1348,17 @@ def sync_local_dir(
     params = zres["ztoken"]
 
     # The dir argument should be an existing path
-    if not (os.path.exists(datadir) and os.path.isdir(datadir)):
-        raise IOError(f"{datadir} is not an existing directory")
+    if not (datadir.exists() and datadir.is_dir()):
+        raise OSError(f"{datadir} is not an existing directory")
 
     # Get the configured metadata api
     api = zres["mdapi"]
 
     # Check for an existing API url file and check it is congruent with config
-    url_file = os.path.join(datadir, "url.json")
+    url_file = datadir / "url.json"
 
-    if os.path.exists(url_file):
-        with open(url_file, "r") as urlf:
+    if url_file.exists():
+        with open(url_file) as urlf:
             dir_api = simplejson.load(urlf)["url"][0]
 
         if api != dir_api:
@@ -1256,11 +1372,9 @@ def sync_local_dir(
     # Download index files - don't bother to check for updates, this isn't
     # a frequent thing to do
     LOGGER.info("Downloading index files")
-    _get_file(f"{api}/api/index", os.path.join(datadir, "index.json"))
-    _get_file(f"{api}/api/gazetteer", os.path.join(datadir, "gazetteer.geojson"))
-    _get_file(
-        f"{api}/api/location_aliases", os.path.join(datadir, "location_aliases.csv")
-    )
+    _get_file(f"{api}/api/index", datadir / "index.json")
+    _get_file(f"{api}/api/gazetteer", datadir / "gazetteer.geojson")
+    _get_file(f"{api}/api/location_aliases", datadir / "location_aliases.csv")
 
     # Get the deposits associated with the account, which includes a list of download
     # links
@@ -1301,10 +1415,10 @@ def sync_local_dir(
         FORMATTER.push()
 
         # Create the directory structure if needed
-        rec_dir = os.path.join(datadir, con_rec_id, rec_id)
-        if not os.path.exists(rec_dir):
+        rec_dir = datadir / con_rec_id / rec_id
+        if not rec_dir.exists():
             LOGGER.info("Creating directory")
-            os.makedirs(rec_dir)
+            rec_dir.mkdir()
         else:
             LOGGER.info("Directory found")
 
@@ -1317,8 +1431,8 @@ def sync_local_dir(
             LOGGER.info(f"Processing {this_file['filename']}")
             FORMATTER.push()
 
-            outf = os.path.join(rec_dir, this_file["filename"])
-            local_copy = os.path.exists(outf)
+            outf = rec_dir / this_file["filename"]
+            local_copy = outf.exists()
 
             if not local_copy:
                 LOGGER.info("Downloading")
@@ -1335,8 +1449,8 @@ def sync_local_dir(
             FORMATTER.pop()
 
         # Get the metadata json
-        metadata = os.path.join(rec_dir, f"{rec_id}.json")
-        if os.path.exists(metadata):
+        metadata = rec_dir / f"{rec_id}.json"
+        if metadata.exists():
             LOGGER.info("JSON Metadata found")
         else:
             LOGGER.info("Downloading JSON metadata ")

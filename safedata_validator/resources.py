@@ -20,10 +20,9 @@ of the package.
 A configuration file can be passed as `config` when creating an instance, but if no
 arguments are provided then an attempt is made to find and load configuration files in
 the user and then site config locations defined by the `appdirs` package. See
-[here](../../data_managers/install/configuration.md#configuration-file-location) for
+[here](../../data_managers/install/configuration.md#configuration-file-locations) for
 details.
 """  # noqa D415
-
 
 import contextlib
 import os
@@ -31,7 +30,6 @@ import sqlite3
 from csv import DictReader
 from csv import Error as csvError
 from datetime import date
-from typing import Any, Optional, Union
 
 import appdirs
 import simplejson
@@ -55,6 +53,7 @@ CONFIGSPEC = {
     "gbif_database": "string()",
     "ncbi_database": "string()",
     "project_database": "string(default=None)",
+    "maximum_embargo_months": "integer(default=24)",
     "extents": {
         "temporal_soft_extent": "date_list(min=2, max=2, default=None)",
         "temporal_hard_extent": "date_list(min=2, max=2, default=None)",
@@ -66,18 +65,28 @@ CONFIGSPEC = {
     "zenodo": {
         "community_name": "string(default=safe)",
         "use_sandbox": "boolean(default=None)",
-        "zenodo_sandbox_api": "string(default=None)",
         "zenodo_sandbox_token": "string(default=None)",
-        "zenodo_api": "string(default=None)",
         "zenodo_token": "string(default=None)",
         "contact_name": "string(default=None)",
         "contact_affiliation": "string(default=None)",
         "contact_orcid": "string(default=None)",
+        "project_url": "string(default=None)",
+        "html_template": "string(default=None)",
     },
     "metadata": {
         "api": "string(default=None)",
         "token": "string(default=None)",
         "ssl_verify": "boolean(default=True)",
+    },
+    "xml": {
+        # Additional elements required for XML
+        "languageCode": "string(default=None)",
+        "characterSet": "string(default=None)",
+        "contactCountry": "string(default=None)",
+        "contactEmail": "string(default=None)",
+        "epsgCode": "integer(default=4326)",
+        "topicCategories": "string_list(default=None)",
+        "lineageStatement": "string(default=None)",
     },
 }
 """dict: The safedata_validator package use the `configobj.ConfigObj`
@@ -133,8 +142,18 @@ class Resources:
     """Load and check validation resources.
 
     Creating an instance of this class locates and validate resources for using the
-    `safedata_validator` package, either from the provided configuration details or from
-    the user and then site config locations defined by the appdirs package.
+    `safedata_validator` package. The resources can be located in several ways, which
+    use the following order of priority:
+
+    * configuration details provided directly via the ``config`` argument (see below),
+    * a path to a configuration file set in the ``SAFEDATA_VALIDATOR_CONFIG``
+      environment variable,
+    * a configuration file in the standard user location, or
+    * a configuration file in the standard system wide location.
+
+    The standard locations follow the implementation of the ``appdirs`` package.
+    Typically, end users will rely on the last two options, but the first two options
+    are useful for testing and validation.
 
     Args:
         config:
@@ -145,7 +164,8 @@ class Resources:
 
     Attributes:
         config_type: The method used to specify the resources. One of
-            'init_dict', 'init_list', 'init_file', 'user_config' or 'site_config'.
+            'init_dict', 'init_list', 'init_path', 'env_var_path', 'user_path' or
+            'site_path'.
         gazetteer: The path to the gazetteer file
         location_aliases: The path to the location_aliases file
         gbif_database: The path to the GBIF database file
@@ -157,8 +177,8 @@ class Resources:
         zenodo: A DotMap of Zenodo information
     """
 
-    def __init__(self, config: Optional[Union[str, list, dict]] = None) -> None:
-        # User and site config paths
+    def __init__(self, config: str | list | dict | None = None) -> None:
+        # Get the standard user and site config paths for the platform
         user_cfg_file = os.path.join(
             appdirs.user_config_dir(), "safedata_validator", "safedata_validator.cfg"
         )
@@ -166,24 +186,30 @@ class Resources:
             appdirs.site_config_dir(), "safedata_validator", "safedata_validator.cfg"
         )
 
-        # First try and populate from a config file.
+        # Look for a config path as an environment variable
+        config_env_path = os.getenv("SAFEDATA_VALIDATOR_CONFIG")
+
+        # Now resolve what to use in order of priority
         if config is not None:
             if isinstance(config, str):
                 if os.path.exists(config) and os.path.isfile(config):
-                    config_type = "init file"
+                    config_type = "init_path"
                 else:
                     log_and_raise(f"Config file path not found: {config}", RuntimeError)
                     return
             elif isinstance(config, list):
-                config_type = "init list"
+                config_type = "init_list"
             elif isinstance(config, dict):
-                config_type = "init dict"
+                config_type = "init_dict"
+        elif config_env_path is not None:
+            config = config_env_path
+            config_type = "env_var_path"
         elif os.path.exists(user_cfg_file) and os.path.isfile(user_cfg_file):
             config = user_cfg_file
-            config_type = "user file"
+            config_type = "user_path"
         elif os.path.exists(site_cfg_file) and os.path.isfile(site_cfg_file):
             config = site_cfg_file
-            config_type = "site file"
+            config_type = "site_path"
         else:
             LOGGER.critical(f"No user config in {user_cfg_file}")
             LOGGER.critical(f"No site config in {site_cfg_file}")
@@ -192,7 +218,7 @@ class Resources:
 
         # Report resource config location and type
         msg = f"Configuring resources from {config_type}"
-        if "file" in config_type:
+        if config_type.endswith("path"):
             msg += f": {config}"
         LOGGER.info(msg)
 
@@ -213,15 +239,17 @@ class Resources:
             if config_loaded.project_database == ""
             else config_loaded.project_database
         )
+        self.maximum_embargo_months = config_loaded.maximum_embargo_months
         self.config_type = config_loaded.config_type
         self.config_source = config_loaded.config_source
 
         self.extents = config_loaded.extents
         self.zenodo = config_loaded.zenodo
         self.metadata = config_loaded.metadata
+        self.xml = config_loaded.xml
 
-        self.gbif_timestamp: Optional[str] = None
-        self.ncbi_timestamp: Optional[str] = None
+        self.gbif_timestamp: str | None = None
+        self.ncbi_timestamp: str | None = None
 
         # Valid locations is a dictionary keying string location names to tuples of
         # floats describing the location bounding box
@@ -239,7 +267,7 @@ class Resources:
         self._validate_projects()
 
     @staticmethod
-    def _load_config(config: Union[str, list, dict], cfg_type: str) -> DotMap:
+    def _load_config(config: str | list | dict, cfg_type: str) -> DotMap:
         """Load a configuration file.
 
         This private static method attempts to load a JSON configuration file
@@ -298,7 +326,7 @@ class Resources:
             log_and_raise("Gazetteer file not found", OSError)
 
         try:
-            loc_payload = simplejson.load(open(self.gaz_path, mode="r"))
+            loc_payload = simplejson.load(open(self.gaz_path))
         except (JSONDecodeError, UnicodeDecodeError):
             log_and_raise("Gazetteer file not valid JSON", OSError)
 
@@ -338,7 +366,7 @@ class Resources:
 
         # Now check to see whether the locations file behaves as expected
         try:
-            dictr = DictReader(open(self.localias_path, mode="r"))
+            dictr = DictReader(open(self.localias_path))
         except FileNotFoundError:
             log_and_raise("Location aliases file not found", FileNotFoundError)
         except IsADirectoryError:
@@ -357,7 +385,7 @@ class Resources:
                 ValueError,
             )
 
-        if fieldnames != set(["zenodo_record_id", "location", "alias"]):
+        if fieldnames != {"zenodo_record_id", "location", "alias"}:
             log_and_raise(
                 "Location aliases file not readable as a CSV file with valid headers",
                 ValueError,
@@ -404,7 +432,7 @@ class Resources:
 
         # Now check to see whether the project database behaves as expected
         try:
-            dictr = DictReader(open(self.project_database, mode="r", encoding="UTF-8"))
+            dictr = DictReader(open(self.project_database, encoding="UTF-8"))
         except FileNotFoundError:
             log_and_raise("Project database file not found", FileNotFoundError)
         except IsADirectoryError:
@@ -423,7 +451,7 @@ class Resources:
             )
             raise excep
 
-        required_names = set(["project_id", "title"])
+        required_names = {"project_id", "title"}
         if required_names.intersection(fieldnames) != required_names:
             log_and_raise(
                 "Project database file does not contain project_id and title headers.",
@@ -482,8 +510,8 @@ def validate_taxon_db(db_path: str, db_name: str, tables: list[str]) -> str:
             log_and_raise(f"Local {db_name} database not an SQLite3 file", ValueError)
 
         # Check the required tables against found tables
-        db_tables_set = set([rw[0] for rw in db_tables.fetchall()])
-        required_tables = set(tables + ["timestamp"])
+        db_tables_set = {rw[0] for rw in db_tables.fetchall()}
+        required_tables = set([*tables, "timestamp"])
         missing = required_tables.difference(db_tables_set)
 
         if missing:

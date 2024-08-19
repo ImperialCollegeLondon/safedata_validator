@@ -4,5 +4,5 @@ usage: safedata_zenodo show_resources [-h]
 Loads the safedata_validator resources file, displays the resources setup
 being used for safedata_zenodo and then exits.
 
-optional arguments:
+options:
   -h, --help  show this help message and exit

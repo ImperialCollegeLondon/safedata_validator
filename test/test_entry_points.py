@@ -2,6 +2,7 @@
 
 import subprocess
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 
@@ -65,33 +66,66 @@ def test_entry_points_via_call(entry_point):
 
 
 @pytest.mark.parametrize(
-    argnames="command, file_exists, returns",
+    argnames="file_exists",
     argvalues=[
-        pytest.param("generate_xml", False, 0, id="xml_ok"),
-        pytest.param("generate_html", False, 0, id="html_ok"),
-        pytest.param("generate_xml", True, 1, id="html_overwrite"),
-        pytest.param("generate_html", True, 1, id="xml_overwrite"),
+        pytest.param(False, id="destination ok"),
+        pytest.param(True, id="destination exists"),
     ],
 )
-def test_sdv_zenodo_html_and_xml(user_config_file, command, file_exists, returns):
-    """Checks that the safedata_zenodo XML and HTML generation commands work."""
+def test_sdv_zenodo_html(user_config_file, file_exists):
+    """Checks that the safedata_zenodo HTML generation commands work."""
 
     from safedata_validator.entry_points import _safedata_zenodo_cli
 
+    ds_json = FIXTURE_FILES.rf.good_ncbi_file_dataset_json
+    output_path = str(Path(ds_json).parent / "test_sdv_zenodo_html.out")
+
     if file_exists:
-        with open("TMP", "w") as outfile:
+        with open(output_path, "w") as outfile:
             outfile.write("Don't overwrite me!")
 
     value = _safedata_zenodo_cli(
         args_list=[
-            command,
-            FIXTURE_FILES.rf.good_ncbi_file_zenodo_json,
+            "generate_html",
             FIXTURE_FILES.rf.good_ncbi_file_dataset_json,
-            "TMP",
+            output_path,
         ]
     )
 
-    assert value == returns
+    expected_return = 1 if file_exists else 0
+    assert value == expected_return
+
+
+@pytest.mark.parametrize(
+    argnames="file_exists",
+    argvalues=[
+        pytest.param(False, id="destination ok"),
+        pytest.param(True, id="destination exists"),
+    ],
+)
+def test_sdv_zenodo_xml(user_config_file, file_exists):
+    """Checks that the safedata_zenodo XML generation commands work."""
+
+    from safedata_validator.entry_points import _safedata_zenodo_cli
+
+    ds_json = FIXTURE_FILES.rf.good_ncbi_file_dataset_json
+    output_path = str(Path(ds_json).parent / "test_sdv_zenodo_xml.out")
+
+    if file_exists:
+        with open(output_path, "w") as outfile:
+            outfile.write("Don't overwrite me!")
+
+    value = _safedata_zenodo_cli(
+        args_list=[
+            "generate_xml",
+            FIXTURE_FILES.rf.good_ncbi_file_zenodo_json,
+            FIXTURE_FILES.rf.good_ncbi_file_dataset_json,
+            output_path,
+        ]
+    )
+
+    expected_return = 1 if file_exists else 0
+    assert value == expected_return
 
 
 @pytest.mark.parametrize(

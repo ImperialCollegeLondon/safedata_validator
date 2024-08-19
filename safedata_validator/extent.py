@@ -13,7 +13,7 @@ Typical usage:
     ```
 """  # noqa D415
 
-from typing import Iterable, Optional, Tuple
+from collections.abc import Iterable
 
 from safedata_validator.logger import LOGGER, log_and_raise
 from safedata_validator.validators import TypeCheck
@@ -37,9 +37,9 @@ class Extent:
     def __init__(
         self,
         label: str,
-        datatype: Tuple[type, ...],
-        hard_bounds: Optional[tuple] = None,
-        soft_bounds: Optional[tuple] = None,
+        datatype: tuple[type, ...],
+        hard_bounds: tuple | None = None,
+        soft_bounds: tuple | None = None,
     ):
         # The extent is stored internally as a list for ease of update
         # but only accessible via the property as a tuple to avoid it
@@ -74,7 +74,7 @@ class Extent:
         return f"Extent: {self.label} {self.extent}"
 
     @property
-    def datatype(self) -> Tuple[type, ...]:
+    def datatype(self) -> tuple[type, ...]:
         """Returns the data types accepted by the Extent object."""
         return self._datatype
 
@@ -84,12 +84,12 @@ class Extent:
         return tuple(self._extent)
 
     @property
-    def hard_bounds(self) -> Optional[tuple]:
+    def hard_bounds(self) -> tuple | None:
         """Returns a tuple showing the hard bounds of the Extent object."""
         return self._hard_bounds
 
     @property
-    def soft_bounds(self) -> Optional[tuple]:
+    def soft_bounds(self) -> tuple | None:
         """Returns a tuple showing the hard bounds of the Extent object."""
         return self._soft_bounds
 

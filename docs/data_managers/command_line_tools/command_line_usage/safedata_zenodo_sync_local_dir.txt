@@ -24,7 +24,7 @@ positional arguments:
   datadir       The path to a local directory containing an existing safedata
                 directory or an empty folder in which to create one
 
-optional arguments:
+options:
   -h, --help    show this help message and exit
   --not-just-xlsx
                 Should large non-xlsx files also be downloaded.

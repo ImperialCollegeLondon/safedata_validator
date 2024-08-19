@@ -31,8 +31,9 @@ discussion.
 
 Restricted datasets must provide a set of access conditions, which will be visible on
 Zenodo along with the dataset metadata. Zenodo provides a link to request access to
-restricted datasets: these will come first to your organisations data manager but they
-will then **always** contact the original data owners before permitting access.
+restricted datasets: these will come first to your organisation's data manager, but the
+organisational policy will then likely be to **always** contact the original data owners
+before permitting access.
 
 ## Altering the access rights
 
@@ -53,9 +54,9 @@ This curation account for the collection is entirely separate from the authorshi
 ownership of datasets: **the citation for the data will always be to the original set of
 authors provided in the metadata.**
 
-Embargoed or restricted data will never be made available within the embargo period or
-without discussion with data authors. Data authors will always be consulted about issues
-arising with their datasets.
+Embargoed or restricted data should never be made available within the embargo period or
+without discussion with data authors. Data authors should always be consulted about
+issues arising with their datasets.
 
 !!! Note "`safedata` at the SAFE Project"
     For details of the SAFE project's data availability polices see
