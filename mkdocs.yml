@@ -69,6 +69,7 @@ nav:
       - 'Taxa': 'developers/api/taxa.md'
       - 'Zenodo': 'developers/api/zenodo.md'
       - 'Server': 'developers/api/server.md'
+      - 'Utilities': 'developers/api/utilities.md'
     - 'Package development': developers/package_development.md
     - 'Strange problems': developers/strange_problems.md
   - 'safedata at the SAFE project': 'safedata_at_SAFE.md'

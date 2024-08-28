@@ -1,8 +1,8 @@
 """This module provides utility functions.
 
 These utility functions are used by the high level functions defined in
-:mod:`~safedata_validator.zenodo` and :mod:`~safedata_validator.server`. The functions
-are used to check that the correct inputs have been supplied in the correct order.
+`safedata_validator.zenodo` and `safedata_validator.server`. The functions are used to
+check that the correct inputs have been supplied in the correct order.
 """
 
 import mimetypes
