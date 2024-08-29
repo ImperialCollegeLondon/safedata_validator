@@ -38,6 +38,11 @@ from safedata_validator.taxondb import (
     get_gbif_version,
     get_ncbi_version,
 )
+from safedata_validator.utilities import (
+    check_file_is_excel,
+    check_file_is_metadata_json,
+    check_file_is_zenodo_json,
+)
 from safedata_validator.zenodo import (
     ZenodoResources,
     create_deposit,
@@ -768,13 +773,29 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     # Load the JSON files if provided via the selected arguments
     zenodo_json_path = getattr(args, "zenodo_json", None)
     if zenodo_json_path is not None:
+        # Check that this points to a valid json file before trying to load
+        if not check_file_is_zenodo_json(zenodo_json_path):
+            LOGGER.error(f"Zenodo metadata file has wrong format: {zenodo_json_path}")
+            return 1
+
         with open(zenodo_json_path) as zn_json:
             zenodo_json_data = simplejson.load(zn_json)
 
     dataset_json_path = getattr(args, "dataset_json", None)
     if dataset_json_path is not None:
+        # Check that this points to a valid json file before trying to load
+        if not check_file_is_metadata_json(dataset_json_path):
+            LOGGER.error(f"Dataset metadata file has wrong format: {dataset_json_path}")
+            return 1
+
         with open(dataset_json_path) as ds_json:
             dataset_json_data = simplejson.load(ds_json)
+
+    if args.dataset is not None:
+        # Check that the dataset is a valid excel file before proceeding
+        if not check_file_is_excel(args.dataset):
+            LOGGER.error(f"Dataset file is not an Excel file: {dataset_json_path}")
+            return 1
 
     # Handle the remaining subcommands
     if args.subcommand == "create_deposit":
@@ -1128,9 +1149,17 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
 
     # Handle the remaining subcommands
     if args.subcommand == "post_metadata":
-        # Open the two JSON files
+        # Open the two JSON files, checking that they point to a valid json file first
+        if not check_file_is_metadata_json(args.dataset_json):
+            LOGGER.error(f"Dataset metadata file has wrong format: {args.dataset_json}")
+            return 1
+
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
+
+        if not check_file_is_zenodo_json(args.zenodo_json):
+            LOGGER.error(f"Zenodo metadata file has wrong format: {args.zenodo_json}")
+            return 1
 
         with open(args.zenodo_json) as zn_json:
             zenodo_json = simplejson.load(zn_json)
