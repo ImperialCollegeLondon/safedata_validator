@@ -791,7 +791,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         with open(dataset_json_path) as ds_json:
             dataset_json_data = simplejson.load(ds_json)
 
-    if args.dataset is not None:
+    if hasattr(args, "dataset"):
         # Check that the dataset is a valid excel file before proceeding
         if not check_file_is_excel(args.dataset):
             LOGGER.error(f"Dataset file is not an Excel file: {dataset_json_path}")
