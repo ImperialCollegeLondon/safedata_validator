@@ -12,6 +12,7 @@ from .conftest import FIXTURE_FILES
     [
         (Path(FIXTURE_FILES.rf.good_excel_file), True),
         (Path(FIXTURE_FILES.rf.good_ncbi_file_dataset_json), False),
+        (Path("safedata_validator"), False),
     ],
 )
 def test_check_file_is_excel(file_path, expected_result):
@@ -28,6 +29,7 @@ def test_check_file_is_excel(file_path, expected_result):
     [
         (Path(FIXTURE_FILES.rf.good_ncbi_file_dataset_json), True),
         (Path(FIXTURE_FILES.rf.good_excel_file), False),
+        (Path("safedata_validator"), False),
     ],
 )
 def test_check_file_is_json(file_path, expected_result):

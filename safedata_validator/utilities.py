@@ -5,7 +5,6 @@ These utility functions are used by the high level functions defined in
 check that the correct inputs have been supplied in the correct order.
 """
 
-import mimetypes
 from pathlib import Path
 
 import simplejson
@@ -21,16 +20,13 @@ def check_file_is_excel(file_path: Path) -> bool:
         A bool specifying whether or not the file is an .xlsx file.
     """
 
-    file_type, _ = mimetypes.guess_type(file_path, strict=True)
+    if not file_path.is_file():
+        return False
 
-    if file_type is None:
+    if file_path.suffix != ".xlsx":
         return False
-    elif (
-        file_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    ):
-        return True
-    else:
-        return False
+
+    return True
 
 
 def check_file_is_json(file_path: Path) -> bool:
@@ -43,17 +39,13 @@ def check_file_is_json(file_path: Path) -> bool:
         A bool specifying whether or not the file is a JSON file.
     """
 
-    file_type, _ = mimetypes.guess_type(file_path, strict=True)
-
-    if file_type is None:
+    if not file_path.is_file():
         return False
 
-    extension = mimetypes.guess_extension(file_type, strict=True)
-
-    if extension == ".json":
-        return True
-    else:
+    if file_path.suffix != ".json":
         return False
+
+    return True
 
 
 def check_file_is_zenodo_json(file_path: Path) -> bool:
