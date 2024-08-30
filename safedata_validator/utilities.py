@@ -25,10 +25,9 @@ def check_file_is_excel(file_path: Path) -> bool:
 
     if file_type is None:
         return False
-
-    extension = mimetypes.guess_extension(file_type, strict=True)
-
-    if extension == ".xlsx":
+    elif (
+        file_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ):
         return True
     else:
         return False
