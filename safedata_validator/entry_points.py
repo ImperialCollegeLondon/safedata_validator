@@ -774,7 +774,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     zenodo_json_path = getattr(args, "zenodo_json", None)
     if zenodo_json_path is not None:
         # Check that this points to a valid json file before trying to load
-        if not check_file_is_zenodo_json(zenodo_json_path):
+        if not check_file_is_zenodo_json(Path(zenodo_json_path)):
             LOGGER.error(f"Zenodo metadata file has wrong format: {zenodo_json_path}")
             return 1
 
@@ -784,7 +784,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     dataset_json_path = getattr(args, "dataset_json", None)
     if dataset_json_path is not None:
         # Check that this points to a valid json file before trying to load
-        if not check_file_is_metadata_json(dataset_json_path):
+        if not check_file_is_metadata_json(Path(dataset_json_path)):
             LOGGER.error(f"Dataset metadata file has wrong format: {dataset_json_path}")
             return 1
 
@@ -793,7 +793,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     if hasattr(args, "dataset"):
         # Check that the dataset is a valid excel file before proceeding
-        if not check_file_is_excel(args.dataset):
+        if not check_file_is_excel(Path(args.dataset)):
             LOGGER.error(f"Dataset file is not an Excel file: {dataset_json_path}")
             return 1
 
@@ -1150,14 +1150,14 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
     # Handle the remaining subcommands
     if args.subcommand == "post_metadata":
         # Open the two JSON files, checking that they point to a valid json file first
-        if not check_file_is_metadata_json(args.dataset_json):
+        if not check_file_is_metadata_json(Path(args.dataset_json)):
             LOGGER.error(f"Dataset metadata file has wrong format: {args.dataset_json}")
             return 1
 
         with open(args.dataset_json) as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        if not check_file_is_zenodo_json(args.zenodo_json):
+        if not check_file_is_zenodo_json(Path(args.zenodo_json)):
             LOGGER.error(f"Zenodo metadata file has wrong format: {args.zenodo_json}")
             return 1
 
