@@ -278,14 +278,14 @@ class NCBITaxon:
 
         if self.ncbi_id != leaf_ncbi_id:
             raise ValueError(
-                f"Provided NCBI ID ({self.ncbi_id}) not does not match "
-                f"first ID in hierarchy ({leaf_ncbi_id})"
+                f"Provided NCBI ID ({self.ncbi_id}) does not match first ID in "
+                f"hierarchy ({leaf_ncbi_id})"
             )
 
         if self.parent_ncbi_id != parent_ncbi_id:
             raise ValueError(
-                f"Provided parent NCBI ID ({self.parent_ncbi_id}) not does not match "
-                f"first parent ID in hierarchy ({parent_ncbi_id})"
+                f"Provided parent NCBI ID ({self.parent_ncbi_id}) does not match first "
+                f"parent ID in hierarchy ({parent_ncbi_id})"
             )
 
     def __repr__(self):

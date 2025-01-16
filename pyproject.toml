@@ -8,13 +8,13 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
-description = "\"Validator for data files in the SAFE data submission format.\""
+description = "Validation and publication tool for data files in the SAFE data submission format."
 homepage = "https://safedata-validator.readthedocs.io/"
 license = "MIT"
 name = "safedata_validator"
 readme = "README.md"
 repository = "https://github.com/imperial_college_london/safedata_validator"
-version = "3.0.1rc1"
+version = "3.0.1"
 
 [tool.poetry.scripts]
 safedata_build_local_gbif = "safedata_validator.entry_points:_build_local_gbif_cli"
