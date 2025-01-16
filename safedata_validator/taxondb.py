@@ -624,8 +624,13 @@ def build_local_ncbi(
     for ky, gp in grp_by_parent:
         children_by_parents[ky] = {ch for ch, _ in gp}
 
-    # Remove a circular reference and then find the static order through the graph
-    children_by_parents["forma specialis"].remove("forma specialis")
+    # Check for any cases where child value is the same as the parent key (this happens
+    # for superfamily and forma specialis in some database versions)
+    for parent, children in children_by_parents.items():
+        if parent in children:
+            children.remove(parent)
+
+    # then find the static order through the graph
     sorter = graphlib.TopologicalSorter(children_by_parents)
     taxon_order = reversed(list(sorter.static_order()))
 

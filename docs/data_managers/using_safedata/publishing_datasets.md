@@ -16,9 +16,11 @@ optional.
 ## Validating and publishing as a new dataset
 
 The [`safedata_zenodo publish_dataset`
-command](../command_line_tools/safedata_zenodo.md#the-publish_dataset-subcommand) is
-the main function for publishing a dataset. The example below shows it being used to
-publish a dataset and additional external files:
+command](../command_line_tools/safedata_zenodo.md#the-publish_dataset-subcommand) is the
+main function for publishing a dataset. It is important to note that the dataset
+metadata file must be provided first and the dataset file provided second, otherwise the
+publication process will fail. The example below shows it being used to publish a
+dataset and additional external files:
 
 ```sh
 safedata_zenodo publish_dataset Example.json Example.xlsx \

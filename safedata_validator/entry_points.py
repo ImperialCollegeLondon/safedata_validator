@@ -29,7 +29,7 @@ from safedata_validator.logger import (
     use_stream_logging,
 )
 from safedata_validator.resources import Resources
-from safedata_validator.server import post_metadata, update_resources
+from safedata_validator.server import MetadataResources, post_metadata, update_resources
 from safedata_validator.taxondb import (
     build_local_gbif,
     build_local_ncbi,
@@ -38,7 +38,13 @@ from safedata_validator.taxondb import (
     get_gbif_version,
     get_ncbi_version,
 )
+from safedata_validator.utilities import (
+    check_file_is_excel,
+    check_file_is_metadata_json,
+    check_file_is_zenodo_json,
+)
 from safedata_validator.zenodo import (
+    ZenodoResources,
     create_deposit,
     dataset_description,
     delete_files,
@@ -594,6 +600,12 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         default=False,
         help="Should locally modified files be overwritten with the archive version",
     )
+    sync_local_dir_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Run the synchronisation process without altering the local directory.",
+    )
     # MAINTAIN RIS subcommand
 
     maintain_ris_desc = """
@@ -742,10 +754,13 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         return 0
 
     # Handle the sandbox switches:
-    # If the command parser provides the sandbox argument and one of the flags has been
-    # set (the default is None) then update the loaded resources
+    # * If the command parser provides the sandbox argument and one of the flags has
+    #   been set (the default is None) then update the loaded resources
     if "sandbox" in args and args.sandbox is not None:
         resources.zenodo.use_sandbox = args.sandbox
+
+    # Create the ZenodoResources instance
+    zenodo_resources = ZenodoResources(resources=resources)
 
     # Set the verbosity
     handler = get_handler()
@@ -755,24 +770,51 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     else:
         handler.setLevel("DEBUG")
 
+    # Load the JSON files if provided via the selected arguments
+    zenodo_json_path = getattr(args, "zenodo_json", None)
+    if zenodo_json_path is not None:
+        # Check that this points to a valid json file before trying to load
+        if not check_file_is_zenodo_json(Path(zenodo_json_path)):
+            LOGGER.error(f"Zenodo metadata file has wrong format: {zenodo_json_path}")
+            return 1
+
+        with open(zenodo_json_path) as zn_json:
+            zenodo_json_data = simplejson.load(zn_json)
+
+    dataset_json_path = getattr(args, "dataset_json", None)
+    if dataset_json_path is not None:
+        # Check that this points to a valid json file before trying to load
+        if not check_file_is_metadata_json(Path(dataset_json_path)):
+            LOGGER.error(f"Dataset metadata file has wrong format: {dataset_json_path}")
+            return 1
+
+        with open(dataset_json_path) as ds_json:
+            dataset_json_data = simplejson.load(ds_json)
+
+    if hasattr(args, "dataset"):
+        # Check that the dataset is a valid excel file before proceeding
+        if not check_file_is_excel(Path(args.dataset)):
+            LOGGER.error(f"Dataset file is not an Excel file: {dataset_json_path}")
+            return 1
+
     # Handle the remaining subcommands
     if args.subcommand == "create_deposit":
         # Run the command
-        response, error = create_deposit(
-            new_version=args.new_version, resources=resources
+        response = create_deposit(
+            new_version=args.new_version, zen_res=zenodo_resources
         )
         # Trap errors
-        if error is not None:
-            LOGGER.error(f"Failed to create deposit: {error}")
+        if not response.ok:
+            LOGGER.error(f"Failed to create deposit: {response.error_message}")
             return 1
 
         # Output the response as a deposit  JSON file
-        rec_id = response["record_id"]
+        rec_id = response.json_data["record_id"]
         LOGGER.info(f"Created deposit: {rec_id}")
         outfile = os.path.join(os.getcwd(), f"zenodo_{rec_id}.json")
 
         with open(outfile, "w", encoding="utf-8") as outf:
-            simplejson.dump(response, outf)
+            simplejson.dump(response.json_data, outf)
             LOGGER.info(f"Zenodo deposit metadata downloaded to: {outfile}")
 
         # If requested, write the record ID to standard out for capture in scripts
@@ -780,47 +822,42 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             sys.stdout.write(str(rec_id))
 
     elif args.subcommand == "discard_deposit":
-        # Load the Zenodo deposit JSON, which contains API links
-        with open(args.zenodo_json, encoding="utf-8") as dep_json:
-            metadata = simplejson.load(dep_json)
-
         # Run the command
-        response, error = discard_deposit(zenodo_metadata=metadata, resources=resources)
+        response = discard_deposit(zenodo=zenodo_json_data, zen_res=zenodo_resources)
 
         # Report on the outcome.
-        if error is not None:
-            LOGGER.error(f"Failed to discard deposit: {error}")
+        if not response.ok:
+            LOGGER.error(f"Failed to discard deposit: {response.error_message}")
             return 1
 
         LOGGER.info("Deposit discarded")
 
     elif args.subcommand == "get_deposit":
         # Run the command
-        response, error = get_deposit(deposit_id=args.zenodo_id, resources=resources)
+        response = get_deposit(deposit_id=args.zenodo_id, zen_res=zenodo_resources)
 
-        if error is not None:
-            LOGGER.error(f"Failed to get info: {error}")
+        if not response.ok:
+            LOGGER.error(f"Failed to get info: {response.error_message}")
             return 1
 
         # Dump the response to a JSON file
         outfile = os.path.join(os.getcwd(), f"zenodo_{args.zenodo_id}.json")
         with open(outfile, "w", encoding="utf-8") as outf:
-            simplejson.dump(response, outf)
+            simplejson.dump(response.json_data, outf)
 
         # Print a short summary
-        LOGGER.info(f"Record ID: {response['record_id']}")
-        LOGGER.info(f"Concept ID: {response['conceptrecid']}")
-        LOGGER.info(
-            f"Status: {'published' if response['submitted'] else 'Not published'}"
-        )
-        LOGGER.info(f"Title: {response['title'] if response['title'] else 'Not set'}")
+        zmd = response.json_data
+        LOGGER.info(f"Record ID: {zmd['record_id']}")
+        LOGGER.info(f"Concept ID: {zmd['conceptrecid']}")
+        LOGGER.info(f"Status: {'published' if zmd['submitted'] else 'Not published'}")
+        LOGGER.info(f"Title: {zmd['title'] if zmd['title'] else 'Not set'}")
 
-        if len(response["files"]) == 0:
+        if len(zmd["files"]) == 0:
             LOGGER.info("Files: none uploaded")
         else:
             LOGGER.info("Files:")
             FORMATTER.push()
-            for this_file in response["files"]:
+            for this_file in zmd["files"]:
                 LOGGER.info(
                     f"{this_file['filename']} ({this_file['filesize']} bytes, "
                     f"md5: {this_file['checksum']})"
@@ -830,92 +867,75 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         LOGGER.info(f"Metadata downloaded to: {outfile}")
 
     elif args.subcommand == "publish_deposit":
-        with open(args.zenodo_json, encoding="utf-8") as zn_json:
-            zenodo_json_data = simplejson.load(zn_json)
-
         # Run the function
-        response, error = publish_deposit(zenodo=zenodo_json_data, resources=resources)
+        response = publish_deposit(zenodo=zenodo_json_data, zen_res=zenodo_resources)
 
         # Report on the outcome.
-        if error is not None:
-            LOGGER.error(f"Failed to publish deposit: {error}")
+        if not response.ok:
+            LOGGER.error(f"Failed to publish deposit: {response.error_message}")
             return 1
 
         # Update the Zenodo JSON file with publication details
-        LOGGER.info(f"Published to: {response['links']['record']}")
+        LOGGER.info(f"Published to: {response.json_data['links']['record']}")
         with open(args.zenodo_json, "w", encoding="utf-8") as zn_json:
-            simplejson.dump(response, zn_json)
+            simplejson.dump(response.json_data, zn_json)
             LOGGER.info("Zenodo metadata updated")
 
     elif args.subcommand == "upload_files":
-        # Load the Zenodo deposit JSON, which contains API links
-        with open(args.zenodo_json, encoding="utf-8") as dep_json:
-            metadata = simplejson.load(dep_json)
-
-        # Run the command - the response here has a different type so use a different
-        # placeholder variable.
-        upload_response, error = upload_files(
-            metadata=metadata,
+        # Run the function
+        response = upload_files(
+            zenodo=zenodo_json_data,
             filepaths=args.filepaths,
-            resources=resources,
+            zen_res=zenodo_resources,
             progress_bar=not args.quiet,
         )
 
         # Report on the outcome.
-        if error is not None:
-            LOGGER.error(f"Failed to upload files: {error}")
+        if not response.ok:
+            LOGGER.error(f"Failed to upload files: {response.error_message}")
             return 1
         else:
             LOGGER.info("Files uploaded")
 
     elif args.subcommand == "delete_files":
-        # Load the Zenodo deposit JSON, which contains API links
-        with open(args.zenodo_json, encoding="utf-8") as dep_json:
-            metadata = simplejson.load(dep_json)
-
         # Run the command
-        response, error = delete_files(
-            metadata=metadata, filenames=args.filenames, resources=resources
+        response = delete_files(
+            metadata=zenodo_json_data,
+            filenames=args.filenames,
+            zen_res=zenodo_resources,
         )
 
         # Report on the outcome.
-        if error is not None:
-            LOGGER.error(f"Failed to delete files: {error}")
+        if not response.ok:
+            LOGGER.error(f"Failed to delete files: {response.error_message}")
         else:
             LOGGER.info("Files deleted")
 
     elif args.subcommand == "upload_metadata":
-        # Open the two JSON files
-        with open(args.dataset_json, encoding="utf-8") as ds_json:
-            dataset_json = simplejson.load(ds_json)
-
-        with open(args.zenodo_json, encoding="utf-8") as zn_json:
-            zenodo_json = simplejson.load(zn_json)
-
         # Run the function
-        response, error = upload_metadata(
-            metadata=dataset_json, zenodo=zenodo_json, resources=resources
+        response = upload_metadata(
+            metadata=dataset_json_data,
+            zenodo=zenodo_json_data,
+            zen_res=zenodo_resources,
         )
 
         # Report on the outcome.
-        if error is not None:
-            LOGGER.error(f"Failed to add metadata file: {error}")
+        if not response.ok:
+            LOGGER.error(f"Failed to add metadata file: {response.error_message}")
         else:
             LOGGER.info("Metadata uploaded")
 
     elif args.subcommand == "amend_metadata":
-        with open(args.deposit_json_update, encoding="utf-8") as zn_json_update:
-            zenodo_json_update = simplejson.load(zn_json_update)
-
         # Run the function
-        response, error = update_published_metadata(
-            zenodo=zenodo_json_update,
-            resources=resources,
+        response = update_published_metadata(
+            zenodo=zenodo_json_data, zen_res=zenodo_resources
         )
 
         # Report on the outcome.
-        if error is not None:
-            LOGGER.error(f"Failed to update published metadata: {error}")
+        if not response.ok:
+            LOGGER.error(
+                f"Failed to update published metadata: {response.error_message}"
+            )
         else:
             LOGGER.info("Metadata updated")
 
@@ -923,21 +943,18 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         sync_local_dir(
             datadir=args.datadir,
             xlsx_only=not args.not_just_xlsx,
-            resources=resources,
+            zen_res=zenodo_resources,
             replace_modified=args.replace_modified,
         )
 
     elif args.subcommand == "maintain_ris":
         # Run the download RIS data function
-        download_ris_data(ris_file=args.ris_file, resources=resources)
+        download_ris_data(ris_file=args.ris_file, zen_res=zenodo_resources)
 
     elif args.subcommand == "generate_html":
-        # Run the download RIS data function
-        with open(args.dataset_json, encoding="utf-8") as ds_json:
-            dataset_json = simplejson.load(ds_json)
-
+        # Run the generate html function
         generated_html = dataset_description(
-            dataset_metadata=dataset_json, resources=resources
+            dataset_metadata=dataset_json_data, resources=resources
         )
 
         out_path = Path(args.html_out)
@@ -951,13 +968,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         LOGGER.info("HTML generated")
 
     elif args.subcommand == "generate_xml":
-        # Open the two JSON files
-        with open(args.dataset_json, encoding="utf-8") as ds_json:
-            dataset_json = simplejson.load(ds_json)
-
-        with open(args.zenodo_json, encoding="utf-8") as zn_json:
-            zenodo_json = simplejson.load(zn_json)
-
+        # Get the lineage statement
         if args.lineage_statement is not None:
             with open(args.lineage_statement) as lin_file:
                 lineage_statement = lin_file.read()
@@ -966,8 +977,8 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
         # Run the function
         generated_xml = generate_inspire_xml(
-            dataset_metadata=dataset_json,
-            zenodo_metadata=zenodo_json,
+            dataset_metadata=dataset_json_data,
+            zenodo_metadata=zenodo_json_data,
             resources=resources,
             lineage_statement=lineage_statement,
         )
@@ -983,16 +994,13 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         LOGGER.info("Inspire XML generated")
 
     elif args.subcommand == "publish_dataset":
-        with open(args.dataset_json, encoding="utf-8") as ds_json:
-            dataset_json = simplejson.load(ds_json)
-
         # Publish the dataset, trapping the possible exceptions to simply print a
         # message and return a failure exit code.
         try:
             publish_id, publish_url = publish_dataset(
                 resources=resources,
                 dataset=args.dataset,
-                dataset_metadata=dataset_json,
+                dataset_metadata=dataset_json_data,
                 external_files=args.external_files,
                 new_version=args.new_version,
                 no_xml=args.no_xml,
@@ -1121,6 +1129,7 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
 
     # Load resources
     resources = Resources(args.resources)
+    server_resources = MetadataResources(resources)
 
     # Show the resources and exit if requested
     if args.show_resources:
@@ -1139,36 +1148,42 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
     else:
         handler.setLevel("DEBUG")
 
-    resources = Resources(args.resources)
-
     # Handle the remaining subcommands
     if args.subcommand == "post_metadata":
-        # Open the two JSON files
+        # Open the two JSON files, checking that they point to a valid json file first
+        if not check_file_is_metadata_json(Path(args.dataset_json)):
+            LOGGER.error(f"Dataset metadata file has wrong format: {args.dataset_json}")
+            return 1
+
         with open(args.dataset_json, encoding="utf-8") as ds_json:
             dataset_json = simplejson.load(ds_json)
+
+        if not check_file_is_zenodo_json(Path(args.zenodo_json)):
+            LOGGER.error(f"Zenodo metadata file has wrong format: {args.zenodo_json}")
+            return 1
 
         with open(args.zenodo_json, encoding="utf-8") as zn_json:
             zenodo_json = simplejson.load(zn_json)
 
         # Run the function
-        response, error = post_metadata(
-            metadata=dataset_json, zenodo=zenodo_json, resources=resources
+        response = post_metadata(
+            metadata=dataset_json, zenodo=zenodo_json, server_resources=server_resources
         )
 
         # Report on the outcome.
-        if error is not None:
-            LOGGER.error(f"Failed to post metadata: {error}")
+        if not response.ok:
+            LOGGER.error(f"Failed to post metadata: {response.error_message}")
             return 1
 
         LOGGER.info("Metadata posted")
 
     if args.subcommand == "update_resources":
         # Run the function
-        response, error = update_resources(resources=resources)
+        response = update_resources(server_resources=server_resources)
 
         # Report on the outcome.
-        if error is not None:
-            LOGGER.error(f"Failed to update resources: {error}")
+        if not response.ok:
+            LOGGER.error(f"Failed to update resources: {response.error_message}")
             return 1
 
         LOGGER.info("Resources updated")

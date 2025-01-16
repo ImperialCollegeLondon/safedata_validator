@@ -19,6 +19,7 @@
             - download_ris_data
             - sync_local_dir
             - taxon_index_to_text
-            - ZenodoFunctionResponseType
+            - ZenodoResponse
+            - ZenodoResources
         show_root_heading: false
         show_root_toc_entry: false
