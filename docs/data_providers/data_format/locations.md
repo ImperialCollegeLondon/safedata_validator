@@ -34,15 +34,13 @@ So, we expect you'll have a set of location names in your data sheets, all of wh
 should appear in this worksheet. The worksheet must have the following structure
 
 <!-- markdownlint-disable MD013 -->
-| Location name | New | Latitude | Longitude  | Type       | WKT                                          |
-| ------------- | --- | -------- | ---------- | ---------- | -------------------------------------------- |
-| E_194         | No  |          |            |            |                                              |
-| E_195         | No  |          |            |            |                                              |
-| My_site_1     | Yes | 4.957721 | 117.776023 | POINT      | NA                                           |
-| My_site_2     | Yes | NA       | NA         | POINT      | NA                                           |
-| My_site_3     | Yes | NA       | NA         | POINT      | Point(117.7762 4.9576)                       |
-| My_transect_1 | Yes | NA       | NA         | Linestring | Linestring(117.7762 4.9576, 117.7862 4.9676) |
+{{ read_excel('Example.xlsx', sheet_name = 'Locations', keep_default_na = False, tablefmt = 'github') }}
 <!-- markdownlint-enable MD013 -->
+
+!!! Note "Naming"
+    This sheet must be called "Locations" for dataset validation to work properly. If it
+    is called something similar but not identical to "Locations" (e.g. "locations")
+    validation will fail.
 
 ## Known locations
 

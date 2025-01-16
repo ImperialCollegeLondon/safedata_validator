@@ -4,7 +4,6 @@ The module contains a set of classes providing data validation for use throughou
 safedata_validator package
 """
 
-
 import re
 from collections import Counter
 from collections.abc import Iterable
@@ -19,26 +18,24 @@ RE_CONTAINS_WSPACE = re.compile(r"\s")
 RE_CONTAINS_PUNC = re.compile(r"[,;:]")
 
 RE_WSPACE_AT_ENDS = re.compile(r"^\s+.+|.+\s+$")
-RE_DMS = re.compile(r'[°\'"dms’”]+')
+RE_DMS = re.compile(r'[°\'"dms’”]+')  # noqa: RUF001
 
 RE_R_ELLIPSIS = re.compile(r"^\\.{2}[0-9]+$|^\\.{3}$")
 RE_R_NAME_CHARS = re.compile(r"^[\w\.]+$")
 RE_R_NAME_BAD_START = re.compile(r"^_|^\\.[0-9]")
 """Constants defining global regular expressions for the module"""
 
-EXCEL_ERRORS = set(
-    [
-        "#DIV/0!",
-        "#NAME?",
-        "#N/A",
-        "#NUM!",
-        "#VALUE!",
-        "#REF!",
-        "#NULL!",
-        "#SPILL!",
-        "#CALC!",
-    ]
-)
+EXCEL_ERRORS = {
+    "#DIV/0!",
+    "#NAME?",
+    "#N/A",
+    "#NUM!",
+    "#VALUE!",
+    "#REF!",
+    "#NULL!",
+    "#SPILL!",
+    "#CALC!",
+}
 """A global set of openpyxl error strings for Worksheets using data_only=True"""
 
 
@@ -196,7 +193,7 @@ class IsNumber(Filter):
     @staticmethod
     def tfunc(val) -> bool:
         """Test for float or int values."""
-        return isinstance(val, (float, int))
+        return isinstance(val, float | int)
 
     @staticmethod
     def rfunc(val) -> Any:
@@ -241,7 +238,7 @@ class IsLocName(Filter):
     @staticmethod
     def tfunc(val) -> bool:
         """Test that a value is a string or integer."""
-        if isinstance(val, (str, int)) or (isinstance(val, float) and val.is_integer()):
+        if isinstance(val, str | int) or (isinstance(val, float) and val.is_integer()):
             return True
 
         return False
@@ -345,7 +342,7 @@ class IsNotNA(Filter):
     @staticmethod
     def tfunc(val) -> bool:
         """Test for NA strings."""
-        return not ((isinstance(val, str) and val == "NA"))
+        return not (isinstance(val, str) and val == "NA")
 
     @staticmethod
     def rfunc(val) -> Any:

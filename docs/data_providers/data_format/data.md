@@ -36,6 +36,20 @@ The worksheet is organised into two sections:
 * field metadata appears at the top of the sheet, and then
 * the actual data for each field appear below the metadata.
 
+!!! Note "Naming"
+    The Data worksheets can be given whatever names you feel are most appropriate, with
+    a few restrictions.
+
+    Firstly, the following names are not allowed as they are reserved for another
+    purpose: "Summary", "Taxa", "GBIFTaxa", "NCBITaxa", "Locations"
+
+    Secondly, all worksheet names should be valid `R` names. See
+    [here](https://adv-r.hadley.nz/names-values.html#non-syntactic) for details of what
+    constitutes a valid name in `R`.
+
+    Finally, the worksheet names must match with the worksheet names that were provided
+    in the [Summary sheet](./summary.md#the-data-worksheet-block).
+
 ## Field metadata
 
 Each data worksheet will require a particular set of **metadata descriptors** - some are
@@ -272,44 +286,25 @@ Both traits and abundance data tie a value (category or number) to a single taxo
 need to format your data so that it is clear which taxon each value comes from. There
 are two possible formats:
 
-1. All observations in a column are from **a single taxon**: in this case, you can put a
-  valid taxon name (see Taxa worksheet) in the `taxon_name` descriptor for this column.
+* One: All observations in a column are from **a single taxon**: in this case, you can
+  put a valid taxon name (see Taxa worksheet) in the `taxon_name` descriptor for this
+  column.
 
     _Example: Observation counts in separate columns for each taxon_
 
-    <!-- markdownlint-disable MD013 -->
+<!-- markdownlint-disable MD013 -->
+{{ read_excel('Example.xlsx', sheet_name = 'abundances_1', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github') }}
+<!-- markdownlint-enable MD013 -->
 
-    |             |                                   |                                   |
-    | ----------- | --------------------------------- | --------------------------------- |
-    | field_type  | Abundance                         | Abundance                         |
-    | taxon_name  | Tiger leech                       | Brown leech                       |
-    | method      | Exhaustive search of 50cm quadrat | Exhaustive search of 50cm quadrat |
-    | description | quadrat count                     | quadrat count                     |
-    | units       | individuals                       | individuals                       |
-    | field_name  | tiger_count                       | brown_count                       |
-    | 1           | 24                                | 12                                |
-    | 2           | 62                                | 3                                 |
-
-    <!-- markdownlint-enable MD013 -->
-
-2. Different rows in the column refer to **different taxa**: in this case, you must also
-  have a Taxa column and the `taxon_field` descriptor needs to contain the field name of
-  the appropriate Taxa column.
+* Two: Different rows in the column refer to **different taxa**: in this case, you must
+  also have a Taxa column and the `taxon_field` descriptor needs to contain the field
+  name of the appropriate Taxa column.
 
     _Example: Observation counts with different taxa in rows_
 
-    |             |               |                                   |
-    | ----------- | ------------- | --------------------------------- |
-    | field_type  | Taxa          | Abundance                         |
-    | taxon_field |               | common_name                       |
-    | method      |               | Exhaustive search of 50cm quadrat |
-    | description | Species found | Number found                      |
-    | units       |               | individuals                       |
-    | field_name  | common_name   | leech_count                       |
-    | 1           | Tiger leech   | 24                                |
-    | 2           | Brown leech   | 12                                |
-    | 3           | Tiger leech   | 62                                |
-    | 4           | Brown leech   | 3                                 |
+<!-- markdownlint-disable MD013 -->
+{{ read_excel('Example.xlsx', sheet_name = 'abundances_2', keep_default_na = False, header = None, names = ["A", "B", "C"], tablefmt = 'github') }}
+<!-- markdownlint-enable MD013 -->
 
 It is an error to provide both `taxon_name` and `taxon_field` descriptors for an
 Abundance or Trait field.
@@ -376,57 +371,32 @@ You can use one or both of the descriptors, depending on how your data is laid
 out. For the most common case of two interacting taxa, the following three
 possibilities exist.
 
-1. Both interacting taxa vary from row to row, so taxon names are provided in two fields.
+* One: Both interacting taxa vary from row to row, so taxon names are provided in two
+  fields.
 
     _Example: Interacting taxa identified in separate columns_
 
-    <!-- markdownlint-disable MD013 -->
+<!-- markdownlint-disable MD013 -->
+{{ read_excel('Example.xlsx', sheet_name = 'interactions_1', keep_default_na = False, tablefmt = 'github', header = None, names = ["A", "B", "C", "D"]) }}
+<!-- markdownlint-enable MD013 -->
 
-    |                   |                    |                    |                            |
-    | ----------------- | ------------------ | ------------------ | -------------------------- |
-    | field_type        | Taxon              | Taxon              | Categorical Interaction    |
-    | interaction_field |                    |                    | predator;prey              |
-    | levels            |                    |                    | success;failure            |
-    | method            | Visual observation | Visual observation | Visual observation         |
-    | description       | Predator observed  | Prey observed      | Outcome of predation event |
-    | field_name        | predator           | prey               | outcome                    |
-    | 1                 | Clouded leopard    | Brown rat          | success                    |
-    | 2                 | Flat headed cat    | Moon rat           | failure                    |
-
-    <!-- markdownlint-enable MD013 -->
-
-2. Alternatively, all of the data might refer to the same two taxa, so the taxon names
-    can be provided directly.
+* Two: Alternatively, all of the data might refer to the same two taxa, so the taxon
+    names can be provided directly.
 
     _Example: Interacting taxa constant_
 
-    |                  |                                         |
-    | ---------------- | --------------------------------------- |
-    | field_type       | Categorical Interaction                 |
-    | interaction_name | Clouded leopard:predator;Brown rat:prey |
-    | levels           | success;failure                         |
-    | method           | Visual observation                      |
-    | description      | Outcome of predation event              |
-    | field_name       | outcome                                 |
-    | 1                | success                                 |
-    | 2                | failure                                 |
+<!-- markdownlint-disable MD013 -->
+{{ read_excel('Example.xlsx', sheet_name = 'interactions_2', keep_default_na = False, tablefmt = 'github', header = None, names = ["A", "B"]) }}
+<!-- markdownlint-enable MD013 -->
 
-3. Finally, one side of the interaction might vary from row to row but the other side is
-    constant for all rows.
+* Three: Finally, one side of the interaction might vary from row to row but the other
+    side is constant for all rows.
 
     _Example: Interacting taxa identified by name and by column_
 
-    |                   |                    |                            |
-    | ----------------- | ------------------ | -------------------------- |
-    | field_type        | Taxon              | Categorical Interaction    |
-    | interaction_name  |                    | Clouded leopard:predator;  |
-    | interaction_field |                    | prey:prey species;         |
-    | levels            |                    | success;failure            |
-    | method            | Visual observation | Visual observation         |
-    | description       | Prey observed      | Outcome of predation event |
-    | field_name        | prey               | outcome                    |
-    | 1                 | Brown rat          | success                    |
-    | 2                 | Moon rat           | failure                    |
+<!-- markdownlint-disable MD013 -->
+{{ read_excel('Example.xlsx', sheet_name = 'interactions_3', keep_default_na = False, tablefmt = 'github', header = None, names = ["A", "B", "C"]) }}
+<!-- markdownlint-enable MD013 -->
 
 You must provide at least two taxon names or fields, but you can provide more if
 you have tritrophic interactions! Again, you can use any combination of
@@ -454,49 +424,22 @@ interaction names and fields to provide your taxon identities.
 This type is used to provide references to information stored in external files.
 It can be used in two ways:
 
-1. The values in the data are direct references to external files provided in the
+* One: The values in the data are direct references to external files provided in the
   Summary worksheet. The values in the field are checked against the list of external
   file names and they must all appear there.  For example, if the Summary worksheet
   includes an external file row with `My_raster_1.tiff` and `My_raster_2,tiff`:
 
-    |             |                          |                             |
-    | ----------- | ------------------------ | --------------------------- |
-    | field_type  | Numeric                  | File                        |
-    | description | Altitude in metres       | DEM  file used for altitude |
-    | method      | Extracted from DEM tiffs |                             |
-    | taxon_name  |                          |                             |
-    | units       | metres                   |                             |
-    | field_name  | Altitude                 | DEM                         |
-    | 1           | 100                      | My_raster_1.tiff            |
-    | 2           | 200                      | My_raster_1.tiff            |
-    | 3           | 300                      | My_raster_1.tiff            |
-    | 4           | 400                      | My_raster_1.tiff            |
-    | 5           | 500                      | My_raster_2.tiff            |
-    | 6           | 600                      | My_raster_2.tiff            |
-    | 7           | 700                      | My_raster_2.tiff            |
-    | 8           | 800                      | My_raster_2.tiff            |
+<!-- markdownlint-disable MD013 -->
+{{ read_excel('Example.xlsx', sheet_name = 'external_1', keep_default_na = False, tablefmt = 'github', header = None, names = ["A", "B", "C"]) }}
+<!-- markdownlint-enable MD013 -->
 
-2. The values in the data are files contained within an external file. In this case, the
-  descriptor `file_container` is used to check the external file is present, but the
-  values in the field are not checked. For example:
+* Two: The values in the data are files contained within an external file. In this
+  case, the descriptor `file_container` is used to check the external file is present,
+  but the values in the field are not checked. For example:
 
-    |                |                          |                    |
-    | -------------- | ------------------------ | ------------------ |
-    | field_type     | Numeric                  | File               |
-    | description    | Altitude in metres       | Image of Quadrat   |
-    | method         | Extracted from DEM tiffs |                    |
-    | taxon_name     |                          |                    |
-    | units          | metres                   |                    |
-    | file_container |                          | My_archive.zip     |
-    | field_name     | Altitude                 | Quadrat_image      |
-    | 1              | 100                      | Site_quadrat_1.jpg |
-    | 2              | 200                      | Site_quadrat_2.jpg |
-    | 3              | 300                      | Site_quadrat_3.jpg |
-    | 4              | 400                      | Site_quadrat_4.jpg |
-    | 5              | 500                      | Site_quadrat_5.jpg |
-    | 6              | 600                      | Site_quadrat_6.jpg |
-    | 7              | 700                      | Site_quadrat_7.jpg |
-    | 8              | 800                      | Site_quadrat_8.jpg |
+<!-- markdownlint-disable MD013 -->
+{{ read_excel('Example.xlsx', sheet_name = 'external_2', keep_default_na = False, tablefmt = 'github', header = None, names = ["A", "B", "C"]) }}
+<!-- markdownlint-enable MD013 -->
 
 ### Comments
 

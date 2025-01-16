@@ -30,8 +30,8 @@ import re
 import sqlite3
 from collections import Counter
 from io import StringIO
-from itertools import compress, groupby
-from typing import Any, Optional, Union
+from itertools import compress, groupby, pairwise
+from typing import Any, Optional
 
 from dominate import tags
 from dominate.util import raw
@@ -64,7 +64,7 @@ GBIF_BACKBONE_RANKS = [
 ]
 
 # Extended version of backbone ranks to capture superkingdoms
-NCBI_BACKBONE_RANKS = ["superkingdom"] + GBIF_BACKBONE_RANKS
+NCBI_BACKBONE_RANKS = ["superkingdom", *GBIF_BACKBONE_RANKS]
 
 # NBCI name regex
 NCBI_prefix_re = re.compile("^[a-z]__")
@@ -125,13 +125,13 @@ class GBIFTaxon:
     # Init properties
     name: str
     rank: str
-    gbif_id: Optional[int] = None
+    gbif_id: int | None = None
     is_backbone: bool = dataclasses.field(init=False)
     is_canon: bool = dataclasses.field(init=False)
     # https://stackoverflow.com/questions/33533148
     canon_usage: Optional["GBIFTaxon"] = dataclasses.field(init=False)
-    parent_id: Optional[int] = dataclasses.field(init=False)
-    taxon_status: Optional[str] = dataclasses.field(init=False)
+    parent_id: int | None = dataclasses.field(init=False)
+    taxon_status: str | None = dataclasses.field(init=False)
     lookup_status: str = dataclasses.field(init=False)
     hierarchy: list = dataclasses.field(init=False)
 
@@ -211,8 +211,8 @@ class NCBITaxon:
     taxa_hier: list[tuple[Any, ...]]
     ncbi_id: int
     parent_ncbi_id: int
-    non_canon_name: Optional[str] = None
-    non_canon_name_class: Optional[str] = None
+    non_canon_name: str | None = None
+    non_canon_name_class: str | None = None
 
     def __post_init__(self):
         """Sets the defaults for the post-init properties and checks inputs."""
@@ -253,8 +253,8 @@ class NCBITaxon:
 
         # Check the tuple values: rank, name, ncbi_id and parent_ncbi_id/None,
         # where None shows the root of the taxonomy.
-        tuple_contents = set(tuple(map(type, x)) for x in self.taxa_hier)
-        valid_tuples = set([(str, str, int, int), (str, str, int, type(None))])
+        tuple_contents = {tuple(map(type, x)) for x in self.taxa_hier}
+        valid_tuples = {(str, str, int, int), (str, str, int, type(None))}
         if not tuple_contents.issubset(valid_tuples):
             raise ValueError("Taxon hierarchy tuples malformed")
 
@@ -278,14 +278,14 @@ class NCBITaxon:
 
         if self.ncbi_id != leaf_ncbi_id:
             raise ValueError(
-                f"Provided NCBI ID ({self.ncbi_id}) not does not match "
-                f"first ID in hierarchy ({leaf_ncbi_id})"
+                f"Provided NCBI ID ({self.ncbi_id}) does not match first ID in "
+                f"hierarchy ({leaf_ncbi_id})"
             )
 
         if self.parent_ncbi_id != parent_ncbi_id:
             raise ValueError(
-                f"Provided parent NCBI ID ({self.parent_ncbi_id}) not does not match "
-                f"first parent ID in hierarchy ({parent_ncbi_id})"
+                f"Provided parent NCBI ID ({self.parent_ncbi_id}) does not match first "
+                f"parent ID in hierarchy ({parent_ncbi_id})"
             )
 
     def __repr__(self):
@@ -648,7 +648,7 @@ class NCBIValidator:
 
     @staticmethod
     def _canon_to_backbone_hierarchy(
-        canon_hier: list[tuple[Any, ...]]
+        canon_hier: list[tuple[Any, ...]],
     ) -> list[tuple[Any, ...]]:
         """Reduce a canonical NCBI hierarchy to the backbone ranks.
 
@@ -670,7 +670,7 @@ class NCBIValidator:
         if len(bb_elements) > 1:
             bb_hierarchy = []
 
-            for child, parent in zip(bb_elements, bb_elements[1:]):
+            for child, parent in pairwise(bb_elements):
                 bb_hierarchy.append(tuple(list(child[:3]) + list([parent[2]])))
 
             bb_hierarchy.append(tuple(list(parent[:3]) + list([None])))
@@ -729,12 +729,10 @@ class NCBIValidator:
 
             # If not, is there a matching alternative name at the same rank and id?
             row = self.ncbi_conn.execute(
-                """select name_class
-                    from names join nodes using (tax_id)
-                    where name_txt = '{}' and rank = '{}' and tax_id = '{}';
-                """.format(
-                    provided_name, rank, tax_id
-                )
+                f"select name_class\n"
+                f"from names join nodes using (tax_id)\n"
+                f"where name_txt = '{provided_name}' and rank = '{rank}' and tax_id = "
+                f"'{tax_id}';"
             ).fetchone()
 
             if row is None:
@@ -1030,18 +1028,16 @@ class GBIFTaxa:
             return
 
         # Fields used to describe taxa
-        tx_fields = set(
-            [
-                "name",
-                "taxon name",
-                "taxon type",
-                "taxon id",
-                "ignore id",
-                "parent name",
-                "parent type",
-                "parent id",
-            ]
-        )
+        tx_fields = {
+            "name",
+            "taxon name",
+            "taxon type",
+            "taxon id",
+            "ignore id",
+            "parent name",
+            "parent type",
+            "parent id",
+        }
 
         # Now check for extra fields and report them to the user
         extra_fields = set(headers).difference(tx_fields)
@@ -1083,7 +1079,7 @@ class GBIFTaxa:
                 row["taxon id"],
                 row["ignore id"],
             ]
-            parent_info: Optional[list] = [
+            parent_info: list | None = [
                 row["parent name"],
                 row["parent type"],
                 row["parent id"],
@@ -1107,9 +1103,9 @@ class GBIFTaxa:
         if self.n_errors is None:
             LOGGER.critical("GBIFTaxa error logging has broken!")
         elif self.n_errors > 0:
-            LOGGER.info("GBIFTaxa contains {} errors".format(self.n_errors))
+            LOGGER.info(f"GBIFTaxa contains {self.n_errors} errors")
         else:
-            LOGGER.info("{} taxa loaded correctly".format(len(self.taxon_names)))
+            LOGGER.info(f"{len(self.taxon_names)} taxa loaded correctly")
 
         FORMATTER.pop()
 
@@ -1151,7 +1147,7 @@ class GBIFTaxa:
         if m_name is None or not isinstance(m_name, str) or m_name.isspace():
             LOGGER.error("Worksheet name missing, whitespace only or not text")
         elif m_name != m_name.strip():
-            LOGGER.error(f"Worksheet name has whitespace padding: {repr(m_name)}")
+            LOGGER.error(f"Worksheet name has whitespace padding: {m_name!r}")
             m_name = m_name.strip()
             self.taxon_names.add(m_name)
         else:
@@ -1169,7 +1165,7 @@ class GBIFTaxa:
                     LOGGER.error(f"{idx_name} missing or not text")
                     p_fail = True
                 elif val != val.strip():
-                    LOGGER.error(f"{idx_name} has whitespace padding: {repr(val)}")
+                    LOGGER.error(f"{idx_name} has whitespace padding: {val!r}")
                     parent_info[idx] = val.strip()
 
             # ID can be None or an integer (openpyxl loads all values as float)
@@ -1193,7 +1189,7 @@ class GBIFTaxa:
                 LOGGER.error(f"{idx_name} missing, whitespace only or not text")
                 mfail = True
             elif val != val.strip():
-                LOGGER.error(f"{idx_name} has whitespace padding: {repr(val)}")
+                LOGGER.error(f"{idx_name} has whitespace padding: {val!r}")
                 taxon_info[idx] = val.strip()
 
         # GBIF ID and Ignore ID can be None or an integer (openpyxl loads all values as
@@ -1642,7 +1638,7 @@ class NCBITaxa:
             return
 
         # The set of possible data fields is name, new and the NCBI ranks
-        data_fields = ["name", "new"] + self.validator.ncbi_ranks_root_to_leaf
+        data_fields = ["name", "new", *self.validator.ncbi_ranks_root_to_leaf]
 
         # Now report extra fields
         extra_fields = set(headers).difference(data_fields)
@@ -1703,14 +1699,12 @@ class NCBITaxa:
             m_name = row["name"]
 
             if not isinstance(m_name, str):
-                LOGGER.error(f"Worksheet name is not a string: {repr(m_name)}")
+                LOGGER.error(f"Worksheet name is not a string: {m_name!r}")
                 m_name = str(m_name)
             else:
                 m_name_strip = m_name.strip()
                 if m_name != m_name_strip:
-                    LOGGER.error(
-                        f"Worksheet name has whitespace padding: {repr(m_name)}"
-                    )
+                    LOGGER.error(f"Worksheet name has whitespace padding: {m_name!r}")
                     m_name = m_name_strip
 
             # Standardise blank and NA values to None
@@ -1741,7 +1735,7 @@ class NCBITaxa:
                 if not isinstance(value, str) or value.isspace():
                     LOGGER.error(
                         f"Rank {rnk} has non-string or empty "
-                        f"string value: {repr(value)}"
+                        f"string value: {value!r}"
                     )
                     validate = False
                     continue
@@ -1749,7 +1743,7 @@ class NCBITaxa:
                 # The value must not be padded but processing can continue
                 value_stripped = value.strip()
                 if value != value_stripped:
-                    LOGGER.error(f"Rank {rnk} has whitespace padding: {repr(value)}")
+                    LOGGER.error(f"Rank {rnk} has whitespace padding: {value!r}")
                     value = value_stripped
 
                 # Strip k__ notation to provide clean name_txt search input - dropping
@@ -1831,9 +1825,9 @@ class NCBITaxa:
         if self.n_errors is None:
             LOGGER.critical("NCBITaxa error logging has broken!")
         elif self.n_errors > 0:
-            LOGGER.info("NCBITaxa contains {} errors".format(self.n_errors))
+            LOGGER.info(f"NCBITaxa contains {self.n_errors} errors")
         else:
-            LOGGER.info("{} taxa loaded correctly".format(len(self.taxon_names)))
+            LOGGER.info(f"{len(self.taxon_names)} taxa loaded correctly")
 
         FORMATTER.pop()
 
@@ -1872,7 +1866,7 @@ class NCBITaxa:
         # Clean whitespace padding and warn
         m_name_strip = m_name.strip()
         if m_name != m_name_strip:
-            LOGGER.error(f"Worksheet name has whitespace padding: {repr(m_name)}")
+            LOGGER.error(f"Worksheet name has whitespace padding: {m_name!r}")
             m_name = m_name_strip
 
         # TODO  - validation at multiple levels. Make less paranoid? Here, an empty list
@@ -1904,7 +1898,7 @@ class NCBITaxa:
             if stripped != entry:
                 LOGGER.error(
                     "Hierarchy contains whitespace: "
-                    f"rank {repr(entry[0])}, name {repr(entry[1])}"
+                    f"rank {entry[0]!r}, name {entry[1]!r}"
                 )
                 taxon_hier[entry_idx] = stripped
 
@@ -2045,7 +2039,7 @@ class Taxa:
 
 def taxon_index_to_text(
     taxa: list[dict], html: bool = False, indent_width: int = 4, auth: str = "GBIF"
-) -> Union[str, tags.div]:
+) -> str | tags.div:
     """Render a taxon index as text or html.
 
     This function takes a taxon index and renders the contents into either a text or
@@ -2231,7 +2225,7 @@ def taxon_index_to_text(
         return html_out.getvalue()
 
 
-def taxa_strip(name: str, rank: str) -> Optional[str]:
+def taxa_strip(name: str, rank: str) -> str | None:
     """Strip NCBI style rank prefixes from taxon names.
 
     This function removes NCBI `k__` type notation from taxa names. It returns the

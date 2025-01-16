@@ -1,9 +1,8 @@
 {
-    "python.linting.flake8Enabled": true,
-    "python.linting.mypyEnabled": true,
-    "python.linting.enabled": true,
-    "python.formatting.provider": "black",
-    "editor.formatOnSave": true,
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "charliermarsh.ruff"
+    },
     "editor.rulers": [
         88
     ],
@@ -13,9 +12,12 @@
         "-s",
         "test",
         // --no-cov needed so that breakpoints work: https://github.com/microsoft/vscode-python/issues/693
-        "--no-cov"
+        "--no-cov",
     ],
     "workbench.editorAssociations": {
         "*.ipynb": "jupyter-notebook"
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
     },
 }

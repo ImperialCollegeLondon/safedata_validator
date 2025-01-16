@@ -9,10 +9,8 @@ URL = (
 
 
 def test_requests():
-
     requests.get(URL)
 
 
 def test_requests_fake(config_filesystem):
-
     requests.get(URL)

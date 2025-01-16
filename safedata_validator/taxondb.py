@@ -18,7 +18,6 @@ import sqlite3
 import zipfile
 from io import TextIOWrapper
 from itertools import groupby
-from typing import Optional
 
 import requests
 from dateutil.parser import isoparse, parse
@@ -27,7 +26,7 @@ from tqdm.auto import tqdm
 from safedata_validator.logger import FORMATTER, LOGGER, log_and_raise
 
 
-def get_gbif_version(timestamp: Optional[str] = None) -> tuple[str, str]:
+def get_gbif_version(timestamp: str | None = None) -> tuple[str, str]:
     """Resolve the timestamp for a GBIF version.
 
     This function validates a user-provided GBIF version timestamp or locates the most
@@ -88,7 +87,7 @@ def get_gbif_version(timestamp: Optional[str] = None) -> tuple[str, str]:
     return timestamp, url
 
 
-def get_ncbi_version(timestamp: Optional[str] = None) -> tuple[str, str, int]:
+def get_ncbi_version(timestamp: str | None = None) -> tuple[str, str, int]:
     """Resolve the timestamp for an NCBI version.
 
     This function validates a user-provided NCBI version timestamp or locates the most
@@ -199,6 +198,14 @@ def download_gbif_backbone(outdir: str, timestamp: str, url: str) -> dict:
                 int(deleted_head.headers["Content-Length"]),
             )
         ]
+    else:
+        # Warn the user that deleted taxa information cannot be found, most likely
+        # because the database snapshot is too old
+        LOGGER.warning(
+            "Information on deleted taxa could not be found. This is likely because you"
+            "are building a database version older than 2021-11-26. The database will"
+            "be built without any information on deleted taxa."
+        )
 
     for key, file, fsize in targets:
         # Download the file with a TQDM progress bar
@@ -221,7 +228,7 @@ def build_local_gbif(
     outfile: str,
     timestamp: str,
     simple: str,
-    deleted: Optional[str] = None,
+    deleted: str | None = None,
     keep: bool = False,
 ) -> None:
     """Create a local GBIF backbone database.
@@ -617,8 +624,13 @@ def build_local_ncbi(
     for ky, gp in grp_by_parent:
         children_by_parents[ky] = {ch for ch, _ in gp}
 
-    # Remove a circular reference and then find the static order through the graph
-    children_by_parents["forma specialis"].remove("forma specialis")
+    # Check for any cases where child value is the same as the parent key (this happens
+    # for superfamily and forma specialis in some database versions)
+    for parent, children in children_by_parents.items():
+        if parent in children:
+            children.remove(parent)
+
+    # then find the static order through the graph
     sorter = graphlib.TopologicalSorter(children_by_parents)
     taxon_order = reversed(list(sorter.static_order()))
 

@@ -6,8 +6,8 @@ configuration file.
 
 ## Configuration file format
 
-The file structure for the configuration file is a simple text file containing
-the details below:
+The file structure for the configuration file is a text file containing the details
+below:
 
 ```ini
 gbif_database = /path/to/local/backbone.sqlite3
@@ -15,6 +15,7 @@ ncbi_database = /path/to/local/ncbi_database.sqlite3
 gazetteer = /path/to/gazeteer.geojson
 location_aliases = /path/to/location_aliases.csv
 project_database = /path/to/project_database.csv
+maximum_embargo_months = 24
 
 [extents]
 temporal_soft_extent = 2002-02-02, 2030-01-31
@@ -30,15 +31,27 @@ contact_name = The SAFE Project
 contact_affiliation = Imperial College London
 contact_orcid = 0000-0003-3378-2814
 use_sandbox = true
-zenodo_api = https://api.zenodo.org
 zenodo_token = abc
-zenodo_sandbox_api = https://sandbox.zenodo.org
 zenodo_sandbox_token = xyz
+project_url = https://safeproject.net/projects/project_view/PROJECT_ID
+html_template = /path/to/html_jinja_template.html
 
 [metadata]
 api = https://safeproject.net
 token = xyz
 ssl_verify = true
+
+[xml]
+languageCode=eng
+characterSet=utf8
+contactCountry=United Kingdom
+contactEmail=admin@safeproject.net
+epsgCode=4326
+topicCategories=biota,environment,geoscientificInformation
+lineageStatement="""This dataset was collected as part of a research project
+based at The SAFE Project. For details of the project and data collection,
+see the methods information contained within the datafile and the project
+website: https://safeproject.net."""
 ```
 
 ## Configuration file locations
@@ -99,7 +112,8 @@ The configuration file content breaks down into three distinct parts of the
   and the extents settings for a project, that are used to check a dataset is valid.
 
 * **Publication**: the account settings and access tokens used to publish validated
-  datasets to Zenodo.
+  datasets to Zenodo. This also includes the section of XML details, since we recommend
+  including XML metadata with published datasets.
 
 * **Metadata**: the URL and access tokens to send metadata about a dataset to a
   metadata server, allowing datasets to be accessed using the
@@ -128,8 +142,8 @@ provided to validate datasets.
 
 **The `gazetteer` and `location_aliases` elements**
 
-: These elements provide the paths to the [location database](gazetteer.md) for the
-  project.
+: These elements provide the paths to the [location database](gazetteer_files.md) for
+  the project.
 
 **The `project_database` element**
 
@@ -147,6 +161,22 @@ provided to validate datasets.
         of whether or not to organise datasets into project. The data manager for a
         project will need to make this decision during the initial configuration of a
         data system.
+
+**The `maximum_embargo_months` element**
+
+: If a data provider submits a dataset with embargoed access, they must provide a date
+  for the end of the embargo period. This configuration element restricts the maximum
+  allowable length of the embargo period within a project, with a default of 24 months.
+  This setting is _only_ used to cause validation failures for datasets that request an
+  overlong embargo period. It does not apply embargo dates to datasets: this is always a
+  dataset specific feature set in the [summary
+  metadata](../../data_providers/data_format/summary.md#the-access-block).
+
+    Allowing reasonable embargo lengths is important to allow time for publications from
+    datasets, but equally setting very long embargo lengths makes it hard to re-use data.
+    It may be more appropriate to allow the use of the [`restricted`
+    access](../../data_providers/data_format/summary.md#the-access-block) option for a
+    subset of datasets than to globally allow very long embargo periods.
 
 **The `extents` element**
 
@@ -218,6 +248,90 @@ configuration elements:
 
 : When this element is `true`, all datasets will be published to the testing sandbox
   site. Set this to `false` when you are ready to actually start publishing datasets.
+  This configuration sets the default behaviour, but you can use the `--live` and
+  `--sandbox` options with the
+  [`safedata_zenodo`](../command_line_tools/safedata_zenodo.md) subcommands to switch
+  between these options without needing to edit the configured default. This can be
+  useful if a user wants to see a preview of the published dataset before commiting to a
+  published dataset.
+
+**The `project_url` element**
+
+: If you are using project IDs, then this can be used to add a project URL to the
+  dataset description on the Zenodo website. It could be a single URL to a generic
+  projects website, but if the provided URL contains the text `PROJECT_ID`, this will be
+  replaced by the Project ID number provided in the dataset Summary metadata. This does
+  assume that your project websites are keyed by the Project ID codes. The project URL
+  will also be included in GEMINI XML for the dataset.
+
+**The `html_template` element**
+
+: An optional path to an alternative template for generating an HTML dataset description
+  for use in Zenodo (see below).
+
+#### HTML description template
+
+A published Zenodo record contains a description of the dataset, which is formatted
+using HTML. This is basically just a more human readable summary of the dataset
+metadata, and is created by filling in a template with the metadata for a given
+dataset. The `safedata_validator` package contains a [default
+template](https://raw.githubusercontent.com/ImperialCollegeLondon/safedata_validator/main/safedata_validator/templates/description_template.html)
+that implements a fairly complete description of the main dataset metadata.
+
+However, you may want to use a different template: you might want a different structure
+or wording or you might want to leave out some of the bulkier information. You can do
+this by taking the default template, editing it and then providing the path to the new
+template in your configuration file. The template uses the [Jinja templating
+syntax](https://jinja.palletsprojects.com/en/latest/templates/) and the default uses all
+of the metadata elements currently exposed for generating descriptions.
+
+### XML configuration
+
+The `safedata_zenodo generate_xml` tool can be used to generate a geo-spatial XML
+metadata file for a dataset. This is relatively high-level metadata that just includes
+the temporal and spatial bounds of the data, along with some contact and access details.
+We recommend that this file is included when datasets are published. If you want to do
+this, you will need to update this section with the details for your own project. The
+elements in this section are the extra information that is uniquely needed to build the
+XML metadata and all elements must be provided.
+
+The generated XML uses a template that is filled in with using project wide and dataset
+specific elements. We have tested this template using the [INSPIRE validator
+tool](https://inspire.ec.europa.eu/validator/test-selection/index.html) using the
+"Common Requirements for ISO/TC 19139:2007" and "Conformance Class 1: 'Baseline metadata
+for data sets and data set series" test suites. This tool may be of use for validating
+your own XML configuration but does include some elements that are specific to the EU
+INSPIRE implementation  of the more general [ISO/TC
+19139:2007](https://wiki.icaci.org/index.php?title=ISO/TS_19139:2007_Geographic_information_-_Metadata_-_XML_schema_implementation)
+metadata specification.
+
+**The `languageCode`, `characterSet` and `epsgCode` elements**
+
+: It is unlikely that you will need to change these, but they just identify the language
+used in the dataset, the character encoding of the metadata and the
+[EPSG](https://epsg.io) code of the geographic coordinate system used in the data. The
+default value of 4326 is the code for the widely used WGS84 datum.
+
+**The `contactCountry` and `contactEmail` elements**
+
+: The XML includes a number of contact details, including the authors, but also requires
+a general point of contact. Some of these details (name and OrcID) are re-used from the
+Zenodo point of contact information above, but the XML validation requires a country and
+email, so these need to be provided here.
+
+**The `topicCategories` element**
+
+: This is a troublesome element - it is just a list of topic categories, but different
+implementations of this XML standard have different list of acceptable values. If highly
+compliant XML is important to your project, you may need to identify the precise set of
+topics that this will be validated against.
+
+**The `lineageStatement`**
+
+: The XML specification requires a lineage statement for the dataset. This could be a
+highly dataset specific record of the lineage of the data, but this entry is used to
+provide a generic statement intended to cover all of the dataset collected within a
+project.
 
 ### Metadata configuration
 

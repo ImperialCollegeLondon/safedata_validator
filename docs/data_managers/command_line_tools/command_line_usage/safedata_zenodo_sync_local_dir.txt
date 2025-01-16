@@ -1,6 +1,6 @@
 cl_prompt $ safedata_zenodo sync_local_dir -h
 usage: safedata_zenodo sync_local_dir [-h] [--not-just-xlsx]
-                                      [--replace-modified]
+                                      [--replace-modified] [--dry-run]
                                       datadir
 
 Synchronize a local data directory
@@ -24,10 +24,12 @@ positional arguments:
   datadir       The path to a local directory containing an existing safedata
                 directory or an empty folder in which to create one
 
-optional arguments:
+options:
   -h, --help    show this help message and exit
   --not-just-xlsx
                 Should large non-xlsx files also be downloaded.
   --replace-modified
                 Should locally modified files be overwritten with the archive
                 version
+  --dry-run     Run the synchronisation process without altering the local
+                directory.

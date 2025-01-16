@@ -15,6 +15,9 @@ plugins:
   - search
   - mkdocstrings
   - include-markdown
+  - table-reader
+hooks:
+  - docs/scripts/hooks.py
 extra_css:
   - custom.css
 use_directory_urls: false
@@ -40,10 +43,14 @@ nav:
       - 'Configuration': 'data_managers/install/configuration.md'
       - 'Building the GBIF database': 'data_managers/install/build_local_gbif.md'
       - 'Building the NCBI database': 'data_managers/install/build_local_ncbi.md'
-      - 'Creating a Gazetteer': 'data_managers/install/gazetteer.md'
+      - 'The gazetteer': 'data_managers/install/gazetteer_files.md'
+      - 'Creating a gazetteer': 'data_managers/install/gazetteer_creation.md'
       - 'Taxonomic validation details': 'data_managers/install/taxonomic_validation.md'
     - 'Using the safedata system':
       - 'Overview': 'data_managers/using_safedata/overview.md'
+      - 'Validating datasets': 'data_managers/using_safedata/validating_datasets.md'
+      - 'Publishing datasets': 'data_managers/using_safedata/publishing_datasets.md'
+      - 'Updating the metadata server': 'data_managers/using_safedata/posting_metadata.md'
     - 'Command line tools': 
       - 'Overview': 'data_managers/command_line_tools/overview.md'
       - 'safedata_validate': 'data_managers/command_line_tools/safedata_validate.md'
@@ -62,6 +69,8 @@ nav:
       - 'Taxa': 'developers/api/taxa.md'
       - 'Zenodo': 'developers/api/zenodo.md'
       - 'Server': 'developers/api/server.md'
+      - 'Utilities': 'developers/api/utilities.md'
     - 'Package development': developers/package_development.md
+    - 'Strange problems': developers/strange_problems.md
   - 'safedata at the SAFE project': 'safedata_at_SAFE.md'
 

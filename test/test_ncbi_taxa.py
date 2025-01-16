@@ -1,5 +1,5 @@
 """Tests checking that the NCBI specific classes work as intended."""
-import copy
+
 from contextlib import nullcontext as does_not_raise
 from logging import CRITICAL, ERROR, INFO, WARNING
 
@@ -63,7 +63,7 @@ from .conftest import log_check
                 taxa_hier="test",
             ),
             pytest.raises(TypeError),
-            "Taxonomic hierarchy not a list",
+            "Taxon hierarchy not a list",
             id="string instead of list",
         ),
         pytest.param(
@@ -120,18 +120,6 @@ from .conftest import log_check
                 rank="species",
                 ncbi_id=37577,
                 parent_ncbi_id=30446,
-                taxa_hier=[("genus", "Morus", 37577, 30446)],
-            ),
-            pytest.raises(ValueError),
-            "Provided rank (species) not in hierarchy",
-            id="rank missing",
-        ),
-        pytest.param(
-            dict(
-                name="Morus",
-                rank="species",
-                ncbi_id=37577,
-                parent_ncbi_id=30446,
                 taxa_hier=[
                     ("genus", "Morus", 37577, 30446),
                     ("species", "Morus bassanus", 1, 37578),
@@ -170,7 +158,7 @@ from .conftest import log_check
             dict(
                 name="Morus",
                 rank="genus",
-                ncbi_id=27,
+                ncbi_id=37577,
                 parent_ncbi_id=666,
                 taxa_hier=[("genus", "Morus", 37577, 30446)],
             ),
@@ -199,8 +187,8 @@ def test_taxon_init_errors(test_input, raises, message):
     with raises as excep:
         _ = taxa.NCBITaxon(**test_input)
 
-        if not isinstance(raises, does_not_raise):
-            assert excep.value == message
+    if not isinstance(raises, does_not_raise):
+        assert str(excep.value) == message
 
 
 # ------------------------------------------

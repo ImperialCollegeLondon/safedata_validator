@@ -1,12 +1,14 @@
-# Creating a gazetteer
+# The gazetteer
 
 Datasets can [use their own unique
 locations](../../data_providers/data_format/locations.md), but it is more generally
 useful to have a centrally curated set of shared locations. These curated locations are
-provided using **gazetteer** and **location alias** files, and known locations  in
+provided using **gazetteer** and **location alias** files, and known locations in
 datasets are then validated against these resources. The data resources providing this
 information are set with the `gazetteer` and `location_aliases` [configuration
-options](configuration.md).
+options](configuration.md). This page exists to explains the purpose and contents of
+these two files. See [here](gazetteer_creation.md) for a guide explaining how to create a
+gazetteer.
 
 ## The gazetteer file
 
@@ -19,7 +21,7 @@ collection of GIS features providing known locations for a project.
   streams or transects and area features like quadrats.
 
 * Each feature will have a set of properties associated with the feature geometry.
-  For `safedata_validator`, we only require the  `location` property, which provides
+  For `safedata_validator`, we only require the `location` property, which provides
   **a unique name** for each location within the gazetteer file. Although only the
   `location` property is required, it is fine for features to have other project
   specific properties.
@@ -33,7 +35,7 @@ commonly used in GIS applications, so can be more easily created and edited usin
 tools like [QGIS](https://qgis.org).
 
 ```json
-{    "type": "FeatureCollection",
+{"type": "FeatureCollection",
     "features": [
         {
             "type": "Feature",

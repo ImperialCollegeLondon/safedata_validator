@@ -1,8 +1,8 @@
 cl_prompt $ safedata_validate -h
-usage: safedata_validate [-h] [-r RESOURCES] [--validate_doi]
+usage: safedata_validate [-h] [-r RESOURCES] [-s] [--validate_doi]
                          [--chunk_size CHUNK_SIZE] [-l LOG] [-j JSON]
                          [--version]
-                         filename
+                         [filename]
 
 Validate a dataset using a command line interface.
 
@@ -30,12 +30,14 @@ Validate a dataset using a command line interface.
     stderr but can be redirected to a file using the `--log` option.
 
 positional arguments:
-  filename      Path to the Excel file to be validated.
+  filename      Path to the Excel file to be validated
 
-optional arguments:
+options:
   -h, --help    show this help message and exit
   -r RESOURCES, --resources RESOURCES
                 A path to a resources configuration file
+  -s, --show-resources
+                Validate and display the selected resources and exit
   --validate_doi
                 Check the validity of any publication DOIs, provided by the
                 user. Requires a web connection.
