@@ -589,7 +589,7 @@ class Summary:
                     if is_doi:
                         api_call = (
                             f"https://doi.org/api/handles/"
-                            f"{is_doi.string[is_doi.end():]}"
+                            f"{is_doi.string[is_doi.end() :]}"
                         )
                         r = requests.get(api_call)
                         if r.json()["responseCode"] != 1:

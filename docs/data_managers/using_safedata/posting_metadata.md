@@ -34,7 +34,7 @@ safedata_server post_metadata zenodo_1143714.json Example.json
 
 The metadata server is also used to distribute some of the validation resources used
 both `safedata_validator` and `safedata`, including the
-[gazetteer](../install/gazetteer_files.md) and the [Project ID
+[gazetteer files](../install/gazetteer_files.md) and the [Project ID
 database](../install/configuration.md#validation-configuration). When you update these
 resources for validation locally, those new data also need to be posted to the metadata
 server. There are no command line arguments for this command - it simply updates the
