@@ -185,6 +185,17 @@ def test_authors(caplog, fixture_summary, alterations, should_log_error, expecte
         ),
         (
             {
+                "access status": ("Embargo",),  # Embargo datetime instead of date
+                "embargo date": (
+                    datetime.datetime.today() + datetime.timedelta(hours=100),
+                ),
+                "access conditions": (None,),
+            },
+            True,
+            "Embargo date should be a date not a datetime value",
+        ),
+        (
+            {
                 "access status": ("Embargo",),  # Bad embargo date type
                 "embargo date": (123,),
                 "access conditions": (None,),
@@ -286,6 +297,24 @@ def test_access(caplog, fixture_summary, row_data, should_log_error, expected_lo
         assert "ERROR" in [r.levelname for r in caplog.records]
 
     assert expected_log in caplog.text
+
+
+def test_embargo_date_reformat(fixture_summary):
+    """Test to check that the embargo date is reformatted correctly as a date."""
+    # Update valid to test error conditions and populate _rows
+    # directly (bypassing .load() and need to pack in worksheet object
+    fixture_summary._rows = {
+        "access status": ("Embargo",),
+        "embargo date": (datetime.datetime.today() + datetime.timedelta(days=365),),
+        "access conditions": (None,),
+    }
+
+    # Test the block load
+    fixture_summary._load_access_details()
+
+    # Check the embargo date has been reformatted as a date (i.e. not a datetime)
+    assert isinstance(fixture_summary.access["embargo_date"], datetime.date)
+    assert not isinstance(fixture_summary.access["embargo_date"], datetime.datetime)
 
 
 @pytest.mark.parametrize(
