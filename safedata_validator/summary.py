@@ -167,9 +167,7 @@ class Summary:
             access=SummaryBlock(
                 fields=[
                     SummaryField("access status", True, "access", str),
-                    SummaryField(
-                        "embargo date", False, "embargo_date", datetime.datetime
-                    ),
+                    SummaryField("embargo date", False, "embargo_date", datetime.date),
                     SummaryField("access conditions", False, "access_conditions", str),
                 ],
                 mandatory=True,
@@ -190,8 +188,8 @@ class Summary:
             ),
             date=SummaryBlock(
                 fields=[
-                    SummaryField("start date", True, None, datetime.datetime),
-                    SummaryField("end date", True, None, datetime.datetime),
+                    SummaryField("start date", True, None, datetime.date),
+                    SummaryField("end date", True, None, datetime.date),
                 ],
                 mandatory=False,
                 title="Date Extents",
@@ -813,8 +811,15 @@ class Summary:
                         LOGGER.error("Embargo date is in the past.")
                     elif embargo_date > maximum_embargo_date:
                         LOGGER.error("Embargo date exceeds the maximum embargo length.")
+                    elif embargo_date.time() != datetime.time(0, 0):
+                        LOGGER.error(
+                            "Embargo date should be a date not a datetime value"
+                        )
                     else:
                         LOGGER.info(f"Dataset access: embargoed until {embargo_date}")
+
+                    # Convert embargo date to date (rather than datetime)
+                    access["embargo_date"] = embargo_date.date()
 
                 if access["access_conditions"] is not None:
                     LOGGER.error("Access conditions cannot be set on embargoed data.")

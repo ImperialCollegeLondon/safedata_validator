@@ -1,4 +1,7 @@
 {
+  "project_ids": [
+    1
+  ],
   "title": "Example data for the safedata system",
   "description": "This is an example dataset",
   "authors": [
@@ -25,7 +28,7 @@
     }
   ],
   "access": "Embargo",
-  "embargo_date": "2026-05-14 00:00:00",
+  "embargo_date": "2026-05-14",
   "access_conditions": null,
   "funders": [
     {
@@ -400,7 +403,7 @@
       "n_data_row": 8
     }
   ],
-  "gbif_timestamp": "2021-11-26",
+  "gbif_timestamp": "2023-08-28",
   "gbif_taxa": [
     {
       "worksheet_name": "crbo",
@@ -548,6 +551,14 @@
     },
     {
       "worksheet_name": null,
+      "taxon_id": 54,
+      "parent_id": 1,
+      "taxon_name": "Arthropoda",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
       "taxon_id": 44,
       "parent_id": 1,
       "taxon_name": "Chordata",
@@ -564,10 +575,10 @@
     },
     {
       "worksheet_name": null,
-      "taxon_id": 54,
-      "parent_id": 1,
-      "taxon_name": "Arthropoda",
-      "taxon_rank": "phylum",
+      "taxon_id": 216,
+      "parent_id": 54,
+      "taxon_name": "Insecta",
+      "taxon_rank": "class",
       "taxon_status": "accepted"
     },
     {
@@ -592,38 +603,6 @@
       "parent_id": 44,
       "taxon_name": "Aves",
       "taxon_rank": "class",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
-      "taxon_id": 216,
-      "parent_id": 54,
-      "taxon_name": "Insecta",
-      "taxon_rank": "class",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
-      "taxon_id": 7192775,
-      "parent_id": 212,
-      "taxon_name": "Suliformes",
-      "taxon_rank": "order",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
-      "taxon_id": 1459,
-      "parent_id": 359,
-      "taxon_name": "Rodentia",
-      "taxon_rank": "order",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
-      "taxon_id": 1077,
-      "parent_id": 255,
-      "taxon_name": "Arhynchobdellida",
-      "taxon_rank": "order",
       "taxon_status": "accepted"
     },
     {
@@ -655,6 +634,30 @@
       "taxon_id": 1457,
       "parent_id": 216,
       "taxon_name": "Hymenoptera",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 7192775,
+      "parent_id": 212,
+      "taxon_name": "Suliformes",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1459,
+      "parent_id": 359,
+      "taxon_name": "Rodentia",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1077,
+      "parent_id": 255,
+      "taxon_name": "Arhynchobdellida",
       "taxon_rank": "order",
       "taxon_status": "accepted"
     },
@@ -708,14 +711,6 @@
     },
     {
       "worksheet_name": null,
-      "taxon_id": 2439223,
-      "parent_id": 5510,
-      "taxon_name": "Rattus",
-      "taxon_rank": "genus",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
       "taxon_id": 2437113,
       "parent_id": 5722,
       "taxon_name": "Echinosorex",
@@ -751,6 +746,14 @@
       "taxon_id": 2434894,
       "parent_id": 9703,
       "taxon_name": "Prionailurus",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2439223,
+      "parent_id": 5510,
+      "taxon_name": "Rattus",
       "taxon_rank": "genus",
       "taxon_status": "accepted"
     }
@@ -807,17 +810,17 @@
     },
     {
       "worksheet_name": null,
-      "taxon_id": 2,
+      "taxon_id": 2759,
       "parent_id": null,
-      "taxon_name": "Bacteria",
+      "taxon_name": "Eukaryota",
       "taxon_rank": "superkingdom",
       "taxon_status": "accepted"
     },
     {
       "worksheet_name": null,
-      "taxon_id": 2759,
+      "taxon_id": 2,
       "parent_id": null,
-      "taxon_name": "Eukaryota",
+      "taxon_name": "Bacteria",
       "taxon_rank": "superkingdom",
       "taxon_status": "accepted"
     },
@@ -856,12 +859,12 @@
   ],
   "locations": [
     {
-      "name": "E_194",
+      "name": "E_195",
       "new_location": false,
       "wkt_wgs84": null
     },
     {
-      "name": "E_195",
+      "name": "E_194",
       "new_location": false,
       "wkt_wgs84": null
     },
