@@ -6,7 +6,7 @@ repos:
       - id: debug-statements
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.9.2
+    rev: v0.9.3
     hooks:
       # Run the linter.
       - id: ruff
@@ -22,6 +22,6 @@ repos:
           - types-python-dateutil
           - types-requests
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.43.0
+    rev: v0.44.0
     hooks:
     - id: markdownlint
