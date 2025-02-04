@@ -241,7 +241,7 @@ def create_deposit(
     # Create the draft
     create_response = ZenodoResponse(requests.post(api, params=zen_res.token, json={}))
 
-    # Return the reponse on failure or if the request is not for a new version
+    # Return the response on failure or if the request is not for a new version
     if not create_response.ok or new_version is None:
         return create_response
 
@@ -1016,7 +1016,10 @@ def publish_dataset(
         # when a version is requested and we need to get the most recent file listing to
         # update the files sanely.
         latest_version = ZenodoResponse(
-            requests.get(requested_version.json_data["links"]["latest"])
+            requests.get(
+                requested_version.json_data["links"]["latest"],
+                params=zen_res.token,
+            )
         )
 
         latest_id = latest_version.json_data["id"]
@@ -1031,8 +1034,8 @@ def publish_dataset(
         # allow for checking of files with identical name and content
         incoming_files = {(p.name, _compute_md5(p)) for p in paths_to_upload}
         existing_files = {
-            (p["key"], p["checksum"].removeprefix("md5:"))
-            for p in latest_version.json_data["files"]
+            (p["filename"], p["checksum"].removeprefix("md5:"))
+            for p in requested_version.json_data["files"]
         }
 
         # Split files into files to be upload, files to be deleted from deposit and
