@@ -62,8 +62,8 @@ mkdocs = "^1.4.3"
 mkdocs-include-markdown-plugin = "^6.0.4"
 mkdocs-material = "^8.3.9"
 mkdocs-table-reader-plugin = "^2.1.0"
-mkdocstrings = "^0.24.0"
 mkdocstrings-python = "^1.7.5"
+mkdocstrings = "^0.28.0"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
