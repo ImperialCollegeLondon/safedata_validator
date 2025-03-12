@@ -168,3 +168,11 @@ involved than creating a new dataset because the existing files need to be delet
     include "data_managers/using_safedata/update_script.py"
     %}
     ```
+
+## Amending metadata of published deposits
+
+Once a deposit has been published to Zenodo its metadata cannot be changed using tools
+provided by the `safedata_validator` package. However, you can edit the metadata by
+using the Zenodo web interface. We would **strongly** advise against doing this, unless
+changes need to be urgently made to dataset access conditions. In all other cases, we
+would recommend uploading a new dataset version instead.
