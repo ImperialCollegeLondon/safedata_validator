@@ -172,7 +172,13 @@ involved than creating a new dataset because the existing files need to be delet
 ## Amending metadata of published deposits
 
 Once a deposit has been published to Zenodo its metadata cannot be changed using tools
-provided by the `safedata_validator` package. However, you can edit the metadata by
-using the Zenodo web interface. We would **strongly** advise against doing this, unless
-changes need to be urgently made to dataset access conditions. In all other cases, we
-would recommend uploading a new dataset version instead.
+provided by the `safedata_validator` package. 
+
+You can edit the metadata through the Zenodo web interface, but this does mean
+that the Zenodo metadata will no longer match the metadata included in the data
+files. If you need to change the metadata associated with a published deposit, we 
+generally strongly recommend uploading a new dataset version with updated metadata. 
+
+We would probably make an exception for simply updating the access status of a published record, 
+for example to release a dataset from embargo ahead of the scheduled date or to remove 
+restrictions from a dataset.
