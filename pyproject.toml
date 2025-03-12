@@ -14,7 +14,7 @@ license = "MIT"
 name = "safedata_validator"
 readme = "README.md"
 repository = "https://github.com/imperial_college_london/safedata_validator"
-version = "3.0.1"
+version = "3.0.2"
 
 [tool.poetry.scripts]
 safedata_build_local_gbif = "safedata_validator.entry_points:_build_local_gbif_cli"
@@ -51,7 +51,7 @@ pytest-mock = "^3.7.0"
 
 [tool.poetry.group.devenv.dependencies]
 mypy = "^1.9.0"
-pre-commit = "^2.18.1"
+pre-commit = "^3.0.0"
 ruff = "^0.4.4"
 types-python-dateutil = "^2.8.19.12"
 types-requests = "^2.28.11.17"
