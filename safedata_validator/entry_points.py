@@ -55,7 +55,6 @@ from safedata_validator.zenodo import (
     publish_dataset,
     publish_deposit,
     sync_local_dir,
-    update_published_metadata,
     upload_files,
     upload_metadata,
 )
@@ -527,29 +526,6 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         parents=[parse_zenodo_metadata, parse_dataset_metadata, sandbox_switches],
     )
 
-    # AMEND METADATA subcommand
-    amend_metadata_desc = """
-    Updates the Zenodo metadata for an published deposit. To use this, make sure
-    you have the most recent Zenodo metadata for the deposit and then edit the
-    JSON file to the new values. You can only edit the contents of the
-    `metadata` section.
-
-    Caution: this command should only be used to make urgent changes - such as
-    access restrictions. It is also easy to submit invalid metadata!
-    """
-
-    amend_metadata_parser = subparsers.add_parser(
-        "amend_metadata",
-        description=textwrap.dedent(amend_metadata_desc),
-        help="Update published Zenodo metadata",
-        formatter_class=_desc_formatter,
-        parents=[sandbox_switches],
-    )
-
-    amend_metadata_parser.add_argument(
-        "zenodo_json_update", type=str, help="Path to an updated Zenodo metadata file"
-    )
-
     # SYNC LOCAL DIR subcommand
 
     sync_local_dir_desc = """
@@ -924,20 +900,6 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
             LOGGER.error(f"Failed to add metadata file: {response.error_message}")
         else:
             LOGGER.info("Metadata uploaded")
-
-    elif args.subcommand == "amend_metadata":
-        # Run the function
-        response = update_published_metadata(
-            zenodo=zenodo_json_data, zen_res=zenodo_resources
-        )
-
-        # Report on the outcome.
-        if not response.ok:
-            LOGGER.error(
-                f"Failed to update published metadata: {response.error_message}"
-            )
-        else:
-            LOGGER.info("Metadata updated")
 
     elif args.subcommand == "sync_local_dir":
         sync_local_dir(
