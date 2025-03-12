@@ -8,7 +8,6 @@
             - create_deposit
             - get_deposit
             - upload_metadata
-            - update_published_metadata
             - upload_files
             - discard_deposit
             - publish_deposit

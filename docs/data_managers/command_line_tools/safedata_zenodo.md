@@ -110,14 +110,6 @@ include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_upl
 %}
 ```
 
-#### The `amend_metadata` subcommand
-
-```sh
-{%
-include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_amend_metadata.txt"
-%}
-```
-
 #### The `sync_local_dir` subcommand
 
 ```sh
