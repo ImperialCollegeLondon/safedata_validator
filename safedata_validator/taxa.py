@@ -2166,8 +2166,7 @@ class SeqTaxa:
                 # The value must be an unpadded and not empty string
                 if not isinstance(value, str) or value.isspace():
                     LOGGER.error(
-                        f"Rank {rnk} has non-string or empty "
-                        f"string value: {value!r}"
+                        f"Rank {rnk} has non-string or empty string value: {value!r}"
                     )
                     continue
 
