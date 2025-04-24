@@ -1330,6 +1330,7 @@
       "taxon_status": "accepted"
     }
   ],
+  "seq_taxa": [],
   "locations": [
     {
       "name": "VJR_573",
