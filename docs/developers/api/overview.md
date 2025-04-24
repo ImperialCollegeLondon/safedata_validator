@@ -29,3 +29,7 @@ components of the validation process.
   taxonomy databases and build usable local SQLite3 databases from them.
 * The [`zenodo` module](./zenodo.md) is used to communicate with the Zenodo in order to
   create and upload Zenodo deposits.
+* The [`server` module](./server.md) is used to communicate with the metadata server in
+  order to upload dataset metadata.
+* The [`utilities` module](./utilities.md) contains helper functions used across the
+  other modules

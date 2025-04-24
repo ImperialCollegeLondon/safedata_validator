@@ -6,51 +6,98 @@
 
 from __future__ import annotations
 
+from dataclasses import InitVar, dataclass, field
+
 import requests  # type: ignore
 
 from safedata_validator.resources import Resources
-from safedata_validator.zenodo import (
-    ZenodoFunctionResponseType,
-    _resources_to_zenodo_api,
-)
+
+
+@dataclass
+class MetadataResources:
+    """Packaging for Metadata resources.
+
+    This dataclass is used to package the Metadata server specific elements of the
+    configuration.
+    """
+
+    resources: Resources
+    """A safedata_validator resources instance."""
+    api: str = field(init=False)
+    """The configured Zenodo API to be used."""
+    token: dict[str, str] = field(init=False)
+    """A dictionary providing the authentication token for the API."""
+
+    def __post_init__(self) -> None:
+        """Populate the post init attributes."""
+
+        # Get the appropriate API and token
+        self.api = self.resources.metadata.api
+        self.token = {"access_token": self.resources.metadata.token}
+        self.ssl_verify = self.resources.metadata.ssl_verify
+
+
+@dataclass
+class MetadataResponse:
+    """Metadata server response processor.
+
+    This dataclass is a processor around `requests.Response` objects from calls to a
+    metadata server. If the response is successful, it parses the returned data payload;
+    otherwise it formats as much information as possible into an error message.
+    """
+
+    response: InitVar[requests.Response]
+    """The incoming response from a Zenodo API call."""
+    ok: bool = field(init=False)
+    """Was the response ok."""
+    status_code: int = field(init=False)
+    """The status code returned by the response."""
+    json_data: dict = field(init=False, default_factory=lambda: dict())
+    """The JSON data payload from a successful response."""
+    error_message: str | None = field(init=False, default=None)
+    """A formatted error message from a failed response."""
+
+    def __post_init__(self, response: requests.Response) -> None:
+        """Populate the ZenodoResponse object."""
+        # Basic status
+        self.ok = response.ok
+        self.status_code = response.status_code
+        # Now either populate json data or the error message
+        if self.ok:
+            self.json_data = response.json()
+        else:
+            self.error_message = response.text
 
 
 def post_metadata(
-    metadata: dict, zenodo: dict, resources: Resources | None = None
-) -> ZenodoFunctionResponseType:
+    metadata: dict, zenodo: dict, server_resources: MetadataResources
+) -> MetadataResponse:
     """Post the dataset metadata and zenodo metadata to the metadata server.
 
     Args:
         metadata: The dataset metadata dictionary for a dataset
         zenodo: The dataset metadata dictionary for a deposit
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        server_resources: The server resources to be used.
 
     Returns:
-        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
+        See [here][safedata_validator.server.MetadataResources].
     """
 
-    # Get resource configuration
-    zres = _resources_to_zenodo_api(resources)
-
+    # Get payload
     payload = {"metadata": metadata, "zenodo": zenodo}
 
     # post the metadata to the server
-    mtd = requests.post(
-        f"{zres['mdapi']}/post_metadata",
-        params={"token": zres["mdtoken"]},
-        json=payload,
-        verify=zres["mdssl"],
+    return MetadataResponse(
+        requests.post(
+            f"{server_resources.api}/post_metadata",
+            params=server_resources.token,
+            json=payload,
+            verify=server_resources.ssl_verify,
+        )
     )
 
-    # trap errors in uploading metadata and tidy up
-    if mtd.status_code != 201:
-        return {}, mtd.text
-    else:
-        return mtd.json(), None
 
-
-def update_resources(resources: Resources) -> ZenodoFunctionResponseType:
+def update_resources(server_resources: MetadataResources) -> MetadataResponse:
     """Update the resources on the metadata server.
 
     The metadata server provides the gazetteer, location aliases and any project IDs as
@@ -59,34 +106,28 @@ def update_resources(resources: Resources) -> ZenodoFunctionResponseType:
     resources to an API on the server that is used to refresh those reseources.
 
     Args:
-        resources: The safedata_validator resource configuration to be used. If
-            none is provided, the standard locations are checked.
+        server_resources: The server resources to be used.
 
     Returns:
-        See [here][safedata_validator.zenodo.ZenodoFunctionResponseType].
+        See [here][safedata_validator.server.MetadataResources].
     """
-
-    # Get resource configuration
-    zres = _resources_to_zenodo_api(resources)
 
     # Get payload
     files = {
-        "gazetteer": open(resources.gaz_path, "rb"),
-        "location_aliases": open(resources.localias_path, "rb"),
+        "gazetteer": open(server_resources.resources.gaz_path, "rb"),
+        "location_aliases": open(server_resources.resources.localias_path, "rb"),
     }
 
-    if resources.project_database is not None:
-        files["project_database"] = open(resources.project_database, "rb")
+    if server_resources.resources.project_database is not None:
+        files["project_database"] = open(
+            server_resources.resources.project_database, "rb"
+        )
 
     # post the resource files to the server
-    response = requests.post(
-        f"{zres['mdapi']}/update_resources",
-        params={"token": zres["mdtoken"]},
-        files=files,
+    return MetadataResponse(
+        requests.post(
+            f"{server_resources.api}/update_resources",
+            params=server_resources.token,
+            files=files,
+        )
     )
-
-    # Trap errors in uploading resources and tidy up
-    if response.status_code != 201:
-        return {}, response.text
-    else:
-        return {}, None

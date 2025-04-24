@@ -5,8 +5,8 @@ from pathlib import Path
 import simplejson
 
 from safedata_validator.resources import Resources
-from safedata_validator.server import post_metadata
 from safedata_validator.zenodo import (
+    ZenodoResources,
     create_deposit,
     delete_files,
     generate_inspire_xml,
@@ -21,8 +21,10 @@ metadata_path = "Example.json"
 extra_file = "Supplementary_files.zip"
 xml_file = "Example_GEMINI.xml"
 
-# Create a Resources object from a configuration file in a standard location
+# Create a Resources object from a configuration file in a standard location and then
+# get the Zenodo specific resources from that
 resources = Resources()
+zenodo_resources = ZenodoResources(resources=resources)
 
 # Extract the validated dataset metadata
 with open(metadata_path) as md_json:
@@ -30,13 +32,14 @@ with open(metadata_path) as md_json:
 
 # Create a new version of an existing dataset using the record ID of the most recent
 # version
-zenodo_metadata, error = create_deposit(
-    new_version=1143714,
-    resources=resources,
-)
+create_response = create_deposit(new_version=1143714, zen_res=zenodo_resources)
 
-# Monitor the success of individual steps
-all_good = error is None
+# Bail if unsuccessful
+if not create_response.ok:
+    raise RuntimeError(create_response.error_message)
+
+# Extract the Zenodo metadata from the response
+zenodo_metadata = create_response.json_data
 
 # Generate XML
 xml_content = generate_inspire_xml(
@@ -49,37 +52,37 @@ with open(xml_file, "w") as xml_out:
 # them all before uploading the provided versions. Note that the publish_dataset
 # function does this in a much more sophisticated way.
 existing_online_files = [p["key"] for p in zenodo_metadata["files"]]
-if all_good:
-    file_delete_response, error = delete_files(
-        metadata=zenodo_metadata, filenames=existing_online_files, resources=resources
-    )
-    all_good = error is None
+file_delete_response = delete_files(
+    metadata=zenodo_metadata, filenames=existing_online_files, zen_res=zenodo_resources
+)
 
+# Bail if unsuccessful
+if not file_delete_response.ok:
+    raise RuntimeError(file_delete_response.error_message)
 
 # Post the files
 files = [Path(f) for f in (dataset, extra_file, xml_file)]
-if all_good:
-    file_upload_response, error = upload_files(
-        metadata=zenodo_metadata, filepaths=files, resources=resources
-    )
-    all_good = error is None
+file_upload_response = upload_files(
+    zenodo=zenodo_metadata, filepaths=files, zen_res=zenodo_resources
+)
+
+# Bail if unsuccessful
+if not file_upload_response.ok:
+    raise RuntimeError(file_upload_response.error_message)
 
 # Post the metadata
-if all_good:
-    md_upload_response, error = upload_metadata(
-        metadata=data_metadata, zenodo=zenodo_metadata, resources=resources
-    )
-    all_good = error is None
+md_upload_response = upload_metadata(
+    metadata=data_metadata, zenodo=zenodo_metadata, zen_res=zenodo_resources
+)
+
+if not md_upload_response.ok:
+    raise RuntimeError(file_upload_response.error_message)
 
 # Publish the deposit
-if all_good:
-    publish_response, error = publish_deposit(
-        zenodo=zenodo_metadata, resources=resources
-    )
-    all_good = error is None
+publish_response = publish_deposit(zenodo=zenodo_metadata, zen_res=zenodo_resources)
 
-# Post the dataset metadata to the safedata server
-if all_good:
-    response, error = post_metadata(
-        zenodo=zenodo_metadata, metadata=data_metadata, resources=resources
-    )
+if not publish_response.ok:
+    raise RuntimeError(publish_response.error_message)
+
+# Show the new publication
+print(publish_response.json_data["links"]["html"])

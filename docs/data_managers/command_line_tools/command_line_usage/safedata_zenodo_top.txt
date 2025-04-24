@@ -51,8 +51,6 @@ positional arguments:
                 Delete files from an unpublished deposit
     upload_metadata
                 Populate the Zenodo metadata
-    amend_metadata
-                Update published Zenodo metadata
     sync_local_dir
                 Create or update a local safedata directory
     maintain_ris

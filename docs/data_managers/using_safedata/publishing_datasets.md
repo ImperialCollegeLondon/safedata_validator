@@ -16,9 +16,11 @@ optional.
 ## Validating and publishing as a new dataset
 
 The [`safedata_zenodo publish_dataset`
-command](../command_line_tools/safedata_zenodo.md#the-publish_dataset-subcommand) is
-the main function for publishing a dataset. The example below shows it being used to
-publish a dataset and additional external files:
+command](../command_line_tools/safedata_zenodo.md#the-publish_dataset-subcommand) is the
+main function for publishing a dataset. It is important to note that the dataset
+metadata file must be provided first and the dataset file provided second, otherwise the
+publication process will fail. The example below shows it being used to publish a
+dataset and additional external files:
 
 ```sh
 safedata_zenodo publish_dataset Example.json Example.xlsx \
@@ -166,3 +168,17 @@ involved than creating a new dataset because the existing files need to be delet
     include "data_managers/using_safedata/update_script.py"
     %}
     ```
+
+## Amending metadata of published deposits
+
+Once a deposit has been published to Zenodo its metadata cannot be changed using tools
+provided by the `safedata_validator` package.
+
+You can edit the metadata through the Zenodo web interface, but this does mean that the
+Zenodo metadata will no longer match the metadata included in the data files. If you
+need to change the metadata associated with a published deposit, we generally strongly
+recommend uploading a new dataset version with updated metadata.
+
+We would probably make an exception for simply updating the access status of a published
+record, for example to release a dataset from embargo ahead of the scheduled date or to
+remove restrictions from a dataset.

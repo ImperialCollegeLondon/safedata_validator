@@ -19,6 +19,8 @@
     options:
         show_root_heading: True
         header_level: 3
+        members: true
+        filters: ["!__del__"]
 
 ::: safedata_validator.taxa.GBIFError
     options:
@@ -36,7 +38,8 @@
     options:
         show_root_heading: True
         header_level: 3
-        members: True # Nuclear option to get private methods to show.
+        members: true
+        filters: ["!__del__"]
 
 ::: safedata_validator.taxa.NCBIError
     options:

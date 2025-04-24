@@ -1,6 +1,6 @@
 cl_prompt $ safedata_zenodo sync_local_dir -h
 usage: safedata_zenodo sync_local_dir [-h] [--not-just-xlsx]
-                                      [--replace-modified]
+                                      [--replace-modified] [--dry-run]
                                       datadir
 
 Synchronize a local data directory
@@ -31,3 +31,5 @@ options:
   --replace-modified
                 Should locally modified files be overwritten with the archive
                 version
+  --dry-run     Run the synchronisation process without altering the local
+                directory.
