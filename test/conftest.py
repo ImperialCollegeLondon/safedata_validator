@@ -48,6 +48,7 @@ def fixture_files():
         ("bad_ncbi_file", "Test_format_bad_NCBI.xlsx"),
         ("weird_ncbi_file", "Test_format_weird_NCBI.xlsx"),
         ("good_ncbi_file", "Test_format_good_NCBI.xlsx"),
+        ("good_seq_taxa_file", "Test_format_good_Seq.xlsx"),
         ("good_ncbi_file_dataset_json", "Test_format_good_NCBI.json"),
         ("good_ncbi_file_zenodo_json", "zenodo_27557.json"),
     ]
