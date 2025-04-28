@@ -8,12 +8,12 @@ relevant taxon Validator classes (GBIF or NCBI) can be used to update a Taxon ob
 with the result of validation against a local version of the taxon databases
 (`GBIFValidator` and `NCBIValidator`).
 
-Parallel 'Taxa' worksheets (GBIFTaxa and NCBITaxa) are defined, which are used to load
-and collate the set of taxonomic entries from a dataset. These are then collected in a
-higher level Taxa object, which additionally records the names used in the Data
-worksheets. This allows us to check that all defined names are used, all used names are
-defined, and that no names are defined in both Taxa worksheets (if both sheets are
-provided).
+Parallel 'Taxa' worksheets (GBIFTaxa, NCBITaxa and SeqTaxa) are defined, which are used
+to load and collate the set of taxonomic entries from a dataset. These are then
+collected in a higher level Taxa object, which additionally records the names used in
+the Data worksheets. This allows us to check that all defined names are used, all used
+names are defined, and that no names are defined in both Taxa worksheets (if both sheets
+are provided).
 
 Note that we explicitly exclude form and variety from the set of GBIF backbone taxonomic
 levels because they cannot be matched into the backbone hierarchy without extra API
@@ -24,6 +24,7 @@ clade) which can be successfully validated will be recorded. However, associated
 taxa will only be recorded if their ranks are either a GBIF backbone rank or
 superkingdom.
 """  # noqa D415
+# TODO - Rewrite this to talk about sequencing taxa
 
 import dataclasses
 import re
@@ -63,9 +64,12 @@ GBIF_BACKBONE_RANKS = [
     "subspecies",
 ]
 
-# TODO - think about this - do we want to add superkingdom and sub species level?
-SEQ_BACKBONE_RANKS = [
-    "kingdom",
+# Possible top level ranks one of which must be provided
+SEQ_TOP_RANKS = ["domain", "superkingdom", "kingdom"]
+
+# List of additional ranks (in descending order) can be used to describe the taxonomy
+# further
+SEQ_ADDITIONAL_RANKS = [
     "phylum",
     "class",
     "order",
@@ -2001,6 +2005,7 @@ class NCBITaxa:
         return len(self.taxon_names) == 0
 
 
+# TODO - UPDATE THIS DOCSTRING SO IT ACTUALLY DESCRIBES THE CLASS
 class SeqTaxa:
     """Manage a set of taxon data derived from a sequencing workflow.
 
@@ -2081,23 +2086,63 @@ class SeqTaxa:
 
         # Only the name field is indispensible
         if "name" not in headers:
-            LOGGER.error("NCBI taxa sheet is missing the name fields")
+            LOGGER.error("Sequencing taxa sheet is missing the name fields")
             FORMATTER.pop()
             return
 
-        # Check for backbone rank fields
-        missing_ranks = set(SEQ_BACKBONE_RANKS).difference(headers)
-        if missing_ranks:
+        # Check that at least one top-level rank is provided, and that both domain and
+        # superkingdom aren't provided
+        top_ranks = set(SEQ_TOP_RANKS).intersection(headers)
+        if len(top_ranks) == 0:
+            LOGGER.error("At least one top-level taxonomic rank must be provided!")
+            FORMATTER.pop()
+            return
+        elif "domain" in top_ranks and "superkingdom" in top_ranks:
             LOGGER.error(
-                "SeqTaxa missing some taxon rank fields: ",
-                extra={"join": missing_ranks},
+                "Cannot provide both 'domain' and 'superkingdom' as taxonomic ranks!"
             )
             FORMATTER.pop()
             return
 
-        # Now report extra fields
-        # TODO - this is now informational rather than anything about taxonomy.
-        extra_fields = set(headers).difference(headers)
+        # It is acceptable to not provide any additional ranks beyond the top level one.
+        # But if additional ranks are provided there can be no gaps between the lowest
+        # provided rank and the top level ranks
+        lower_ranks = set(SEQ_ADDITIONAL_RANKS).intersection(headers)
+        lowest_rank = next(
+            x for x in reversed(SEQ_ADDITIONAL_RANKS) if x in lower_ranks
+        )
+        if lowest_rank:
+            missing_ranks = set(
+                SEQ_ADDITIONAL_RANKS[: SEQ_ADDITIONAL_RANKS.index(lowest_rank)]
+            ).difference(headers)
+            if missing_ranks:
+                LOGGER.error(
+                    "Need to provide all taxonomic ranks higher than current lowest "
+                    f"rank {lowest_rank} in SeqTaxa, missing ranks are as follows: ",
+                    extra={"join": missing_ranks},
+                )
+                FORMATTER.pop()
+                return
+
+        # List the ranks used in descending order. When only one top rank is provided,
+        # then its just added. If two are provided the second one has to be kingdom and
+        # first rank is filled by the other one.
+        if len(top_ranks) == 1:
+            ordered_ranks = [
+                *top_ranks,
+                *SEQ_ADDITIONAL_RANKS[: SEQ_ADDITIONAL_RANKS.index(lowest_rank)],
+            ]
+        else:
+            ordered_ranks = [
+                *top_ranks.difference("kingdom"),
+                "kingdom",
+                *SEQ_ADDITIONAL_RANKS[: SEQ_ADDITIONAL_RANKS.index(lowest_rank)],
+            ]
+
+        # Now report extra fields (non-backbone ranks and other information)
+        extra_fields = set(headers).difference(
+            [*SEQ_TOP_RANKS, *SEQ_ADDITIONAL_RANKS, "name"]
+        )
         if extra_fields:
             LOGGER.info("Additional fields provided: ", extra={"join": extra_fields})
 
@@ -2155,7 +2200,7 @@ class SeqTaxa:
 
             taxon_rank_tuple: list[tuple[str, str]] = []
 
-            for rnk in SEQ_BACKBONE_RANKS:
+            for rnk in ordered_ranks:
                 # Get the name value associated with the rank
                 value = row[rnk]
 
@@ -2287,7 +2332,7 @@ class SeqTaxa:
 
             required_parents_sorted = [
                 sorted(required_parents_by_rank[rnk], key=lambda x: x[4])  # type: ignore [return-value, arg-type]
-                for rnk in SEQ_BACKBONE_RANKS
+                for rnk in ordered_ranks
                 if rnk in required_parents_by_rank
             ]
             required_parents = [
