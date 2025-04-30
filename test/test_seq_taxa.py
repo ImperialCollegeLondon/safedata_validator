@@ -353,6 +353,75 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 {
                     "data_columns": [
                         ("ASV_100",),
+                        ("Fungi",),
+                        ("Basidiomycota",),
+                        ("Tremellomycetes",),
+                        ("Tremellales",),
+                        ("Trimorphomycetaceae",),
+                        (23,),
+                        ("podzolica",),
+                    ],
+                    "headers": [
+                        "name",
+                        "kingdom",
+                        "phylum",
+                        "class",
+                        "order",
+                        "family",
+                        "genus",
+                        "species",
+                    ],
+                }
+            ),
+            (
+                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Reading bioinformatics taxon data"),
+                (INFO, "Loading row 1: ASV_100"),
+                (ERROR, "Rank genus has non-string or empty string value: 23"),
+                (INFO, "Loaded species: <genus unknown> podzolica"),
+                (INFO, "SeqTaxa contains 1 errors"),
+            ),
+            id="whitespace genus",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("ASV_100",),
+                        ("k__Fungi",),
+                        ("p__Basidiomycota",),
+                        ("c__Tremellomycetes",),
+                        ("o__Tremellales",),
+                        ("f__Trimorphomycetaceae",),
+                        ("g__",),
+                        ("s__podzolica",),
+                    ],
+                    "headers": [
+                        "name",
+                        "kingdom",
+                        "phylum",
+                        "class",
+                        "order",
+                        "family",
+                        "genus",
+                        "species",
+                    ],
+                }
+            ),
+            (
+                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Reading bioinformatics taxon data"),
+                (INFO, "Loading row 1: ASV_100"),
+                (INFO, "Loaded species: <genus unknown> podzolica"),
+                (INFO, "1 taxa loaded correctly"),
+            ),
+            id="g__ genus",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("ASV_100",),
                         ("k__Fungi",),
                         ("p__Basidiomycota",),
                         ("c__Tremellomycetes",),

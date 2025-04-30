@@ -2205,12 +2205,14 @@ class SeqTaxa:
                 # Get the name value associated with the rank
                 value = row[rnk]
 
+                # Genus name is needed to construct the species binomial name. It is set
+                # as unknown until such time as it turns out that a valid name has been
+                # provided (which then overwrites it)
+                if rnk == "genus":
+                    last_genus = "<genus unknown>"
+
                 # Don't copy empty entries
                 if value is None:
-                    # If it's a genus rank that's missing, record this in case the
-                    # species binomial needs to be constructed
-                    if rnk == "genus":
-                        last_genus = "<genus unknown>"
                     continue
 
                 # The value must be an unpadded and not empty string
@@ -2218,10 +2220,6 @@ class SeqTaxa:
                     LOGGER.error(
                         f"Rank {rnk} has non-string or empty string value: {value!r}"
                     )
-                    # If it's a genus rank that's badly formatted, record this in case
-                    # the species binomial needs to be constructed
-                    if rnk == "genus":
-                        last_genus = "<genus unknown>"
                     continue
 
                 # The value must not be padded but processing can continue
@@ -2240,8 +2238,8 @@ class SeqTaxa:
                 # Also remove any additional tags in front of the name, e.g. candidatus
                 value = remove_additional_tags(value)
 
-                # Hang on to the genus and insert it if there is a subsequent species
-                # rank pair.
+                # Genus name is now known to be properly formatted so we overwrite the
+                # "<genus unknown>" placeholder with it
                 if rnk == "genus":
                     last_genus = value
 
