@@ -2108,21 +2108,25 @@ class SeqTaxa:
         # But if additional ranks are provided there can be no gaps between the lowest
         # provided rank and the top level ranks
         lower_ranks = set(SEQ_ADDITIONAL_RANKS).intersection(headers)
-        lowest_rank = next(
-            x for x in reversed(SEQ_ADDITIONAL_RANKS) if x in lower_ranks
+        if lower_ranks:
+            lowest_rank = next(
+                x for x in reversed(SEQ_ADDITIONAL_RANKS) if x in lower_ranks
+            )
+            lowest_rank_index = SEQ_ADDITIONAL_RANKS.index(lowest_rank) + 1
+        else:
+            lowest_rank_index = 0
+
+        missing_ranks = set(SEQ_ADDITIONAL_RANKS[:lowest_rank_index]).difference(
+            headers
         )
-        if lowest_rank:
-            missing_ranks = set(
-                SEQ_ADDITIONAL_RANKS[: SEQ_ADDITIONAL_RANKS.index(lowest_rank)]
-            ).difference(headers)
-            if missing_ranks:
-                LOGGER.error(
-                    "Need to provide all taxonomic ranks higher than current lowest "
-                    f"rank {lowest_rank} in SeqTaxa, missing ranks are as follows: ",
-                    extra={"join": missing_ranks},
-                )
-                FORMATTER.pop()
-                return
+        if missing_ranks:
+            LOGGER.error(
+                "Need to provide all taxonomic ranks higher than current lowest "
+                f"rank ({lowest_rank}) in SeqTaxa, missing ranks are as follows: ",
+                extra={"join": missing_ranks},
+            )
+            FORMATTER.pop()
+            return
 
         # List the ranks used in descending order. When only one top rank is provided,
         # then its just added. If two are provided the second one has to be kingdom and
@@ -2130,13 +2134,13 @@ class SeqTaxa:
         if len(top_ranks) == 1:
             ordered_ranks = [
                 *top_ranks,
-                *SEQ_ADDITIONAL_RANKS[: SEQ_ADDITIONAL_RANKS.index(lowest_rank)],
+                *SEQ_ADDITIONAL_RANKS[:lowest_rank_index],
             ]
         else:
             ordered_ranks = [
-                *top_ranks.difference("kingdom"),
+                *(top_ranks - {"kingdom"}),
                 "kingdom",
-                *SEQ_ADDITIONAL_RANKS[: SEQ_ADDITIONAL_RANKS.index(lowest_rank)],
+                *SEQ_ADDITIONAL_RANKS[:lowest_rank_index],
             ]
 
         # Now report extra fields (non-backbone ranks and other information)
@@ -2203,6 +2207,10 @@ class SeqTaxa:
 
                 # Don't copy empty entries
                 if value is None:
+                    # If it's a genus rank that's missing, record this in case the
+                    # species binomial needs to be constructed
+                    if rnk == "genus":
+                        last_genus = "<genus unknown>"
                     continue
 
                 # The value must be an unpadded and not empty string
@@ -2210,6 +2218,10 @@ class SeqTaxa:
                     LOGGER.error(
                         f"Rank {rnk} has non-string or empty string value: {value!r}"
                     )
+                    # If it's a genus rank that's badly formatted, record this in case
+                    # the species binomial needs to be constructed
+                    if rnk == "genus":
+                        last_genus = "<genus unknown>"
                     continue
 
                 # The value must not be padded but processing can continue
@@ -2229,11 +2241,9 @@ class SeqTaxa:
                 value = remove_additional_tags(value)
 
                 # Hang on to the genus and insert it if there is a subsequent species
-                # rank pair. If the genus is unknown record it as such so that any
-                # species binomial renders sensibly
-                # TODO - This is an area that needs tests
+                # rank pair.
                 if rnk == "genus":
-                    last_genus = value or "<genus unknown>"
+                    last_genus = value
 
                 if rnk == "species":
                     # Log an error if the species name appears to be a binomial
@@ -2242,6 +2252,7 @@ class SeqTaxa:
                             "Provided species name appears to be a binomial (which "
                             f"isn't allowed): {value}"
                         )
+                        break
 
                     value = f"{last_genus} {value}"
 
@@ -2292,9 +2303,9 @@ class SeqTaxa:
         # summary of processing
         self.n_errors = handler.counters["ERROR"] - start_errors
         if self.n_errors is None:
-            LOGGER.critical("NCBITaxa error logging has broken!")
+            LOGGER.critical("SeqTaxa error logging has broken!")
         elif self.n_errors > 0:
-            LOGGER.info(f"NCBITaxa contains {self.n_errors} errors")
+            LOGGER.info(f"SeqTaxa contains {self.n_errors} errors")
         else:
             LOGGER.info(f"{len(self.taxon_names)} taxa loaded correctly")
 
