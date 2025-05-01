@@ -765,6 +765,72 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
             ),
             id="padded taxon",
         ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("ASV_100",),
+                        ("",),
+                        ("Basidiomycota",),
+                        ("Tremellomycetes",),
+                    ],
+                    "headers": ["name", "kingdom", "phylum", "class"],
+                }
+            ),
+            (
+                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Reading bioinformatics taxon data"),
+                (INFO, "Loading row 1: ASV_100"),
+                (ERROR, "Highest taxonomic rank (kingdom) must be populated!"),
+                (INFO, "Failed to load taxon ASV_100"),
+                (INFO, "SeqTaxa contains 1 errors"),
+            ),
+            id="missing kingdom",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("ASV_100",),
+                        ("k__",),
+                        ("Basidiomycota",),
+                        ("Tremellomycetes",),
+                    ],
+                    "headers": ["name", "kingdom", "phylum", "class"],
+                }
+            ),
+            (
+                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Reading bioinformatics taxon data"),
+                (INFO, "Loading row 1: ASV_100"),
+                (ERROR, "Highest taxonomic rank (kingdom) must be populated!"),
+                (INFO, "Failed to load taxon ASV_100"),
+                (INFO, "SeqTaxa contains 1 errors"),
+            ),
+            id="missing kingdom k__ notation",
+        ),
+        pytest.param(
+            DotMap(
+                {
+                    "data_columns": [
+                        ("ASV_100",),
+                        ("",),
+                        ("Fungi",),
+                        ("Basidiomycota",),
+                    ],
+                    "headers": ["name", "superkingdom", "kingdom", "phylum"],
+                }
+            ),
+            (
+                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Reading bioinformatics taxon data"),
+                (INFO, "Loading row 1: ASV_100"),
+                (ERROR, "Highest taxonomic rank (superkingdom) must be populated!"),
+                (INFO, "Failed to load taxon ASV_100"),
+                (INFO, "SeqTaxa contains 1 errors"),
+            ),
+            id="missing superkingdom",
+        ),
     ],
 )
 def test_load_worksheet(
@@ -792,7 +858,7 @@ def test_load_worksheet(
     "example_seq_files, n_errors, n_taxa, t_taxa",
     [
         pytest.param("good", 0, 14, 49, id="good"),
-        pytest.param("bad", 3, 14, 47, id="bad"),
+        pytest.param("bad", 4, 14, 43, id="bad"),
     ],
     indirect=["example_seq_files"],  # take actual params from fixture
 )

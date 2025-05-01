@@ -84,8 +84,8 @@ if you want to use `Crbe` in your data worksheets, rather than typing out
 
         Missing rank entries are generally completely fine, e.g. if you have genera that
         haven't been assigned to a family level no entry has to be provided for the
-        rank. However, an entry for at least one of the top level ranks has to be
-        provided for every row.
+        rank. However, an entry for highest taxonomic rank has to be provided for every
+        row.
 
     Names can be provided in plain text, or alternatively in a commonly used notation,
     where the rank is indicated by a lower case first letter and the name follows after

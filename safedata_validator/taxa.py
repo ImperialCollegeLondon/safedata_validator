@@ -2108,6 +2108,13 @@ class SeqTaxa:
             FORMATTER.pop()
             return
 
+        if "domain" in top_ranks:
+            highest_rank = "domain"
+        elif "superkingdom" in top_ranks:
+            highest_rank = "superkingdom"
+        else:
+            highest_rank = "kingdom"
+
         # It is acceptable to not provide any additional ranks beyond the top level one.
         # But if additional ranks are provided there can be no gaps between the lowest
         # provided rank and the top level ranks
@@ -2137,12 +2144,12 @@ class SeqTaxa:
         # first rank is filled by the other one.
         if len(top_ranks) == 1:
             ordered_ranks = [
-                *top_ranks,
+                highest_rank,
                 *SEQ_ADDITIONAL_RANKS[:lowest_rank_index],
             ]
         else:
             ordered_ranks = [
-                *(top_ranks - {"kingdom"}),
+                highest_rank,
                 "kingdom",
                 *SEQ_ADDITIONAL_RANKS[:lowest_rank_index],
             ]
@@ -2217,7 +2224,13 @@ class SeqTaxa:
 
                 # Don't copy empty entries
                 if value is None:
-                    continue
+                    if rnk == highest_rank:
+                        LOGGER.error(
+                            f"Highest taxonomic rank ({rnk}) must be populated!"
+                        )
+                        break
+                    else:
+                        continue
 
                 # The value must be an unpadded and not empty string
                 if not isinstance(value, str) or value.isspace():
@@ -2237,7 +2250,13 @@ class SeqTaxa:
                 # etc. entries)
                 value = taxa_strip(value, rnk)
                 if value is None:
-                    continue
+                    if rnk == highest_rank:
+                        LOGGER.error(
+                            f"Highest taxonomic rank ({rnk}) must be populated!"
+                        )
+                        break
+                    else:
+                        continue
 
                 # Also remove any additional tags in front of the name, e.g. candidatus
                 value = remove_additional_tags(value)
@@ -2261,9 +2280,12 @@ class SeqTaxa:
                 taxon_rank_tuple.append((rnk, value))
 
             # Add cleaned taxon tuples to list and report
-            cleaned_taxa[worksheet_name] = taxon_rank_tuple
-            leaf = taxon_rank_tuple[-1]
-            LOGGER.info(f"Loaded {leaf[0]}: {leaf[1]}")
+            if taxon_rank_tuple:
+                cleaned_taxa[worksheet_name] = taxon_rank_tuple
+                leaf = taxon_rank_tuple[-1]
+                LOGGER.info(f"Loaded {leaf[0]}: {leaf[1]}")
+            else:
+                LOGGER.info(f"Failed to load taxon {worksheet_name}")
 
             FORMATTER.pop()
 
