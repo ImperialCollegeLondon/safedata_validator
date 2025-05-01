@@ -1,6 +1,10 @@
-"""This module describes classes and methods used to compile taxonomic data from datasets
-and to validate taxonomy against the GBIF backbone database and/or the NCBI taxonomy
-database.
+"""This module describes classes used to compile taxonomic data from datasets.
+
+This taxonomy can be validated against either the GBIF backbone database and/or the NCBI
+taxonomy database. Alternatively, taxonomic information from sequencing can be taken on
+a trust basis, in which case checks are performed to catch badly formatted taxonomy data
+but the provided taxonomy is accepted as is without being checked against a taxonomic
+authority.
 
 The two parallel Taxon dataclasses (GBIFTaxon and NCBITaxon) are used to store data
 about a taxon entry in a dataset. They are initialised with user data and then the
@@ -23,8 +27,7 @@ When validating against the NCBI database supplied taxa of any rank (i.e. strain
 clade) which can be successfully validated will be recorded. However, associated higher
 taxa will only be recorded if their ranks are either a GBIF backbone rank or
 superkingdom.
-"""  # noqa D415
-# TODO - Rewrite this to talk about sequencing taxa
+"""
 
 import dataclasses
 import re
@@ -2005,14 +2008,13 @@ class NCBITaxa:
         return len(self.taxon_names) == 0
 
 
-# TODO - UPDATE THIS DOCSTRING SO IT ACTUALLY DESCRIBES THE CLASS
 class SeqTaxa:
     """Manage a set of taxon data derived from a sequencing workflow.
 
-    This is a prototype class to manage the generation of a taxon index from taxon
-    tables generated through bioinformatics pipelines. It is a high-trust taxon table
-    implementation that accepts a typically machine-generated taxon table and simply
-    compiles a taxon hierarchy from the table.
+    This class to manage the generation of a taxon index from taxon tables generated
+    through bioinformatics pipelines. It is a high-trust taxon table implementation that
+    accepts a typically machine-generated taxon table and simply compiles a taxon
+    hierarchy from the table.
 
     i)  the taxon_names attribute of the dataset, which is just a set of
         names used as a validation list for taxon names used in data worksheets.
@@ -2020,14 +2022,16 @@ class SeqTaxa:
         of lists structured as:
 
             [worksheet_name (str),
-            ncbi_id (int),
-            ncbi_parent_id (int),
+            taxon_id (int),
+            parent_id (int),
             canonical_name (str),
             taxonomic_rank (str),
             ncbi_status (str)]
 
-    TODO - we have no persistent ID codes for this taxonomy parsing - currently using
-           arbitrary per dataset integer codes.
+    Each taxon is assigned an arbitrary (negative) ID number. These are needed so that
+    the taxon index follows the same format as for the GBIF validated case. These ID
+    numbers are all negative so as to prevent any possible confusion with GBIF ID
+    numbers, which refer to actual entries in the GBIF taxonomy database.
 
     The index can then be used:
 
