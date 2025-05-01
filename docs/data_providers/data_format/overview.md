@@ -20,7 +20,10 @@ typically contain at least four worksheets.
 - [**GBIFTaxa**](gbif_taxa.md): This describes taxa used in the Data worksheets, using
   the GBIF taxonomy backbone as a reference. This is best for observational data.
 - [**NCBITaxa**](ncbi_taxa.md): This describes taxa used in the Data worksheets, using
-  the NCBI taxonomy database as a reference. This is best for sequencing data.
+  the NCBI taxonomy database as a reference.
+- [**SeqTaxa**](sequenced_taxa.md): This describes taxa used in the Data worksheets,
+  this intended for machine-generated taxonomy and is validated in a high trust manner.
+  This should only be used for sequencing data.
 - [**Locations**](locations.md): This describes all the sampling locations used in the
   dataset.
 - [**Data worksheets**](data.md): After these worksheets come your data tables. You
@@ -29,9 +32,10 @@ typically contain at least four worksheets.
   like in a single dataset: we don't want you to spend time rearranging your data and
   are happy just to take the data in the natural tables you already use.
 
-The Summary, GBIFTaxa, NCBITaxa and Locations worksheet names should not be used for
-data worksheets. The Summary table **must** be present, but the GBIFTaxa, NCBITaxa and
-Locations can be ommitted if datasets do not contain taxonomic or location data.
+The Summary, GBIFTaxa, NCBITaxa, SeqTaxa and Locations worksheet names should not be
+used for data worksheets. The Summary table **must** be present, but the GBIFTaxa,
+NCBITaxa, SeqTaxa and Locations can be ommitted if datasets do not contain taxonomic or
+location data.
 
 ### File naming
 
