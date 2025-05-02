@@ -192,38 +192,6 @@ def test_taxon_init_errors(test_input, raises, message):
 
 
 # ------------------------------------------
-# Testing taxa_strip
-# ------------------------------------------
-# Only need to test that output is sensible here
-@pytest.mark.parametrize(
-    "test_input,exp_name,exp_log",
-    [
-        (dict(name="Bacteria", rank="Kingdom"), "Bacteria", ()),
-        (dict(name="k__Bacteria", rank="Kingdom"), "Bacteria", ()),
-        (
-            dict(name="k__Bacteria", rank="Phylum"),
-            "Bacteria",
-            ((ERROR, "Prefix of taxon k__Bacteria inconsistent with rank Phylum"),),
-        ),
-        (dict(name="p__Acidobacteria", rank="Phylum"), "Acidobacteria", ()),
-        (dict(name="s__", rank="Species"), None, ()),
-    ],
-)
-def test_taxa_strip(caplog, test_input, exp_name, exp_log):
-    """Checks that the function to remove k__ type notation is functioning properly.
-
-    This function also checks that the supplied rank matches the rank implied by the
-    notation.
-    """
-
-    s_taxa = taxa.taxa_strip(**test_input)
-
-    assert s_taxa == exp_name
-
-    log_check(caplog, exp_log)
-
-
-# ------------------------------------------
 # Testing construct_bi_or_tri
 # ------------------------------------------
 @pytest.mark.parametrize(

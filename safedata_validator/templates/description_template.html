@@ -120,11 +120,10 @@
   </ul>
 
   <!-- Conditional display of taxonomic information -->
-  {% if gbif_taxa or ncbi_taxa %}
+  {% if gbif_taxa or ncbi_taxa or seq_taxa%}
   <h1>Taxonomic coverage</h1>
 
-  <p>This dataset contains data associated with taxa and these have been validated
-    against appropriate taxonomic authority databases.
+  <p>This dataset contains data associated with taxa.
   </p>
   {% if gbif_taxa %}
   <h2>GBIF taxa details</h2>
@@ -150,6 +149,17 @@
     accompanied by an message stating their rank.
   </p>
   {{ ncbi_taxa }}
+  {% endif %}
+
+  {% if seq_taxa %}
+  <h2>Bioinformatics taxonomy details</h2>
+
+  <p>The dataset contains taxa that were identified as part of a bioinformatics
+    workkflow. The taxa listed in the dataset are compiled to provide the taxonomic
+    summary shown below. These taxa are not independently validated as they have been
+    generated using established reference databases.
+  </p>
+  {{ seq_taxa }}
   {% endif %}
 
   {% endif %}

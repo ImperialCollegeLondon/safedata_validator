@@ -48,6 +48,8 @@ def fixture_files():
         ("bad_ncbi_file", "Test_format_bad_NCBI.xlsx"),
         ("weird_ncbi_file", "Test_format_weird_NCBI.xlsx"),
         ("good_ncbi_file", "Test_format_good_NCBI.xlsx"),
+        ("good_seq_taxa_file", "Test_format_good_Seq.xlsx"),
+        ("bad_seq_taxa_file", "Test_format_bad_Seq.xlsx"),
         ("good_ncbi_file_dataset_json", "Test_format_good_NCBI.json"),
         ("good_ncbi_file_zenodo_json", "zenodo_27557.json"),
     ]
@@ -308,6 +310,23 @@ def example_ncbi_files(config_filesystem, request):
         return wb
     elif request.param == "weird":
         wb = openpyxl.load_workbook(FIXTURE_FILES.rf.weird_ncbi_file, read_only=True)
+        return wb
+
+
+@pytest.fixture()
+def example_seq_files(config_filesystem, request):
+    """Fixture providing additional excel files with Seq taxa details for testing.
+
+    This uses indirect parameterisation, to allow the shared fixture to be paired with
+    request specific expectations rather than all pair combinations. This is an
+    equivalent function to example_excel_files but for the sequencing taxa specific
+    excel files.
+    """
+    if request.param == "good":
+        wb = openpyxl.load_workbook(FIXTURE_FILES.rf.good_seq_taxa_file, read_only=True)
+        return wb
+    elif request.param == "bad":
+        wb = openpyxl.load_workbook(FIXTURE_FILES.rf.bad_seq_taxa_file, read_only=True)
         return wb
 
 

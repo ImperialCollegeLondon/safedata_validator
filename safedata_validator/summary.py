@@ -715,7 +715,14 @@ class Summary:
 
         # 1. Strip out faulty inclusion of standard worksheets
         cited_sheets = {ws["name"] for ws in data_worksheets}
-        standard_sheets = {"Summary", "GBIFTaxa", "NCBITaxa", "Taxa", "Locations"}
+        standard_sheets = {
+            "Summary",
+            "GBIFTaxa",
+            "NCBITaxa",
+            "Taxa",
+            "SeqTaxa",
+            "Locations",
+        }
         cited_standard_sheets = cited_sheets.intersection(standard_sheets)
 
         if cited_standard_sheets:

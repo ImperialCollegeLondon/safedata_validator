@@ -1,6 +1,10 @@
-"""This module describes classes and methods used to compile taxonomic data from datasets
-and to validate taxonomy against the GBIF backbone database and/or the NCBI taxonomy
-database.
+"""This module describes classes used to compile taxonomic data from datasets.
+
+This taxonomy can be validated against either the GBIF backbone database and/or the NCBI
+taxonomy database. Alternatively, taxonomic information from sequencing can be taken on
+a trust basis, in which case checks are performed to catch badly formatted taxonomy data
+but the provided taxonomy is accepted as is without being checked against a taxonomic
+authority.
 
 The two parallel Taxon dataclasses (GBIFTaxon and NCBITaxon) are used to store data
 about a taxon entry in a dataset. They are initialised with user data and then the
@@ -8,12 +12,12 @@ relevant taxon Validator classes (GBIF or NCBI) can be used to update a Taxon ob
 with the result of validation against a local version of the taxon databases
 (`GBIFValidator` and `NCBIValidator`).
 
-Parallel 'Taxa' worksheets (GBIFTaxa and NCBITaxa) are defined, which are used to load
-and collate the set of taxonomic entries from a dataset. These are then collected in a
-higher level Taxa object, which additionally records the names used in the Data
-worksheets. This allows us to check that all defined names are used, all used names are
-defined, and that no names are defined in both Taxa worksheets (if both sheets are
-provided).
+Parallel 'Taxa' worksheets (GBIFTaxa, NCBITaxa and SeqTaxa) are defined, which are used
+to load and collate the set of taxonomic entries from a dataset. These are then
+collected in a higher level Taxa object, which additionally records the names used in
+the Data worksheets. This allows us to check that all defined names are used, all used
+names are defined, and that no names are defined in both Taxa worksheets (if both sheets
+are provided).
 
 Note that we explicitly exclude form and variety from the set of GBIF backbone taxonomic
 levels because they cannot be matched into the backbone hierarchy without extra API
@@ -23,7 +27,7 @@ When validating against the NCBI database supplied taxa of any rank (i.e. strain
 clade) which can be successfully validated will be recorded. However, associated higher
 taxa will only be recorded if their ranks are either a GBIF backbone rank or
 superkingdom.
-"""  # noqa D415
+"""
 
 import dataclasses
 import re
@@ -61,6 +65,20 @@ GBIF_BACKBONE_RANKS = [
     "genus",
     "species",
     "subspecies",
+]
+
+# Possible top level ranks one of which must be provided
+SEQ_TOP_RANKS = ["domain", "superkingdom", "kingdom"]
+
+# List of additional ranks (in descending order) can be used to describe the taxonomy
+# further
+SEQ_ADDITIONAL_RANKS = [
+    "phylum",
+    "class",
+    "order",
+    "family",
+    "genus",
+    "species",
 ]
 
 # Extended version of backbone ranks to capture superkingdoms
@@ -1990,27 +2008,358 @@ class NCBITaxa:
         return len(self.taxon_names) == 0
 
 
-class Taxa:
-    """Manage combined NCBITaxa and GBIFTaxa instances.
+class SeqTaxa:
+    """Manage a set of taxon data derived from a sequencing workflow.
 
-    This class wraps parallel instances of GBIFTaxa and NCBITaxa and provides shared
-    properties across the two instances.
+    This class to manage the generation of a taxon index from taxon tables generated
+    through bioinformatics pipelines. It is a high-trust taxon table implementation that
+    accepts a typically machine-generated taxon table and simply compiles a taxon
+    hierarchy from the table.
+
+    i)  the taxon_names attribute of the dataset, which is just a set of
+        names used as a validation list for taxon names used in data worksheets.
+    ii) the taxon_index attribute of the dataset, which contains a set
+        of lists structured as:
+
+            [worksheet_name (str),
+            taxon_id (int),
+            parent_id (int),
+            canonical_name (str),
+            taxonomic_rank (str),
+            ncbi_status (str)]
+
+    Each taxon is assigned an arbitrary (negative) ID number. These are needed so that
+    the taxon index follows the same format as for the GBIF validated case. These ID
+    numbers are all negative so as to prevent any possible confusion with GBIF ID
+    numbers, which refer to actual entries in the GBIF taxonomy database.
+
+    The index can then be used:
+
+    a) to generate the taxonomic coverage section of the dataset description, and
+    b) to populate a database table to index the taxonomic coverage of datasets.
+
+    Args:
+        resources: A Resources instance.
+
+    Attributes:
+        taxon_index: A list containing taxon index lists
+        taxon_names: A set of worksheet names
+        hierarchy: A set of lists containing the complete taxonomic hierarchy for taxa
+            in the GBIFTaxa instance.
+        taxon_names_used: A set used to track which taxon names have been used in data
+            worksheets
+    """
+
+    def __init__(self, resources: Resources) -> None:
+        self.taxon_index: list[tuple] = []
+        self.taxon_names: set[str] = set()
+        self.hierarchy: set[tuple] = set()
+        self.n_errors: int = 0
+
+    @loggerinfo_push_pop("Loading SeqTaxa worksheet")
+    def load(self, worksheet: worksheet) -> None:
+        """Populate an SeqTaxa instance from an Excel worksheet.
+
+        This method loads a set of taxa from the rows of a `safedata` formatted SeqTaxa
+        worksheet and populates the taxonomic hierarchy for those rows.
+
+        Args:
+            worksheet: An openpyxl worksheet instance using the SeqTaxa formatting
+        """
+        handler = get_handler()
+        start_errors = handler.counters["ERROR"]
+
+        # Get the data read in, handling header issues like whitespace padding
+        LOGGER.info("Reading bioinformatics taxon data")
+        FORMATTER.push()
+        dframe = GetDataFrame(worksheet)
+
+        if not dframe.data_columns:
+            LOGGER.error("No data or only headers in Taxa worksheet")
+            FORMATTER.pop()
+            return
+
+        # Dupe headers likely cause serious issues, so stop
+        if "duplicated" in dframe.bad_headers:
+            LOGGER.error("Cannot parse taxa with duplicated headers")
+            FORMATTER.pop()
+            return
+
+        # Get the headers
+        headers = IsLower(dframe.headers).values
+
+        # Only the name field is indispensible
+        if "name" not in headers:
+            LOGGER.error("Sequencing taxa sheet is missing the name fields")
+            FORMATTER.pop()
+            return
+
+        # Check that at least one top-level rank is provided, and that both domain and
+        # superkingdom aren't provided
+        top_ranks = set(SEQ_TOP_RANKS).intersection(headers)
+        if len(top_ranks) == 0:
+            LOGGER.error("At least one top-level taxonomic rank must be provided!")
+            FORMATTER.pop()
+            return
+        elif "domain" in top_ranks and "superkingdom" in top_ranks:
+            LOGGER.error(
+                "Cannot provide both 'domain' and 'superkingdom' as taxonomic ranks!"
+            )
+            FORMATTER.pop()
+            return
+
+        if "domain" in top_ranks:
+            highest_rank = "domain"
+        elif "superkingdom" in top_ranks:
+            highest_rank = "superkingdom"
+        else:
+            highest_rank = "kingdom"
+
+        # It is acceptable to not provide any additional ranks beyond the top level one.
+        # But if additional ranks are provided there can be no gaps between the lowest
+        # provided rank and the top level ranks
+        lower_ranks = set(SEQ_ADDITIONAL_RANKS).intersection(headers)
+        if lower_ranks:
+            lowest_rank = next(
+                x for x in reversed(SEQ_ADDITIONAL_RANKS) if x in lower_ranks
+            )
+            lowest_rank_index = SEQ_ADDITIONAL_RANKS.index(lowest_rank) + 1
+        else:
+            lowest_rank_index = 0
+
+        missing_ranks = set(SEQ_ADDITIONAL_RANKS[:lowest_rank_index]).difference(
+            headers
+        )
+        if missing_ranks:
+            LOGGER.error(
+                "Need to provide all taxonomic ranks higher than current lowest "
+                f"rank ({lowest_rank}) in SeqTaxa, missing ranks are as follows: ",
+                extra={"join": missing_ranks},
+            )
+            FORMATTER.pop()
+            return
+
+        # List the ranks used in descending order. When only one top rank is provided,
+        # then its just added. If two are provided the second one has to be kingdom and
+        # first rank is filled by the other one.
+        if len(top_ranks) == 1:
+            ordered_ranks = [
+                highest_rank,
+                *SEQ_ADDITIONAL_RANKS[:lowest_rank_index],
+            ]
+        else:
+            ordered_ranks = [
+                highest_rank,
+                "kingdom",
+                *SEQ_ADDITIONAL_RANKS[:lowest_rank_index],
+            ]
+
+        # Now report extra fields (non-backbone ranks and other information)
+        extra_fields = set(headers).difference(
+            [*SEQ_TOP_RANKS, *SEQ_ADDITIONAL_RANKS, "name"]
+        )
+        if extra_fields:
+            LOGGER.info("Additional fields provided: ", extra={"join": extra_fields})
+
+        # Get dictionaries of the taxa
+        taxa = [dict(zip(headers, rw)) for rw in zip(*dframe.data_columns)]
+        FORMATTER.pop()
+
+        # check number of taxa found
+        if len(taxa) == 0:
+            LOGGER.info("No taxon rows found")
+            return
+
+        # Store cleaned information as lists of taxon tuple - this is used to provide a
+        # clean indexing system to build internally consistent parent child taxon ids
+        # for the table.
+        cleaned_taxa = {}
+
+        # Clean and validate each taxon row
+        for idx, row in enumerate(taxa):
+            # Start validating the row
+            LOGGER.info(f"Loading row {idx + 1}: {row['name']}")
+            FORMATTER.push()
+
+            # Get the worksheet row name
+            worksheet_name = row["name"]
+
+            if not isinstance(worksheet_name, str):
+                LOGGER.error(f"Worksheet name is not a string: {worksheet_name!r}")
+                worksheet_name = str(worksheet_name)
+            else:
+                worksheet_name_strip = worksheet_name.strip()
+                if worksheet_name != worksheet_name_strip:
+                    LOGGER.error(
+                        f"Worksheet name has whitespace padding: {worksheet_name!r}"
+                    )
+                    worksheet_name = worksheet_name_strip
+
+            self.taxon_names.add(worksheet_name)
+
+            # Standardise blank and NA values to None
+            row = {
+                ky: None if blank_value(vl) or vl == "NA" else vl
+                for ky, vl in row.items()
+            }
+
+            # Loop over rank fields to populate a cleaned taxon hierarchy:
+            # - Tackle in taxonomic order by iterating over required ranks
+            # - Drop empty entries
+            # - Validate non-empty entries as unpadded strings
+            # - Strip any NCBI k__ notation to match entries in names.names_txt db
+            #   field. Runs from root, so cleans genus, species, subspecies.
+
+            taxon_rank_tuple: list[tuple[str, str]] = []
+
+            for rnk in ordered_ranks:
+                # Get the name value associated with the rank
+                value = row[rnk]
+
+                # Genus name is needed to construct the species binomial name. It is set
+                # as unknown until such time as it turns out that a valid name has been
+                # provided (which then overwrites it)
+                if rnk == "genus":
+                    last_genus = "<genus unknown>"
+
+                # Don't copy empty entries
+                if value is None:
+                    if rnk == highest_rank:
+                        LOGGER.error(
+                            f"Highest taxonomic rank ({rnk}) must be populated!"
+                        )
+                        break
+                    else:
+                        continue
+
+                # The value must be an unpadded and not empty string
+                if not isinstance(value, str) or value.isspace():
+                    LOGGER.error(
+                        f"Rank {rnk} has non-string or empty string value: {value!r}"
+                    )
+                    continue
+
+                # The value must not be padded but processing can continue
+                value_stripped = value.strip()
+                if value != value_stripped:
+                    LOGGER.error(f"Rank {rnk} has whitespace padding: {value!r}")
+                    value = value_stripped
+
+                # Strip k__ notation to provide clean name_txt search input - dropping
+                # levels no taxonomic information is associated with the annotation (s__
+                # etc. entries)
+                value = taxa_strip(value, rnk)
+                if value is None:
+                    if rnk == highest_rank:
+                        LOGGER.error(
+                            f"Highest taxonomic rank ({rnk}) must be populated!"
+                        )
+                        break
+                    else:
+                        continue
+
+                # Also remove any additional tags in front of the name, e.g. candidatus
+                value = remove_additional_tags(value)
+
+                # Genus name is now known to be properly formatted so we overwrite the
+                # "<genus unknown>" placeholder with it
+                if rnk == "genus":
+                    last_genus = value
+
+                if rnk == "species":
+                    # Log an error if the species name appears to be a binomial
+                    if len(value.split()) > 1:
+                        LOGGER.error(
+                            "Provided species name appears to be a binomial (which "
+                            f"isn't allowed): {value}"
+                        )
+                        break
+
+                    value = f"{last_genus} {value}"
+
+                taxon_rank_tuple.append((rnk, value))
+
+            # Add cleaned taxon tuples to list and report
+            if taxon_rank_tuple:
+                cleaned_taxa[worksheet_name] = taxon_rank_tuple
+                leaf = taxon_rank_tuple[-1]
+                LOGGER.info(f"Loaded {leaf[0]}: {leaf[1]}")
+            else:
+                LOGGER.info(f"Failed to load taxon {worksheet_name}")
+
+            FORMATTER.pop()
+
+        # Build the taxon index
+
+        # Assign an negative arbitrary ID number to each unique pair of taxon rank and
+        # name across the dataset. Negative numbers are used so that they cannot be
+        # confused with the real ID numbers used in the GBIF case
+        all_ranks = set([rank_pair for tx in cleaned_taxa.values() for rank_pair in tx])
+        all_ranks_index = {
+            rank_pair: val
+            for val, rank_pair in zip(range(-1, -len(all_ranks) - 1, -1), all_ranks)
+        }
+
+        unique_taxa: set[tuple[None, int, int | None, str, str, str]] = set()
+
+        for ws_name, taxon_details in cleaned_taxa.items():
+            # Add taxa from the root to the tip, maintaining the chain of internal
+            # ID values, and using the None index to represent the root node.
+            lower_index = None
+            for taxon_pair in taxon_details:
+                this_index = all_ranks_index[taxon_pair]
+                unique_taxa.add(
+                    (
+                        None,
+                        this_index,
+                        lower_index,
+                        taxon_pair[1],
+                        taxon_pair[0],
+                        "loaded",
+                    )
+                )
+                lower_index = this_index
+
+            self.taxon_index = list(unique_taxa)
+
+        FORMATTER.pop()
+
+        # summary of processing
+        self.n_errors = handler.counters["ERROR"] - start_errors
+        if self.n_errors is None:
+            LOGGER.critical("SeqTaxa error logging has broken!")
+        elif self.n_errors > 0:
+            LOGGER.info(f"SeqTaxa contains {self.n_errors} errors")
+        else:
+            LOGGER.info(f"{len(self.taxon_names)} taxa loaded correctly")
+
+        FORMATTER.pop()
+
+    @property
+    def is_empty(self) -> bool:
+        """Check if an NCBITaxa instance contains any taxa."""
+        return len(self.taxon_names) == 0
+
+
+class Taxa:
+    """Manage combined taxon sheet instances.
+
+    This class wraps taxon sheets and provides shared properties across the instances
 
     Args:
         resources: A Resources instance
 
 
-    We are interested in checking that no worksheet
-    names are reused when both Taxa sheets are provided, that every worksheet
-    name is used somewhere in the Data worksheets, and that every taxon name
-    used across the Data worksheets is defined in a Taxa worksheet.
+    We are interested in checking that:
+    * no worksheet names are reused when more than one taxon sheet are provided,
+    * every worksheet name is used somewhere in the Data worksheets, and
+    * every taxon name used across the Data worksheets is defined in a Taxa worksheet.
 
-    This overarching class stores instances of the two lower level classes
-    (GBIFTaxa, NCBITaxa). It can also store (as `taxon_names_used`) the set
-    of all names used across the Data worksheets. The property `is_empty` can
-    be used to check whether both of the lower level classes are empty, and
-    the property `taxon_names` can be used to find the set of all taxon names
-    defined in either GBIFTaxa or NCBITaxa. Finally, the property `repeat_names`
+    This overarching class stores instances of the lower level taxon sheet handler
+    classes. It can also store (as `taxon_names_used`) the set of all names used across
+    Data worksheets. The property `is_empty` can be used to check whether lower level
+    classes are empty, and the property `taxon_names` can be used to find the set of all
+    taxon names defined across taxon handlers. Finally, the property `repeat_names`
     can be used to find if any names are used in both GBIFTaxa and NCBITaxa
     worksheets.
     """
@@ -2018,22 +2367,49 @@ class Taxa:
     def __init__(self, resources: Resources):
         self.gbif_taxa = GBIFTaxa(resources)
         self.ncbi_taxa = NCBITaxa(resources)
+        self.seq_taxa = SeqTaxa(resources)
         self.taxon_names_used: set[str] = set()
 
     @property
     def is_empty(self) -> bool:
         """Reports if neither GBIF nor NCBI taxa any taxa loaded."""
-        return self.gbif_taxa.is_empty and self.ncbi_taxa.is_empty
+        return (
+            self.gbif_taxa.is_empty
+            and self.ncbi_taxa.is_empty
+            and self.seq_taxa.is_empty
+        )
 
     @property
     def taxon_names(self) -> set[str]:
-        """Provides loaded taxon names from both NCBI and GBIF taxa."""
-        return self.gbif_taxa.taxon_names.union(self.ncbi_taxa.taxon_names)
+        """Provides loaded taxon names from all taxon handlers."""
+        return set(
+            [
+                *self.gbif_taxa.taxon_names,
+                *self.ncbi_taxa.taxon_names,
+                *self.seq_taxa.taxon_names,
+            ]
+        )
 
     @property
     def repeat_names(self) -> set[str]:
-        """Reports taxon names duplicated between NCBI and GBIF taxa."""
-        return self.gbif_taxa.taxon_names.intersection(self.ncbi_taxa.taxon_names)
+        """Reports taxon names duplicated between taxon handlers."""
+
+        seen = set()
+        duplicated = set()
+
+        all_names = [
+            *self.gbif_taxa.taxon_names,
+            *self.ncbi_taxa.taxon_names,
+            *self.seq_taxa.taxon_names,
+        ]
+
+        for this_name in all_names:
+            if this_name not in seen:
+                seen.add(this_name)
+            else:
+                duplicated.add(this_name)
+
+        return duplicated
 
 
 def taxon_index_to_text(
@@ -2324,3 +2700,29 @@ def construct_bi_or_tri(higher_nm: str, lower_nm: str, tri: bool) -> str:
         raise ValueError(msg)
 
     return value
+
+
+def remove_additional_tags(taxon_name: str) -> str:
+    """Remove additional tags from taxon names.
+
+    Reference taxonomy databases sometimes attach additional tags in front of taxon
+    names (e.g. 'candidatus' to indicate that a taxon has never been cultured). We do
+    not want to clog up our taxon names with these tags, so this function removes them.
+    It does this by checking if the provided taxon name starts with a known tag of this
+    type and removing it if so.
+
+    Args:
+        taxon_name: The name provided for the taxon.
+
+    Returns:
+        The taxon name with additional tags stripped out.
+    """
+
+    known_tags = ["candidatus"]
+
+    if len(taxon_name.split()) >= 1 and any(
+        taxon_name.lower().startswith(tag) for tag in known_tags
+    ):
+        return " ".join(taxon_name.split()[1:])
+    else:
+        return taxon_name
