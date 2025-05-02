@@ -21,9 +21,7 @@ typically contain at least four worksheets.
   the GBIF taxonomy backbone as a reference. This is best for observational data.
 - [**NCBITaxa**](ncbi_taxa.md): This describes taxa used in the Data worksheets, using
   the NCBI taxonomy database as a reference.
-- [**SeqTaxa**](sequenced_taxa.md): This describes taxa used in the Data worksheets,
-  this intended for machine-generated taxonomy and is validated in a high trust manner.
-  This should only be used for sequencing data.
+- [**SeqTaxa**](sequenced_taxa.md): In many cases, taxa are identified by sequence matching against sequence databases (e.g. NCBI). In theory, `safedata_validator` could validate taxon ids against the underlying databases in the same way that it does using GBIF for visually identified taxa. However there are many databases and they are frequently updated. Instead, a SeqTaxa sheet can be used to provide a table of taxonomic ranks for matched sequences: this is a common export format from bioinformatics workflows and allows `safedata_validator` to provide an hierarchical taxon index for these taxa. This sheet should only be used for sequenced taxa and no validation is carried out beyond the formatting of the table.
 - [**Locations**](locations.md): This describes all the sampling locations used in the
   dataset.
 - [**Data worksheets**](data.md): After these worksheets come your data tables. You
