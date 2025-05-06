@@ -38,9 +38,9 @@ basic overview is:
 - [x] Create a `safedata_validator` configuration file, which is used by the package and
    command line tools to locate required resources and settings.
 
-- [x] Use the `safedata_build_local_gbif` and `safedata_build_local_ncbi` command line
-   tools to create local taxonomic validation databases and add the locations of these
-   files to the configuration.
+- [x] Use the `safedata_build_local_gbif`  command line tool to create  a local
+   taxonomic validation database and add the locations of this file to the
+   configuration.
 
 - [x] Create a GeoJSON gazetteer for your project, defining named locations to be used
    across datasets, and add the location of the gazetteer file to the configuration.

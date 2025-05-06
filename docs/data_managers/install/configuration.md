@@ -11,7 +11,6 @@ below:
 
 ```ini
 gbif_database = /path/to/local/backbone.sqlite3
-ncbi_database = /path/to/local/ncbi_database.sqlite3
 gazetteer = /path/to/gazeteer.geojson
 location_aliases = /path/to/location_aliases.csv
 project_database = /path/to/project_database.csv
@@ -134,11 +133,6 @@ provided to validate datasets.
 
 : This element provides the path to the [local GBIF backbone
   database](build_local_gbif.md) to be used in this configuration.
-
-**The `ncbi_database` element**
-
-: This element provides the path to the [local NCBI backbone
-  database](build_local_ncbi.md) to be used in this configuration.
 
 **The `gazetteer` and `location_aliases` elements**
 

@@ -9,9 +9,10 @@ components of the validation process.
   gazetteer and providing a Locations class to be used in validation of the
   [Locations datasheet](../../data_providers/data_format/locations.md).
 * Similarly, the [`taxa` module](./taxa.md) handles the creation of taxonomic validation
-  classes, using local databases to check the contents of the
-  [GBIF](../../data_providers/data_format/gbif_taxa.md) and
-  [NCBI](../../data_providers/data_format/ncbi_taxa.md) data worksheets.
+  classes, using a local database to check the contents of the
+  [GBIF](../../data_providers/data_format/gbif_taxa.md) taxa worksheet and checking that
+  any [sequencing data](../../data_providers/data_format/sequenced_taxa.md) is provided
+  in a searchable format.
 * The [`field` module](./field.md) contains all of the code for reading and validating
   data worksheets, along with the main Dataset class used to load and validate entire
   dataset files.
@@ -25,8 +26,8 @@ components of the validation process.
   process. Logging is a core component of the system, because the validation process is
   written to work through the whole file, logging issues as it goes, rather than exiting
   at the first problem.
-* The [`taxondb` module](./taxondb.md) is used to download copies of the GBIF and NCBI
-  taxonomy databases and build usable local SQLite3 databases from them.
+* The [`taxondb` module](./taxondb.md) is used to download copies of the GBIF taxonomy
+  database and build usable local SQLite3 databases from them.
 * The [`zenodo` module](./zenodo.md) is used to communicate with the Zenodo in order to
   create and upload Zenodo deposits.
 * The [`server` module](./server.md) is used to communicate with the metadata server in

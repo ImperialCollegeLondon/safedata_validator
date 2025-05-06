@@ -5,12 +5,9 @@ TODO - This needs to change once multiple SeqTaxa sheets are supported
 Many datasets will involve data taken from organisms, whether that is a count of the
 number of individuals or measurement of a trait such as body length. In order to help us
 keep track of taxa, all datasets using taxa **must** contain a Taxa spreadsheet,
-providing taxonomic information. There are three kinds:
+providing taxonomic information. There are two kinds:
 
 * A [GBIFTaxa worksheet](gbif_taxa.md), which is typically used for observational data
-* A [NCBITaxa worksheet](ncbi_taxa.md), which is used for data that has been obtained
-  from genetic sequencing which very often cannot be easily mapped onto the GBIF taxonomic
-  backbone.
 * A [SeqTaxa worksheet](sequenced_taxa.md), which is used for data that has been
   obtained from genetic sequencing, the taxonomies of which can be generated from a wide
   variety of reference taxonomy databases

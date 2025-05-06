@@ -27,25 +27,6 @@
         show_root_heading: True
         header_level: 3
 
-## NCBI Validation
-
-::: safedata_validator.taxa.NCBITaxon
-    options:
-        show_root_heading: True
-        header_level: 3
-
-::: safedata_validator.taxa.NCBIValidator
-    options:
-        show_root_heading: True
-        header_level: 3
-        members: true
-        filters: ["!__del__"]
-
-::: safedata_validator.taxa.NCBIError
-    options:
-        show_root_heading: True
-        header_level: 3
-
 ## Taxon worksheet classes
 
 ::: safedata_validator.taxa.GBIFTaxa
@@ -53,7 +34,7 @@
         show_root_heading: True
         header_level: 3
 
-::: safedata_validator.taxa.NCBITaxa
+::: safedata_validator.taxa.SeqTaxa
     options:
         show_root_heading: True
         header_level: 3

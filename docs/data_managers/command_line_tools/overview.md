@@ -1,9 +1,8 @@
 # Command line tools overview
 
 The `safedata_validator` package provides three main command line tools, but see also
-the installation documentation for tools to build local copies of the
-[GBIF](../install/build_local_gbif.md) and [NCBI](../install/build_local_ncbi.md)
-taxonomic databases.
+the installation documentation for tool to build a local copy of the
+[GBIF](../install/build_local_gbif.md) taxonomic database.
 
 !!! tip
 

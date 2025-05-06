@@ -16,7 +16,7 @@ the dataset.
 Even if all of your actual data is in other file formats, you will still need to fill in
 an Excel template containing the key metadata for your dataset:
 
-* Fill in a standard Excel template, using the Summary, Taxa (GBIFTaxa and/or NCBITaxa)
+* Fill in a standard Excel template, using the Summary, Taxa (GBIFTaxa and/or SeqTaxa)
   and Locations worksheets to provide basic metadata and spatial and taxonomic indexing.
 * In the Summary sheet, use the **External file** and **External file description** rows
   to provide a name and description for **every** external file you want to upload.
