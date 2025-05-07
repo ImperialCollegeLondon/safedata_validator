@@ -718,7 +718,6 @@ class Summary:
         standard_sheets = {
             "Summary",
             "GBIFTaxa",
-            "NCBITaxa",
             "Taxa",
             "SeqTaxa",
             "Locations",

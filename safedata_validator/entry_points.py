@@ -6,7 +6,6 @@ This module provides functions exposed as command line entry points:
 * ``_safedata_zenodo_cli``, exposed as `safedata_zenodo`
 * ``_safedata_metadata_cli``, exposed as `safedata_metadata`
 * ``_build_local_gbif_cli``, exposed as `safedata_build_local_gbif`
-* ``_build_local_ncbi_cli``, exposed as `safedata_build_local_ncbi`
 """
 
 import argparse
@@ -32,11 +31,8 @@ from safedata_validator.resources import Resources
 from safedata_validator.server import MetadataResources, post_metadata, update_resources
 from safedata_validator.taxondb import (
     build_local_gbif,
-    build_local_ncbi,
     download_gbif_backbone,
-    download_ncbi_taxonomy,
     get_gbif_version,
-    get_ncbi_version,
 )
 from safedata_validator.utilities import (
     check_file_is_excel,
@@ -1236,92 +1232,5 @@ def _build_local_gbif_cli(args_list: list[str] | None = None) -> int:
             outdir=download_loc, timestamp=timestamp, url=url
         )
         build_local_gbif(outfile=args.outfile, **file_data)
-
-    return 0
-
-
-def _build_local_ncbi_cli(args_list: list[str] | None = None) -> int:
-    """Build a local NCBI database.
-
-    This tool builds an SQLite database of the NCBI  taxonomy to use in
-    validation by safedata_validate. There are multiple archived versions
-    of the dataset, and the available versions can be seen here:
-
-        https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/
-
-    The tool will optionally take a timestamp - using the format '2021-11-26'
-    - to build a particular version, but defaults to the most recent version.
-
-    Args:
-        args_list: This is a developer option used to simulate command line usage by
-            providing a list of command line argument strings to the entry point
-            function. For example, ``safedata_build_local_ncbi -t 2012-01-01 file``
-            can be replicated by calling ``_build_local_ncbi_cli(['-t', '2012-01-01',
-            'file']))``.
-
-    Returns:
-        An integer code showing success (0) or failure (1).
-    """
-
-    # If no arguments list is provided
-    if args_list is None:
-        args_list = sys.argv[1:]
-
-    # Check function docstring exists to safeguard against -OO mode, and strip off the
-    # description of the function args_list, which should not be included in the command
-    # line docs
-    if _build_local_ncbi_cli.__doc__ is not None:
-        desc = textwrap.dedent(
-            "\n".join(_build_local_ncbi_cli.__doc__.splitlines()[:-10])
-        )
-    else:
-        desc = "Python in -OO mode: no docs"
-
-    # create the parser
-    parser = argparse.ArgumentParser(
-        prog="safedata_build_local_ncbi",
-        description=desc,
-        formatter_class=_desc_formatter,
-    )
-
-    parser.add_argument("outfile", help="Filename to use for database file.", type=Path)
-    parser.add_argument(
-        "-t",
-        "--timestamp",
-        default=None,
-        type=str,
-        help="The time stamp of a database archive version to use.",
-    )
-
-    args = parser.parse_args(args=args_list)
-
-    # Validate output file
-    # Look that file can be created without clobbering existing file
-    outdir = args.outfile.absolute().parent
-
-    if not (outdir.exists() and outdir.is_dir()):
-        LOGGER.error("The output directory does not exist.")
-        return 1
-
-    if args.outfile.absolute().exists():
-        LOGGER.error("The output file already exists.")
-        return 1
-
-    # Validate the timestamp
-    try:
-        filename, timestamp, filesize = get_ncbi_version(timestamp=args.timestamp)
-    except ValueError as excep:
-        LOGGER.error(str(excep))
-        return 1
-
-    # Download and build
-    with tempfile.TemporaryDirectory() as download_loc:
-        file_data = download_ncbi_taxonomy(
-            outdir=download_loc,
-            timestamp=timestamp,
-            filename=filename,
-            filesize=filesize,
-        )
-        build_local_ncbi(outfile=args.outfile, **file_data)
 
     return 0

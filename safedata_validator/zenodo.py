@@ -670,26 +670,18 @@ def dataset_description(
     # Find taxa data from each database and convert to HTML representation. The metadata
     # will be an empty list if the dataset does not contain any taxa.
     context_dict["gbif_timestamp"] = dataset_metadata["gbif_timestamp"]
-    context_dict["ncbi_timestamp"] = dataset_metadata["ncbi_timestamp"]
 
     gbif_taxon_index = dataset_metadata["gbif_taxa"]
-    ncbi_taxon_index = dataset_metadata["ncbi_taxa"]
     seq_taxon_index = dataset_metadata["seq_taxa"]
 
     context_dict["gbif_taxa"] = (
-        taxon_index_to_text(taxa=gbif_taxon_index, html=True, auth="GBIF")
+        taxon_index_to_text(taxa=gbif_taxon_index, html=True)
         if gbif_taxon_index
         else None
     )
 
-    context_dict["ncbi_taxa"] = (
-        taxon_index_to_text(taxa=ncbi_taxon_index, html=True, auth="NCBI")
-        if ncbi_taxon_index
-        else None
-    )
-
     context_dict["seq_taxa"] = (
-        taxon_index_to_text(taxa=seq_taxon_index, html=True, auth="NCBI")
+        taxon_index_to_text(taxa=seq_taxon_index, html=True)
         if seq_taxon_index
         else None
     )

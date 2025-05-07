@@ -55,8 +55,3 @@
     options:
         show_root_heading: True
         header_level: 3
-
-::: safedata_validator.taxa.construct_bi_or_tri
-    options:
-        show_root_heading: True
-        header_level: 3
