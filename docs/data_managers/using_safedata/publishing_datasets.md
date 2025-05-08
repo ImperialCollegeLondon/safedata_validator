@@ -35,7 +35,6 @@ The expected output from that command is shown below:
     - Validating gazetteer: spatial_resources/gazetteer.geojson
     - Validating location aliases: spatial_resources/location_aliases.csv
     - Validating GBIF database: gbif_databases/gbif_backbone_2021-11-26.sqlite
-    - Validating NCBI database: ncbi_databases/ncbi_taxonomy_2023-11-01.sqlite
     - Validating project database: project_databases/safe_projects.csv
 Deposit created: 1143714
 XML created: 1143714_GEMINI.xml
@@ -103,7 +102,6 @@ The output from that command would look like:
     - Validating gazetteer: spatial_resources/gazetteer.geojson
     - Validating location aliases: spatial_resources/location_aliases.csv
     - Validating GBIF database: gbif_databases/gbif_backbone_2021-11-26.sqlite
-    - Validating NCBI database: ncbi_databases/ncbi_taxonomy_2023-11-01.sqlite
     - Validating project database: project_databases/safe_projects.csv
 Preparing new version of deposit 1143714
  - Unchanged files: Supplementary_files.zip

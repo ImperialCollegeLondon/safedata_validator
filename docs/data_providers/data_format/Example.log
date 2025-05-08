@@ -1,10 +1,3 @@
-- Configuring Resources
-    - Configuring resources from init_path: local/config_files/sandbox_safeweb_gbif_2021_11_26.cfg
-    - Validating gazetteer: local/spatial_resources/gazetteer.geojson
-    - Validating location aliases: local/spatial_resources/location_aliases.csv
-    - Validating GBIF database: local/gbif_databases/gbif_backbone_2021-11-26.sqlite
-    - Validating NCBI database: local/ncbi_databases/ncbi_taxonomy_2023-11-01.sqlite
-    - Validating project database: local/project_databases/safe_projects.csv
 - Checking Summary worksheet
     - Loading core metadata
         - Metadata for Core fields found: 1 records
@@ -82,59 +75,65 @@
             - Taxon found in GBIF backbone (accepted)
         - Indexing taxonomic hierarchy
             - Added kingdom Animalia
-            - Added phylum Chordata
             - Added phylum Annelida
             - Added phylum Arthropoda
+            - Added phylum Chordata
+            - Added class Insecta
             - Added class Mammalia
             - Added class Clitellata
             - Added class Aves
-            - Added class Insecta
+            - Added order Hymenoptera
+            - Added order Primates
             - Added order Suliformes
             - Added order Rodentia
             - Added order Arhynchobdellida
             - Added order Carnivora
             - Added order Erinaceomorpha
-            - Added order Primates
-            - Added order Hymenoptera
             - Added family Erinaceidae
             - Added family Felidae
             - Added family Hominidae
             - Added family Haemadipsidae
             - Added family Sulidae
             - Added family Muridae
+            - Added genus Haemadipsa
+            - Added genus Prionailurus
             - Added genus Rattus
             - Added genus Echinosorex
             - Added genus Neofelis
             - Added genus Crematogaster
-            - Added genus Haemadipsa
-            - Added genus Prionailurus
         - 13 taxa loaded correctly
-- Loading NCBITaxa worksheet
-    - Reading NCBI taxa data
+- Loading SeqTaxa worksheet
+    - Reading bioinformatics taxon data
         - Additional fields provided: 'comments'
-        - 4 NCBI rank fields found: 'superkingdom', 'kingdom', 'phylum', 'class'
-    - Validating row 1: G_proteobacteria
-        - Match found for G_proteobacteria
-    - Validating row 2: E_mycetes
-        - Match found for E_mycetes
-    - Validating row 3: Dinophyceae
-        - Match found for Dinophyceae
-    - Validating row 4: Acidobact
-        ? NCBI records Bacteria as a superkingdom rather than a kingdom
-        ? Non-canon usage: Acidobacteriia is synonym for Terriglobia
-        ? Non-canon name Acidobacteria at rank phylum: synonym for Acidobacteriota
-        - Match found for Acidobact
-    - Validating row 5: New_fungus
-        - Mynewfungusetes marked as new taxon
-        - Match found for New_fungus
-- Indexing taxonomic hierarchy
-    - Added superkingdom Bacteria
-    - Added superkingdom Eukaryota
-    - Added kingdom Fungi
-    - Added phylum Acidobacteriota
-    - Added phylum Ascomycota
-    - Added phylum Pseudomonadota
-- 5 taxa loaded correctly
+    - Loading row 1: ASV_100
+        - Loaded species: Saitozyma podzolica
+    - Loading row 2: ASV_101
+        - Loaded species: Trichoderma spirale
+    - Loading row 3: ASV_102
+        - Loaded species: Apiotrichum sporotrichoides
+    - Loading row 4: ASV_103
+        - Loaded genus: Trichoderma
+    - Loading row 5: ASV_104
+        - Loaded species: Mortierella elongata
+    - Loading row 6: ASV_105
+        - Loaded genus: Talaromyces
+    - Loading row 7: ASV_106
+        - Loaded species: Purpureocillium lilacinum
+    - Loading row 8: ASV_107
+        - Loaded species: Trichoderma harzianum
+    - Loading row 9: ASV_108
+        - Loaded species: Geoglossum difforme
+    - Loading row 10: ASV_109
+        - Loaded species: Trichoderma harzianum
+    - Loading row 11: ASV_110
+        - Loaded species: Pyrenochaetopsis leptospora
+    - Loading row 12: ASV_111
+        - Loaded species: Trichoderma koningiopsis
+    - Loading row 13: ASV_113
+        - Loaded species: Metarhizium carneum
+    - Loading row 14: ASV_114
+        - Loaded genus: Chloridium
+- 14 taxa loaded correctly
 - Checking worksheet 'abundances_1'
     - Validating field metadata
     - Validating field data
@@ -192,6 +191,4 @@
     - Checking temporal and geographic extents
         ? The Latitudinal extent is set in Summary but also is populated from the data - this may be deliberate!
         ? The Longitudinal extent is set in Summary but also is populated from the data - this may be deliberate!
-- PASS: file formatted correctly but with 8 warnings
-File validation passed
-JSON metadata written to Example.json
+- PASS: file formatted correctly but with 5 warnings

@@ -41,7 +41,7 @@ The worksheet is organised into two sections:
     a few restrictions.
 
     Firstly, the following names are not allowed as they are reserved for another
-    purpose: "Summary", "Taxa", "GBIFTaxa", "NCBITaxa", "Locations"
+    purpose: "Summary", "Taxa", "GBIFTaxa", "Locations"
 
     Secondly, all worksheet names should be valid `R` names. See
     [here](https://adv-r.hadley.nz/names-values.html#non-syntactic) for details of what
@@ -202,7 +202,7 @@ recorded. All of the labels must have been included in the Locations worksheet.
 
 Columns of this type contain taxon names showing the taxon from which other data in the
 row was recorded. All of the values in the row must appear in the Taxon Names column in
-a Taxa worksheet (i.e. either GBIFTaxa or NCBITaxa).
+a Taxa worksheet (i.e. either GBIFTaxa or SeqTaxa).
 
 You don't need to complete any other descriptors. In particular, there is no need to
 provide a list of accepted values: the entries are validated against the Taxa worksheet.

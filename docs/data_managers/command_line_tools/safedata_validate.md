@@ -5,8 +5,8 @@ containing data using `safedata` formatting  and report on any problems. The cod
 validates:
 
 1. The data submission formatting of the file.
-1. All taxonomic names against either the [GBIF or NCBI taxonomy
-   databases](../install/taxonomic_validation.md).
+1. All taxonomic names against the [GBIF taxonomy
+   database](../install/taxonomic_validation.md).
 1. All location names against a locations gazetteer.
 
 The package can be imported in Python for use within other frameworks. However, the
@@ -20,12 +20,11 @@ both dataset locations and taxa. You will need to [create a configuration
 file](../install/configuration.md) to set `safedata_validator` up to find those
 resources.
 
-Note that two key resources - the GBIF and NCBI taxonomy databases - require local
-SQLite3 databases containing the core data from those databases. These are relatively
-large files (~ 2GB in total). The package provides two commands
-([safedata_build_local_gbif](../install/build_local_gbif.md) and
-[safedata_build_local_ncbi](../install/build_local_ncbi.md)) to download and build
-these databases, and the path to those files can then be included in the configuration.
+Note that a key resource - the GBIF taxonomy database - require a local SQLite3 database
+containing the core data from this database. This is a relatively large file (~ 2GB in
+total). The package provides a command
+([safedata_build_local_gbif](../install/build_local_gbif.md) to download and build this
+database, and the path to this file can then be included in the configuration.
 
 Note that you cannot validate DOIs without an internet connection, but this is optional.
 
@@ -37,15 +36,6 @@ template Python script to do this. If you are happy with running Python scripts,
 is not particularly hard and is described in detail
 [here](../install/build_local_gbif.md). The resulting database file is around 1.6GB, so
 you'll need file space!
-
-### NCBITaxa
-
-Similarly, taxon validation against NCBI requires you to download a snapshot of the
-**NCBI database** and building a SQLite3 database from it. Using a local database is
-substantially faster than using the online NCBI Entrez tools, which has a built-in rate
-limitation. Instructions on how to construct the local database are given
-[here](../install/build_local_ncbi.md). Again, the resulting database is large (~600 MB)
-so you will need to ensure you have sufficient file space!
 
 ## Using `safedata_validate`
 

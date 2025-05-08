@@ -43,6 +43,3 @@ done
 
 echo "cl_prompt $ safedata_build_local_gbif -h" > safedata_build_local_gbif.txt
 safedata_build_local_gbif -h >> safedata_build_local_gbif.txt
-
-echo "cl_prompt $ safedata_build_local_ncbi -h" > safedata_build_local_ncbi.txt
-safedata_build_local_ncbi -h >> safedata_build_local_ncbi.txt

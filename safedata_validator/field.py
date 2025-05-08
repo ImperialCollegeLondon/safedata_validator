@@ -187,17 +187,12 @@ class Dataset:
         elif len(gbif_sheets) == 1:
             self.taxa.gbif_taxa.load(wb[next(iter(gbif_sheets))])
 
-        # Populate ncbi taxa
-        ncbi_sheet = "NCBITaxa" in wb.sheetnames
-        if ncbi_sheet:
-            self.taxa.ncbi_taxa.load(wb["NCBITaxa"])
-
         # Populate Seq taxa
         seq_sheet = "SeqTaxa" in wb.sheetnames
         if seq_sheet:
             self.taxa.seq_taxa.load(wb["SeqTaxa"])
 
-        if not (len(gbif_sheets) > 0 or ncbi_sheet or seq_sheet):
+        if not (len(gbif_sheets) > 0 or seq_sheet):
             # Leave the default empty Taxa object
             LOGGER.warning("No taxon worksheet found - moving on")
 
@@ -219,7 +214,7 @@ class Dataset:
 
         This method checks that:
         1. all locations and taxa provided have been used in the data worksheets scanned
-        2. no worksheet taxon names are duplicated between GBIFTaxa and NCBITaxa.
+        2. no worksheet taxon names are duplicated between GBIFTaxa and SeqTaxa.
         3. extents in the data are congruent with the summary extents
 
         Finally, the method reports the total number of errors and warnings from
@@ -273,8 +268,7 @@ class Dataset:
 
                 if self.taxa.repeat_names != set():
                     LOGGER.error(
-                        "The following taxa are defined in both GBIFTaxa and "
-                        "NCBITaxa: ",
+                        "The following taxa are defined in both GBIFTaxa and SeqTaxa: ",
                         extra={"join": self.taxa.repeat_names},
                     )
 
@@ -390,24 +384,6 @@ class Dataset:
                 )
                 for tx in self.taxa.gbif_taxa.taxon_index
             ],
-            # NCBI taxa if they exist
-            ncbi_timestamp=self.resources.ncbi_timestamp,
-            ncbi_taxa=[
-                dict(
-                    zip(
-                        (
-                            "worksheet_name",
-                            "taxon_id",
-                            "parent_id",
-                            "taxon_name",
-                            "taxon_rank",
-                            "taxon_status",
-                        ),
-                        tx,
-                    )
-                )
-                for tx in self.taxa.ncbi_taxa.taxon_index
-            ],
             # Sequence taxa if they exist
             # TODO - add reference database information
             seq_taxa=[
@@ -457,7 +433,7 @@ class Dataset:
             "summary": self.summary.n_errors,
             "locations": self.locations.n_errors,
             "gbif": self.taxa.gbif_taxa.n_errors,
-            "ncbi": self.taxa.ncbi_taxa.n_errors,
+            "seq": self.taxa.seq_taxa.n_errors,
             "data": [(d.name, d.n_errors) for d in self.dataworksheets],
         }
 

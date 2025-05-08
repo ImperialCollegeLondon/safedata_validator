@@ -551,6 +551,14 @@
     },
     {
       "worksheet_name": null,
+      "taxon_id": 42,
+      "parent_id": 1,
+      "taxon_name": "Annelida",
+      "taxon_rank": "phylum",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
       "taxon_id": 54,
       "parent_id": 1,
       "taxon_name": "Arthropoda",
@@ -562,14 +570,6 @@
       "taxon_id": 44,
       "parent_id": 1,
       "taxon_name": "Chordata",
-      "taxon_rank": "phylum",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
-      "taxon_id": 42,
-      "parent_id": 1,
-      "taxon_name": "Annelida",
       "taxon_rank": "phylum",
       "taxon_status": "accepted"
     },
@@ -607,17 +607,9 @@
     },
     {
       "worksheet_name": null,
-      "taxon_id": 732,
-      "parent_id": 359,
-      "taxon_name": "Carnivora",
-      "taxon_rank": "order",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
-      "taxon_id": 829,
-      "parent_id": 359,
-      "taxon_name": "Erinaceomorpha",
+      "taxon_id": 1457,
+      "parent_id": 216,
+      "taxon_name": "Hymenoptera",
       "taxon_rank": "order",
       "taxon_status": "accepted"
     },
@@ -626,14 +618,6 @@
       "taxon_id": 798,
       "parent_id": 359,
       "taxon_name": "Primates",
-      "taxon_rank": "order",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
-      "taxon_id": 1457,
-      "parent_id": 216,
-      "taxon_name": "Hymenoptera",
       "taxon_rank": "order",
       "taxon_status": "accepted"
     },
@@ -658,6 +642,22 @@
       "taxon_id": 1077,
       "parent_id": 255,
       "taxon_name": "Arhynchobdellida",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 732,
+      "parent_id": 359,
+      "taxon_name": "Carnivora",
+      "taxon_rank": "order",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 829,
+      "parent_id": 359,
+      "taxon_name": "Erinaceomorpha",
       "taxon_rank": "order",
       "taxon_status": "accepted"
     },
@@ -711,30 +711,6 @@
     },
     {
       "worksheet_name": null,
-      "taxon_id": 2437113,
-      "parent_id": 5722,
-      "taxon_name": "Echinosorex",
-      "taxon_rank": "genus",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
-      "taxon_id": 2435078,
-      "parent_id": 9703,
-      "taxon_name": "Neofelis",
-      "taxon_rank": "genus",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
-      "taxon_id": 1324306,
-      "parent_id": 4342,
-      "taxon_name": "Crematogaster",
-      "taxon_rank": "genus",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
       "taxon_id": 4810276,
       "parent_id": 7292,
       "taxon_name": "Haemadipsa",
@@ -756,105 +732,416 @@
       "taxon_name": "Rattus",
       "taxon_rank": "genus",
       "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2437113,
+      "parent_id": 5722,
+      "taxon_name": "Echinosorex",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 2435078,
+      "parent_id": 9703,
+      "taxon_name": "Neofelis",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": 1324306,
+      "parent_id": 4342,
+      "taxon_name": "Crematogaster",
+      "taxon_rank": "genus",
+      "taxon_status": "accepted"
     }
   ],
-  "ncbi_timestamp": "2023-11-01",
-  "ncbi_taxa": [
+  "seq_taxa": [
     {
-      "worksheet_name": "G_proteobacteria",
-      "taxon_id": 1236,
-      "parent_id": 1224,
-      "taxon_name": "Gammaproteobacteria",
-      "taxon_rank": "class",
-      "taxon_status": "accepted"
+      "worksheet_name": null,
+      "taxon_id": -23,
+      "parent_id": -38,
+      "taxon_name": "Saitozyma podzolica",
+      "taxon_rank": "species",
+      "taxon_status": "loaded"
     },
     {
-      "worksheet_name": "E_mycetes",
-      "taxon_id": 147545,
-      "parent_id": 4890,
+      "worksheet_name": null,
+      "taxon_id": -46,
+      "parent_id": -47,
+      "taxon_name": "Mortierella",
+      "taxon_rank": "genus",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -7,
+      "parent_id": -28,
       "taxon_name": "Eurotiomycetes",
       "taxon_rank": "class",
-      "taxon_status": "accepted"
+      "taxon_status": "loaded"
     },
     {
-      "worksheet_name": "Dinophyceae",
-      "taxon_id": 2864,
-      "parent_id": 2759,
-      "taxon_name": "Dinophyceae",
+      "worksheet_name": null,
+      "taxon_id": -29,
+      "parent_id": -16,
+      "taxon_name": "Pyrenochaetopsis",
+      "taxon_rank": "genus",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -21,
+      "parent_id": -29,
+      "taxon_name": "Pyrenochaetopsis leptospora",
+      "taxon_rank": "species",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -8,
+      "parent_id": -27,
+      "taxon_name": "Trichosporonaceae",
+      "taxon_rank": "family",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -41,
+      "parent_id": -28,
+      "taxon_name": "Geoglossomycetes",
       "taxon_rank": "class",
-      "taxon_status": "accepted"
+      "taxon_status": "loaded"
     },
     {
-      "worksheet_name": "Acidobact",
-      "taxon_id": 204432,
-      "parent_id": 57723,
-      "taxon_name": "Terriglobia",
-      "taxon_rank": "class",
-      "taxon_status": "accepted"
+      "worksheet_name": null,
+      "taxon_id": -39,
+      "parent_id": -41,
+      "taxon_name": "Geoglossales",
+      "taxon_rank": "order",
+      "taxon_status": "loaded"
     },
     {
-      "worksheet_name": "Acidobact",
-      "taxon_id": 204432,
-      "parent_id": 57723,
-      "taxon_name": "Acidobacteriia",
-      "taxon_rank": "class",
-      "taxon_status": "synonym"
-    },
-    {
-      "worksheet_name": "New_fungus",
+      "worksheet_name": null,
       "taxon_id": -1,
-      "parent_id": 4890,
-      "taxon_name": "Mynewfungusetes",
+      "parent_id": -3,
+      "taxon_name": "Mortierellomycetes",
       "taxon_rank": "class",
-      "taxon_status": "user"
+      "taxon_status": "loaded"
     },
     {
       "worksheet_name": null,
-      "taxon_id": 2759,
+      "taxon_id": -35,
+      "parent_id": -20,
+      "taxon_name": "Clavicipitaceae",
+      "taxon_rank": "family",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -40,
+      "parent_id": -33,
+      "taxon_name": "Talaromyces",
+      "taxon_rank": "genus",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -11,
+      "parent_id": -24,
+      "taxon_name": "Trichoderma harzianum",
+      "taxon_rank": "species",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -30,
+      "parent_id": -5,
+      "taxon_name": "Chloridium",
+      "taxon_rank": "genus",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -18,
+      "parent_id": -25,
+      "taxon_name": "Geoglossum difforme",
+      "taxon_rank": "species",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -10,
+      "parent_id": -46,
+      "taxon_name": "Mortierella elongata",
+      "taxon_rank": "species",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -2,
+      "parent_id": -28,
+      "taxon_name": "Sordariomycetes",
+      "taxon_rank": "class",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -48,
+      "parent_id": -14,
+      "taxon_name": "Metarhizium carneum",
+      "taxon_rank": "species",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -22,
+      "parent_id": -42,
+      "taxon_name": "Trimorphomycetaceae",
+      "taxon_rank": "family",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -4,
+      "parent_id": -32,
+      "taxon_name": "Purpureocillium lilacinum",
+      "taxon_rank": "species",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -9,
+      "parent_id": -17,
+      "taxon_name": "Apiotrichum sporotrichoides",
+      "taxon_rank": "species",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -16,
+      "parent_id": -44,
+      "taxon_name": "Cucurbitariaceae",
+      "taxon_rank": "family",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -42,
+      "parent_id": -34,
+      "taxon_name": "Tremellales",
+      "taxon_rank": "order",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -5,
+      "parent_id": -6,
+      "taxon_name": "Chaetosphaeriaceae",
+      "taxon_rank": "family",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -37,
+      "parent_id": -7,
+      "taxon_name": "Eurotiales",
+      "taxon_rank": "order",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -47,
+      "parent_id": -31,
+      "taxon_name": "Mortierellaceae",
+      "taxon_rank": "family",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -34,
+      "parent_id": -45,
+      "taxon_name": "Tremellomycetes",
+      "taxon_rank": "class",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -26,
+      "parent_id": -28,
+      "taxon_name": "Dothideomycetes",
+      "taxon_rank": "class",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -17,
+      "parent_id": -8,
+      "taxon_name": "Apiotrichum",
+      "taxon_rank": "genus",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -6,
+      "parent_id": -2,
+      "taxon_name": "Chaetosphaeriales",
+      "taxon_rank": "order",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -33,
+      "parent_id": -37,
+      "taxon_name": "Trichocomaceae",
+      "taxon_rank": "family",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -14,
+      "parent_id": -35,
+      "taxon_name": "Metarhizium",
+      "taxon_rank": "genus",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -32,
+      "parent_id": -12,
+      "taxon_name": "Purpureocillium",
+      "taxon_rank": "genus",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -19,
       "parent_id": null,
-      "taxon_name": "Eukaryota",
-      "taxon_rank": "superkingdom",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
-      "taxon_id": 2,
-      "parent_id": null,
-      "taxon_name": "Bacteria",
-      "taxon_rank": "superkingdom",
-      "taxon_status": "accepted"
-    },
-    {
-      "worksheet_name": null,
-      "taxon_id": 4751,
-      "parent_id": 2759,
       "taxon_name": "Fungi",
       "taxon_rank": "kingdom",
-      "taxon_status": "accepted"
+      "taxon_status": "loaded"
     },
     {
       "worksheet_name": null,
-      "taxon_id": 57723,
-      "parent_id": 2,
-      "taxon_name": "Acidobacteriota",
-      "taxon_rank": "phylum",
-      "taxon_status": "accepted"
+      "taxon_id": -44,
+      "parent_id": -26,
+      "taxon_name": "Pleosporales",
+      "taxon_rank": "order",
+      "taxon_status": "loaded"
     },
     {
       "worksheet_name": null,
-      "taxon_id": 4890,
-      "parent_id": 4751,
+      "taxon_id": -20,
+      "parent_id": -2,
+      "taxon_name": "Hypocreales",
+      "taxon_rank": "order",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -28,
+      "parent_id": -19,
       "taxon_name": "Ascomycota",
       "taxon_rank": "phylum",
-      "taxon_status": "accepted"
+      "taxon_status": "loaded"
     },
     {
       "worksheet_name": null,
-      "taxon_id": 1224,
-      "parent_id": 2,
-      "taxon_name": "Pseudomonadota",
+      "taxon_id": -27,
+      "parent_id": -34,
+      "taxon_name": "Trichosporonales",
+      "taxon_rank": "order",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -25,
+      "parent_id": -15,
+      "taxon_name": "Geoglossum",
+      "taxon_rank": "genus",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -15,
+      "parent_id": -39,
+      "taxon_name": "Geoglossaceae",
+      "taxon_rank": "family",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -45,
+      "parent_id": -19,
+      "taxon_name": "Basidiomycota",
       "taxon_rank": "phylum",
-      "taxon_status": "accepted"
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -38,
+      "parent_id": -22,
+      "taxon_name": "Saitozyma",
+      "taxon_rank": "genus",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -43,
+      "parent_id": -20,
+      "taxon_name": "Hypocreaceae",
+      "taxon_rank": "family",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -36,
+      "parent_id": -24,
+      "taxon_name": "Trichoderma spirale",
+      "taxon_rank": "species",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -13,
+      "parent_id": -24,
+      "taxon_name": "Trichoderma koningiopsis",
+      "taxon_rank": "species",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -12,
+      "parent_id": -20,
+      "taxon_name": "Ophiocordycipitaceae",
+      "taxon_rank": "family",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -31,
+      "parent_id": -1,
+      "taxon_name": "Mortierellales",
+      "taxon_rank": "order",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -3,
+      "parent_id": -19,
+      "taxon_name": "Mortierellomycota",
+      "taxon_rank": "phylum",
+      "taxon_status": "loaded"
+    },
+    {
+      "worksheet_name": null,
+      "taxon_id": -24,
+      "parent_id": -43,
+      "taxon_name": "Trichoderma",
+      "taxon_rank": "genus",
+      "taxon_status": "loaded"
     }
   ],
   "locations": [

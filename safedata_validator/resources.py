@@ -9,8 +9,6 @@ configuration to work. The core resources for file validation are:
 
 - gbif_database: The path to a local SQLite copy of the GBIF backbone database.
 
-- ncbi_database: The path to a local SQLite copy of the NCBI database files.
-
 - project_database: Optionally, a path to a CSV file providing valid project IDs.
 
 The [Resources][safedata_validator.resources.Resources] class is used to locate and
@@ -51,7 +49,6 @@ CONFIGSPEC = {
     "gazetteer": "string()",
     "location_aliases": "string()",
     "gbif_database": "string()",
-    "ncbi_database": "string()",
     "project_database": "string(default=None)",
     "maximum_embargo_months": "integer(default=24)",
     "extents": {
@@ -169,7 +166,6 @@ class Resources:
         gazetteer: The path to the gazetteer file
         location_aliases: The path to the location_aliases file
         gbif_database: The path to the GBIF database file
-        ncbi_database: The path to the NCBI database file
         project_database: An optional path to a database of valid project IDs
         valid_locations: The locations defined in the locations file
         location_aliases: Location aliases defined in the locations file
@@ -233,7 +229,6 @@ class Resources:
         self.gaz_path = config_loaded.gazetteer
         self.localias_path = config_loaded.location_aliases
         self.gbif_database = config_loaded.gbif_database
-        self.ncbi_database = config_loaded.ncbi_database
         self.project_database = (
             None
             if config_loaded.project_database == ""
@@ -249,7 +244,6 @@ class Resources:
         self.xml = config_loaded.xml
 
         self.gbif_timestamp: str | None = None
-        self.ncbi_timestamp: str | None = None
 
         # Valid locations is a dictionary keying string location names to tuples of
         # floats describing the location bounding box
@@ -263,7 +257,6 @@ class Resources:
         self._validate_gazetteer()
         self._validate_location_aliases()
         self._validate_gbif()
-        self._validate_ncbi()
         self._validate_projects()
 
     @staticmethod
@@ -403,17 +396,6 @@ class Resources:
 
         self.gbif_timestamp = validate_taxon_db(
             self.gbif_database, "GBIF", ["backbone"]
-        )
-
-    def _validate_ncbi(self) -> None:
-        """Validate the NCBI settings.
-
-        This private function validates the provided sqlite3 database files and updates
-        the instance with validated details.
-        """
-
-        self.ncbi_timestamp = validate_taxon_db(
-            self.ncbi_database, "NCBI", ["nodes", "merge", "names"]
         )
 
     def _validate_projects(self) -> None:

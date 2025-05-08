@@ -19,8 +19,6 @@ typically contain at least four worksheets.
   the dataset, access rights and the individual data tables in the dataset.
 - [**GBIFTaxa**](gbif_taxa.md): This describes taxa used in the Data worksheets, using
   the GBIF taxonomy backbone as a reference. This is best for observational data.
-- [**NCBITaxa**](ncbi_taxa.md): This describes taxa used in the Data worksheets, using
-  the NCBI taxonomy database as a reference.
 - [**SeqTaxa**](sequenced_taxa.md): In many cases, taxa are identified by sequence
   matching against sequence databases (e.g. NCBI). In theory, `safedata_validator` could
   validate taxon ids against the underlying databases in the same way that it does using
@@ -38,10 +36,9 @@ typically contain at least four worksheets.
   like in a single dataset: we don't want you to spend time rearranging your data and
   are happy just to take the data in the natural tables you already use.
 
-The Summary, GBIFTaxa, NCBITaxa, SeqTaxa and Locations worksheet names should not be
-used for data worksheets. The Summary table **must** be present, but the GBIFTaxa,
-NCBITaxa, SeqTaxa and Locations can be ommitted if datasets do not contain taxonomic or
-location data.
+The Summary, GBIFTaxa, SeqTaxa and Locations worksheet names should not be used for data
+worksheets. The Summary table **must** be present, but the GBIFTaxa, SeqTaxa and
+Locations can be omitted if datasets do not contain taxonomic or location data.
 
 ### File naming
 

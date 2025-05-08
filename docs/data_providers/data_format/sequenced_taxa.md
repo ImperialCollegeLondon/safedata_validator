@@ -66,9 +66,8 @@ if you want to use `Crbe` in your data worksheets, rather than typing out
     These are the names that you are going to use in your data worksheet. The
     other columns are to help us validate the taxonomy of your names.
 
-* **Name**: This column can be optionally used to note that a row contains a new taxon
-  that is not expected to be present in the NCBI database. The taxon will be included as
-  a new taxon as a child of the next taxonomic rank.
+* **Name**: This column is mandatory and provides the name by which the taxon is
+  referred to in the data worksheets.
 
 * **Ranks**: Here the column name (e.g. Phylum) provides a **taxonomic rank**, and the
   row entries provide the relevant names for this rank. A top level rank must be
@@ -99,12 +98,11 @@ if you want to use `Crbe` in your data worksheets, rather than typing out
     tags (e.g. "candidatus") are fine to include as part of the name, however they are
     removed from the searchable metadata.
   
-* **Comments and other fields**: These fields are obviously optional. If you
-  do have particular notes that you want to make - explaining disagreements with NCBI
-  taxonomy, new species notes and the like - then these can be very useful for future
-  researchers trying to place taxa. Equally if you want to record further information
-  about NCBI taxon rows, you can add additional fields as long as they do not duplicate
-  any of the field names mentioned above.
+* **Comments and other fields**: These fields are obviously optional. If you do have
+  particular notes that you want to make - new species notes and the like - then these
+  can be very useful for future researchers trying to place taxa. Equally if you want to
+  record further information about the taxon rows, you can add additional fields as long
+  as they do not duplicate any of the field names mentioned above.
 
 ## My data is not sequencing data
 

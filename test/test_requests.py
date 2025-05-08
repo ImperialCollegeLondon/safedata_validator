@@ -2,10 +2,7 @@
 
 import requests  # type: ignore
 
-URL = (
-    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&"
-    "term=science%5bjournal%5d+AND+breast+cancer+AND+2008%5bpdat%5d"
-)
+URL = "https://zenodo.org/communities/safe/"
 
 
 def test_requests():

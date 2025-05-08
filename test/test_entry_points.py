@@ -21,7 +21,6 @@ def does_not_raise():
         "safedata_zenodo",
         "safedata_metadata",
         "safedata_build_local_gbif",
-        "safedata_build_local_ncbi",
     ],
 )
 def test_entry_points_run(entry_point):
@@ -44,7 +43,6 @@ def test_entry_points_run(entry_point):
         "_safedata_zenodo_cli",
         "_safedata_metadata_cli",
         "_build_local_gbif_cli",
-        "_build_local_ncbi_cli",
     ],
 )
 def test_entry_points_via_call(entry_point):
@@ -77,7 +75,7 @@ def test_sdv_zenodo_html(user_config_file, file_exists):
 
     from safedata_validator.entry_points import _safedata_zenodo_cli
 
-    ds_json = FIXTURE_FILES.rf.good_ncbi_file_dataset_json
+    ds_json = FIXTURE_FILES.rf.good_seq_file_dataset_json
     output_path = str(Path(ds_json).parent / "test_sdv_zenodo_html.out")
 
     if file_exists:
@@ -87,7 +85,7 @@ def test_sdv_zenodo_html(user_config_file, file_exists):
     value = _safedata_zenodo_cli(
         args_list=[
             "generate_html",
-            FIXTURE_FILES.rf.good_ncbi_file_dataset_json,
+            FIXTURE_FILES.rf.good_seq_file_dataset_json,
             output_path,
         ]
     )
@@ -108,7 +106,7 @@ def test_sdv_zenodo_xml(user_config_file, file_exists):
 
     from safedata_validator.entry_points import _safedata_zenodo_cli
 
-    ds_json = FIXTURE_FILES.rf.good_ncbi_file_dataset_json
+    ds_json = FIXTURE_FILES.rf.good_seq_file_dataset_json
     output_path = str(Path(ds_json).parent / "test_sdv_zenodo_xml.out")
 
     if file_exists:
@@ -118,8 +116,8 @@ def test_sdv_zenodo_xml(user_config_file, file_exists):
     value = _safedata_zenodo_cli(
         args_list=[
             "generate_xml",
-            FIXTURE_FILES.rf.good_ncbi_file_zenodo_json,
-            FIXTURE_FILES.rf.good_ncbi_file_dataset_json,
+            FIXTURE_FILES.rf.good_seq_file_zenodo_json,
+            FIXTURE_FILES.rf.good_seq_file_dataset_json,
             output_path,
         ]
     )
@@ -162,40 +160,6 @@ def test_build_local_gbif_cli(user_config_file, args, return_value):
     assert _build_local_gbif_cli(args_list=args) == return_value
 
 
-@pytest.mark.parametrize(
-    argnames="args, return_value",
-    argvalues=[
-        pytest.param(
-            ["/tmp_missing/notchecked.sqlite"],
-            1,
-            id="bad dir",
-        ),
-        pytest.param(
-            ["/tmp/blocking_file.sqlite"],
-            1,
-            id="existing file",
-        ),
-        pytest.param(
-            ["-t", "2022-11-29", "/tmp/should_be_ok.sqlite"],
-            1,
-            id="unknown timestamp",
-        ),
-        pytest.param(
-            ["-t", "2022_11_23", "/tmp/should_be_ok.sqlite"],
-            1,
-            id="bad timestamp format",
-        ),
-    ],
-)
-def test_build_local_ncbi_cli(user_config_file, args, return_value):
-    """Test failure modes on _build_local_gbif_cli."""
-    from safedata_validator.entry_points import _build_local_ncbi_cli
-
-    user_config_file.create_file("/tmp/blocking_file.sqlite")
-
-    assert _build_local_ncbi_cli(args_list=args) == return_value
-
-
 def test_safedata_validate(user_config_file):
     """Test the safedata_validate entry point works via the arglist.
 
@@ -215,6 +179,6 @@ def test_safedata_validate(user_config_file):
             "/tmp/validation_log.txt",
             "--json",
             "/tmp/validation_report.json",
-            FIXTURE_FILES.rf.good_ncbi_file,
+            FIXTURE_FILES.rf.good_seq_taxa_file,
         ]
     )

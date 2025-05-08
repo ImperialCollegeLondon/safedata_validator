@@ -12,9 +12,8 @@ from .conftest import FIXTURE_FILES
     [
         ("good_excel_file", 0),
         ("bad_excel_file", 94),
-        ("good_ncbi_file", 0),
-        ("bad_ncbi_file", 106),
         ("good_seq_taxa_file", 0),
+        ("bad_seq_taxa_file", 4),
     ],
 )
 def test_DataSet_load_from_file(fixture_resources, file_key, n_errors):

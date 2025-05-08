@@ -11,7 +11,7 @@ from .conftest import FIXTURE_FILES
     "file_path,expected_result",
     [
         (Path(FIXTURE_FILES.rf.good_excel_file), True),
-        (Path(FIXTURE_FILES.rf.good_ncbi_file_dataset_json), False),
+        (Path(FIXTURE_FILES.rf.good_seq_file_dataset_json), False),
         (Path("safedata_validator"), False),
     ],
 )
@@ -27,7 +27,7 @@ def test_check_file_is_excel(file_path, expected_result):
 @pytest.mark.parametrize(
     "file_path,expected_result",
     [
-        (Path(FIXTURE_FILES.rf.good_ncbi_file_dataset_json), True),
+        (Path(FIXTURE_FILES.rf.good_seq_file_dataset_json), True),
         (Path(FIXTURE_FILES.rf.good_excel_file), False),
         (Path("safedata_validator"), False),
     ],
@@ -41,12 +41,11 @@ def test_check_file_is_json(file_path, expected_result):
     assert is_file_json == expected_result
 
 
-# PROVIDE EXCEL FILE AND ALL THREE JSON FILES, NEED TO TRACK DOWN NAMES
 @pytest.mark.parametrize(
     "file_path,expected_result",
     [
-        (Path(FIXTURE_FILES.rf.good_ncbi_file_dataset_json), False),
-        (Path(FIXTURE_FILES.rf.good_ncbi_file_zenodo_json), True),
+        (Path(FIXTURE_FILES.rf.good_seq_file_dataset_json), False),
+        (Path(FIXTURE_FILES.rf.good_seq_file_zenodo_json), True),
         (Path(FIXTURE_FILES.rf.json_not_locations), False),
         (Path(FIXTURE_FILES.rf.good_excel_file), False),
     ],
@@ -63,8 +62,8 @@ def test_check_file_is_zenodo_json(file_path, expected_result):
 @pytest.mark.parametrize(
     "file_path,expected_result",
     [
-        (Path(FIXTURE_FILES.rf.good_ncbi_file_dataset_json), True),
-        (Path(FIXTURE_FILES.rf.good_ncbi_file_zenodo_json), False),
+        (Path(FIXTURE_FILES.rf.good_seq_file_dataset_json), True),
+        (Path(FIXTURE_FILES.rf.good_seq_file_zenodo_json), False),
         (Path(FIXTURE_FILES.rf.json_not_locations), False),
         (Path(FIXTURE_FILES.rf.good_excel_file), False),
     ],

@@ -14,7 +14,7 @@ from dotmap import DotMap
 from safedata_validator.field import Dataset, DataWorksheet
 from safedata_validator.locations import Locations
 from safedata_validator.resources import Resources
-from safedata_validator.taxa import GBIFTaxa, GBIFValidator, NCBIValidator
+from safedata_validator.taxa import GBIFTaxa, GBIFValidator
 
 
 def fixture_files():
@@ -41,17 +41,13 @@ def fixture_files():
         ("project_database_file", "project_database_simple.csv"),
         ("project_database_file_bad", "project_database_bad.csv"),
         ("gbif_file", "gbif_backbone_truncated.sqlite"),
-        ("ncbi_file", "ncbi_database_truncated.sqlite"),
         ("json_not_locations", "notalocationsjson.json"),
         ("bad_excel_file", "Test_format_bad.xlsx"),
         ("good_excel_file", "Test_format_good.xlsx"),
-        ("bad_ncbi_file", "Test_format_bad_NCBI.xlsx"),
-        ("weird_ncbi_file", "Test_format_weird_NCBI.xlsx"),
-        ("good_ncbi_file", "Test_format_good_NCBI.xlsx"),
         ("good_seq_taxa_file", "Test_format_good_Seq.xlsx"),
         ("bad_seq_taxa_file", "Test_format_bad_Seq.xlsx"),
-        ("good_ncbi_file_dataset_json", "Test_format_good_NCBI.json"),
-        ("good_ncbi_file_zenodo_json", "zenodo_27557.json"),
+        ("good_seq_file_dataset_json", "Test_format_good_Seq.json"),
+        ("good_seq_file_zenodo_json", "zenodo_214116.json"),
     ]
 
     real_files = {ky: os.path.join(fixture_dir, vl) for ky, vl in real_files}
@@ -141,7 +137,6 @@ def config_filesystem(fs):
         "gazetteer = ",
         "location_aliases = ",
         "gbif_database = ",
-        "ncbi_database = ",
         "project_database = ",
         "[extents]",
         "temporal_soft_extent = 2002-02-02, 2030-01-31",
@@ -171,12 +166,11 @@ def config_filesystem(fs):
     config_contents[0] += FIXTURE_FILES.rf.gaz_file
     config_contents[1] += FIXTURE_FILES.rf.localias_file
     config_contents[2] += FIXTURE_FILES.rf.gbif_file
-    config_contents[3] += FIXTURE_FILES.rf.ncbi_file
     fs.create_file(
         FIXTURE_FILES.vf.fix_config_no_projects, contents="\n".join(config_contents)
     )
 
-    config_contents[4] += FIXTURE_FILES.rf.project_database_file
+    config_contents[3] += FIXTURE_FILES.rf.project_database_file
     fs.create_file(FIXTURE_FILES.vf.fix_config, contents="\n".join(config_contents))
 
     yield fs
@@ -263,7 +257,7 @@ def log_check(caplog, expected_log):
 
 @pytest.fixture()
 def fixture_resources(config_filesystem):
-    """Creates a Resource object configured to use local NCBI and GBIF.
+    """Creates a Resource object configured to use local GBIF.
 
     Returns:
         A safedata_validator.resources.Resources instance
@@ -295,25 +289,6 @@ def example_excel_files(config_filesystem, request):
 
 
 @pytest.fixture()
-def example_ncbi_files(config_filesystem, request):
-    """Fixture providing additional excel files with NCBI taxa details for testing.
-
-    This uses indirect parameterisation, to allow the shared fixture to be paired with
-    request specific expectations rather than all pair combinations. This is an
-    equivalent function to example_excel_files but for the NCBI specific excel files.
-    """
-    if request.param == "good":
-        wb = openpyxl.load_workbook(FIXTURE_FILES.rf.good_ncbi_file, read_only=True)
-        return wb
-    elif request.param == "bad":
-        wb = openpyxl.load_workbook(FIXTURE_FILES.rf.bad_ncbi_file, read_only=True)
-        return wb
-    elif request.param == "weird":
-        wb = openpyxl.load_workbook(FIXTURE_FILES.rf.weird_ncbi_file, read_only=True)
-        return wb
-
-
-@pytest.fixture()
 def example_seq_files(config_filesystem, request):
     """Fixture providing additional excel files with Seq taxa details for testing.
 
@@ -335,13 +310,6 @@ def fixture_gbif_validator(fixture_resources):
     """Fixture to return GBIF taxon validators."""
 
     return GBIFValidator(fixture_resources)
-
-
-@pytest.fixture()
-def fixture_ncbi_validator(fixture_resources):
-    """Fixture to NCBI validator."""
-
-    return NCBIValidator(fixture_resources)
 
 
 # Fixtures to provide Taxon, Locations, Dataset, Dataworksheet
