@@ -127,7 +127,9 @@ class Summary:
         self.external_files: list[dict] | None = None
         """A list of dictionaries of external file metadata."""
         self.data_worksheets: list[Worksheet] = []
-        """A list of dictionaries of data tables in the Dataset."""
+        """A list of worksheets (data tables) in the Dataset."""
+        self.sequenced_taxa_sheet_names: set[str] = set()
+        """List sheet names used for sequenced taxa sheets."""
 
         self._rows: dict = {}
         """A private attribute holding the row data for the summary."""
@@ -248,6 +250,17 @@ class Summary:
                 title="Worksheets",
                 singular=False,
             ),
+            sequenced_taxa=SummaryBlock(
+                fields=[
+                    SummaryField("sequenced taxa sheet name", True, "sheet_name", str),
+                    SummaryField("reference database name", True, "database_name", str),
+                    SummaryField("reference database version", True, "version", str),
+                    SummaryField("reference database link", False, "link", str),
+                ],
+                mandatory=False,
+                title="Sequenced Taxa Sheets",
+                singular=False,
+            ),
             permits=SummaryBlock(
                 fields=[
                     SummaryField("permit type", True, "type", str),
@@ -326,7 +339,10 @@ class Summary:
         self._load_funders()
         self._load_permits()
         self._load_external_files()
-        self._load_data_worksheets(sheetnames)
+        self._load_sequenced_taxa_sheets(sheetnames=sheetnames)
+        self._load_data_worksheets(
+            sheetnames=sheetnames, sequenced_taxa_sheets=self.sequenced_taxa_sheet_names
+        )
 
         # summary of processing
         self.n_errors = handler.counters["ERROR"] - start_errors
@@ -696,8 +712,59 @@ class Summary:
 
         self.external_files = external_files
 
+    @loggerinfo_push_pop("Loading sequenced taxa metadata")
+    def _load_sequenced_taxa_sheets(self, sheetnames):
+        """Load the sequenced taxa block.
+
+        Provides summary validation specific to the sequenced taxa sheets block. The
+        main things to be checked here are:
+
+        1. Are there any standard worksheets incorrectly included in the sequenced taxa
+           sheets block?
+        2. That all sequenced taxa sheets listed in the metadata block actually exist as
+           worksheets?
+        """
+
+        # Load data worksheet data and convert an empty block from None to an empty list
+        seq_taxa_sheets = self._read_block(self.fields["sequenced_taxa"])
+        seq_taxa_sheets = [] if seq_taxa_sheets is None else seq_taxa_sheets
+
+        # 1. Strip out faulty inclusion of standard worksheets
+        cited_sheets = {seq_taxa["sheet_name"] for seq_taxa in seq_taxa_sheets}
+        standard_sheets = {
+            "Summary",
+            "GBIFTaxa",
+            "Taxa",
+            "Locations",
+        }
+        cited_standard_sheets = cited_sheets.intersection(standard_sheets)
+
+        if cited_standard_sheets:
+            LOGGER.error(
+                "Do not include standard metadata sheets in sequenced taxa metadata: ",
+                extra={"join": cited_standard_sheets},
+            )
+
+            seq_taxa_sheets = [
+                seq_taxa
+                for seq_taxa in seq_taxa_sheets
+                if seq_taxa["sheet_name"] not in standard_sheets
+            ]
+
+        # 2. Named sequenced taxa sheets must exist
+        for each_seq_taxa in seq_taxa_sheets:
+            if each_seq_taxa["sheet_name"] not in sheetnames:
+                # Unknown worksheet
+                LOGGER.error(
+                    f"Sequenced taxa sheet {each_seq_taxa['sheet_name']} not found"
+                )
+            else:
+                LOGGER.info(f"Data worksheet {each_seq_taxa['sheet_name']} found.")
+
+        self.sequenced_taxa_sheet_names = cited_sheets
+
     @loggerinfo_push_pop("Loading data worksheet metadata")
-    def _load_data_worksheets(self, sheetnames):
+    def _load_data_worksheets(self, sheetnames, sequenced_taxa_sheets: set[str]):
         """Load the worksheets block.
 
         Provides summary validation specific to the worksheets block. The main things to
@@ -705,8 +772,9 @@ class Summary:
 
         1. Are there any standard worksheets incorrectly included in the data worksheets
            block?
-        2. Are all the data worksheets present in the workbook documented?
-        3. Do any worksheets linked to external files used documented external files?
+        2. Are any sheets claimed as sequenced taxa sheets as well as data worksheets?
+        3. Are all the data worksheets present in the workbook documented?
+        4. Do any worksheets linked to external files used documented external files?
         """
 
         # Load data worksheet data and convert an empty block from None to an empty list
@@ -719,7 +787,6 @@ class Summary:
             "Summary",
             "GBIFTaxa",
             "Taxa",
-            "SeqTaxa",
             "Locations",
         }
         cited_standard_sheets = cited_sheets.intersection(standard_sheets)
@@ -731,17 +798,34 @@ class Summary:
             )
 
             data_worksheets = [
-                ws for ws in data_worksheets if ws["name"] in standard_sheets
+                ws for ws in data_worksheets if ws["name"] not in standard_sheets
             ]
 
-        # 2. Check for existing sheets without description
-        extra_names = set(sheetnames) - standard_sheets - cited_sheets
+        # 2. Check if sheets have been included that are already claimed as sequenced
+        #    taxonomy sheets
+        cited_seq_taxa_sheets = cited_sheets.intersection(sequenced_taxa_sheets)
+
+        if cited_seq_taxa_sheets:
+            LOGGER.error(
+                "Cannot include sheets as both a data worksheet and a sequenced "
+                "taxonomy sheet: ",
+                extra={"join": cited_seq_taxa_sheets},
+            )
+
+            data_worksheets = [
+                ws for ws in data_worksheets if ws["name"] not in sequenced_taxa_sheets
+            ]
+
+        # 3. Check for existing sheets without description
+        extra_names = (
+            set(sheetnames) - standard_sheets - cited_sheets - sequenced_taxa_sheets
+        )
         if extra_names:
             LOGGER.error(
                 "Undocumented sheets found in workbook: ", extra={"join": extra_names}
             )
 
-        # 3. Look to see what data is available:
+        # 4. Look to see what data is available:
         #    - No worksheets or external files: no data to document is an error.
         #    - Only external files: no tabular description of external files, just
         #      descriptions of the files themselves.
@@ -776,7 +860,7 @@ class Summary:
                     f"external files: {each_ws['external']}",
                 )
             else:
-                LOGGER.info(f"Data worksheet  {each_ws['name']} found.")
+                LOGGER.info(f"Data worksheet {each_ws['name']} found.")
 
         self.data_worksheets = data_worksheets
 
