@@ -7,6 +7,7 @@ methods for loading the summary data from file.
 import datetime
 import re
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 import requests  # type: ignore
 from dateutil.relativedelta import relativedelta
@@ -601,13 +602,10 @@ class Summary:
             if self.validate_doi:
                 for is_doi in pub_doi_re:
                     if is_doi:
-                        api_call = (
+                        check_link_validity(
                             f"https://doi.org/api/handles/"
                             f"{is_doi.string[is_doi.end() :]}"
                         )
-                        r = requests.get(api_call)
-                        if r.json()["responseCode"] != 1:
-                            LOGGER.error(f"DOI not found: {is_doi.string}")
 
         self.publication_doi = pub_doi
 
@@ -623,9 +621,10 @@ class Summary:
         # of the funding type and then optionally a reference number and a URL
 
         funders = self._read_block(self.fields["funding"])
-
-        # TODO - currently no check beyond _read_block but maybe actually check
-        #        the URL is a URL and maybe even opens? Could use urllib.parse
+        if funders:
+            for funder in funders:
+                if isinstance(funder["url"], str):
+                    check_link_validity(funder["url"])
 
         self.funders = funders
 
@@ -723,6 +722,7 @@ class Summary:
            sheets block?
         2. That all sequenced taxa sheets listed in the metadata block actually exist as
            worksheets?
+        3. That links to online databases are valid (if they are provided).
         """
 
         # Load data worksheet data and convert an empty block from None to an empty list
@@ -760,6 +760,11 @@ class Summary:
                 )
             else:
                 LOGGER.info(f"Data worksheet {each_seq_taxa['sheet_name']} found.")
+
+        # 3. Check that links to online databases are valid (if they are provided)
+        for seq_taxa in seq_taxa_sheets:
+            if isinstance(seq_taxa["link"], str):
+                check_link_validity(seq_taxa["link"])
 
         self.sequenced_taxa_sheet_names = cited_sheets
 
@@ -1022,3 +1027,30 @@ def load_rows_from_worksheet(worksheet: Worksheet) -> list[tuple]:
             rows.append(this_row)
 
     return rows
+
+
+def check_link_validity(link_address: str) -> None:
+    """Check the validity of a link that has been provided.
+
+    This function checks that the link has a valid syntax (http or https network
+    scheme). If the link appears to be syntactically valid is valid, then requests is
+    used to check that the link actually exists.
+
+    Args:
+        link_address: Link to validate.
+    """
+
+    parsed_link = urlparse(link_address)
+
+    if parsed_link.scheme not in ["http", "https"]:
+        LOGGER.error(f"Links must start with http or https: {link_address}")
+        return
+
+    try:
+        r = requests.head(link_address)
+    except requests.exceptions.ConnectionError:
+        LOGGER.error(f"Could not connect to link: {link_address}")
+        return
+
+    if r.status_code != 200:
+        LOGGER.error(f"Could not connect to link: {link_address}")

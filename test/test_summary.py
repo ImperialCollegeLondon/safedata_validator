@@ -474,7 +474,7 @@ def test_permits(caplog, fixture_summary, alterations, should_log_error, expecte
         (
             {"publication doi": ("https://doi.org/this.does/not.exist",)},
             True,
-            "DOI not found",
+            "Could not connect to link: ",
             True,
         ),
     ],
@@ -579,6 +579,11 @@ def test_doi(
             True,
             "Field funding link contains values of wrong type",
         ),  # via _read_block
+        (
+            {"funding link": ("baosdhvuey",)},
+            True,
+            "Links must start with http or https: ",
+        ),  # not a real link
     ],
 )
 def test_funders(caplog, fixture_summary, alterations, should_log_error, expected_log):
@@ -1297,6 +1302,12 @@ def test_data_worksheets(
             True,
             "Do not include standard metadata sheets in sequenced taxa metadata",
         ),
+        (
+            {"reference database link": ("baosdhvuey", None)},
+            None,
+            True,
+            "Links must start with http or https: ",
+        ),  # not a real link
     ],
 )
 def test_load_sequenced_taxa_sheets(
@@ -1700,5 +1711,54 @@ def test_core(
     # check that relevant attributes have be populated correctly
     assert fixture_summary.title == "Test data set"
     assert fixture_summary.description == "An example data set to test core loading"
+
+    log_check(caplog, expected_log_entries)
+
+
+@pytest.mark.parametrize(
+    argnames=["link", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            "https://unite.ut.ee",
+            (),
+            id="valid link",
+        ),
+        pytest.param(
+            "http://unite.ut.ee",
+            ((ERROR, "Could not connect to link: "),),
+            id="incorrect link",
+        ),
+        pytest.param(
+            "www.unite.ut.ee",
+            ((ERROR, "Links must start with http or https: "),),
+            id="used www",
+        ),
+        pytest.param(
+            "unite.ut.ee",
+            ((ERROR, "Links must start with http or https: "),),
+            id="missing https",
+        ),
+        pytest.param(
+            "adsbohvqewivdahsv",
+            ((ERROR, "Links must start with http or https: "),),
+            id="meaningless string",
+        ),
+        pytest.param(
+            r"C:\Users\User\Documents\file.txt",
+            ((ERROR, "Links must start with http or https: "),),
+            id="file path",
+        ),
+        pytest.param(
+            "https://notarealwebsite.com",
+            ((ERROR, "Could not connect to link:"),),
+            id="not a real website",
+        ),
+    ],
+)
+def test_check_link_validity(caplog, link, expected_log_entries):
+    """Check that the function to check the validity of links works as intended."""
+    from safedata_validator.summary import check_link_validity
+
+    check_link_validity(link)
 
     log_check(caplog, expected_log_entries)
