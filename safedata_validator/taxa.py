@@ -1011,19 +1011,18 @@ class SeqTaxa:
     b) to populate a database table to index the taxonomic coverage of datasets.
 
     Args:
-        resources: A Resources instance.
-
-    Attributes:
-        taxon_index: A list containing taxon index lists
-        taxon_names: A set of worksheet names
-        hierarchy: A set of lists containing the complete taxonomic hierarchy for taxa
-            in the SeqTaxa instance.
         sheet_name: The name of the sheet that the specific SeqTaxa instance corresponds
             to
         database_name: The name of the database that the sequencing taxonomy has been
             resolved using
         database_version: The specific database version used to resolve the taxonomy
         database_link: Link (optional) to where the database can be found
+
+    Attributes:
+        taxon_index: A list containing taxon index lists
+        taxon_names: A set of worksheet names
+        hierarchy: A set of lists containing the complete taxonomic hierarchy for taxa
+            in the SeqTaxa instance.
     """
 
     def __init__(
