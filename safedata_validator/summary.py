@@ -129,7 +129,7 @@ class Summary:
         """A list of dictionaries of external file metadata."""
         self.data_worksheets: list[Worksheet] = []
         """A list of worksheets (data tables) in the Dataset."""
-        self.sequenced_taxa_sheet_names: set[str] = set()
+        self.sequenced_taxa_metadata: list[dict[str, str]] = []
         """List sheet names used for sequenced taxa sheets."""
 
         self._rows: dict = {}
@@ -342,7 +342,10 @@ class Summary:
         self._load_external_files()
         self._load_sequenced_taxa_sheets(sheetnames=sheetnames)
         self._load_data_worksheets(
-            sheetnames=sheetnames, sequenced_taxa_sheets=self.sequenced_taxa_sheet_names
+            sheetnames=sheetnames,
+            sequenced_taxa_sheets={
+                metadata["sheet_name"] for metadata in self.sequenced_taxa_metadata
+            },
         )
 
         # summary of processing
@@ -766,7 +769,18 @@ class Summary:
             if isinstance(seq_taxa["link"], str):
                 check_link_validity(seq_taxa["link"])
 
-        self.sequenced_taxa_sheet_names = cited_sheets
+        # Find the metadata for the taxa
+        metadata = [
+            {
+                "sheet_name": sheet["sheet_name"],
+                "database_name": sheet["database_name"],
+                "database_version": sheet["version"],
+                "database_link": sheet["link"],
+            }
+            for sheet in seq_taxa_sheets
+        ]
+
+        self.sequenced_taxa_metadata = metadata
 
     @loggerinfo_push_pop("Loading data worksheet metadata")
     def _load_data_worksheets(self, sheetnames, sequenced_taxa_sheets: set[str]):

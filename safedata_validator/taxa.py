@@ -1017,18 +1017,31 @@ class SeqTaxa:
         taxon_index: A list containing taxon index lists
         taxon_names: A set of worksheet names
         hierarchy: A set of lists containing the complete taxonomic hierarchy for taxa
-            in the GBIFTaxa instance.
-        taxon_names_used: A set used to track which taxon names have been used in data
-            worksheets
+            in the SeqTaxa instance.
+        sheet_name: The name of the sheet that the specific SeqTaxa instance corresponds
+            to
+        database_name: The name of the database that the sequencing taxonomy has been
+            resolved using
+        database_version: The specific database version used to resolve the taxonomy
+        database_link: Link (optional) to where the database can be found
     """
 
-    def __init__(self, resources: Resources) -> None:
+    def __init__(
+        self,
+        sheet_name: str,
+        database_name: str,
+        database_version: str,
+        database_link: str | None,
+    ) -> None:
         self.taxon_index: list[tuple] = []
         self.taxon_names: set[str] = set()
-        self.hierarchy: set[tuple] = set()
         self.n_errors: int = 0
+        self.sheet_name = sheet_name
+        self.database_name = database_name
+        self.database_version = database_version
+        self.database_link = database_link
 
-    @loggerinfo_push_pop("Loading SeqTaxa worksheet")
+    @loggerinfo_push_pop("Loading sequenced taxonomy worksheet")
     def load(self, worksheet: worksheet) -> None:
         """Populate an SeqTaxa instance from an Excel worksheet.
 
@@ -1042,7 +1055,7 @@ class SeqTaxa:
         start_errors = handler.counters["ERROR"]
 
         # Get the data read in, handling header issues like whitespace padding
-        LOGGER.info("Reading bioinformatics taxon data")
+        LOGGER.info(f"Reading bioinformatics taxon data from {self.sheet_name}")
         FORMATTER.push()
         dframe = GetDataFrame(worksheet)
 
@@ -1060,7 +1073,7 @@ class SeqTaxa:
         # Get the headers
         headers = IsLower(dframe.headers).values
 
-        # Only the name field is indispensible
+        # Only the name field is indispensable
         if "name" not in headers:
             LOGGER.error("Sequencing taxa sheet is missing the name fields")
             FORMATTER.pop()
@@ -1301,9 +1314,11 @@ class SeqTaxa:
         if self.n_errors is None:
             LOGGER.critical("SeqTaxa error logging has broken!")
         elif self.n_errors > 0:
-            LOGGER.info(f"SeqTaxa contains {self.n_errors} errors")
+            LOGGER.info(f"{self.sheet_name} contains {self.n_errors} errors")
         else:
-            LOGGER.info(f"{len(self.taxon_names)} taxa loaded correctly")
+            LOGGER.info(
+                f"{len(self.taxon_names)} taxa loaded correctly from {self.sheet_name}"
+            )
 
         FORMATTER.pop()
 
@@ -1337,21 +1352,22 @@ class Taxa:
 
     def __init__(self, resources: Resources):
         self.gbif_taxa = GBIFTaxa(resources)
-        self.seq_taxa = SeqTaxa(resources)
+        self.seq_taxa_sheets: list[SeqTaxa] = []
         self.taxon_names_used: set[str] = set()
 
     @property
     def is_empty(self) -> bool:
         """Reports if neither GBIF nor sequenced taxa are loaded."""
-        return self.gbif_taxa.is_empty and self.seq_taxa.is_empty
+        return self.gbif_taxa.is_empty and len(self.seq_taxa_sheets) == 0
 
     @property
     def taxon_names(self) -> set[str]:
         """Provides loaded taxon names from all taxon handlers."""
+
         return set(
             [
                 *self.gbif_taxa.taxon_names,
-                *self.seq_taxa.taxon_names,
+                *[name for sheet in self.seq_taxa_sheets for name in sheet.taxon_names],
             ]
         )
 
@@ -1364,7 +1380,7 @@ class Taxa:
 
         all_names = [
             *self.gbif_taxa.taxon_names,
-            *self.seq_taxa.taxon_names,
+            *[name for sheet in self.seq_taxa_sheets for name in sheet.taxon_names],
         ]
 
         for this_name in all_names:

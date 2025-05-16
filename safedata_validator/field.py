@@ -26,7 +26,7 @@ from safedata_validator.logger import (
 )
 from safedata_validator.resources import Resources
 from safedata_validator.summary import Summary
-from safedata_validator.taxa import Taxa
+from safedata_validator.taxa import SeqTaxa, Taxa
 from safedata_validator.validators import (
     RE_DMS,
     HasDuplicates,
@@ -187,12 +187,13 @@ class Dataset:
         elif len(gbif_sheets) == 1:
             self.taxa.gbif_taxa.load(wb[next(iter(gbif_sheets))])
 
-        # Populate Seq taxa
-        seq_sheet = "SeqTaxa" in wb.sheetnames
-        if seq_sheet:
-            self.taxa.seq_taxa.load(wb["SeqTaxa"])
+        # Populate from sequenced taxa sheets
+        for sheet_metadata in self.summary.sequenced_taxa_metadata:
+            seq_taxa = SeqTaxa(**sheet_metadata)
+            seq_taxa.load(worksheet=wb[sheet_metadata["sheet_name"]])
+            self.taxa.seq_taxa_sheets.append(seq_taxa)
 
-        if not (len(gbif_sheets) > 0 or seq_sheet):
+        if len(gbif_sheets) == 0 and len(self.summary.sequenced_taxa_metadata) == 0:
             # Leave the default empty Taxa object
             LOGGER.warning("No taxon worksheet found - moving on")
 
@@ -268,7 +269,7 @@ class Dataset:
 
                 if self.taxa.repeat_names != set():
                     LOGGER.error(
-                        "The following taxa are defined in both GBIFTaxa and SeqTaxa: ",
+                        "The following taxa are defined in multiple taxonomy sheets: ",
                         extra={"join": self.taxa.repeat_names},
                     )
 
@@ -385,23 +386,30 @@ class Dataset:
                 for tx in self.taxa.gbif_taxa.taxon_index
             ],
             # Sequence taxa if they exist
-            # TODO - add reference database information
-            seq_taxa=[
-                dict(
-                    zip(
-                        (
-                            "worksheet_name",
-                            "taxon_id",
-                            "parent_id",
-                            "taxon_name",
-                            "taxon_rank",
-                            "taxon_status",
-                        ),
-                        tx,
-                    )
-                )
-                for tx in self.taxa.seq_taxa.taxon_index
-            ],
+            sequenced_taxa={
+                f"{seq_taxa.sheet_name}": {
+                    "taxon_index": [
+                        dict(
+                            zip(
+                                (
+                                    "worksheet_name",
+                                    "taxon_id",
+                                    "parent_id",
+                                    "taxon_name",
+                                    "taxon_rank",
+                                    "taxon_status",
+                                ),
+                                tx,
+                            )
+                        )
+                        for tx in seq_taxa.taxon_index
+                    ],
+                    "database_name": seq_taxa.database_name,
+                    "database_version": seq_taxa.database_version,
+                    "database_link": seq_taxa.database_link,
+                }
+                for seq_taxa in self.taxa.seq_taxa_sheets
+            },
             # Locations
             locations=[
                 dict(zip(("name", "new_location", "wkt_wgs84"), lc))
@@ -433,7 +441,9 @@ class Dataset:
             "summary": self.summary.n_errors,
             "locations": self.locations.n_errors,
             "gbif": self.taxa.gbif_taxa.n_errors,
-            "seq": self.taxa.seq_taxa.n_errors,
+            "seq": sum(
+                [taxa_sheet.n_errors for taxa_sheet in self.taxa.seq_taxa_sheets]
+            ),
             "data": [(d.name, d.n_errors) for d in self.dataworksheets],
         }
 

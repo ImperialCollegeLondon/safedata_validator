@@ -76,7 +76,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
         pytest.param(
             DotMap({"data_columns": []}),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (ERROR, "No data or only headers in Taxa worksheet"),
             ),
@@ -85,7 +85,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
         pytest.param(
             DotMap({"data_columns": ["some_columns"], "bad_headers": "duplicated"}),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (ERROR, "Cannot parse taxa with duplicated headers"),
             ),
@@ -94,7 +94,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
         pytest.param(
             DotMap({"data_columns": [tuple()], "headers": ["genus"]}),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (ERROR, "Sequencing taxa sheet is missing the name field"),
             ),
@@ -105,7 +105,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 {"data_columns": [tuple(), tuple()], "headers": ["name", "comments"]}
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (ERROR, "At least one top-level taxonomic rank must be provided!"),
             ),
@@ -124,7 +124,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Additional fields provided:"),
                 (INFO, "No taxon rows found"),
@@ -139,7 +139,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "No taxon rows found"),
             ),
@@ -153,7 +153,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "No taxon rows found"),
             ),
@@ -167,7 +167,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "No taxon rows found"),
             ),
@@ -181,7 +181,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "No taxon rows found"),
             ),
@@ -195,7 +195,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "No taxon rows found"),
             ),
@@ -209,7 +209,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (
                     ERROR,
@@ -227,7 +227,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (ERROR, "At least one top-level taxonomic rank must be provided!"),
             ),
@@ -241,7 +241,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (
                     ERROR,
@@ -264,7 +264,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (INFO, "Loaded class: Tremellomycetes"),
@@ -285,7 +285,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (INFO, "Loaded phylum: Basidiomycota"),
@@ -306,7 +306,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (INFO, "Loaded class: Tremellomycetes"),
@@ -340,7 +340,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (INFO, "Loaded species: <genus unknown> podzolica"),
@@ -374,7 +374,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (ERROR, "Rank genus has non-string or empty string value: 23"),
@@ -409,7 +409,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (INFO, "Loaded species: <genus unknown> podzolica"),
@@ -430,7 +430,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (INFO, "Loaded class: Tremellomycetes"),
@@ -451,7 +451,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (
@@ -476,7 +476,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (INFO, "Loaded class: Tremellomycetes"),
@@ -497,7 +497,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (INFO, "Loaded class: Tremellomycetes"),
@@ -518,7 +518,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (INFO, "Loaded class: Tremellomycetes"),
@@ -552,7 +552,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (
@@ -591,7 +591,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (
@@ -630,7 +630,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (INFO, "Loaded species: Saitozyma podzolica"),
@@ -664,7 +664,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (
@@ -690,7 +690,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: 562"),
                 (ERROR, "Worksheet name is not a string: 562"),
@@ -712,7 +712,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (ERROR, "Worksheet name has whitespace padding: 'ASV_100 '"),
@@ -734,7 +734,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (ERROR, "Rank kingdom has non-string or empty string value: 123"),
@@ -756,7 +756,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (ERROR, "Rank phylum has whitespace padding: 'Basidiomycota '"),
@@ -778,7 +778,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (ERROR, "Highest taxonomic rank (kingdom) must be populated!"),
@@ -800,7 +800,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (ERROR, "Highest taxonomic rank (kingdom) must be populated!"),
@@ -822,7 +822,7 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
                 }
             ),
             (
-                (INFO, "Loading SeqTaxa worksheet"),
+                (INFO, "Loading sequenced taxonomy worksheet"),
                 (INFO, "Reading bioinformatics taxon data"),
                 (INFO, "Loading row 1: ASV_100"),
                 (ERROR, "Highest taxonomic rank (superkingdom) must be populated!"),
@@ -833,15 +833,18 @@ def test_taxa_strip(caplog, test_input, exp_name, exp_log):
         ),
     ],
 )
-def test_load_worksheet(
-    caplog, mocker, fixture_resources, mock_output, expected_log_entries
-):
+def test_load_worksheet(caplog, mocker, mock_output, expected_log_entries):
     """Test that unexpected header names are caught by load."""
     from safedata_validator.logger import FORMATTER
     from safedata_validator.taxa import SeqTaxa
 
     # Create GBIFTaxa class
-    tx = SeqTaxa(fixture_resources)
+    tx = SeqTaxa(
+        sheet_name="SeqTaxa",
+        database_name="GreenGenes",
+        database_version="v1.0.0",
+        database_link=None,
+    )
 
     # Setup mocking
     mock_get = mocker.patch("safedata_validator.taxa.GetDataFrame")
@@ -862,7 +865,7 @@ def test_load_worksheet(
     ],
     indirect=["example_seq_files"],  # take actual params from fixture
 )
-def test_taxa_load(fixture_resources, example_seq_files, n_errors, n_taxa, t_taxa):
+def test_taxa_load(example_seq_files, n_errors, n_taxa, t_taxa):
     """This tests the ensemble loading of taxa from sequencing from a file.
 
     It uses indirect parametrisation to access the fixtures containing the sample excel
@@ -870,7 +873,12 @@ def test_taxa_load(fixture_resources, example_seq_files, n_errors, n_taxa, t_tax
     """
     from safedata_validator.taxa import SeqTaxa
 
-    tx = SeqTaxa(fixture_resources)
+    tx = SeqTaxa(
+        sheet_name="SeqTaxa",
+        database_name="GreenGenes",
+        database_version="v1.0.0",
+        database_link=None,
+    )
     tx.load(example_seq_files["SeqTaxa"])
 
     assert tx.n_errors == n_errors

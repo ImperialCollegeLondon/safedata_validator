@@ -8,20 +8,21 @@ from .conftest import FIXTURE_FILES
 
 
 @pytest.mark.parametrize(
-    "file_key, n_errors",
+    "file_key, n_errors, n_taxa",
     [
-        ("good_excel_file", 0),
-        ("bad_excel_file", 94),
-        ("good_seq_taxa_file", 0),
-        ("bad_seq_taxa_file", 4),
+        ("good_excel_file", 0, 20),
+        ("bad_excel_file", 94, 13),
+        ("good_seq_taxa_file", 0, 48),
+        ("bad_seq_taxa_file", 6, 34),
     ],
 )
-def test_DataSet_load_from_file(fixture_resources, file_key, n_errors):
+def test_DataSet_load_from_file(fixture_resources, file_key, n_errors, n_taxa):
     # Load the taxa and locations
     ds = Dataset(fixture_resources)
     ds.load_from_workbook(FIXTURE_FILES.rf[file_key])
 
     assert ds.n_errors == n_errors
+    assert len(ds.taxa.taxon_names) == n_taxa
 
 
 def test_example_dataset(fixture_resources):
