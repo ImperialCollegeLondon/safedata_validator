@@ -894,7 +894,7 @@ def test_external_files(
         "alterations",
         "alt_sheets",
         "ext_alterations",
-        "seq_taxa_sheets",
+        "taxa_sheet_name",
         "should_log_error",
         "expected_log",
     ],
@@ -1005,7 +1005,7 @@ def test_external_files(
                 "SequenceData",
             },
             dict(),
-            set(["SequenceData"]),
+            "SequenceData",
             False,
             "Loading external file metadata",
         ),
@@ -1013,7 +1013,7 @@ def test_external_files(
             dict(),  # Dataworksheet sequenced taxa sheet clash
             False,
             dict(),
-            set(["Transects"]),
+            "Transects",
             True,
             "Cannot include sheets as both a data worksheet and a sequenced taxonomy "
             "sheet:",
@@ -1039,7 +1039,7 @@ def test_external_files(
                 "SequenceData",
             },
             dict(),
-            set(["SequenceData"]),
+            "SequenceData",
             True,
             "Undocumented sheets found in workbook",
         ),
@@ -1133,7 +1133,7 @@ def test_data_worksheets(
     alterations,
     alt_sheets,
     ext_alterations,
-    seq_taxa_sheets,
+    taxa_sheet_name,
     should_log_error,
     expected_log,
 ):
@@ -1151,6 +1151,21 @@ def test_data_worksheets(
         "Taxa",
         "Locations",
     }
+
+    if taxa_sheet_name:
+        seq_taxa_metadata = [
+            {
+                "sheet_name": taxa_sheet_name,
+                "database_name": None,
+                "database_version": None,
+                "database_link": None,
+            }
+        ]
+    else:
+        seq_taxa_metadata = []
+
+    fixture_summary.sheetnames = sheetnames
+    fixture_summary.sequenced_taxa_metadata = seq_taxa_metadata
 
     # Valid set of information - slightly hacky switch to move between updating a basic
     # example and simply providing no data worksheet information at all.
@@ -1191,9 +1206,7 @@ def test_data_worksheets(
     fixture_summary._load_external_files()
 
     # Test the block load
-    fixture_summary._load_data_worksheets(
-        sheetnames, sequenced_taxa_sheets=seq_taxa_sheets
-    )
+    fixture_summary._load_data_worksheets()
 
     if should_log_error:
         assert "ERROR" in [r.levelname for r in caplog.records]
@@ -1331,6 +1344,8 @@ def test_load_sequenced_taxa_sheets(
         "SequenceData2",
     }
 
+    fixture_summary.sheetnames = sheetnames
+
     # Valid set of information - slightly hacky switch to move between updating a basic
     # example and simply providing no data worksheet information at all.
     input = {
@@ -1350,7 +1365,7 @@ def test_load_sequenced_taxa_sheets(
     fixture_summary._rows = input
 
     # Test the block load
-    fixture_summary._load_sequenced_taxa_sheets(sheetnames)
+    fixture_summary._load_sequenced_taxa_sheets()
 
     if should_log_error:
         assert "ERROR" in [r.levelname for r in caplog.records]
