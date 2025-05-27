@@ -250,6 +250,12 @@ class Dataset:
 
         # check taxa
         if not self.taxa.is_empty:
+            if self.taxa.repeat_names != set():
+                LOGGER.error(
+                    "The following taxa are defined in multiple taxonomy sheets: ",
+                    extra={"join": self.taxa.repeat_names},
+                )
+
             if self.summary.external_files:
                 LOGGER.warning(
                     "Taxon list cannot be validated when external data files are used"
@@ -265,12 +271,6 @@ class Dataset:
                         extra={
                             "join": self.taxa.taxon_names - self.taxa.taxon_names_used
                         },
-                    )
-
-                if self.taxa.repeat_names != set():
-                    LOGGER.error(
-                        "The following taxa are defined in multiple taxonomy sheets: ",
-                        extra={"join": self.taxa.repeat_names},
                     )
 
         # Check the extents - there are both summary and dataset extents so
