@@ -29,10 +29,10 @@ the Data worksheets. This taxonomic information should be recorded in a format t
 be validated against the GBIF backbone taxonomy. Generally the GBIF backbone taxonomy is
 most suitable for taxa discovered via direct observation (rather than sequencing), so
 this worksheet is most appropriate for storing the details of directly observed taxa. If
-taxa are used anywhere in the dataset either this worksheet or the [SeqTaxa
-worksheet](./sequenced_taxa.md) must be included. It is also an option to provide both a
-GBIFTaxa worksheet and a SeqTaxa worksheet, e.g. in cases where both sequencing and
-direct observational data are being reported.
+taxa are used anywhere in the dataset either this worksheet or a [sequenced taxa
+worksheet](./sequenced_taxa.md) must be included. It is also an option to provide a
+GBIFTaxa worksheet along with one or more sequenced taxa worksheets, e.g. in cases where
+both sequencing and direct observational data are being reported.
 
 ## GBIF Taxon validation
 
@@ -191,4 +191,4 @@ used in the GBIFTaxa worksheet.
 
 ## My data doesn't contain taxa
 
-Fine. You can omit either or both of the GBIFTaxa and SeqTaxa worksheets!
+Fine. You can omit both the GBIFTaxa worksheet and the sequenced taxa worksheets!

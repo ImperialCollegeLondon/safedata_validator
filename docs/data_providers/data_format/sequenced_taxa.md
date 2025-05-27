@@ -1,4 +1,4 @@
-# The SeqTaxa worksheet
+# Sequenced taxa worksheets
 
 <!-- markdownlint-disable MD033 -->
 <style>
@@ -24,41 +24,51 @@ thead th {
 </style>
 <!-- markdownlint-enable MD033 -->
 
-This worksheet plays a similar role to the [GBIFTaxa worksheet](./gbif_taxa.md), that is
-recording the taxonomic information for organisms referred to in the Data worksheets.
-The key difference is that this taxonomic information is not validated against a
-reference database. The reason for this is that software to generate taxonomies from
-sequencing data use a wide range of different reference databases, and it is not
-appropriate for a piece of validation software like `safedata_validator` to dictate
-which reference databases can be used. This approach is only suitable for sequencing
-data, and this worksheet is recommended for this class of data. If taxa are used
-anywhere in the dataset either this worksheet or the GBIFTaxa worksheet must be
-included. It is also an option to provide both a GBIFTaxa worksheet and a SeqTaxa
-worksheet, e.g. in cases where both sequencing and observational data are being
-reported.
+This type of worksheet plays a similar role to the [GBIFTaxa worksheet](./gbif_taxa.md),
+that is recording the taxonomic information for organisms referred to in the Data
+worksheets. The key difference is that this taxonomic information is not validated
+against a reference database. The reason for this is that software to generate
+taxonomies from sequencing data use a wide range of different reference databases, and
+it is not appropriate for a piece of validation software like `safedata_validator` to
+dictate which reference databases can be used. This approach is only suitable for
+sequencing data, and this worksheet is recommended for this class of data.
 
-TODO - Once multiple sheets are implemented I need to describe this + talk about the
-required sheet metadata
+Multiple sequenced taxa worksheets can be provided. The names of these sheets and the
+details (name, version, etc) of the reference databases used to generate them should be
+provided in the Summary metadata. If taxa are used anywhere in the dataset at least one
+worksheet of this type or the GBIFTaxa worksheet must be included. It is also an option
+to provide both a GBIFTaxa worksheet and one or more sequenced taxa worksheets, e.g. in
+cases where both sequencing and observational data are being reported.
+
+We would also encourage you (where possible) to include the raw sequencing data used to
+generate your taxonomies, as it improves replicability to have the raw genomic
+information presented without the interpretative step of generating a taxonomy from it.
+These should be included in addition to your taxonomy sheets as external files
+(described [here](other_formats.md)).
 
 ## Taxon table layout
 
 The table format looks like this:
 
-TODO - Once I've settled I've added the metadata this should be populated from the
-template
+<!-- markdownlint-disable MD013 -->
+{{ read_excel('Example.xlsx', sheet_name = 'Sequenced', keep_default_na = False, tablefmt = 'github') }}
+<!-- markdownlint-enable MD013 -->
 
 The table must contain column headers in the **first row** of the worksheet. The Name
 column is mandatory and must contain a local name for **all** of the taxa that you are
-going to use in the rest of the dataset, aside those that are already described on a
-GBIFTaxa worksheet.
+going to use in the rest of the dataset, aside those that are described in another
+sequenced taxa worksheet or in a GBIFTaxa worksheet.
 
-If both a SeqTaxa and a GBIFTaxa worksheet are provided the same
-taxa can be included in both, e.g. a species found both by observation and eDNA
-sequencing. However, to avoid confusion these should be given different names, i.e.
+If multiple taxonomy worksheets are provided then the same taxon can be included in
+multiple sheets. This could happen when a GBIFTaxa worksheet and a sequenced taxa
+worksheet are both provided, e.g. a species is found both by observation and eDNA
+sequencing. It could also happen when multiple sequenced taxa worksheets are provided if
+they represent different sequencing methods which capture overlapping taxonomic groups.
+In either case, to avoid confusion the taxa should should be given different names, i.e.
 `Vulpes_obs` and `Vulpes_seq` for observed and sequenced instances of `Vulpes`,
-respectively. Names cannot be duplicated either within a SeqTaxa worksheet or from a
-GBIFTaxa worksheet (when one exists)! Note that these can be abbreviations or codes:
-if you want to use `Crbe` in your data worksheets, rather than typing out
+respectively. Names cannot be duplicated either within a sequenced taxa worksheet or
+from a GBIFTaxa worksheet (when one exists)! Note that these can be abbreviations or
+codes: if you want to use `Crbe` in your data worksheets, rather than typing out
 `Crematogaster borneensis` every time, then that is fine.
 
 !!! Note
@@ -110,4 +120,4 @@ You should record this data using GBIF format on a GBIFTaxa worksheet instead.
 
 ## My data doesn't contain taxa
 
-Fine. You can omit either or both of the GBIFTaxa and SeqTaxa worksheets!
+Fine. You can omit both the GBIFTaxa worksheet and the sequenced taxa worksheets!
