@@ -2058,8 +2058,8 @@ class DatetimeField(BaseField):
         self.all_midnight = True
 
         self.bad_strings: list[str] = []
-        self.min = None
-        self.max = None
+        self.min: datetime.datetime | None = None
+        self.max: datetime.datetime | None = None
 
     def validate_data(self, data: list) -> None:
         """Validate date and datetime field data.

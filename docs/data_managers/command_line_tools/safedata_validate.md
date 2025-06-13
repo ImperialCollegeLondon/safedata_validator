@@ -33,9 +33,9 @@ Note that you cannot validate DOIs without an internet connection, but this is o
 To validate taxonomic information against GBIF, you will need to download a copy of the
 **GBIF backbone taxonomy** and build a SQLite3 database from it. The package provides a
 template Python script to do this. If you are happy with running Python scripts, then it
-is not particularly hard and is described in detail
-[here](../install/build_local_gbif.md). The resulting database file is around 1.6GB, so
-you'll need file space!
+is not particularly difficult if you follow the
+[instructions](../install/build_local_gbif.md) provided. The resulting database file is
+around 1.6GB, so you'll need file space!
 
 ## Using `safedata_validate`
 

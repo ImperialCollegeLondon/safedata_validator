@@ -63,9 +63,9 @@ From the archive directory for the version, the database is built from two files
 version](https://hosted-datasets.gbif.org/datasets/backbone/README.html) of the GBIF
 backbone, including taxa that have been deleted from the GBIF backbone.
 
-Those files are both dumps from a PostGRESQL database, and the definition
-(schema) for the resulting table can be found
-[here](https://raw.githubusercontent.com/gbif/checklistbank/master/checklistbank-mybatis-service/src/main/resources/backbone-ddl.sql)
+Those files are both dumps from a PostGRESQL database, and the resulting table follows
+[this definition
+(schema)](https://raw.githubusercontent.com/gbif/checklistbank/master/checklistbank-mybatis-service/src/main/resources/backbone-ddl.sql).
 
 There are a number of steps needed to convert this data into a SQLite3 database, but the
 basic process is:

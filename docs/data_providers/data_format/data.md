@@ -66,9 +66,9 @@ fields and which **cannot be blank**.
 * **field_name**: the name of the variable. This descriptor **must always be the last
   descriptor row**, immediately above the data, so that it can be used as field headers
   when loading data from the file for analysis. Field names _have_ to follow the
-  convention for field names in R (see
-  [here](https://adv-r.hadley.nz/names-values.html#non-syntactic)). Broadly, this should
-  use standard [ASCII](https://en.wikipedia.org/wiki/ASCII) characters and should not
+  [convention for field names in
+  R](https://adv-r.hadley.nz/names-values.html#non-syntactic). Broadly, this should use
+  standard [ASCII](https://en.wikipedia.org/wiki/ASCII) characters and should not
   contain spaces or punctuation, although underscores and full stops are permitted. In
   addition, names starting with a number (e.g. `1` or `2day`) are also forbidden, along
   with a small set of [reserved

@@ -40,7 +40,7 @@ This tool is simply used to validate a dataset that is in [the `safedata`
 format](../../data_providers/data_format/overview.md). The tool needs some simple
 configuration, but is intended to be fairly easy to set up and use.
 
-For more details, see [here](safedata_validate.md).
+For more details, consult the full [tool documentation](safedata_validate.md).
 
 ## `safedata_zenodo`
 
@@ -50,7 +50,7 @@ community account and access tokens and you may also want to edit the default
 [HTML description](../install/configuration.md#html-description-template) used on Zenodo
 and provide additional information to include XML summary metadata.
 
-For more details, see [here](safedata_zenodo.md).
+For more details, consult the full [tool documentation](safedata_zenodo.md).
 
 ## `safedata_metadata`
 
@@ -59,4 +59,4 @@ including adding the details of published datasets and configuring core data suc
 gazetteer. The configuration requires a URL for a server running the safedata server API
 and an access token for posting data to the server.
 
-For more details, see [here](safedata_metadata.md).
+For more details, consult the full [tool documentation](safedata_metadata.md).
