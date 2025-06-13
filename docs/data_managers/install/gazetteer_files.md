@@ -7,8 +7,8 @@ provided using **gazetteer** and **location alias** files, and known locations i
 datasets are then validated against these resources. The data resources providing this
 information are set with the `gazetteer` and `location_aliases` [configuration
 options](configuration.md). This page exists to explains the purpose and contents of
-these two files. See [here](gazetteer_creation.md) for a guide explaining how to create a
-gazetteer.
+these two files. We also provide [a guide](gazetteer_creation.md) explaining how to
+create a gazetteer.
 
 ## The gazetteer file
 
