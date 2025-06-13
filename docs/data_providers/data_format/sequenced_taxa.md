@@ -43,8 +43,8 @@ cases where both sequencing and observational data are being reported.
 We would also encourage you (where possible) to include the raw sequencing data used to
 generate your taxonomies, as it improves replicability to have the raw genomic
 information presented without the interpretative step of generating a taxonomy from it.
-These should be included in addition to your taxonomy sheets as external files
-(described [here](other_formats.md)).
+These should be included in addition to your taxonomy sheets as [external
+files](other_formats.md).
 
 ## Taxon table layout
 
