@@ -60,8 +60,8 @@ locations: chr [1:2691] "SAFE_camp" "Flux_tower" "A_1" "A_2" ...
 If you only use known locations, then you _only need to provide the  location name column_.
 
 !!! Note "`safedata` at the SAFE Project"
-    Details of how to view and use the SAFE project specific gazetteer can be found
-    [here](../../safedata_at_SAFE.md).
+    Details of how to view and use the SAFE project specific gazetteer are included in
+    the [SAFE project details](../../safedata_at_SAFE.md).
 
 ## New locations
 

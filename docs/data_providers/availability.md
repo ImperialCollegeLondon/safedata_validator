@@ -4,8 +4,8 @@ When your dataset is published, the **metadata** will be always immediately publ
 visible on Zenodo. This includes details of the data fields, the spatial scope, the date
 range and the like.
 
-You will also need to set the dataset access rights (see
-[here](data_format/summary.md#access-status)). In general, as much data as possible
+You will also need to set the [dataset access
+rights](data_format/summary.md#access-status). In general, as much data as possible
 should be submitted as **Open access** but the framework supports two alternative access
 models provided by Zenodo:
 
@@ -59,5 +59,5 @@ without discussion with data authors. Data authors should always be consulted ab
 issues arising with their datasets.
 
 !!! Note "`safedata` at the SAFE Project"
-    For details of the SAFE project's data availability polices see
-    [here](../safedata_at_SAFE.md).
+    The SAFE project's data availability polices are included in the SAFE project
+    details](../safedata_at_SAFE.md).

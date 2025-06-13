@@ -189,10 +189,10 @@ worksheet.
     You only need to provide this information if you are also providing data in
     other file formats. If you do provide this block, all rows are mandatory.
 
-You can include files in other file formats in your data submission as described
-[here](other_formats.md). If you do so, then these files must be listed in this
-block: we use this information to ensure that all the correct datafiles have
-been uploaded to Zenodo and to provide a description in the Zenodo record.
+You can include files in [other file formats](other_formats.md) in your data submission.
+If you do so, then these files must be listed in this block: we use this information to
+ensure that all the correct datafiles have been uploaded to Zenodo and to provide a
+description in the Zenodo record.
 
 For each file you must provided the exact filename, which **must not** contain
 spaces, and a description of the file.
@@ -231,8 +231,8 @@ the root of the URL.
     reference number and a link if possible.
 
 !!! Note "`safedata` at the SAFE Project"
-    For funder specific details for the SAFE project see
-    [here](../../safedata_at_SAFE.md).
+    The funder specific details for the SAFE project are included in the [SAFE project
+    details](../../safedata_at_SAFE.md).
 
 Funding details are provided by completing a block as follows and,  as with
 Authors and Worksheets, you can use multiple columns to acknowledge more than
@@ -312,7 +312,8 @@ minutes and seconds (16° 45' 00'") or degrees and decimal minutes (16° 45.00).
 <!-- markdownlint-enable MD013 -->
 
 !!! Note "`safedata` at the SAFE Project"
-    For geographic bounds of the SAFE project see [here](../../safedata_at_SAFE.md).
+    The geographic bounds of the SAFE project are included in the [SAFE project
+    details](../../safedata_at_SAFE.md).
 
 ## Complete example summary table
 

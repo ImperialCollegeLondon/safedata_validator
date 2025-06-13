@@ -13,4 +13,4 @@ See the main documentation for a detailed description and usage:
 ## Development notes
 
 Detailed notes for those interested in assisting with development of the package can be
-found [here](docs/developers/package_development.md).
+found in the [developer documentation](docs/developers/package_development.md).
