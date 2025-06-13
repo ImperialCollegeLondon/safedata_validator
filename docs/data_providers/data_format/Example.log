@@ -82,23 +82,23 @@
             - Added phylum Chordata
             - Added phylum Annelida
             - Added phylum Arthropoda
+            - Added class Insecta
             - Added class Mammalia
             - Added class Clitellata
             - Added class Aves
-            - Added class Insecta
-            - Added order Suliformes
             - Added order Rodentia
             - Added order Arhynchobdellida
             - Added order Carnivora
             - Added order Erinaceomorpha
-            - Added order Primates
             - Added order Hymenoptera
-            - Added family Erinaceidae
+            - Added order Primates
+            - Added order Suliformes
             - Added family Felidae
             - Added family Hominidae
             - Added family Haemadipsidae
-            - Added family Sulidae
             - Added family Muridae
+            - Added family Sulidae
+            - Added family Erinaceidae
             - Added genus Echinosorex
             - Added genus Neofelis
             - Added genus Crematogaster
