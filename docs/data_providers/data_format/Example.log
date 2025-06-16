@@ -23,15 +23,19 @@
         - Metadata for Permits found: 1 records
     - Loading external file metadata
         - Metadata for External Files found: 3 records
+    - Loading sequenced taxa metadata
+        - Metadata for Sequenced Taxa Sheets found: 2 records
+        - Data worksheet Sequenced found.
+        - Data worksheet MoreSeqData found.
     - Loading data worksheet metadata
         - Metadata for Worksheets found: 7 records
-        - Data worksheet  abundances_1 found.
-        - Data worksheet  abundances_2 found.
-        - Data worksheet  interactions_1 found.
-        - Data worksheet  interactions_2 found.
-        - Data worksheet  interactions_3 found.
-        - Data worksheet  external_1 found.
-        - Data worksheet  external_2 found.
+        - Data worksheet abundances_1 found.
+        - Data worksheet abundances_2 found.
+        - Data worksheet interactions_1 found.
+        - Data worksheet interactions_2 found.
+        - Data worksheet interactions_3 found.
+        - Data worksheet external_1 found.
+        - Data worksheet external_2 found.
     - Summary formatted correctly
 - Loading Locations worksheet
     - Checking known locations
@@ -75,35 +79,35 @@
             - Taxon found in GBIF backbone (accepted)
         - Indexing taxonomic hierarchy
             - Added kingdom Animalia
+            - Added phylum Chordata
             - Added phylum Annelida
             - Added phylum Arthropoda
-            - Added phylum Chordata
             - Added class Insecta
             - Added class Mammalia
             - Added class Clitellata
             - Added class Aves
-            - Added order Hymenoptera
-            - Added order Primates
-            - Added order Suliformes
             - Added order Rodentia
             - Added order Arhynchobdellida
             - Added order Carnivora
             - Added order Erinaceomorpha
-            - Added family Erinaceidae
+            - Added order Hymenoptera
+            - Added order Primates
+            - Added order Suliformes
             - Added family Felidae
             - Added family Hominidae
             - Added family Haemadipsidae
-            - Added family Sulidae
             - Added family Muridae
-            - Added genus Haemadipsa
-            - Added genus Prionailurus
-            - Added genus Rattus
+            - Added family Sulidae
+            - Added family Erinaceidae
             - Added genus Echinosorex
             - Added genus Neofelis
             - Added genus Crematogaster
+            - Added genus Haemadipsa
+            - Added genus Prionailurus
+            - Added genus Rattus
         - 13 taxa loaded correctly
-- Loading SeqTaxa worksheet
-    - Reading bioinformatics taxon data
+- Loading sequenced taxonomy worksheet
+    - Reading bioinformatics taxon data from Sequenced
         - Additional fields provided: 'comments'
     - Loading row 1: ASV_100
         - Loaded species: Saitozyma podzolica
@@ -133,7 +137,39 @@
         - Loaded species: Metarhizium carneum
     - Loading row 14: ASV_114
         - Loaded genus: Chloridium
-- 14 taxa loaded correctly
+- 14 taxa loaded correctly from Sequenced
+- Loading sequenced taxonomy worksheet
+    - Reading bioinformatics taxon data from MoreSeqData
+        - Additional fields provided: 'comments'
+    - Loading row 1: TH_100
+        - Loaded species: Saitozyma podzolica
+    - Loading row 2: TH_101
+        - Loaded species: Trichoderma spirale
+    - Loading row 3: TH_102
+        - Loaded species: Apiotrichum sporotrichoides
+    - Loading row 4: TH_103
+        - Loaded genus: Trichoderma
+    - Loading row 5: TH_104
+        - Loaded species: Mortierella elongata
+    - Loading row 6: TH_105
+        - Loaded genus: Talaromyces
+    - Loading row 7: TH_106
+        - Loaded species: Purpureocillium lilacinum
+    - Loading row 8: TH_107
+        - Loaded species: Trichoderma harzianum
+    - Loading row 9: TH_108
+        - Loaded species: Geoglossum difforme
+    - Loading row 10: TH_109
+        - Loaded species: Trichoderma harzianum
+    - Loading row 11: TH_110
+        - Loaded species: Pyrenochaetopsis leptospora
+    - Loading row 12: TH_111
+        - Loaded species: Trichoderma koningiopsis
+    - Loading row 13: TH_113
+        - Loaded species: Metarhizium carneum
+    - Loading row 14: TH_114
+        - Loaded genus: Chloridium
+- 14 taxa loaded correctly from MoreSeqData
 - Checking worksheet 'abundances_1'
     - Validating field metadata
     - Validating field data

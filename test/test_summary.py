@@ -474,7 +474,7 @@ def test_permits(caplog, fixture_summary, alterations, should_log_error, expecte
         (
             {"publication doi": ("https://doi.org/this.does/not.exist",)},
             True,
-            "DOI not found",
+            "Could not connect to link: ",
             True,
         ),
     ],
@@ -579,6 +579,11 @@ def test_doi(
             True,
             "Field funding link contains values of wrong type",
         ),  # via _read_block
+        (
+            {"funding link": ("baosdhvuey",)},
+            True,
+            "Links must start with http or https: ",
+        ),  # not a real link
     ],
 )
 def test_funders(caplog, fixture_summary, alterations, should_log_error, expected_log):
@@ -885,9 +890,23 @@ def test_external_files(
 
 
 @pytest.mark.parametrize(
-    "alterations,alt_sheets,ext_alterations,should_log_error,expected_log",
-    [
-        (dict(), None, dict(), False, "Metadata for Worksheets found"),  # no amendments
+    argnames=[
+        "alterations",
+        "alt_sheets",
+        "ext_alterations",
+        "taxa_sheet_name",
+        "should_log_error",
+        "expected_log",
+    ],
+    argvalues=[
+        (
+            dict(),
+            None,
+            dict(),
+            set(),
+            False,
+            "Metadata for Worksheets found",
+        ),  # no amendments
         (
             {
                 "worksheet title": (
@@ -898,6 +917,7 @@ def test_external_files(
             },  # Missing data
             None,
             dict(),
+            set(),
             True,
             "Missing metadata in mandatory field worksheet title",
         ),
@@ -905,6 +925,7 @@ def test_external_files(
             {"worksheet name": ("DF", None, "Transects")},  # Missing data
             None,
             dict(),
+            set(),
             True,
             "Missing metadata in mandatory field worksheet name",
         ),
@@ -918,6 +939,7 @@ def test_external_files(
             },  # Missing data
             None,
             dict(),
+            set(),
             True,
             "Missing metadata in mandatory field worksheet description",
         ),
@@ -927,6 +949,7 @@ def test_external_files(
             },  # Missing data not a problem for external files
             None,
             dict(),
+            set(),
             False,
             "Metadata for Worksheets found",
         ),
@@ -934,6 +957,7 @@ def test_external_files(
             {"worksheet title": (123, 123, 123)},  # Type errors
             None,
             dict(),
+            set(),
             True,
             "Field worksheet title contains values of wrong type",
         ),
@@ -941,6 +965,7 @@ def test_external_files(
             {"worksheet name": (123, 123, 123)},
             None,
             dict(),
+            set(),
             True,
             "Field worksheet name contains values of wrong type",
         ),
@@ -948,6 +973,7 @@ def test_external_files(
             {"worksheet description": (123, 123, 123)},
             None,
             dict(),
+            set(),
             True,
             "Field worksheet description contains values of wrong type",
         ),
@@ -955,6 +981,7 @@ def test_external_files(
             {"worksheet external file": (None, None, 123)},
             None,
             dict(),
+            set(),
             True,
             "Field worksheet external file contains values of wrong type",
         ),
@@ -962,13 +989,57 @@ def test_external_files(
             {"worksheet name": ("NotInTheSheets",)},  # Unknown worksheet
             None,
             dict(),
+            set(),
             True,
             "Data worksheet NotInTheSheets not found",
+        ),
+        (
+            dict(),  # Sequenced taxa sheet
+            {
+                "DF",
+                "Incidence",
+                "Transects",
+                "Summary",
+                "Taxa",
+                "Locations",
+                "SequenceData",
+            },
+            dict(),
+            "SequenceData",
+            False,
+            "Loading external file metadata",
+        ),
+        (
+            dict(),  # Dataworksheet sequenced taxa sheet clash
+            False,
+            dict(),
+            "Transects",
+            True,
+            "Cannot include sheets as both a data worksheet and a sequenced taxonomy "
+            "sheet:",
         ),
         (
             dict(),  # Unused worksheet
             {"DF", "Incidence", "Transects", "Summary", "Taxa", "Locations", "NotUsed"},
             dict(),
+            set(),
+            True,
+            "Undocumented sheets found in workbook",
+        ),
+        (
+            dict(),  # Unused worksheet + sequenced taxa
+            {
+                "DF",
+                "Incidence",
+                "Transects",
+                "Summary",
+                "Taxa",
+                "Locations",
+                "NotUsed",
+                "SequenceData",
+            },
+            dict(),
+            "SequenceData",
             True,
             "Undocumented sheets found in workbook",
         ),
@@ -982,6 +1053,7 @@ def test_external_files(
             },  # Unknown external file.
             None,
             dict(),
+            set(),
             True,
             "Data worksheet Transects linked to unknown "
             "external files: Amissingfile.dat",
@@ -995,6 +1067,7 @@ def test_external_files(
             },
             None,
             dict(),
+            set(),
             True,
             "Do not include standard metadata sheets in data worksheet details",
         ),
@@ -1009,6 +1082,7 @@ def test_external_files(
             },
             None,
             dict(),
+            set(),
             True,
             "Do not include standard metadata sheets in data worksheet details",
         ),
@@ -1021,6 +1095,7 @@ def test_external_files(
             },
             None,
             {"external file": (None,), "external file description": (None,)},
+            set(),
             True,
             "No data worksheets or external files provided - no data.",
         ),
@@ -1033,6 +1108,7 @@ def test_external_files(
             },
             None,
             dict(),
+            set(),
             False,
             "Only external file descriptions provided",
         ),
@@ -1045,6 +1121,7 @@ def test_external_files(
             },
             None,
             dict(),
+            set(),
             True,
             "Undocumented sheets found in workbook",
         ),  # No worksheets at all provided
@@ -1056,6 +1133,7 @@ def test_data_worksheets(
     alterations,
     alt_sheets,
     ext_alterations,
+    taxa_sheet_name,
     should_log_error,
     expected_log,
 ):
@@ -1074,29 +1152,41 @@ def test_data_worksheets(
         "Locations",
     }
 
+    if taxa_sheet_name:
+        seq_taxa_metadata = [
+            {
+                "sheet_name": taxa_sheet_name,
+                "database_name": None,
+                "database_version": None,
+                "database_link": None,
+            }
+        ]
+    else:
+        seq_taxa_metadata = []
+
+    fixture_summary.sheetnames = sheetnames
+    fixture_summary.sequenced_taxa_metadata = seq_taxa_metadata
+
     # Valid set of information - slightly hacky switch to move between updating a basic
     # example and simply providing no data worksheet information at all.
-    if alterations is None:
-        input = dict()
-    else:
-        input = {
-            "worksheet title": (
-                "My shiny dataset",
-                "My incidence matrix",
-                "Bait trap transect lines",
-            ),
-            "worksheet name": ("DF", "Incidence", "Transects"),
-            "worksheet description": (
-                "This is a test dataset",
-                "A test dataset too",
-                "Attribute table for transect GIS",
-            ),
-            "worksheet external file": (None, None, "BaitTrapTransects.geojson"),
-        }
+    input = {
+        "worksheet title": (
+            "My shiny dataset",
+            "My incidence matrix",
+            "Bait trap transect lines",
+        ),
+        "worksheet name": ("DF", "Incidence", "Transects"),
+        "worksheet description": (
+            "This is a test dataset",
+            "A test dataset too",
+            "Attribute table for transect GIS",
+        ),
+        "worksheet external file": (None, None, "BaitTrapTransects.geojson"),
+    }
 
-        # Update valid to test error conditions and populate _rows
-        # directly (bypassing .load() and need to pack in worksheet object
-        input.update(alterations)
+    # Update valid to test error conditions and populate _rows
+    # directly (bypassing .load() and need to pack in worksheet object
+    input.update(alterations)
 
     fixture_summary._rows = input
 
@@ -1116,7 +1206,166 @@ def test_data_worksheets(
     fixture_summary._load_external_files()
 
     # Test the block load
-    fixture_summary._load_data_worksheets(sheetnames)
+    fixture_summary._load_data_worksheets()
+
+    if should_log_error:
+        assert "ERROR" in [r.levelname for r in caplog.records]
+
+    assert expected_log in caplog.text
+
+
+@pytest.mark.parametrize(
+    argnames=["alterations", "alt_sheets", "should_log_error", "expected_log"],
+    argvalues=[
+        (
+            dict(),
+            None,
+            False,
+            "Metadata for Sequenced Taxa Sheets found: 2 records",
+        ),  # no amendments
+        (
+            {"sequenced taxa sheet name": ("SequenceData1", None)},  # Missing data
+            None,
+            True,
+            "Missing metadata in mandatory field sequenced taxa sheet name",
+        ),
+        (
+            {"reference database name": (None, "SILVA")},  # Missing database name
+            None,
+            True,
+            "Missing metadata in mandatory field reference database name",
+        ),
+        (
+            {
+                "reference database version": (None, "2025-02")
+            },  # Missing database version
+            None,
+            True,
+            "Missing metadata in mandatory field reference database version",
+        ),
+        (
+            {
+                "reference database link": (None, None)
+            },  # Missing data not a problem for database links
+            None,
+            False,
+            "Metadata for Sequenced Taxa Sheets found: 2 records",
+        ),
+        (
+            {"sequenced taxa sheet name": (123, 123)},  # Type errors
+            None,
+            True,
+            "Field sequenced taxa sheet name contains values of wrong type",
+        ),
+        (
+            {"reference database name": (123, 123)},
+            None,
+            True,
+            "Field reference database name contains values of wrong type",
+        ),
+        (
+            {"reference database version": (123, 123)},
+            None,
+            True,
+            "Field reference database version contains values of wrong type",
+        ),
+        (
+            {"reference database link": (None, 123)},
+            None,
+            True,
+            "Field reference database link contains values of wrong type",
+        ),
+        (
+            {
+                "sequenced taxa sheet name": ("SequenceDataUnknown",)
+            },  # Unknown worksheet
+            None,
+            True,
+            "Sequenced taxa sheet SequenceDataUnknown not found",
+        ),
+        (
+            dict(),  # Unused worksheets ignored
+            {"DF", "Incidence", "Transects", "Summary", "Taxa", "Locations", "NotUsed"},
+            False,
+            "Metadata for Sequenced Taxa Sheets found: 2 records",
+        ),
+        (
+            {
+                "sequenced taxa sheet name": (
+                    "Taxa",
+                ),  # Taxa included in sequenced taxa sheets
+                "reference database name": ("GBIF",),
+                "reference database version": ("2023-06-01",),
+                "reference database link": ("https://gbif.org",),
+            },
+            None,
+            True,
+            "Do not include standard metadata sheets in sequenced taxa metadata",
+        ),
+        (
+            {
+                "sequenced taxa sheet name": (
+                    "Locations",
+                ),  # Locations included in sequenced taxa sheets
+                "reference database name": ("Google Earth",),
+                "reference database version": ("v12.3.4",),
+                "reference database link": (None,),
+            },
+            None,
+            True,
+            "Do not include standard metadata sheets in sequenced taxa metadata",
+        ),
+        (
+            {"reference database link": ("baosdhvuey", None)},
+            None,
+            True,
+            "Links must start with http or https: ",
+        ),  # not a real link
+    ],
+)
+def test_load_sequenced_taxa_sheets(
+    caplog,
+    fixture_summary,
+    alterations,
+    alt_sheets,
+    should_log_error,
+    expected_log,
+):
+    """Test that sequenced taxa sheet metadata is appropriately validated."""
+
+    sheetnames = alt_sheets or {
+        "DF",
+        "Incidence",
+        "Transects",
+        "Summary",
+        "Taxa",
+        "Locations",
+        "SequenceData1",
+        "SequenceData2",
+    }
+
+    fixture_summary.sheetnames = sheetnames
+
+    # Valid set of information - slightly hacky switch to move between updating a basic
+    # example and simply providing no data worksheet information at all.
+    input = {
+        "sequenced taxa sheet name": (
+            "SequenceData1",
+            "SequenceData2",
+        ),
+        "reference database name": ("GreenGenes", "SILVA"),
+        "reference database version": ("v1.7.9", "2024-02-29"),
+        "reference database link": ("https://greengenes2.ucsd.edu", None),
+    }
+
+    # Update valid to test error conditions and populate _rows
+    # directly (bypassing .load() and need to pack in worksheet object
+    input.update(alterations)
+
+    fixture_summary._rows = input
+
+    # Test the block load
+    fixture_summary._load_sequenced_taxa_sheets()
 
     if should_log_error:
         assert "ERROR" in [r.levelname for r in caplog.records]
@@ -1477,5 +1726,54 @@ def test_core(
     # check that relevant attributes have be populated correctly
     assert fixture_summary.title == "Test data set"
     assert fixture_summary.description == "An example data set to test core loading"
+
+    log_check(caplog, expected_log_entries)
+
+
+@pytest.mark.parametrize(
+    argnames=["link", "expected_log_entries"],
+    argvalues=[
+        pytest.param(
+            "https://unite.ut.ee",
+            (),
+            id="valid link",
+        ),
+        pytest.param(
+            "http://unite.ut.ee",
+            ((ERROR, "Could not connect to link: "),),
+            id="incorrect link",
+        ),
+        pytest.param(
+            "www.unite.ut.ee",
+            ((ERROR, "Links must start with http or https: "),),
+            id="used www",
+        ),
+        pytest.param(
+            "unite.ut.ee",
+            ((ERROR, "Links must start with http or https: "),),
+            id="missing https",
+        ),
+        pytest.param(
+            "adsbohvqewivdahsv",
+            ((ERROR, "Links must start with http or https: "),),
+            id="meaningless string",
+        ),
+        pytest.param(
+            r"C:\Users\User\Documents\file.txt",
+            ((ERROR, "Links must start with http or https: "),),
+            id="file path",
+        ),
+        pytest.param(
+            "https://notarealwebsite.com",
+            ((ERROR, "Could not connect to link:"),),
+            id="not a real website",
+        ),
+    ],
+)
+def test_check_link_validity(caplog, link, expected_log_entries):
+    """Check that the function to check the validity of links works as intended."""
+    from safedata_validator.summary import check_link_validity
+
+    check_link_validity(link)
 
     log_check(caplog, expected_log_entries)

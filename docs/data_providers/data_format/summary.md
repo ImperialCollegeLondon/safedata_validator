@@ -151,9 +151,9 @@ URL `http://orcid.org/0000-0002-7005-1394`.
     The **Worksheet external file** field is only required if a worksheet entry
     describes data held in another file. All other fields are mandatory,
 
-Each **data worksheet** must be described here - do not include the Taxa and
-Locations worksheet in this block. As with the authors, you can describe
-multiple sheets in adjacent columns.
+Each **data worksheet** must be described here - do not include the GBIFTaxa worksheet,
+any sequenced taxa worksheets or the Locations worksheet in this block. As with the
+authors, you can describe multiple sheets in adjacent columns.
 
 * The **Worksheet name** row must contain the label of a worksheet in the
    workbook: that is, the **exact text** shown on the worksheet tab at the
@@ -168,6 +168,41 @@ multiple sheets in adjacent columns.
 
 <!-- markdownlint-disable MD013 -->
 {{ read_csv('Summary.csv', keep_default_na = False, header = None, tablefmt = 'github', skiprows = 10, nrows = 4) }}
+<!-- markdownlint-enable MD013 -->
+
+## Sequenced taxa sheets block
+
+!!! Note "Optional block"
+    You only need to provide this information if you are providing sequenced taxonomy
+    sheets. If you are either providing observed taxonomy (as a GBIFTaxa sheet) or your
+    data doesn't involve taxonomy at all nothing needs to be provided here.
+
+For each sequenced taxa sheet, metadata has to be provided. This is so that the
+taxonomic authority the taxonomy is generated from is recorded. This isn't required for
+observed taxonomy as GBIF is the only taxonomic authority that we allow, but for
+sequenced taxonomies we do not restrict you to use a particular taxonomic authority, and
+so the details of this authority need to be recorded.
+
+Each **sequenced taxonomy sheet** must have its metadata described - do not include
+metadata for the GBIFTaxa worksheet, the Locations worksheet or data worksheets in this
+block. As with the data worksheets, you can describe multiple sheets in adjacent
+columns.
+
+* The **Sequenced taxa sheet name** row must contain the label of a worksheet in the
+   workbook: that is, the **exact text** shown on the worksheet tab at the
+   bottom.
+* The **Reference database name** row is free text and must contain the name of the
+  reference taxonomy database used.
+* The **Reference database version** row is also free text and must contain the
+  specific version of the reference database that was used to generate the taxonomy.
+  Sometimes these versions are provided as date stamps, in this case you **must** ensure
+  that the cell is formatted as text and **not** as a date.
+* You can also optionally provide a link to the taxonomic authority/reference database
+  using the **Reference database link** row. If provided this value must be a valid link
+  (e.g. start with `https` or `http`, etc).
+
+<!-- markdownlint-disable MD013 -->
+{{ read_csv('Summary.csv', keep_default_na = False, header = None, tablefmt = 'github', skiprows = 31, nrows = 4, usecols=[0, 1, 2]) }}
 <!-- markdownlint-enable MD013 -->
 
 ## Keywords block

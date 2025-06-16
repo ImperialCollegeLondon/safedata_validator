@@ -672,7 +672,6 @@ def dataset_description(
     context_dict["gbif_timestamp"] = dataset_metadata["gbif_timestamp"]
 
     gbif_taxon_index = dataset_metadata["gbif_taxa"]
-    seq_taxon_index = dataset_metadata["seq_taxa"]
 
     context_dict["gbif_taxa"] = (
         taxon_index_to_text(taxa=gbif_taxon_index, html=True)
@@ -680,11 +679,24 @@ def dataset_description(
         else None
     )
 
-    context_dict["seq_taxa"] = (
-        taxon_index_to_text(taxa=seq_taxon_index, html=True)
-        if seq_taxon_index
-        else None
-    )
+    # Save both taxon index and the database metadata as sections of the context dict.
+    # Both of these are separated by sheet
+    sequenced_taxa_sheets = dataset_metadata["sequenced_taxa"]
+    if sequenced_taxa_sheets:
+        context_dict["seq_taxa"] = {}
+        context_dict["seq_taxa_metadata"] = {}
+        for sheet_name, taxon_data in sequenced_taxa_sheets.items():
+            context_dict["seq_taxa"][f"{sheet_name}"] = taxon_index_to_text(
+                taxa=taxon_data["taxon_index"], html=True
+            )
+            context_dict["seq_taxa"][f"{sheet_name}"] = {
+                "database_name": taxon_data["database_name"],
+                "database_version": taxon_data["database_version"],
+                "database_link": taxon_data["database_link"],
+            }
+    else:
+        context_dict["seq_taxa"] = None
+        context_dict["seq_taxa_metadata"] = None
 
     html = template.render(context_dict)
 

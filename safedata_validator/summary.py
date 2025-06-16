@@ -7,6 +7,7 @@ methods for loading the summary data from file.
 import datetime
 import re
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 import requests  # type: ignore
 from dateutil.relativedelta import relativedelta
@@ -126,8 +127,12 @@ class Summary:
         """Extent instance for the longitudinal extent of the Dataset."""
         self.external_files: list[dict] | None = None
         """A list of dictionaries of external file metadata."""
+        self.sheetnames: set[str] = set()
+        """List of sheet names provided in the Excel file."""
         self.data_worksheets: list[Worksheet] = []
-        """A list of dictionaries of data tables in the Dataset."""
+        """A list of worksheets (data tables) in the Dataset."""
+        self.sequenced_taxa_metadata: list[dict[str, str]] = []
+        """List sheet names used for sequenced taxa sheets."""
 
         self._rows: dict = {}
         """A private attribute holding the row data for the summary."""
@@ -248,6 +253,17 @@ class Summary:
                 title="Worksheets",
                 singular=False,
             ),
+            sequenced_taxa=SummaryBlock(
+                fields=[
+                    SummaryField("sequenced taxa sheet name", True, "sheet_name", str),
+                    SummaryField("reference database name", True, "database_name", str),
+                    SummaryField("reference database version", True, "version", str),
+                    SummaryField("reference database link", False, "link", str),
+                ],
+                mandatory=False,
+                title="Sequenced Taxa Sheets",
+                singular=False,
+            ),
             permits=SummaryBlock(
                 fields=[
                     SummaryField("permit type", True, "type", str),
@@ -280,6 +296,7 @@ class Summary:
 
         self.validate_doi = validate_doi
 
+        self.sheetnames = sheetnames
         rows = load_rows_from_worksheet(worksheet)
 
         self._ncols = worksheet.max_column
@@ -326,7 +343,8 @@ class Summary:
         self._load_funders()
         self._load_permits()
         self._load_external_files()
-        self._load_data_worksheets(sheetnames)
+        self._load_sequenced_taxa_sheets()
+        self._load_data_worksheets()
 
         # summary of processing
         self.n_errors = handler.counters["ERROR"] - start_errors
@@ -585,13 +603,10 @@ class Summary:
             if self.validate_doi:
                 for is_doi in pub_doi_re:
                     if is_doi:
-                        api_call = (
+                        check_link_validity(
                             f"https://doi.org/api/handles/"
                             f"{is_doi.string[is_doi.end() :]}"
                         )
-                        r = requests.get(api_call)
-                        if r.json()["responseCode"] != 1:
-                            LOGGER.error(f"DOI not found: {is_doi.string}")
 
         self.publication_doi = pub_doi
 
@@ -607,9 +622,10 @@ class Summary:
         # of the funding type and then optionally a reference number and a URL
 
         funders = self._read_block(self.fields["funding"])
-
-        # TODO - currently no check beyond _read_block but maybe actually check
-        #        the URL is a URL and maybe even opens? Could use urllib.parse
+        if funders:
+            for funder in funders:
+                if isinstance(funder["url"], str):
+                    check_link_validity(funder["url"])
 
         self.funders = funders
 
@@ -696,8 +712,76 @@ class Summary:
 
         self.external_files = external_files
 
+    @loggerinfo_push_pop("Loading sequenced taxa metadata")
+    def _load_sequenced_taxa_sheets(self):
+        """Load the sequenced taxa block.
+
+        Provides summary validation specific to the sequenced taxa sheets block. The
+        main things to be checked here are:
+
+        1. Are there any standard worksheets incorrectly included in the sequenced taxa
+           sheets block?
+        2. That all sequenced taxa sheets listed in the metadata block actually exist as
+           worksheets?
+        3. That links to online databases are valid (if they are provided).
+        """
+
+        # Load data worksheet data and convert an empty block from None to an empty list
+        seq_taxa_sheets = self._read_block(self.fields["sequenced_taxa"])
+        seq_taxa_sheets = [] if seq_taxa_sheets is None else seq_taxa_sheets
+
+        # 1. Strip out faulty inclusion of standard worksheets
+        cited_sheets = {seq_taxa["sheet_name"] for seq_taxa in seq_taxa_sheets}
+        standard_sheets = {
+            "Summary",
+            "GBIFTaxa",
+            "Taxa",
+            "Locations",
+        }
+        cited_standard_sheets = cited_sheets.intersection(standard_sheets)
+
+        if cited_standard_sheets:
+            LOGGER.error(
+                "Do not include standard metadata sheets in sequenced taxa metadata: ",
+                extra={"join": cited_standard_sheets},
+            )
+
+            seq_taxa_sheets = [
+                seq_taxa
+                for seq_taxa in seq_taxa_sheets
+                if seq_taxa["sheet_name"] not in standard_sheets
+            ]
+
+        # 2. Named sequenced taxa sheets must exist
+        for each_seq_taxa in seq_taxa_sheets:
+            if each_seq_taxa["sheet_name"] not in self.sheetnames:
+                # Unknown worksheet
+                LOGGER.error(
+                    f"Sequenced taxa sheet {each_seq_taxa['sheet_name']} not found"
+                )
+            else:
+                LOGGER.info(f"Data worksheet {each_seq_taxa['sheet_name']} found.")
+
+        # 3. Check that links to online databases are valid (if they are provided)
+        for seq_taxa in seq_taxa_sheets:
+            if isinstance(seq_taxa["link"], str):
+                check_link_validity(seq_taxa["link"])
+
+        # Find the metadata for the taxa
+        metadata = [
+            {
+                "sheet_name": sheet["sheet_name"],
+                "database_name": sheet["database_name"],
+                "database_version": sheet["version"],
+                "database_link": sheet["link"],
+            }
+            for sheet in seq_taxa_sheets
+        ]
+
+        self.sequenced_taxa_metadata = metadata
+
     @loggerinfo_push_pop("Loading data worksheet metadata")
-    def _load_data_worksheets(self, sheetnames):
+    def _load_data_worksheets(self):
         """Load the worksheets block.
 
         Provides summary validation specific to the worksheets block. The main things to
@@ -705,8 +789,9 @@ class Summary:
 
         1. Are there any standard worksheets incorrectly included in the data worksheets
            block?
-        2. Are all the data worksheets present in the workbook documented?
-        3. Do any worksheets linked to external files used documented external files?
+        2. Are any sheets claimed as sequenced taxa sheets as well as data worksheets?
+        3. Are all the data worksheets present in the workbook documented?
+        4. Do any worksheets linked to external files used documented external files?
         """
 
         # Load data worksheet data and convert an empty block from None to an empty list
@@ -719,7 +804,6 @@ class Summary:
             "Summary",
             "GBIFTaxa",
             "Taxa",
-            "SeqTaxa",
             "Locations",
         }
         cited_standard_sheets = cited_sheets.intersection(standard_sheets)
@@ -731,17 +815,40 @@ class Summary:
             )
 
             data_worksheets = [
-                ws for ws in data_worksheets if ws["name"] in standard_sheets
+                ws for ws in data_worksheets if ws["name"] not in standard_sheets
             ]
 
-        # 2. Check for existing sheets without description
-        extra_names = set(sheetnames) - standard_sheets - cited_sheets
+        # 2. Check if sheets have been included that are already claimed as sequenced
+        #    taxonomy sheets
+        sequenced_taxa_sheets = {
+            metadata["sheet_name"] for metadata in self.sequenced_taxa_metadata
+        }
+        cited_seq_taxa_sheets = cited_sheets.intersection(sequenced_taxa_sheets)
+
+        if cited_seq_taxa_sheets:
+            LOGGER.error(
+                "Cannot include sheets as both a data worksheet and a sequenced "
+                "taxonomy sheet: ",
+                extra={"join": cited_seq_taxa_sheets},
+            )
+
+            data_worksheets = [
+                ws for ws in data_worksheets if ws["name"] not in sequenced_taxa_sheets
+            ]
+
+        # 3. Check for existing sheets without description
+        extra_names = (
+            set(self.sheetnames)
+            - standard_sheets
+            - cited_sheets
+            - sequenced_taxa_sheets
+        )
         if extra_names:
             LOGGER.error(
                 "Undocumented sheets found in workbook: ", extra={"join": extra_names}
             )
 
-        # 3. Look to see what data is available:
+        # 4. Look to see what data is available:
         #    - No worksheets or external files: no data to document is an error.
         #    - Only external files: no tabular description of external files, just
         #      descriptions of the files themselves.
@@ -763,7 +870,7 @@ class Summary:
 
         # Check provided data worksheets
         for each_ws in data_worksheets:
-            if each_ws["name"] not in sheetnames:
+            if each_ws["name"] not in self.sheetnames:
                 # Unknown worksheet
                 LOGGER.error(f"Data worksheet {each_ws['name']} not found")
             elif (
@@ -776,7 +883,7 @@ class Summary:
                     f"external files: {each_ws['external']}",
                 )
             else:
-                LOGGER.info(f"Data worksheet  {each_ws['name']} found.")
+                LOGGER.info(f"Data worksheet {each_ws['name']} found.")
 
         self.data_worksheets = data_worksheets
 
@@ -938,3 +1045,30 @@ def load_rows_from_worksheet(worksheet: Worksheet) -> list[tuple]:
             rows.append(this_row)
 
     return rows
+
+
+def check_link_validity(link_address: str) -> None:
+    """Check the validity of a link that has been provided.
+
+    This function checks that the link has a valid syntax (http or https network
+    scheme). If the link appears to be syntactically valid is valid, then requests is
+    used to check that the link actually exists.
+
+    Args:
+        link_address: Link to validate.
+    """
+
+    parsed_link = urlparse(link_address)
+
+    if parsed_link.scheme not in ["http", "https"]:
+        LOGGER.error(f"Links must start with http or https: {link_address}")
+        return
+
+    try:
+        r = requests.head(link_address)
+    except requests.exceptions.ConnectionError:
+        LOGGER.error(f"Could not connect to link: {link_address}")
+        return
+
+    if r.status_code != 200:
+        LOGGER.error(f"Could not connect to link: {link_address}")

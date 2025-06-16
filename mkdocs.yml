@@ -31,7 +31,7 @@ nav:
       - 'Summary worksheet': 'data_providers/data_format/summary.md'
       - 'Taxa worksheets': 'data_providers/data_format/taxa.md'
       - 'GBIFTaxa worksheet': 'data_providers/data_format/gbif_taxa.md'
-      - 'SeqTaxa worksheet': 'data_providers/data_format/sequenced_taxa.md'
+      - 'Sequenced taxa worksheets': 'data_providers/data_format/sequenced_taxa.md'
       - 'Locations worksheet': 'data_providers/data_format/locations.md'
       - 'Data worksheets': 'data_providers/data_format/data.md'
       - 'Other file formats': 'data_providers/data_format/other_formats.md'
