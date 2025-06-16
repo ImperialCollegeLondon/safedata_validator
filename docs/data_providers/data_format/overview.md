@@ -17,19 +17,14 @@ typically contain at least four worksheets.
 
 - [**Summary**](summary.md): This contains some simple information about the authors of
   the dataset, access rights and the individual data tables in the dataset.
-- [**GBIFTaxa**](gbif_taxa.md): This describes taxa used in the Data worksheets, using
-  the GBIF taxonomy backbone as a reference. This is best for observational data.
-- [**Sequenced taxa sheets**](sequenced_taxa.md): In many cases, taxa are identified by
-  sequence matching against sequence databases (e.g. NCBI). In theory,
-  `safedata_validator` could validate taxon ids against the underlying databases in the
-  same way that it does using GBIF for visually identified taxa. However there are many
-  databases and they are frequently updated. Instead, sequenced taxa sheets can be
-  used to provide a table of taxonomic ranks for matched sequences: this is a common
-  export format from bioinformatics workflows and allows `safedata_validator` to provide
-  an hierarchical taxon index for these taxa. These sheets should only be used for
-  sequenced taxa and no validation is carried out beyond the formatting of the table.
-  The names used for these sheets should be recorded along with details of the database
-  used to generate them in the Summary metadata.
+- [**GBIFTaxa**](gbif_taxa.md): This worksheet is used to provide detailed taxonomic
+  information for field observations of taxa used in the Data worksheets. The worksheet
+  is used to validate that all taxa referenced in datasets are recorded and can be
+  placed on the GBIF backbone taxonomy.
+- [**Sequenced taxa sheets**](sequenced_taxa.md): These worksheets are used to record
+  taxonomic details of taxa identified through sequence matching against bioinformatic
+  databases (e.g. NCBI). They are used to confirm that bioinformatic details are
+  provided for all sequenced taxa referenced in datasets.
 - [**Locations**](locations.md): This describes all the sampling locations used in the
   dataset.
 - [**Data worksheets**](data.md): After these worksheets come your data tables. You

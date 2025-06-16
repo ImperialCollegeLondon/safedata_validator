@@ -24,15 +24,24 @@ thead th {
 </style>
 <!-- markdownlint-enable MD033 -->
 
-This worksheet exists to record taxonomic in information for organisms referred to in
-the Data worksheets. This taxonomic information should be recorded in a format that can
-be validated against the GBIF backbone taxonomy. Generally the GBIF backbone taxonomy is
-most suitable for taxa discovered via direct observation (rather than sequencing), so
-this worksheet is most appropriate for storing the details of directly observed taxa. If
-taxa are used anywhere in the dataset either this worksheet or a [sequenced taxa
-worksheet](./sequenced_taxa.md) must be included. It is also an option to provide a
-GBIFTaxa worksheet along with one or more sequenced taxa worksheets, e.g. in cases where
-both sequencing and direct observational data are being reported.
+The `GBIFTaxa` worksheet is used to record taxonomic details of organisms referred to in
+the Data worksheets. It is generally intended for use with field observations of
+organisms, such as direct observation, camera trapping, audio recordings and similar.
+The taxonomic information is used in three ways:
+
+* The listed taxa are validated against a version of the GBIF backbone taxonomy. This is
+  done to try and identify the common typographic errors and taxonomic issues that make
+  it difficult to reuse field data.
+* The list of taxa are cross-checked against taxon fields in the [data
+  worksheets](./data.md) to confirm that there is a complete list of the taxa recorded
+  in the datasets.
+* The taxonomy is used to generate an hierarchical taxon index that can be used to
+  search datasets for taxa of interest.
+
+If you have taxa that have been identified via sequencing - rather than field
+observation - then one or more [sequenced taxa worksheets](./sequenced_taxa.md) should
+be included instead. If you have both field observations and sequenced taxa, you will
+need to provide both.
 
 ## GBIF Taxon validation
 
@@ -57,21 +66,25 @@ The table format looks like this:
 The table must contain column headers in the **first row** of the worksheet. The first
 three columns (Name, Taxon name and Taxon type) are mandatory and contain the following:
 
-- **Name**: This column must contain a local name for **all** of the taxa that you are
+* **Name**: This column must contain a local name for **all** of the taxa that you are
   going to use in the rest of the dataset. You cannot have duplicated names! Note that
   these can be abbreviations or codes: if you want to use `Crbe` in your data
   worksheets, rather than typing out `Crematogaster borneensis` every time, then that is
   fine.
+  
+  Please also note that different worksheet names need to be used if a taxon is detected
+  in multiple ways and hence represented in [multiple taxa
+  worksheets](./taxa.md#duplicate-taxa).
 
 !!! Note
     These are the names that you are going to use in your data worksheet. The
     other columns are to help us validate the taxonomy of your names.
 
-- **Taxon name**: This column must contain the scientific name of the taxon, which will
+* **Taxon name**: This column must contain the scientific name of the taxon, which will
   be used for taxon validation via GBIF. Note that this should not include any taxon
   authority, so _Panthera tigris_ not _Panthera tigris_ (Linnaeus, 1758).
 
-- **Taxon type**: This column must provide the **taxonomic type** of the named taxon,
+* **Taxon type**: This column must provide the **taxonomic type** of the named taxon,
   which is usually the taxonomic **rank**. For example, the taxon _Pongo pygmaeus_ would
   be of type `Species` and the taxon Formicidae would be of type `Family`. If the taxon
   type is not one of the core GBIF backbone ranks ( Kingdom, Phylum, Order, Class,
@@ -79,7 +92,7 @@ three columns (Name, Taxon name and Taxon type) are mandatory and contain the fo
   `Morphospecies` or `Functional group`, then you will need to provide a **parent
   taxon** (see below).
 
-- **Comments**: This is entirely optional - if you have a fairly standard set of taxa
+* **Comments**: This is entirely optional - if you have a fairly standard set of taxa
   with no  serious issues then you can leave it out entirely or it can be empty. If you
   do have particular notes that you want to make - explaining disagreements with GBIF
   taxonomy, new species notes and the  like - then these can be very useful for future

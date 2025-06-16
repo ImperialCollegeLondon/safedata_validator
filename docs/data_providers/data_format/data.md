@@ -202,7 +202,8 @@ recorded. All of the labels must have been included in the Locations worksheet.
 
 Columns of this type contain taxon names showing the taxon from which other data in the
 row was recorded. All of the values in the row must appear in the Taxon Names column in
-a Taxa worksheet (i.e. either GBIFTaxa or a sequenced taxa worksheet).
+a Taxa worksheet (i.e. either [GBIFTaxa](./gbif_taxa.md) or a [sequenced
+taxa](./sequenced_taxa.md)  worksheet).
 
 You don't need to complete any other descriptors. In particular, there is no need to
 provide a list of accepted values: the entries are validated against the Taxa worksheet.

@@ -24,27 +24,45 @@ thead th {
 </style>
 <!-- markdownlint-enable MD033 -->
 
-This type of worksheet plays a similar role to the [GBIFTaxa worksheet](./gbif_taxa.md),
-that is recording the taxonomic information for organisms referred to in the Data
-worksheets. The key difference is that this taxonomic information is not validated
-against a reference database. The reason for this is that software to generate
-taxonomies from sequencing data use a wide range of different reference databases, and
-it is not appropriate for a piece of validation software like `safedata_validator` to
-dictate which reference databases can be used. This approach is only suitable for
-sequencing data, and this worksheet is recommended for this class of data.
+Like the [GBIFTaxa worksheet](./gbif_taxa.md), a sequenced taxa worksheet is used to
+record taxonomic details of organisms referred to in the Data worksheets, but is
+intended for use with taxa identified through sequencing rather than field observation.
+Like the GBIFTaxa worksheet, the taxonomic information is used to:
+
+* Cross-check the listed taxa against taxon fields in the [data worksheets](./data.md)
+  to confirm that there is a complete list of the taxa recorded in the datasets.
+* Generate an hierarchical taxon index that can be used to search datasets for taxa of
+  interest.
+
+However, unlike the GBIF taxa worksheets, `safedata_validator` does not validate the
+provided taxa against the underlying bioinformatic datasets. Latin binomial names from
+field observations can be matched against any broad taxonomic database - we use GBIF
+because it is well-curated and updated - but taxonomic ids from sequencing can only
+really be validated against the specific bioinformatic database and version used by the
+researchers. This is beyond the scope of `safedata_validator`, so no validation is
+performed. We instead expect researchers to provide simple information in the Summary
+data about the bioinformatic dataset used to generate sequenced taxa id, which could
+be used to revisit taxon identification.
+
+A sequenced taxa worksheet is used to provide a table of taxonomic ranks for matched
+sequences. This is a common export format from bioinformatics workflows and allows
+`safedata_validator` to provide an hierarchical taxon index for these taxa as well as
+providing a list of sequenced taxon names to be checked against the taxon names provided
+in [data worksheets](./data.md).
 
 Multiple sequenced taxa worksheets can be provided. The names of these sheets and the
 details (name, version, etc) of the reference databases used to generate them should be
 provided in the Summary metadata. If taxa are used anywhere in the dataset at least one
 worksheet of this type or the GBIFTaxa worksheet must be included. It is also an option
-to provide both a GBIFTaxa worksheet and one or more sequenced taxa worksheets, e.g. in
-cases where both sequencing and observational data are being reported.
+to provide both a GBIFTaxa worksheet and one or more sequenced taxa worksheets, where
+taxa identified through both sequencing and field observation are being reported.
 
 We would also encourage you (where possible) to include the raw sequencing data used to
 generate your taxonomies, as it improves replicability to have the raw genomic
-information presented without the interpretative step of generating a taxonomy from it.
-These should be included in addition to your taxonomy sheets as [external
-files](other_formats.md).
+information in addition to your taxonomic assignment of sequences presented in the
+sequenced taxa worksheets. Sequencing data should be included as [external
+files](other_formats.md), and you should note in the comments which sequence worksheet
+it provides raw data for.
 
 ## Taxon table layout
 
@@ -57,27 +75,17 @@ The table format looks like this:
 The table must contain column headers in the **first row** of the worksheet. The Name
 column is mandatory and must contain a local name for **all** of the taxa that you are
 going to use in the rest of the dataset, aside those that are described in another
-sequenced taxa worksheet or in a GBIFTaxa worksheet.
+sequenced taxa worksheet or in a GBIFTaxa worksheet. The other columns are to help us
+maintain a taxonomic index for the taxa used in your datasets.
 
-If multiple taxonomy worksheets are provided then the same taxon can be included in
-multiple sheets. This could happen when a GBIFTaxa worksheet and a sequenced taxa
-worksheet are both provided, e.g. a species is found both by observation and eDNA
-sequencing. It could also happen when multiple sequenced taxa worksheets are provided if
-they represent different sequencing methods which capture overlapping taxonomic groups.
-In either case, to avoid confusion the taxa should should be given different names, i.e.
-`Vulpes_obs` and `Vulpes_seq` for observed and sequenced instances of `Vulpes`,
-respectively. Names cannot be duplicated either within a sequenced taxa worksheet or
-from a GBIFTaxa worksheet (when one exists)! Note that these can be abbreviations or
-codes: if you want to use `Crbe` in your data worksheets, rather than typing out
-`Crematogaster borneensis` every time, then that is fine.
+* **Name**: This column is mandatory and these are the names that you are going to use
+  in your data worksheet.  These can be abbreviations or codes: if you want to use
+  `E_coli_FaMsAh` in your data worksheets, rather than typing out `Escherichia coli
+  FaMsAh gene for 16S rRNA, LC842012` every time, then that is fine.
 
-!!! Note
-
-    These are the names that you are going to use in your data worksheet. The
-    other columns are to help us validate the taxonomy of your names.
-
-* **Name**: This column is mandatory and provides the name by which the taxon is
-  referred to in the data worksheets.
+  Please note that different worksheet names need to be used if a taxon is detected in
+  multiple ways and hence represented in [multiple taxa
+  worksheets](./taxa.md#duplicate-taxa).
 
 * **Ranks**: Here the column name (e.g. Phylum) provides a **taxonomic rank**, and the
   row entries provide the relevant names for this rank. A top level rank must be
