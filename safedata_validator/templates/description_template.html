@@ -141,12 +141,15 @@
   <h2>Bioinformatics taxonomy details</h2>
 
   <p>The dataset contains taxa that were identified as part of a bioinformatics
-    workflow. These taxa are not independently validated as they have been
-    generated using established reference databases. Details of the reference databases
-    used by each sequenced taxonomy worksheet are provided below.
+    workflow. These taxa are not independently validated as they have been generated using
+    established reference databases. Details of the reference databases used by each
+    sequenced taxonomy worksheet are provided below. Taxonomy trees (resolved to phylum
+    level) are also provided. For more detailed information on the taxa contained in the
+    dataset, you will need to download the data.
   </p>
   {% for sheet_name, details in seq_taxa.items() %}
   <h3>{{ sheet_name }} taxonomy sheet</h3>
+  <h4>Reference taxonomy database details</h4>
   <ul>
     <li>Reference taxonomy database: {{ details.database_name }}</li>
     <li>Database version used: {{ details.database_version }}</li>
@@ -154,6 +157,8 @@
     <li>Database link: <a href="{{details.database_link}}">{{ details.database_link }}</a></li>
     {% endif %}
   </ul>
+  <h4>Taxa tree (to phylum level)</h4>
+  <p>{{details.index}}</p>
   {% endfor %}
   {% endif %}
 

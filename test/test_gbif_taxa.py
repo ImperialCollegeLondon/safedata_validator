@@ -1,5 +1,6 @@
 """Tests checking that the GBIF specific classes work as intended."""
 
+from contextlib import nullcontext as does_not_raise
 from logging import ERROR, INFO, WARNING
 
 import pytest
@@ -823,3 +824,31 @@ def test_taxa_load(example_excel_files, fixture_resources, n_errors, n_taxa):
     tx.load(example_excel_files["Taxa"])
 
     assert tx.n_errors == n_errors
+
+
+@pytest.mark.parametrize(
+    "lowest_rank, raises, error_message",
+    [
+        ("phylum", does_not_raise(), ""),
+        (None, does_not_raise(), ""),
+        (
+            "gibberish",
+            pytest.raises(ValueError),
+            "Rank provided to render taxa tree down to gibberish is not a backbone "
+            "rank! Should be one of: ['domain', ",
+        ),
+    ],
+)
+def test_taxon_index_to_text(
+    example_dataset_metadata, lowest_rank, raises, error_message
+):
+    """Test that taxon_index_to_text fails if bad input is given."""
+    from safedata_validator.taxa import taxon_index_to_text
+
+    with raises as e:
+        taxon_index_to_text(
+            taxa=example_dataset_metadata["gbif_taxa"], lowest_taxa=lowest_rank
+        )
+
+    if error_message:
+        assert str(e.value).startswith(error_message)

@@ -48,7 +48,9 @@ from safedata_validator.validators import (
     blank_value,
 )
 
-GBIF_BACKBONE_RANKS = [
+ALL_BACKBONE_RANKS = [
+    "domain",
+    "superkingdom",
     "kingdom",
     "phylum",
     "class",
@@ -59,19 +61,16 @@ GBIF_BACKBONE_RANKS = [
     "subspecies",
 ]
 
-# Possible top level ranks one of which must be provided
-SEQ_TOP_RANKS = ["domain", "superkingdom", "kingdom"]
+# GBIF backbone doesn't include the two highest-level ranks ("domain", "superkingdom")
+GBIF_BACKBONE_RANKS = ALL_BACKBONE_RANKS[2:]
 
-# List of additional ranks (in descending order) can be used to describe the taxonomy
-# further
-SEQ_ADDITIONAL_RANKS = [
-    "phylum",
-    "class",
-    "order",
-    "family",
-    "genus",
-    "species",
-]
+# For sequenced taxonomy the top level rank can be any of the top three ranks ("domain",
+# "superkingdom", "kingdom")
+SEQ_TOP_RANKS = ALL_BACKBONE_RANKS[0:3]
+
+# Sequenced taxonomy can then also include anything else as a backbone rank apart from
+# subspecies
+SEQ_ADDITIONAL_RANKS = ALL_BACKBONE_RANKS[3:-1]
 
 # NBCI name regex
 NCBI_prefix_re = re.compile("^[a-z]__")
@@ -1392,7 +1391,10 @@ class Taxa:
 
 
 def taxon_index_to_text(
-    taxa: list[dict], html: bool = False, indent_width: int = 4
+    taxa: list[dict],
+    html: bool = False,
+    indent_width: int = 4,
+    lowest_taxa: str | None = None,
 ) -> str | tags.div:
     """Render a taxon index as text or html.
 
@@ -1404,6 +1406,8 @@ def taxon_index_to_text(
         taxa: A list of taxon dictionaries containing the taxa for a dataset.
         html: Render as html or text.
         indent_width: The indentation width to use for successive taxonomic ranks.
+        lowest_taxa: The lowest taxonomic rank that the index renders, if no rank is
+            provided then the index is rendered for all ranks.
 
     Returns:
         Either a HTML or text representation of the taxa tree.
@@ -1468,8 +1472,26 @@ def taxon_index_to_text(
             if first_nm != taxon["worksheet_name"]:
                 surp_tx_ids.append(idx)
 
+    # Eliminate any taxa with ranks below the minimum
+    if lowest_taxa:
+        # Check that the lowest rank appears in the full set of taxa
+        if lowest_taxa not in ALL_BACKBONE_RANKS:
+            raise ValueError(
+                f"Rank provided to render taxa tree down to {lowest_taxa} is not a "
+                f"backbone rank! Should be one of: {ALL_BACKBONE_RANKS}"
+            )
+
+        # Generate the full list of ranks that should be rendered
+        rendered_ranks = ALL_BACKBONE_RANKS[: ALL_BACKBONE_RANKS.index(lowest_taxa) + 1]
+
+        # Then add any taxa that have ranks that aren't in the list of rendered ranks to
+        # the superfluous taxa index
+        for idx, taxon in enumerate(taxa):
+            if taxon["taxon_rank"] not in rendered_ranks:
+                surp_tx_ids.append(idx)
+
     # Delete taxa that are superfluous by index
-    for index in sorted(surp_tx_ids, reverse=True):
+    for index in sorted(set(surp_tx_ids), reverse=True):
         del taxa[index]
 
     # group taxa by their parent id
