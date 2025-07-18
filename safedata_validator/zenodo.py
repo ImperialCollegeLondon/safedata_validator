@@ -684,19 +684,17 @@ def dataset_description(
     sequenced_taxa_sheets = dataset_metadata["sequenced_taxa"]
     if sequenced_taxa_sheets:
         context_dict["seq_taxa"] = {}
-        context_dict["seq_taxa_metadata"] = {}
         for sheet_name, taxon_data in sequenced_taxa_sheets.items():
-            context_dict["seq_taxa"][f"{sheet_name}"] = taxon_index_to_text(
-                taxa=taxon_data["taxon_index"], html=True
-            )
             context_dict["seq_taxa"][f"{sheet_name}"] = {
                 "database_name": taxon_data["database_name"],
                 "database_version": taxon_data["database_version"],
                 "database_link": taxon_data["database_link"],
+                "index": taxon_index_to_text(
+                    taxa=taxon_data["taxon_index"], html=True, lowest_taxa="phylum"
+                ),
             }
     else:
         context_dict["seq_taxa"] = None
-        context_dict["seq_taxa_metadata"] = None
 
     html = template.render(context_dict)
 

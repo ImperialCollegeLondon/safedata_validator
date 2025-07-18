@@ -9,6 +9,7 @@ import appdirs
 import certifi
 import openpyxl
 import pytest
+import simplejson
 from dotmap import DotMap
 
 from safedata_validator.field import Dataset, DataWorksheet
@@ -47,7 +48,7 @@ def fixture_files():
         ("good_seq_taxa_file", "Test_format_good_Seq.xlsx"),
         ("bad_seq_taxa_file", "Test_format_bad_Seq.xlsx"),
         ("good_seq_file_dataset_json", "Test_format_good_Seq.json"),
-        ("good_seq_file_zenodo_json", "zenodo_214116.json"),
+        ("good_seq_file_zenodo_json", "zenodo_292625.json"),
     ]
 
     real_files = {ky: os.path.join(fixture_dir, vl) for ky, vl in real_files}
@@ -303,6 +304,16 @@ def example_seq_files(config_filesystem, request):
     elif request.param == "bad":
         wb = openpyxl.load_workbook(FIXTURE_FILES.rf.bad_seq_taxa_file, read_only=True)
         return wb
+
+
+@pytest.fixture()
+def example_dataset_metadata(config_filesystem):
+    """Fixture providing an example dataset metadata to use in testing."""
+
+    with open(FIXTURE_FILES.rf.good_seq_file_dataset_json) as f:
+        dataset_metadata = simplejson.load(f)
+
+    return dataset_metadata
 
 
 @pytest.fixture()
