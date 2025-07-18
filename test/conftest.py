@@ -48,7 +48,7 @@ def fixture_files():
         ("good_seq_taxa_file", "Test_format_good_Seq.xlsx"),
         ("bad_seq_taxa_file", "Test_format_bad_Seq.xlsx"),
         ("good_seq_file_dataset_json", "Test_format_good_Seq.json"),
-        ("good_seq_file_zenodo_json", "zenodo_214116.json"),
+        ("good_seq_file_zenodo_json", "zenodo_292625.json"),
     ]
 
     real_files = {ky: os.path.join(fixture_dir, vl) for ky, vl in real_files}
