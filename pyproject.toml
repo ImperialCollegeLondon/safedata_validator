@@ -59,7 +59,7 @@ types-simplejson = "^3.19.0.0"
 
 [tool.poetry.group.docs.dependencies]
 mkdocs = "^1.4.3"
-mkdocs-include-markdown-plugin = "^6.0.4"
+mkdocs-include-markdown-plugin = ">=6.0.4,<8.0.0"
 mkdocs-material = "^8.3.9"
 mkdocs-table-reader-plugin = "^2.1.0"
 mkdocstrings-python = "^1.7.5"
