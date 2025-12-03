@@ -575,7 +575,7 @@ class Summary:
             if not set(permit_types).issubset(valid_permit_types):
                 LOGGER.error(
                     "Unknown permit types: ",
-                    extra={"join": permit_types - valid_permit_types},
+                    extra={"join": set(permit_types) - valid_permit_types},
                 )
 
         self.permits = permits
