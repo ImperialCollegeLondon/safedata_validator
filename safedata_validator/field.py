@@ -568,6 +568,12 @@ class DataWorksheet:
                 "Unknown field descriptors:", extra={"join": unknown_descriptors}
             )
 
+        # Check that field name is included at all, if not the dataframe can't be
+        # sensibly be evaluated. So metadata validation has to stop for this sheet
+        if "field_name" not in list(field_meta.keys()):
+            LOGGER.error("Field_name row is not included, and must be!")
+            return
+
         # * Check for field name as _last_ descriptor. This is primarily to
         #   make it easy to read the dataframe - just skip the other descriptors
         if list(field_meta.keys())[-1] != "field_name":
