@@ -2404,32 +2404,46 @@ def test_FileField_init(
 
 
 @pytest.mark.parametrize(
-    "data, expected_log",
+    "external_files, data, expected_log",
     [
         (
+            True,
             ["extfile1.sql", "extfile2.zip", "extfile1.sql", "extfile2.zip"],
             ((INFO, "Checking field file"),),
         ),
         (
+            True,
             ["extfile1.sql", "extfile2.zip", "extfile6.sql", "extfile2.zip"],
             (
                 (INFO, "Checking field file"),
                 (ERROR, "Field contains external files not provided in Summary"),
             ),
         ),
+        (
+            False,
+            ["extfile1.sql", "extfile2.zip", "extfile6.sql", "extfile2.zip"],
+            (
+                (INFO, "Checking field file"),
+                (ERROR, "No external files listed in Summary"),
+            ),
+        ),
     ],
 )
-def test_FileField_validate_data(caplog, fixture_dataset, data, expected_log):
+def test_FileField_validate_data(
+    caplog, fixture_dataset, external_files, data, expected_log
+):
     """Testing behaviour of the FileField class in using validate_data."""
 
     field_meta = {"field_name": "file", "field_type": "file", "description": "file"}
 
-    fixture_dataset.summary.external_files = [
-        {"file": "extfile1.sql"},
-        {"file": "extfile2.zip"},
-    ]
+    if external_files:
+        fixture_dataset.summary.external_files = [
+            {"file": "extfile1.sql"},
+            {"file": "extfile2.zip"},
+        ]
 
     fld = FileField(field_meta, dataset=fixture_dataset)
+
     fld.validate_data(data)
     fld.report()
 
