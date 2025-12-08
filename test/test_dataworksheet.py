@@ -92,6 +92,18 @@ def test_DataWorksheet_init(caplog, fixture_field_meta, sheet_meta, expected_log
             OrderedDict(
                 [
                     ("field_type", ["numeric", "numeric", "numeric"]),
+                    ("description", ["a", "b", "c"]),
+                ]
+            ),
+            (
+                (INFO, "Validating field metadata"),
+                (ERROR, "Field_name row is not included, and must be!"),
+            ),
+        ),
+        (
+            OrderedDict(
+                [
+                    ("field_type", ["numeric", "numeric", "numeric"]),
                     ("field_name", ["a", "b", "c"]),
                     ("description", ["a", "b", "c"]),
                 ]
