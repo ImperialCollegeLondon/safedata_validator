@@ -390,6 +390,11 @@ def test_keywords(caplog, fixture_summary, alterations, should_log_error, expect
             "Field permit type contains values of wrong type",
         ),  # via _read_block
         (
+            {"permit type": ("N/A",)},
+            True,
+            "Unknown permit types:",
+        ),  # via _read_block
+        (
             {"permit authority": (None,)},
             True,
             "Missing metadata in mandatory field permit authority",

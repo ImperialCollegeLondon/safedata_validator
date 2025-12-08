@@ -79,32 +79,32 @@
             - Taxon found in GBIF backbone (accepted)
         - Indexing taxonomic hierarchy
             - Added kingdom Animalia
-            - Added phylum Chordata
             - Added phylum Annelida
             - Added phylum Arthropoda
+            - Added phylum Chordata
             - Added class Insecta
             - Added class Mammalia
             - Added class Clitellata
             - Added class Aves
-            - Added order Rodentia
             - Added order Arhynchobdellida
             - Added order Carnivora
+            - Added order Rodentia
             - Added order Erinaceomorpha
-            - Added order Hymenoptera
             - Added order Primates
+            - Added order Hymenoptera
             - Added order Suliformes
-            - Added family Felidae
-            - Added family Hominidae
-            - Added family Haemadipsidae
             - Added family Muridae
             - Added family Sulidae
             - Added family Erinaceidae
+            - Added family Felidae
+            - Added family Hominidae
+            - Added family Haemadipsidae
+            - Added genus Prionailurus
+            - Added genus Rattus
             - Added genus Echinosorex
             - Added genus Neofelis
             - Added genus Crematogaster
             - Added genus Haemadipsa
-            - Added genus Prionailurus
-            - Added genus Rattus
         - 13 taxa loaded correctly
 - Loading sequenced taxonomy worksheet
     - Reading bioinformatics taxon data from Sequenced
