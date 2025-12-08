@@ -2245,6 +2245,11 @@ class FileField(BaseField):
 
         data = self.run_common_validation(data)
 
+        # If there are not external file names to compare to exit before the filename
+        # checking runs
+        if self.summary is None or self.summary.external_files is None:
+            return
+
         # If the files are listed in external and not provided in a file
         # container then check they are all present
         if not self.file_container:
