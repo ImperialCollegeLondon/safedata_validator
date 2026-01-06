@@ -1599,7 +1599,7 @@ class CategoricalField(BaseField):
         levels = meta.get("levels")
 
         if levels is not None and isinstance(levels, str) and not levels.isspace():
-            level_labels, level_desc = self._parse_levels(levels)
+            level_labels, _ = self._parse_levels(levels)
             self.level_labels = set(level_labels)
 
     def validate_data(self, data: list) -> None:
