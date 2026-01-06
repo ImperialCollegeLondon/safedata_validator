@@ -402,8 +402,8 @@ def test_validate_taxon_sanitise(
 
 
 @pytest.mark.parametrize(
-    "taxon_tuple,expected_log_entries",
-    [  # IGNORED: Testing ignored backbone matches
+    argnames=["taxon_tuple", "expected_log_entries"],
+    argvalues=(  # IGNORED: Testing ignored backbone matches
         # Ignored non backbone (no parent)
         (
             ("Morphospecies", ["mspecies", "Morphospecies", None, 123456789], None),
@@ -685,7 +685,7 @@ def test_validate_taxon_sanitise(
                 (INFO, "valid parent information"),
             ),
         ),
-    ],
+    ),
 )
 def test_validate_taxon_lookup(
     caplog, fixture_resources, taxon_tuple, expected_log_entries
