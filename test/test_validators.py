@@ -32,52 +32,58 @@ def test_naive_dims(dummy_ws_with_extra):
 
 
 @pytest.mark.parametrize(
-    "hd_vals,nonstr,padded,duped,blank",
-    [
-        (None, [], [], [], []),
-        (
+    argnames=["hd_vals", "nonstr", "padded", "duped", "blank"],
+    argvalues=(
+        pytest.param(None, [], [], [], [], id="nothing"),
+        pytest.param(
             ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"],
             [],
             [],
             [],
             [],
-        ),  # replacement works!
-        (
+            id="replacement works",
+        ),
+        pytest.param(
             ["A", "B", "C", "D", "E", "  \n", "G", "H", None, "J", "J"],
             [],
             [],
             [],
             ["  \n", None],
-        ),  # blanks
-        (
+            id="blanks",
+        ),
+        pytest.param(
             ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "J"],
             [],
             [],
             ["J"],
             [],
-        ),  # dupe
-        (
+            id="dupe",
+        ),
+        pytest.param(
             ["A", "B", 3, "D", "E", "F", False, "H", "I", "J", "K"],
             [3, False],
             [],
             [],
             [],
-        ),  # nonstring
-        (
+            id="nonstring",
+        ),
+        pytest.param(
             ["A", " B", "C", "D ", "E", "F", "G", "H", "I", "J", "K"],
             [],
             [" B", "D "],
             [],
             [],
-        ),  # padded
-        (
+            id="padded",
+        ),
+        pytest.param(
             ["A", " B", 3, "D ", "E", "  \n", False, "H", None, "J", "J"],
             [3, False, None],
             [" B", "D "],
             ["J"],
             ["  \n", None],
-        ),  # all - None caught twice
-    ],
+            id="all - none caught twice",
+        ),
+    ),
 )
 def test_getdataframe(dummy_ws_with_extra, hd_vals, nonstr, padded, duped, blank):
     """Does GetDataFrame work?"""
