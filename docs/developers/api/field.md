@@ -28,6 +28,7 @@
             - FileField
             - GeoField
             - LocationsField
+            - LogicalField
             - NumericField
             - NumericInteractionField
             - NumericTaxaField

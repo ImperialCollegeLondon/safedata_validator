@@ -850,7 +850,7 @@ def test_DataWorksheet_load_from_worksheet(
     [
         ("good", "DF", 0),
         ("good", "Incidence", 0),
-        ("bad", "DF", 41),
+        ("bad", "DF", 42),
         ("bad", "Incidence", 8),
     ],
     indirect=["example_excel_files"],  # take actual params from fixture

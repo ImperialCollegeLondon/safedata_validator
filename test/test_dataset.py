@@ -11,7 +11,7 @@ from .conftest import FIXTURE_FILES
     "file_key, n_errors, n_taxa",
     [
         ("good_excel_file", 0, 20),
-        ("bad_excel_file", 94, 13),
+        ("bad_excel_file", 95, 13),
         ("good_seq_taxa_file", 0, 48),
         ("bad_seq_taxa_file", 6, 34),
     ],
