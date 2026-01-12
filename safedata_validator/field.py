@@ -30,6 +30,7 @@ from safedata_validator.taxa import SeqTaxa, Taxa
 from safedata_validator.validators import (
     RE_DMS,
     HasDuplicates,
+    IsBool,
     IsInSet,
     IsLocName,
     IsNotBlank,
@@ -1571,6 +1572,30 @@ class NumericField(BaseField):
 
         if not numeric:
             self._log("Cells contain non-numeric values")
+
+
+class LogicalField(BaseField):
+    """A BaseField subclass for logical (true vs false) fields.
+
+    Extends [BaseField][safedata_validator.field.BaseField] to validate logical data
+    fields.
+    """
+
+    field_types: tuple[str, ...] = ("logical",)
+
+    def validate_data(self, data: list) -> None:
+        """Validate logical field data.
+
+        Runs the BaseField
+        [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
+        method and also ensures that data values are logical (i.e. booleans).
+        """
+        data = self.run_common_validation(data)
+
+        boolean = IsBool(data)
+
+        if not boolean:
+            self._log("Cells contain non-boolean values")
 
 
 class CategoricalField(BaseField):
