@@ -134,6 +134,7 @@ formatting, but the available types are:
   a fixed set of groups.
 * **Ordered Categorical**: a factor where there is a logical order to the levels.
 * **Numeric**: all kinds of numeric data.
+* **Logical**: for logical (i.e. True vs False) data.
 * **Taxa**: what taxa was the data collected from?
 * **Abundance**: for abundance/density/presence data collected about a taxon.
 * **Categorical Trait**: for categorical data collected on a taxon.
@@ -280,6 +281,20 @@ Not all numeric variables have methods or units: a column of replicate numbers, 
 example. If this is the case, enter None rather than leaving the descriptors blank. (If
 you prefer to use Dimensionless as the unit for dimensionless quantities then that is
 also fine!)
+
+### Logical data
+
+This field type should be used to record data that is either True or False. Data of this
+type could alternatively be captured as categorical data with "True" and "False" being
+used as levels. However, using this field type should make subsequent analyses similar
+as it ensures that the data remains stored as booleans.
+
+We would recommend this field type for situations where only two unambiguous outcomes
+are possible (e.g whether a trap had been triggered when you returned to a plot). In
+situations of greater ambiguity, such as describing the logging status of a forest, we
+would recommend using the categorical data field type instead, as this allows you to
+express multiple levels (i.e. unlogged, lightly logged vs heavily logged, rather than
+just logged vs unlogged).
 
 ### Abundance and trait data
 
