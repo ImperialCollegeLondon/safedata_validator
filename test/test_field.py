@@ -1193,6 +1193,74 @@ def test_NumericField_and_subclasses_validate_data(
     )
 
 
+@pytest.mark.parametrize(
+    "data, expected_log",
+    [
+        (
+            [True, False, False, False, True, True, True, False, False],
+            ((INFO, "Checking field trap_empty"),),
+        ),
+        (
+            [True, "NA", False, False, True, True, "NA", False, False],
+            ((INFO, "Checking field trap_empty"), (WARNING, "2 / 9 values missing")),
+        ),
+        (
+            [True, None, False, False, True, True, "   ", False, False],
+            (
+                (INFO, "Checking field trap_empty"),
+                (ERROR, "2 cells are blank or contain only whitespace text"),
+            ),
+        ),
+        (
+            [True, False, False, False, "#REF!", True, "#N/A", False, False],
+            (
+                (INFO, "Checking field trap_empty"),
+                (ERROR, "2 cells contain Excel formula errors"),
+            ),
+        ),
+        (
+            [True, False, False, False, "wrong_type", True, True, False, False],
+            (
+                (INFO, "Checking field trap_empty"),
+                (ERROR, "Cells contain non-boolean values"),
+            ),
+        ),
+        (
+            [True, False, "NA", False, "wrong_type", True, None, False, False],
+            (
+                (INFO, "Checking field trap_empty"),
+                (ERROR, "Cells contain non-boolean values"),
+                (WARNING, "1 / 9 values missing"),
+                (ERROR, "1 cells are blank or contain only whitespace text"),
+            ),
+        ),
+    ],
+)
+def test_LogicalField_validate_data(caplog, fixture_dataset, data, expected_log):
+    """Testing behaviour of the LogicalField in using _validate_data."""
+    from safedata_validator.field import LogicalField
+
+    # Create an instance of the LogicalField
+    field_meta = {
+        "field_type": "logical",
+        "description": "Was small mammal trap empty?",
+        "field_name": "trap_empty",
+    }
+    fld = LogicalField(field_meta, dataset=fixture_dataset)
+
+    fld.validate_data(data)
+    fld.report()
+
+    assert len(expected_log) == len(caplog.records)
+
+    assert all(
+        [exp[0] == rec.levelno for exp, rec in zip(expected_log, caplog.records)]
+    )
+    assert all(
+        [exp[1] in rec.message for exp, rec in zip(expected_log, caplog.records)]
+    )
+
+
 # CategoricalField and derived classes
 # - Can reuse the same data to also check taxon and interaction classes
 #   inheriting from CategoricalField for validate_data.

@@ -201,6 +201,25 @@ class IsNumber(Filter):
         return val
 
 
+class IsBool(Filter):
+    """A Filter subclass for boolean values.
+
+    The `tfunc` method overrides the base
+    [tfunc][safedata_validator.validators.Filter.tfunc] method to check if values are a
+    bool. Failing values are kept unchanged in the instance values.
+    """
+
+    @staticmethod
+    def tfunc(val) -> bool:
+        """Test for float or int values."""
+        return isinstance(val, bool)
+
+    @staticmethod
+    def rfunc(val) -> Any:
+        """Return failing values unchanged."""
+        return val
+
+
 class IsNotNumericString(Filter):
     """A Filter subclass to trap numeric strings.
 
