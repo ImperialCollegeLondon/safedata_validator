@@ -9,7 +9,7 @@ repos:
     rev: v0.15.7
     hooks:
       # Run the linter.
-      - id: ruff
+      - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix, --target-version, py312]
       # Run the formatter.
       - id: ruff-format
