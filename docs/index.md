@@ -1,7 +1,7 @@
 # Overview
 
 The `safedata_validator` package is a dataset validation and publishing tool for use
-with large collections of related but heterogenous datasets. It was originally built to
+with large collections of related but heterogeneous datasets. It was originally built to
 handle the field data collections from the [SAFE Project](https://safeproject.net),
 which has generated a [large number of related
 datasets](https://zenodo.org/communities/safe).

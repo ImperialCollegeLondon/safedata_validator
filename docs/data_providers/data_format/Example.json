@@ -309,7 +309,7 @@
       "max_col": 2,
       "name": "external_1",
       "title": "External file example 1",
-      "description": "Example worksheet showing the secod method for including information from external files",
+      "description": "Example worksheet showing the second method for including information from external files",
       "descriptors": [
         "field_type",
         "description",
