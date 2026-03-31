@@ -1612,14 +1612,14 @@ pyyaml = "*"
 
 [[package]]
 name = "requests"
-version = "2.33.0"
+version = "2.33.1"
 description = "Python HTTP for Humans."
 optional = false
 python-versions = ">=3.10"
 groups = ["main", "docs"]
 files = [
-    {file = "requests-2.33.0-py3-none-any.whl", hash = "sha256:3324635456fa185245e24865e810cecec7b4caf933d7eb133dcde67d48cee69b"},
-    {file = "requests-2.33.0.tar.gz", hash = "sha256:c7ebc5e8b0f21837386ad0e1c8fe8b829fa5f544d8df3b2253bff14ef29d7652"},
+    {file = "requests-2.33.1-py3-none-any.whl", hash = "sha256:4e6d1ef462f3626a1f0a0a9c42dd93c63bad33f9f1c1937509b8c5c8718ab56a"},
+    {file = "requests-2.33.1.tar.gz", hash = "sha256:18817f8c57c6263968bc123d237e3b8b08ac046f5456bd1e307ee8f4250d3517"},
 ]
 
 [package.dependencies]
@@ -1630,24 +1630,22 @@ urllib3 = ">=1.26,<3"
 
 [package.extras]
 socks = ["PySocks (>=1.5.6,!=1.5.7)"]
-test = ["PySocks (>=1.5.6,!=1.5.7)", "pytest (>=3)", "pytest-cov", "pytest-httpbin (==2.1.0)", "pytest-mock", "pytest-xdist"]
 use-chardet-on-py3 = ["chardet (>=3.0.2,<8)"]
 
 [[package]]
 name = "rispy"
-version = "0.7.1"
+version = "0.10.0"
 description = "A Python reader/writer of RIS reference files"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "rispy-0.7.1-py3-none-any.whl", hash = "sha256:130ba974f8bd95c0be2fabd8e7a82794174e99f433a36099c4b9bed80bfa9ec6"},
-    {file = "rispy-0.7.1.tar.gz", hash = "sha256:391624c74bfeec94c7ecb62d72d59d6df0980b3e1c736897dbd07163c949d676"},
+    {file = "rispy-0.10.0-py3-none-any.whl", hash = "sha256:acc8b941ab5e7b65b5365e468af2e00f0cb031a9e5c5a6b06538d856151e61be"},
+    {file = "rispy-0.10.0.tar.gz", hash = "sha256:0b815b668fcc993e4f540670fd37090576ecfbc58a57e2daae67774241e91c84"},
 ]
 
 [package.extras]
-dev = ["black (==21.5b1)", "check-manifest", "flake8 (==3.7.9)", "wheel"]
-test = ["coverage", "pytest"]
+dev = ["coverage (>=7.8.0,<7.9.0)", "flit (>=3.12.0,<3.13.0)", "poethepoet (>=0.34.0,<0.35.0)", "pytest (>=8.3.5,<8.4.0)", "pytest-benchmark (>=5.1.0,<5.2.0)", "ruff (>=0.11.10,<0.12.0)"]
 
 [[package]]
 name = "ruff"
@@ -2099,4 +2097,4 @@ bracex = ">=2.1.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "238b6b9815a76f1bda70f6988b4f2e8d56e16965db03bd6b09cf954376994e6d"
+content-hash = "e4aa873d4d7c04b22f83d637d75dc85861a97b846061c654b3254cb826c15a6a"
