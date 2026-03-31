@@ -3,7 +3,7 @@
 Running a metadata server is the most complex part of the `safedata` system. It involves
 setting up and configuring a website and database and so requires further skills and
 resources. There are real advantages in running a metadata server: it makes your data
-much easier to find and use throught the `safedata` R package.
+much easier to find and use through the `safedata` R package.
 
 However, you may choose to get started with using the `safedata_validator` system alone
 to ensure data standards and publish the datasets. You can always set up a server and

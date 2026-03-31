@@ -13,7 +13,7 @@ Fixed:
 * Restructured checking for singleton summary fields to give clearer sequence of error messages.
 * Added system to allow users to forcibly ignore a GBIF match
 * Moved to gitflow and Travis
-* Now enforcing syntatically valid R names in field name
+* Now enforcing syntactically valid R names in field name
 
 1.2.8
 * Fixed bug in checking for spaces in external files

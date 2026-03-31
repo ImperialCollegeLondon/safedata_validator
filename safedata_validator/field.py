@@ -1984,7 +1984,7 @@ class TimeField(BaseField):
 
         Runs the BaseField
         [run_common_validation][safedata_validator.field.BaseField.run_common_validation]
-        methoda nd also checks that time data has consistent formatting and are valid
+        method and also checks that time data has consistent formatting and are valid
         time values.
         """
         data = self.run_common_validation(data)

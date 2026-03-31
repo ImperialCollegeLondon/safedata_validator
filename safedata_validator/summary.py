@@ -448,7 +448,7 @@ class Summary:
         # Drop empty records
         block_list = [bl for bl in block_list if any(bl.values())]
 
-        # Contine if data are present
+        # Continue if data are present
         if not block_list:
             if block.mandatory:
                 LOGGER.error(f"No {block.title} metadata found")

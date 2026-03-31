@@ -431,7 +431,7 @@ class NoPunctuation(Filter):
 class HasDuplicates:
     """Find any duplicates in a set of values.
 
-    The class checks a provided iterable of valies and identifies whether any values are
+    The class checks a provided iterable of values and identifies whether any values are
     duplicated. The __bool__ magic method returns False if no duplicates are found.
 
     Args:
