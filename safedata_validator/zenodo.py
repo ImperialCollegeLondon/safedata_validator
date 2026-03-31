@@ -887,7 +887,7 @@ def publish_dataset(
     This will be inefficient if only some files need to be changed, and this function
     may be updated in the future to allow only new files to be updated.
 
-    It returns the URL of the resulting published datset. If the publication process
+    It returns the URL of the resulting published dataset. If the publication process
     fails, the partly completed deposit is deleted to avoid cluttering the Zenodo
     deposit list.
 

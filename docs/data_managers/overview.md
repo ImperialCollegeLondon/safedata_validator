@@ -8,7 +8,7 @@ data management and discovery. This system comprises:
    validate submitted datasets and ensure that the data and metadata for those datasets
    are consistent and meet the minimum requirements. When a dataset is successfully
    validated, the package also provides tools to both publish the dataset to the Zenodo
-   community for your datasets and to upload the metadata to a seperate metadata server
+   community for your datasets and to upload the metadata to a separate metadata server
    for the project.
 
 2. The metadata server is a web server running the [`safedata_server` web

@@ -167,7 +167,7 @@ provided to validate datasets.
   metadata](../../data_providers/data_format/summary.md#the-access-block).
 
     Allowing reasonable embargo lengths is important to allow time for publications from
-    datasets, but equally setting very long embargo lengths makes it hard to re-use data.
+    datasets, but equally setting very long embargo lengths makes it hard to reuse data.
     It may be more appropriate to allow the use of the [`restricted`
     access](../../data_providers/data_format/summary.md#the-access-block) option for a
     subset of datasets than to globally allow very long embargo periods.
@@ -246,8 +246,8 @@ configuration elements:
   `--sandbox` options with the
   [`safedata_zenodo`](../command_line_tools/safedata_zenodo.md) subcommands to switch
   between these options without needing to edit the configured default. This can be
-  useful if a user wants to see a preview of the published dataset before commiting to a
-  published dataset.
+  useful if a user wants to see a preview of the published dataset before committing to
+  a published dataset.
 
 **The `project_url` element**
 
@@ -309,7 +309,7 @@ default value of 4326 is the code for the widely used WGS84 datum.
 **The `contactCountry` and `contactEmail` elements**
 
 : The XML includes a number of contact details, including the authors, but also requires
-a general point of contact. Some of these details (name and OrcID) are re-used from the
+a general point of contact. Some of these details (name and OrcID) are reused from the
 Zenodo point of contact information above, but the XML validation requires a country and
 email, so these need to be provided here.
 
@@ -338,8 +338,8 @@ application allows more detailed metadata to be made available to end users of t
 and provides an API to aid data discovery and downloading. This API is used extensively
 by the [`safedata`](https://imperialcollegelondon.github.io/safedata/) R package.
 
-To use this system, you will need to deploy the web application to a publically
-accessible URL and then configure the following elements:
+To use this system, you will need to deploy the web application to a publicly accessible
+URL and then configure the following elements:
 
 **The `api` and `token` elements**
 

@@ -5,7 +5,7 @@
 #   standard locations. If not, the path can be specified explicitly 
 #   using, the -r flag:
 #     -r /path/to/safedata_validator_local_test.cfg 
-# * the Example.xlsx file has been sucessfully validated, generating the
+# * the Example.xlsx file has been successfully validated, generating the
 #   Example.json metadata file
 
 
