@@ -62,7 +62,7 @@ mkdocs = "^1.4.3"
 mkdocs-include-markdown-plugin = ">=6.0.4,<8.0.0"
 mkdocs-material = ">=8.3.9,<10.0.0"
 mkdocs-table-reader-plugin = ">=2.1,<4.0"
-mkdocstrings-python = "^1.7.5"
+mkdocstrings-python = ">=1.7.5,<3.0.0"
 mkdocstrings = ">=0.28,<1.1"
 
 [build-system]
