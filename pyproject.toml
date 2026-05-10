@@ -50,7 +50,7 @@ pytest-cov = ">=3,<8"
 pytest-mock = "^3.7.0"
 
 [tool.poetry.group.devenv.dependencies]
-mypy = "^1.9.0"
+mypy = ">=1.9,<3.0"
 pre-commit = ">=3,<5"
 ruff = ">=0.4.4,<0.16.0"
 types-python-dateutil = "^2.8.19.12"
