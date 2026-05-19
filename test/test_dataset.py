@@ -1,6 +1,7 @@
 """Test loading a dataworksheet from file."""
 
 import pytest
+from freezegun import freeze_time
 
 from safedata_validator.field import Dataset
 
@@ -25,6 +26,7 @@ def test_DataSet_load_from_file(fixture_resources, file_key, n_errors, n_taxa):
     assert len(ds.taxa.taxon_names) == n_taxa
 
 
+@freeze_time("2025-02-11")  # Freeze time to stay within dataset embargo window
 def test_example_dataset(fixture_resources):
     """Test that the example dataset we provide actually passes validation.
 
