@@ -45,18 +45,14 @@ underscores to separate words.
 
 ### Spreadsheet Template and Examples
 
-<!-- The links here are hard coded to main, so if you've changed one of the files but 
-can't see the change in the docs that is why-->
-We provide a [spreadsheet
-template](https://github.com/ImperialCollegeLondon/safedata_validator/raw/main/docs/data_providers/data_format/Template.xlsx)
-containing the required worksheets, labels and headers.
+We provide a [spreadsheet template](Template.xlsx) containing the required worksheets,
+labels and headers.
 
-We also provide an [example
-file](https://github.com/ImperialCollegeLondon/safedata_validator/raw/main/docs/data_providers/data_format/Example.xlsx).
-This file is intended to demonstrate how to correctly format a wide variety of different
-types of data. The data in this spreadsheet mirrors the example data showed later in
-this section of the documentation. We would strongly recommend reading the relevant
-documentation before looking at the example file.
+We also provide an [example file](Example.xlsx). This file is intended to demonstrate
+how to correctly format a wide variety of different types of data. The data in this
+spreadsheet mirrors the example data showed later in this section of the documentation.
+We would strongly recommend reading the relevant documentation before looking at the
+example file.
 
 You can also look at existing published datasets, such as those from the SAFE Project,
 to see how the format is used:

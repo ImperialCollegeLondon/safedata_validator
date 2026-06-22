@@ -61,16 +61,13 @@ The [usage recipes](using_safedata/overview.md) show how the tools are used.
 
 ## Example `safedata` format datasets
 
-<!-- The links here are hard coded to main, so if you've changed one of the files but 
-can't see the change in the docs that is why-->
 To help both data managers and data providers understand the `safedata` format we
 provide a number of resources. Firstly, a [template
-dataset](https://github.com/ImperialCollegeLondon/safedata_validator/raw/main/docs/data_providers/data_format/Template.xlsx)
-containing the required worksheets, labels and headers. Secondly, an [example
-dataset](https://github.com/ImperialCollegeLondon/safedata_validator/raw/main/docs/data_providers/data_format/Example.xlsx)
-demonstrating how to correctly format a wide variety of different types of data. You can
-also look at existing published datasets, such as those from the SAFE Project, to see
-how the format is used:
+dataset](../data_providers/data_format/Template.xlsx) containing the required
+worksheets, labels and headers. Secondly, an [example
+dataset](../data_providers/data_format/Example.xlsx) demonstrating how to correctly
+format a wide variety of different types of data. You can also look at existing
+published datasets, such as those from the SAFE Project, to see how the format is used:
 
 - [https://safeproject.net/datasets/view_datasets](https://safeproject.net/datasets/view_datasets)
 - [https://zenodo.org/communities/safe/](https://zenodo.org/communities/safe/)
