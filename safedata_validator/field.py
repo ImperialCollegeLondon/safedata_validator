@@ -1624,11 +1624,17 @@ class CategoricalField(BaseField):
         # values
         self.level_labels = set()
         self.reported_levels: set[str] = set()
+        self.invalid_level_name = False
         levels = meta.get("levels")
 
         if levels is not None and isinstance(levels, str) and not levels.isspace():
             level_labels, _ = self._parse_levels(levels)
             self.level_labels = set(level_labels)
+
+            # Only banned level name is "NA" (as its the missing data code so doesn't
+            # get picked up by the dataset checking)
+            if "NA" in level_labels:
+                self.invalid_level_name = True
 
     def validate_data(self, data: list) -> None:
         """Validate categorical field data.
@@ -1662,15 +1668,20 @@ class CategoricalField(BaseField):
         extra = self.reported_levels.difference(self.level_labels)
         unused = self.level_labels.difference(self.reported_levels)
 
+        if self.invalid_level_name:
+            LOGGER.error(
+                "Do not include the missing data code 'NA' as a level descriptor",
+            )
+        elif unused:
+            LOGGER.error(
+                "Categories found in levels descriptor not used in data: ",
+                extra={"join": unused},
+            )
+
         if extra:
             LOGGER.error(
                 "Categories found in data missing from levels descriptor: ",
                 extra={"join": extra},
-            )
-        if unused:
-            LOGGER.error(
-                "Categories found in levels descriptor not used in data: ",
-                extra={"join": unused},
             )
 
         FORMATTER.pop()

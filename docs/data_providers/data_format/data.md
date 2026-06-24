@@ -235,7 +235,9 @@ shows which level applies to each row.
 In the `levels` descriptor, you must provide a complete set of all the levels used in
 the column, which will be checked against the data. The level names must be short text
 labels. **Do not use integer level names**: they are harder to interpret in statistical
-analyses and there is a real risk that they are analysed as a number by mistake.
+analyses and there is a real risk that they are analysed as a number by mistake. **Do
+not use NA as a level name**: this code is reserved specifically for missing data, so
+using it creates ambiguity as to whether level data is missing or not.
 
 The format is that the level names are separated using semi-colons (`;`). For example:
 

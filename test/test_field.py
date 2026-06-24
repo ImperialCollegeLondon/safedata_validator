@@ -1334,6 +1334,22 @@ def test_LogicalField_validate_data(caplog, fixture_dataset, data, expected_log)
                 (ERROR, "Categories found in levels descriptor not used in data:"),
             ),
         ),
+        (
+            {
+                "field_type": "categorical",
+                "description": "a factor",
+                "field_name": "factor1",
+                "levels": "level1;NA;",
+                "col_idx": 1,
+            },
+            (
+                (INFO, "Checking field factor1"),
+                (
+                    ERROR,
+                    "Do not include the missing data code 'NA' as a level descriptor",
+                ),
+            ),
+        ),
     ],
 )
 def test_CategoricalField_init(caplog, field_meta, expected_log):
