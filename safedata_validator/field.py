@@ -16,6 +16,7 @@ from dateutil import parser
 from openpyxl import load_workbook, worksheet
 from openpyxl.utils import get_column_letter
 
+import safedata_validator as sdv
 from safedata_validator.extent import Extent
 from safedata_validator.locations import Locations
 from safedata_validator.logger import (
@@ -416,6 +417,8 @@ class Dataset:
                 dict(zip(("name", "new_location", "wkt_wgs84"), lc))
                 for lc in self.locations.location_index
             ],
+            # Store version of software dataset was validated using
+            validator_version=sdv.__version__,
             # Publication details - these are populated by the
             # Zenodo publication mechanism.
             zenodo_concept_id=None,

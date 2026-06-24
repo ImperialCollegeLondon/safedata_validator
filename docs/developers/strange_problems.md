@@ -4,14 +4,6 @@ This document exists to collect possible strange failures in the package testing
 documentation. These are issues we were aware of when implementing the relevant features
 but couldn't think of a good way to fix. They are collected here for future reference.
 
-## `test_example_dataset` suddenly fails
-
-If an embargo date is provided, validation can only pass if this date is not in the past
-and is not more than two years into the future (at least for the default SAFE Project
-setup). `test_example_dataset` validates the `Example.xlsx` file which contains an
-embargo date. This means that once this date is in the past the test will suddenly fail
-without any modifications being made to any file.
-
 ## Docs build fails with message "Docs build process has resulted in file changes."
 
 As part of the documentation build process the [`update_command_line_usage.sh`

@@ -86,25 +86,25 @@
             - Added class Mammalia
             - Added class Clitellata
             - Added class Aves
+            - Added order Erinaceomorpha
+            - Added order Hymenoptera
+            - Added order Primates
+            - Added order Suliformes
+            - Added order Rodentia
             - Added order Arhynchobdellida
             - Added order Carnivora
-            - Added order Rodentia
-            - Added order Erinaceomorpha
-            - Added order Primates
-            - Added order Hymenoptera
-            - Added order Suliformes
-            - Added family Muridae
-            - Added family Sulidae
             - Added family Erinaceidae
             - Added family Felidae
             - Added family Hominidae
             - Added family Haemadipsidae
-            - Added genus Prionailurus
-            - Added genus Rattus
+            - Added family Sulidae
+            - Added family Muridae
             - Added genus Echinosorex
             - Added genus Neofelis
             - Added genus Crematogaster
             - Added genus Haemadipsa
+            - Added genus Prionailurus
+            - Added genus Rattus
         - 13 taxa loaded correctly
 - Loading sequenced taxonomy worksheet
     - Reading bioinformatics taxon data from Sequenced
