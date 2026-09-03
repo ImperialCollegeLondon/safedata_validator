@@ -90,12 +90,12 @@ maintain a taxonomic index for the taxa used in your datasets.
 * **Ranks**: Here the column name (e.g. Phylum) provides a **taxonomic rank**, and the
   row entries provide the relevant names for this rank. A top level rank must be
   provided, this is one of `domain`, `superkingdom` or `kingdom`. If either `domain` or
-  `superkingdom` is provided `kingdom` can also be provided. The other thing ranks that
-  can be provided are the standard backbone ranks (`phylum` down to `species`). It is up
-  to you which of these you provide but if a rank is provided every higher backbone rank
-  must be provided, e.g. if `order` is provided as a rank `class` and `phylum` must also
-  be provided. Non-backbone ranks can be provided (e.g. `subspecies` or `strain`) but
-  they are treated as additional information and are therefore not validated.
+  `superkingdom` is provided `kingdom` can also be provided. Users are not forced to
+  provide any further standard backbone ranks (`phylum` down to `subspecies`), but if a
+  rank from this backbone is provided every higher backbone rank must be provided, e.g.
+  if `order` is provided as a rank `class` and `phylum` must also be provided.
+  Non-backbone ranks can be provided (e.g. `suborder` or `strain`) but they are treated
+  as additional information and are therefore not validated.
 
     !!! Note
 
