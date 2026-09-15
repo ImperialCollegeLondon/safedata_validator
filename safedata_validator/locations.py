@@ -6,7 +6,7 @@ of the dataset.
 
 from openpyxl.worksheet.worksheet import Worksheet
 from shapely import wkt
-from shapely.errors import WKTReadingError
+from shapely.errors import ShapelyError
 
 from safedata_validator.extent import Extent
 from safedata_validator.logger import (
@@ -354,7 +354,7 @@ class Locations:
                         # Run the potential WKT through the parser
                         try:
                             this_new_geom = wkt.loads(this_new_loc["wkt"])
-                        except WKTReadingError:
+                        except ShapelyError:
                             bad_wkt.append(this_new_loc["location name"])
                         else:
                             # Is it a valid 2D geom

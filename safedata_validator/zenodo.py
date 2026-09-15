@@ -31,6 +31,7 @@ from tqdm.utils import CallbackIOWrapper
 
 from safedata_validator.logger import FORMATTER, LOGGER
 from safedata_validator.resources import Resources
+from safedata_validator.server import MetadataResources
 from safedata_validator.taxa import taxon_index_to_text
 
 
@@ -1209,7 +1210,7 @@ def download_ris_data(zen_res: ZenodoResources, ris_file: Path | None = None) ->
 
 def sync_local_dir(
     datadir: Path,
-    zen_res: ZenodoResources,
+    resources: Resources,
     xlsx_only: bool = True,
     replace_modified: bool = False,
     dry_run: bool = False,
@@ -1230,7 +1231,7 @@ def sync_local_dir(
     Args:
         datadir: The path to a local directory containing an existing safedata
             directory or an empty folder in which to create one.
-        zen_res: The zenodo resources from the safedata_validator configuration.
+        resources: Resources from the safedata_validator configuration.
         xlsx_only: Should the download ignore large non-xlsx files, defaulting
             to True.
         replace_modified: Should the synchronisation replace locally modified files with
@@ -1251,34 +1252,40 @@ def sync_local_dir(
     if not (datadir.exists() and datadir.is_dir()):
         raise OSError(f"{datadir} is not an existing directory")
 
-    # Get the configured metadata api
-    api = zen_res.api
+    # Get the resource subsets
+    metadata_resources = MetadataResources(resources=resources)
+    zenodo_resources = ZenodoResources(resources=resources)
+
+    # APIs for function: zenodo for accessing data and JSON, metadata server for
+    # downloading index files and other resources from the metadata server.
+    zenodo_api = zenodo_resources.api
+    metadata_api = metadata_resources.api
 
     # Check for an existing API url file and check it is congruent with config
     url_file = datadir / "url.json"
 
     if url_file.exists():
         with open(url_file) as urlf:
-            dir_api = simplejson.load(urlf)["url"][0]
+            dir_metadata_api = simplejson.load(urlf)["url"][0]
 
-        if api != dir_api:
+        if metadata_api != dir_metadata_api:
             raise RuntimeError(
                 "Configured api does not match existing api in directory"
             )
     else:
         with open(url_file, "w") as urlf:
-            simplejson.dump({"url": [api]}, urlf)
+            simplejson.dump({"url": [metadata_api]}, urlf)
 
     # Download index files - don't bother to check for updates, this isn't
     # a frequent thing to do
     LOGGER.info("Downloading index files")
-    _get_file(f"{api}/api/index", datadir / "index.json")
-    _get_file(f"{api}/api/gazetteer", datadir / "gazetteer.geojson")
-    _get_file(f"{api}/api/location_aliases", datadir / "location_aliases.csv")
+    _get_file(f"{metadata_api}/api/index", datadir / "index.json")
+    _get_file(f"{metadata_api}/api/gazetteer", datadir / "gazetteer.geojson")
+    _get_file(f"{metadata_api}/api/location_aliases", datadir / "location_aliases.csv")
 
     # Get the deposits associated with the account, which includes a list of download
     # links. Need to set the page parameter to the API to track paginated results.
-    params = zen_res.token.copy()
+    params = zenodo_resources.token.copy()
     params["page"] = 1
     deposits: list = []
 
@@ -1286,7 +1293,7 @@ def sync_local_dir(
     while True:
         this_page = ZenodoResponse(
             requests.get(
-                f"{zen_res.api}/deposit/depositions",
+                f"{zenodo_api}/deposit/depositions",
                 params=params,
                 json={},
                 headers={"Content-Type": "application/json"},
@@ -1317,12 +1324,13 @@ def sync_local_dir(
         LOGGER.info(f"Processing deposit {con_rec_id}/{rec_id}")
         FORMATTER.push()
 
-        # Create the directory structure if needed
+        # Create the directory structure if needed - the parent directory for the
+        # concept record might already exist, but allow it to be created if not.
         rec_dir = datadir / con_rec_id / rec_id
         if not rec_dir.exists():
             LOGGER.info("Creating directory")
             if not dry_run:
-                rec_dir.mkdir()
+                rec_dir.mkdir(parents=True, exist_ok=True)
         else:
             LOGGER.info("Directory found")
 
@@ -1361,6 +1369,6 @@ def sync_local_dir(
         else:
             LOGGER.info("Downloading JSON metadata ")
             if not dry_run:
-                _get_file(f"{api}/api/record/{rec_id}", metadata)
+                _get_file(f"{zenodo_api}/api/record/{rec_id}", metadata)
 
         FORMATTER.pop()
