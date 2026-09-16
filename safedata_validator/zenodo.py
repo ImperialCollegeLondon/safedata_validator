@@ -1292,10 +1292,17 @@ def sync_local_dir(
     _get_file(f"{metadata_api}/api/gazetteer", datadir / "gazetteer.geojson")
     _get_file(f"{metadata_api}/api/location_aliases", datadir / "location_aliases.csv")
 
-    # Get the deposits associated with the account, which includes a list of download
-    # links. Need to set the page parameter to the API to track paginated results.
+    # Get all versions of published deposits associated with the community. Need to set
+    # the page parameter to the API to track paginated results.
     params = zenodo_resources.token.copy()
-    params["page"] = 1
+    params.update(
+        {
+            "page": 1,
+            "all_versions": "true",
+            "status": "published",
+            "q": f"communities:{zenodo_resources.community}",
+        }
+    )
     deposits: list = []
 
     # TODO - would be much easier to run this off the index.json rather than trawling
@@ -1304,7 +1311,7 @@ def sync_local_dir(
     while True:
         this_page = ZenodoResponse(
             requests.get(
-                f"{zenodo_api}/deposit/depositions",
+                f"{zenodo_api}/deposit/depositions?all_versions=true",
                 params=params,
                 json={},
                 headers={"Content-Type": "application/json"},
@@ -1328,10 +1335,6 @@ def sync_local_dir(
         con_rec_id = str(dep["conceptrecid"])
         rec_id = str(dep["record_id"])
 
-        if not dep["submitted"]:
-            LOGGER.info(f"Unsubmitted draft {con_rec_id}/{rec_id}")
-            continue
-
         LOGGER.info(f"Processing deposit {con_rec_id}/{rec_id}")
         FORMATTER.push()
 
@@ -1345,7 +1348,7 @@ def sync_local_dir(
         else:
             LOGGER.info("Directory found")
 
-        # Get the metadata json
+        # Get the metadata json, which includes file links.
         metadata = rec_dir / f"{rec_id}.json"
         if metadata.exists():
             LOGGER.info("JSON Metadata found")
