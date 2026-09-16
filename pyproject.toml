@@ -14,7 +14,7 @@ license = "MIT"
 name = "safedata_validator"
 readme = "README.md"
 repository = "https://github.com/imperial_college_london/safedata_validator"
-version = "3.1.1"
+version = "3.1.2"
 
 [tool.poetry.scripts]
 safedata_build_local_gbif = "safedata_validator.entry_points:_build_local_gbif_cli"
@@ -44,11 +44,11 @@ tqdm = "^4.64.0"
 typing-extensions = "^4.8.0"
 
 [tool.poetry.group.test.dependencies]
+freezegun = "^1.5.5"
 pyfakefs = ">=5.3,<7.0"
 pytest = ">=7,<10"
 pytest-cov = ">=3,<8"
 pytest-mock = "^3.7.0"
-freezegun = "^1.5.5"
 
 [tool.poetry.group.devenv.dependencies]
 mypy = ">=1.9,<3.0"
@@ -63,8 +63,8 @@ mkdocs = "^1.4.3"
 mkdocs-include-markdown-plugin = ">=6.0.4,<8.0.0"
 mkdocs-material = ">=8.3.9,<10.0.0"
 mkdocs-table-reader-plugin = ">=2.1,<4.0"
-mkdocstrings-python = "^1.7.5"
 mkdocstrings = ">=0.28,<1.1"
+mkdocstrings-python = "^1.7.5"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
