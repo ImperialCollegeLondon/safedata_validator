@@ -1335,9 +1335,6 @@ def sync_local_dir(
         con_rec_id = str(dep["conceptrecid"])
         rec_id = str(dep["record_id"])
 
-        if rec_id != "5729342":
-            continue
-
         LOGGER.info(f"Processing deposit {con_rec_id}/{rec_id}")
         FORMATTER.push()
 
