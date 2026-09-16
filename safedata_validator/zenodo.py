@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import decimal
 import hashlib
+import json
 import re
 import shutil
 from dataclasses import InitVar, dataclass, field
@@ -1242,8 +1243,16 @@ def sync_local_dir(
 
     # Private helper functions
     def _get_file(url: str, outf: Path, params: dict | None = None) -> None:
-        """Download a file from a URL."""
-        resource = requests.get(url, params=params, stream=True)
+        """Download a file from a URL.
+
+        TODO - retire this, error handling for different APIs needs different approaches
+        """
+        resource = requests.get(
+            url,
+            params=params,
+            stream=True,
+            verify=False,  # THIS IS BAD BUT GETTING SSL FAILURES WITH SAFEPROJECT.NET
+        )
 
         with open(outf, "wb") as outf_obj:
             shutil.copyfileobj(resource.raw, outf_obj)
@@ -1289,6 +1298,8 @@ def sync_local_dir(
     params["page"] = 1
     deposits: list = []
 
+    # TODO - would be much easier to run this off the index.json rather than trawling
+    #        Zenodo pagination!
     LOGGER.info("Scanning Zenodo deposits")
     while True:
         this_page = ZenodoResponse(
@@ -1334,41 +1345,78 @@ def sync_local_dir(
         else:
             LOGGER.info("Directory found")
 
-        # loop over the files in the record
-        for this_file in dep["files"]:
-            if xlsx_only and not this_file["filename"].endswith(".xlsx"):
-                LOGGER.info(f"Skipping non-excel file {this_file['filename']}")
-                continue
-
-            LOGGER.info(f"Processing {this_file['filename']}")
-            FORMATTER.push()
-
-            outf = rec_dir / this_file["filename"]
-            local_copy = outf.exists()
-
-            if not local_copy:
-                LOGGER.info("Downloading")
-                if not dry_run:
-                    _get_file(this_file["links"]["download"], outf, params=params)
-            elif local_copy and _compute_md5(outf) != this_file["checksum"]:
-                if replace_modified:
-                    LOGGER.info("Replacing locally modified file")
-                    if not dry_run:
-                        _get_file(this_file["links"]["download"], outf, params=params)
-                else:
-                    LOGGER.warning("Local copy modified")
-            else:
-                LOGGER.info("Already present")
-
-            FORMATTER.pop()
-
         # Get the metadata json
         metadata = rec_dir / f"{rec_id}.json"
         if metadata.exists():
             LOGGER.info("JSON Metadata found")
+            # Load the metadata to run file checking.
+            with open(metadata) as md:
+                record_json = json.load(md)
         else:
             LOGGER.info("Downloading JSON metadata ")
+
             if not dry_run:
-                _get_file(f"{zenodo_api}/api/record/{rec_id}", metadata)
+                # Request the JSON data for the record from the /records/<ID> API
+                this_record = ZenodoResponse(
+                    requests.get(f"{zenodo_api}/records/{rec_id}")
+                )
+                # Handle errors
+                if not this_record.ok:
+                    raise RuntimeError(this_record.error_message)
+
+                # Dump JSON payload to file
+                record_json = this_record.json_data
+                with open(metadata, "w") as md:
+                    json.dump(record_json, md, indent=4)
+
+        # loop over the files in the record
+        for this_file in record_json["files"]:
+            filename = this_file["key"]
+            if xlsx_only and not filename.endswith(".xlsx"):
+                LOGGER.info(f"Skipping non-excel file {filename}")
+                continue
+
+            LOGGER.info(f"Processing {filename}")
+            FORMATTER.push()
+
+            outf = rec_dir / filename
+            local_copy = outf.exists()
+
+            # Handle local copies - skip file if present and unmodified or when
+            # replace_modified is turned off.
+            if local_copy:
+                md5_match = _compute_md5(outf) == this_file["checksum"]
+
+                if md5_match:
+                    LOGGER.info("Local copy found")
+                    continue
+
+                if not replace_modified:
+                    LOGGER.info("Modified local copy found - not replacing")
+                    continue
+
+            # Not skipping, so log reason for download and get the file
+            if local_copy:
+                LOGGER.info("Replacing locally modified file")
+            else:
+                LOGGER.info("Downloading")
+
+            if not dry_run:
+                # Get a streaming request for the file download link
+                req = requests.get(
+                    this_file["links"]["self"],
+                    params=params,
+                    stream=True,
+                )
+
+                # Handle errors
+                if not req.status_code == 200:
+                    raise RuntimeError(ZenodoResponse(response=req).error_message)
+
+                # Else stream to file.
+                with open(outf, "wb") as outf_obj:
+                    shutil.copyfileobj(req.raw, outf_obj)
+
+            FORMATTER.pop()
 
         FORMATTER.pop()
