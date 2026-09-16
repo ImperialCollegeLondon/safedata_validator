@@ -1335,6 +1335,9 @@ def sync_local_dir(
         con_rec_id = str(dep["conceptrecid"])
         rec_id = str(dep["record_id"])
 
+        if rec_id != "5729342":
+            continue
+
         LOGGER.info(f"Processing deposit {con_rec_id}/{rec_id}")
         FORMATTER.push()
 
@@ -1359,9 +1362,12 @@ def sync_local_dir(
             LOGGER.info("Downloading JSON metadata ")
 
             if not dry_run:
-                # Request the JSON data for the record from the /records/<ID> API
+                # Request the JSON data for the record from the /records/<ID> API,
+                # passing in the parameters to ensure the files data is filled for
+                # restricted or embargoed records. They are always populated for public
+                # records.
                 this_record = ZenodoResponse(
-                    requests.get(f"{zenodo_api}/records/{rec_id}")
+                    requests.get(f"{zenodo_api}/records/{rec_id}", params=params)
                 )
                 # Handle errors
                 if not this_record.ok:
