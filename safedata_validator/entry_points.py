@@ -554,7 +554,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
     sync_local_dir_parser.add_argument(
         "datadir",
-        type=str,
+        type=Path,
         help="The path to a local directory containing "
         "an existing safedata directory or an empty folder in which to create one",
     )
@@ -901,7 +901,7 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         sync_local_dir(
             datadir=args.datadir,
             xlsx_only=not args.not_just_xlsx,
-            zen_res=zenodo_resources,
+            resources=resources,
             replace_modified=args.replace_modified,
         )
 

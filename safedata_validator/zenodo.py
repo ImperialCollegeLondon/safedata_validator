@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import decimal
 import hashlib
+import json
 import re
 import shutil
 from dataclasses import InitVar, dataclass, field
@@ -31,6 +32,7 @@ from tqdm.utils import CallbackIOWrapper
 
 from safedata_validator.logger import FORMATTER, LOGGER
 from safedata_validator.resources import Resources
+from safedata_validator.server import MetadataResources
 from safedata_validator.taxa import taxon_index_to_text
 
 
@@ -1209,7 +1211,7 @@ def download_ris_data(zen_res: ZenodoResources, ris_file: Path | None = None) ->
 
 def sync_local_dir(
     datadir: Path,
-    zen_res: ZenodoResources,
+    resources: Resources,
     xlsx_only: bool = True,
     replace_modified: bool = False,
     dry_run: bool = False,
@@ -1230,7 +1232,7 @@ def sync_local_dir(
     Args:
         datadir: The path to a local directory containing an existing safedata
             directory or an empty folder in which to create one.
-        zen_res: The zenodo resources from the safedata_validator configuration.
+        resources: Resources from the safedata_validator configuration.
         xlsx_only: Should the download ignore large non-xlsx files, defaulting
             to True.
         replace_modified: Should the synchronisation replace locally modified files with
@@ -1241,8 +1243,16 @@ def sync_local_dir(
 
     # Private helper functions
     def _get_file(url: str, outf: Path, params: dict | None = None) -> None:
-        """Download a file from a URL."""
-        resource = requests.get(url, params=params, stream=True)
+        """Download a file from a URL.
+
+        TODO - retire this, error handling for different APIs needs different approaches
+        """
+        resource = requests.get(
+            url,
+            params=params,
+            stream=True,
+            verify=False,  # THIS IS BAD BUT GETTING SSL FAILURES WITH SAFEPROJECT.NET
+        )
 
         with open(outf, "wb") as outf_obj:
             shutil.copyfileobj(resource.raw, outf_obj)
@@ -1251,42 +1261,57 @@ def sync_local_dir(
     if not (datadir.exists() and datadir.is_dir()):
         raise OSError(f"{datadir} is not an existing directory")
 
-    # Get the configured metadata api
-    api = zen_res.api
+    # Get the resource subsets
+    metadata_resources = MetadataResources(resources=resources)
+    zenodo_resources = ZenodoResources(resources=resources)
+
+    # APIs for function: zenodo for accessing data and JSON, metadata server for
+    # downloading index files and other resources from the metadata server.
+    zenodo_api = zenodo_resources.api
+    metadata_api = metadata_resources.api
 
     # Check for an existing API url file and check it is congruent with config
     url_file = datadir / "url.json"
 
     if url_file.exists():
         with open(url_file) as urlf:
-            dir_api = simplejson.load(urlf)["url"][0]
+            dir_metadata_api = simplejson.load(urlf)["url"][0]
 
-        if api != dir_api:
+        if metadata_api != dir_metadata_api:
             raise RuntimeError(
                 "Configured api does not match existing api in directory"
             )
     else:
         with open(url_file, "w") as urlf:
-            simplejson.dump({"url": [api]}, urlf)
+            simplejson.dump({"url": [metadata_api]}, urlf)
 
     # Download index files - don't bother to check for updates, this isn't
     # a frequent thing to do
     LOGGER.info("Downloading index files")
-    _get_file(f"{api}/api/index", datadir / "index.json")
-    _get_file(f"{api}/api/gazetteer", datadir / "gazetteer.geojson")
-    _get_file(f"{api}/api/location_aliases", datadir / "location_aliases.csv")
+    _get_file(f"{metadata_api}/api/index", datadir / "index.json")
+    _get_file(f"{metadata_api}/api/gazetteer", datadir / "gazetteer.geojson")
+    _get_file(f"{metadata_api}/api/location_aliases", datadir / "location_aliases.csv")
 
-    # Get the deposits associated with the account, which includes a list of download
-    # links. Need to set the page parameter to the API to track paginated results.
-    params = zen_res.token.copy()
-    params["page"] = 1
+    # Get all versions of published deposits associated with the community. Need to set
+    # the page parameter to the API to track paginated results.
+    params = zenodo_resources.token.copy()
+    params.update(
+        {
+            "page": 1,
+            "all_versions": "true",
+            "status": "published",
+            "q": f"communities:{zenodo_resources.community}",
+        }
+    )
     deposits: list = []
 
+    # TODO - would be much easier to run this off the index.json rather than trawling
+    #        Zenodo pagination!
     LOGGER.info("Scanning Zenodo deposits")
     while True:
         this_page = ZenodoResponse(
             requests.get(
-                f"{zen_res.api}/deposit/depositions",
+                f"{zenodo_api}/deposit/depositions?all_versions=true",
                 params=params,
                 json={},
                 headers={"Content-Type": "application/json"},
@@ -1310,57 +1335,94 @@ def sync_local_dir(
         con_rec_id = str(dep["conceptrecid"])
         rec_id = str(dep["record_id"])
 
-        if not dep["submitted"]:
-            LOGGER.info(f"Unsubmitted draft {con_rec_id}/{rec_id}")
-            continue
-
         LOGGER.info(f"Processing deposit {con_rec_id}/{rec_id}")
         FORMATTER.push()
 
-        # Create the directory structure if needed
+        # Create the directory structure if needed - the parent directory for the
+        # concept record might already exist, but allow it to be created if not.
         rec_dir = datadir / con_rec_id / rec_id
         if not rec_dir.exists():
             LOGGER.info("Creating directory")
             if not dry_run:
-                rec_dir.mkdir()
+                rec_dir.mkdir(parents=True, exist_ok=True)
         else:
             LOGGER.info("Directory found")
 
-        # loop over the files in the record
-        for this_file in dep["files"]:
-            if xlsx_only and not this_file["filename"].endswith(".xlsx"):
-                LOGGER.info(f"Skipping non-excel file {this_file['filename']}")
-                continue
-
-            LOGGER.info(f"Processing {this_file['filename']}")
-            FORMATTER.push()
-
-            outf = rec_dir / this_file["filename"]
-            local_copy = outf.exists()
-
-            if not local_copy:
-                LOGGER.info("Downloading")
-                if not dry_run:
-                    _get_file(this_file["links"]["download"], outf, params=params)
-            elif local_copy and _compute_md5(outf) != this_file["checksum"]:
-                if replace_modified:
-                    LOGGER.info("Replacing locally modified file")
-                    if not dry_run:
-                        _get_file(this_file["links"]["download"], outf, params=params)
-                else:
-                    LOGGER.warning("Local copy modified")
-            else:
-                LOGGER.info("Already present")
-
-            FORMATTER.pop()
-
-        # Get the metadata json
+        # Get the metadata json, which includes file links.
         metadata = rec_dir / f"{rec_id}.json"
         if metadata.exists():
             LOGGER.info("JSON Metadata found")
+            # Load the metadata to run file checking.
+            with open(metadata) as md:
+                record_json = json.load(md)
         else:
             LOGGER.info("Downloading JSON metadata ")
+
             if not dry_run:
-                _get_file(f"{api}/api/record/{rec_id}", metadata)
+                # Request the JSON data for the record from the /records/<ID> API,
+                # passing in the parameters to ensure the files data is filled for
+                # restricted or embargoed records. They are always populated for public
+                # records.
+                this_record = ZenodoResponse(
+                    requests.get(f"{zenodo_api}/records/{rec_id}", params=params)
+                )
+                # Handle errors
+                if not this_record.ok:
+                    raise RuntimeError(this_record.error_message)
+
+                # Dump JSON payload to file
+                record_json = this_record.json_data
+                with open(metadata, "w") as md:
+                    json.dump(record_json, md, indent=4)
+
+        # loop over the files in the record
+        for this_file in record_json["files"]:
+            filename = this_file["key"]
+            if xlsx_only and not filename.endswith(".xlsx"):
+                LOGGER.info(f"Skipping non-excel file {filename}")
+                continue
+
+            LOGGER.info(f"Processing {filename}")
+            FORMATTER.push()
+
+            outf = rec_dir / filename
+            local_copy = outf.exists()
+
+            # Handle local copies - skip file if present and unmodified or when
+            # replace_modified is turned off.
+            if local_copy:
+                md5_match = _compute_md5(outf) == this_file["checksum"]
+
+                if md5_match:
+                    LOGGER.info("Local copy found")
+                    continue
+
+                if not replace_modified:
+                    LOGGER.info("Modified local copy found - not replacing")
+                    continue
+
+            # Not skipping, so log reason for download and get the file
+            if local_copy:
+                LOGGER.info("Replacing locally modified file")
+            else:
+                LOGGER.info("Downloading")
+
+            if not dry_run:
+                # Get a streaming request for the file download link
+                req = requests.get(
+                    this_file["links"]["self"],
+                    params=params,
+                    stream=True,
+                )
+
+                # Handle errors
+                if not req.status_code == 200:
+                    raise RuntimeError(ZenodoResponse(response=req).error_message)
+
+                # Else stream to file.
+                with open(outf, "wb") as outf_obj:
+                    shutil.copyfileobj(req.raw, outf_obj)
+
+            FORMATTER.pop()
 
         FORMATTER.pop()
