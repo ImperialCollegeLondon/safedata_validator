@@ -10,16 +10,17 @@ from safedata_validator.zenodo import (
     create_deposit,
     delete_files,
     generate_inspire_xml,
+    merge_metadata,
     publish_deposit,
     upload_files,
     upload_metadata,
 )
 
 # Local paths to the files to be published
-dataset = "Example.xlsx"
-metadata_path = "Example.json"
-extra_file = "Supplementary_files.zip"
-xml_file = "Example_GEMINI.xml"
+dataset = Path("Example.xlsx")
+metadata_path = Path("Example.json")
+extra_file = Path("Supplementary_files.zip")
+xml_file = Path("Example_GEMINI.xml")
 
 # Create a Resources object from a configuration file in a standard location and then
 # get the Zenodo specific resources from that
@@ -83,6 +84,14 @@ publish_response = publish_deposit(zenodo=zenodo_metadata, zen_res=zenodo_resour
 
 if not publish_response.ok:
     raise RuntimeError(publish_response.error_message)
+
+# Merge the metadata
+merge_metadata(
+    path=metadata_path,
+    dataset_metadata=data_metadata,
+    zenodo_metadata=publish_response.json_data,
+)
+print(f"Metadata merged to: {metadata_path}")
 
 # Show the new publication
 print(publish_response.json_data["links"]["html"])
