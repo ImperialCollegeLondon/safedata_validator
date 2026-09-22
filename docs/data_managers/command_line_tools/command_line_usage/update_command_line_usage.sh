@@ -20,7 +20,7 @@ safedata_zenodo -h >> safedata_zenodo_top.txt
 
 subcommands=(create_deposit get_deposit discard_deposit publish_deposit \
              upload_files delete_files upload_metadata  sync_local_dir \
-             maintain_ris generate_html generate_xml publish_dataset)
+             maintain_ris generate_html generate_xml publish_dataset merge_metadata)
 
 for subc in "${subcommands[@]}";
 do

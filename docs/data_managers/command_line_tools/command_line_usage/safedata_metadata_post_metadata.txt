@@ -1,5 +1,5 @@
 cl_prompt $ safedata_metadata post_metadata -h
-usage: safedata_metadata post_metadata [-h] zenodo_json dataset_json
+usage: safedata_metadata post_metadata [-h] dataset_json
 
 This function posts dataset and Zenodo metadata for a validated and published
 dataset to an server providing the API for accessing and searching safedata
@@ -7,7 +7,6 @@ metadata. The metadata server then handles populating a database with the
 metadata and exposing that data via the server API.
 
 positional arguments:
-  zenodo_json   Path to a Zenodo metadata file
   dataset_json  Path to a dataset metadata file
 
 options:
