@@ -716,6 +716,11 @@ def test_temporal_extent(
     [
         (dict(), False, "Metadata for Geographic Extents found"),  # no amendments
         (
+            {"south": (4,), "north": (6,), "east": (119,), "west": (115,)},
+            False,
+            "Metadata for Geographic Extents found",
+        ),
+        (
             {"south": (None,), "north": (None,), "east": (None,), "west": (None,)},
             False,  # Not a mandatory block
             "",
@@ -816,8 +821,9 @@ def test_geographic_extent(
     # Test the block load
     fixture_summary._load_geographic_extent()
 
-    if should_log_error:
-        assert "ERROR" in [r.levelname for r in caplog.records]
+    error_logged = any(r.levelname == "ERROR" for r in caplog.records)
+
+    assert should_log_error == error_logged
 
     assert expected_log in caplog.text
 
