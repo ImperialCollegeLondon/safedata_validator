@@ -86,6 +86,14 @@ include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_pub
 %}
 ```
 
+#### The `merge_metadata` subcommand
+
+```sh
+{%
+include "data_managers/command_line_tools/command_line_usage/safedata_zenodo_merge_metadata.txt"
+%}
+```
+
 #### The `upload_files` subcommand
 
 ```sh

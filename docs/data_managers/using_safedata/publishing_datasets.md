@@ -20,7 +20,9 @@ command](../command_line_tools/safedata_zenodo.md#the-publish_dataset-subcommand
 main function for publishing a dataset. It is important to note that the dataset
 metadata file must be provided first and the dataset file provided second, otherwise the
 publication process will fail. The example below shows it being used to publish a
-dataset and additional external files:
+dataset and additional external files. The final step is to add the Zenodo publication
+metadata to the validation metadata file, ready for upload to the [metadata
+server](./posting_metadata.md).
 
 ```sh
 safedata_zenodo publish_dataset Example.json Example.xlsx \
@@ -29,7 +31,7 @@ safedata_zenodo publish_dataset Example.json Example.xlsx \
 
 The expected output from that command is shown below:
 
-```sh
+```txt
 - Configuring Resources
     - Configuring resources from user config: configs/config.cfg
     - Validating gazetteer: spatial_resources/gazetteer.geojson
@@ -46,6 +48,7 @@ Uploading Supplementary_files.zip
 Uploading 1143714_GEMINI.xml
 100%|████████████████████████████████████| 27.1k/27.1k [00:00<00:00, 83.4kB/s]
 Uploading deposit metadata
+Metadata merged to: Example.json
 Dataset published: https://zenodo.org/records/1143714
 ```
 
@@ -96,7 +99,7 @@ safedata_zenodo publish_dataset Example.json Example.xlsx \
 
 The output from that command would look like:
 
-```sh
+```txt
 - Configuring Resources
     - Configuring resources from user config: configs/config.cfg
     - Validating gazetteer: spatial_resources/gazetteer.geojson
@@ -116,6 +119,7 @@ Uploading Example.xlsx
 Uploading 1143900_GEMINI.xml
 100%|████████████████████████████████████| 27.1k/27.1k [00:00<00:00, 89.0kB/s]
 Uploading deposit metadata
+Metadata merged to: Example.json
 Dataset published: https://sandbox.zenodo.org/records/1143900
 ```
 

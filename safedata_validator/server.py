@@ -70,28 +70,27 @@ class MetadataResponse:
 
 
 def post_metadata(
-    metadata: dict, zenodo: dict, server_resources: MetadataResources
+    metadata: dict, server_resources: MetadataResources
 ) -> MetadataResponse:
-    """Post the dataset metadata and zenodo metadata to the metadata server.
+    """Post the dataset metadata to the metadata server.
 
     Args:
         metadata: The dataset metadata dictionary for a dataset
-        zenodo: The dataset metadata dictionary for a deposit
         server_resources: The server resources to be used.
 
     Returns:
         See [here][safedata_validator.server.MetadataResources].
     """
 
-    # Get payload
-    payload = {"metadata": metadata, "zenodo": zenodo}
+    if "zenodo" not in metadata:
+        raise ValueError("Metadata does not include published Zenodo metadata.")
 
     # post the metadata to the server
     return MetadataResponse(
         requests.post(
             f"{server_resources.api}/post_metadata",
             params=server_resources.token,
-            json=payload,
+            json=metadata,
             verify=server_resources.ssl_verify,
         )
     )

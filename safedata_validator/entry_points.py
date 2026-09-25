@@ -48,6 +48,7 @@ from safedata_validator.zenodo import (
     download_ris_data,
     generate_inspire_xml,
     get_deposit,
+    merge_metadata,
     publish_dataset,
     publish_deposit,
     sync_local_dir,
@@ -660,6 +661,21 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
         help="Output path for the XML file",
     )
 
+    # COMBINE METADATA subcommand
+    merge_metadata_desc = """
+    Merges the Zenodo metadata from a published dataset into the validation metadata to
+    create a single JSON data file for upload to the metadata server.
+    """
+
+    # This does not use the sandbox switches - not applicable
+    merge_metadata_parser = subparsers.add_parser(  # noqa: F841
+        "merge_metadata",
+        description=textwrap.dedent(merge_metadata_desc),
+        help="Merge Zenodo metadata into validation metadata",
+        formatter_class=_desc_formatter,
+        parents=[parse_zenodo_metadata, parse_dataset_metadata],
+    )
+
     # PUBLISH DATASET subcommand
     publish_dataset_desc = """
     This subcommand runs through the complete publication process for a validated
@@ -746,6 +762,9 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
     zenodo_json_path = getattr(args, "zenodo_json", None)
     if zenodo_json_path is not None:
         # Check that this points to a valid json file before trying to load
+        # TODO - here and below the check functions are loading the data and then
+        #        throwing it away before reloading it. Move to pydantic to validate and
+        #        load?
         if not check_file_is_zenodo_json(Path(zenodo_json_path)):
             LOGGER.error(f"Zenodo metadata file has wrong format: {zenodo_json_path}")
             return 1
@@ -951,13 +970,25 @@ def _safedata_zenodo_cli(args_list: list[str] | None = None) -> int:
 
         LOGGER.info("Inspire XML generated")
 
+    elif args.subcommand == "merge_metadata":
+        # Mypy cannot know here that the dataset json path _must_ be non-None
+        _ = merge_metadata(
+            path=Path(dataset_json_path),  # type: ignore[arg-type]
+            dataset_metadata=dataset_json_data,
+            zenodo_metadata=zenodo_json_data,
+        )
+
+        LOGGER.info("Zenodo metadata merged into validation JSON.")
+
     elif args.subcommand == "publish_dataset":
         # Publish the dataset, trapping the possible exceptions to simply print a
         # message and return a failure exit code.
+        # Mypy cannot know here that the dataset json path _must_ be non-None
         try:
             _, _ = publish_dataset(
                 resources=resources,
                 dataset=args.dataset,
+                dataset_metadata_path=Path(dataset_json_path),  # type: ignore[arg-type]
                 dataset_metadata=dataset_json_data,
                 external_files=args.external_files,
                 new_version=args.new_version,
@@ -1054,9 +1085,6 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
 
     # positional argument inputs
     post_metadata_parser.add_argument(
-        "zenodo_json", type=str, help="Path to a Zenodo metadata file"
-    )
-    post_metadata_parser.add_argument(
         "dataset_json", type=str, help="Path to a dataset metadata file"
     )
 
@@ -1108,7 +1136,9 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
 
     # Handle the remaining subcommands
     if args.subcommand == "post_metadata":
-        # Open the two JSON files, checking that they point to a valid json file first
+        # Open the JSON files, checking that they point to a valid json file first
+        # TODO - this loads the file twice, replace with a load and validate function,
+        #        but we might want to go for a proper pydantic model validation?
         if not check_file_is_metadata_json(Path(args.dataset_json)):
             LOGGER.error(f"Dataset metadata file has wrong format: {args.dataset_json}")
             return 1
@@ -1116,16 +1146,9 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
         with open(args.dataset_json, encoding="utf-8") as ds_json:
             dataset_json = simplejson.load(ds_json)
 
-        if not check_file_is_zenodo_json(Path(args.zenodo_json)):
-            LOGGER.error(f"Zenodo metadata file has wrong format: {args.zenodo_json}")
-            return 1
-
-        with open(args.zenodo_json, encoding="utf-8") as zn_json:
-            zenodo_json = simplejson.load(zn_json)
-
         # Run the function
         response = post_metadata(
-            metadata=dataset_json, zenodo=zenodo_json, server_resources=server_resources
+            metadata=dataset_json, server_resources=server_resources
         )
 
         # Report on the outcome.

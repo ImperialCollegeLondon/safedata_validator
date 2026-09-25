@@ -59,6 +59,8 @@ positional arguments:
                 Generate an HTML dataset description
     generate_xml
                 Create INSPIRE compliant metadata XML
+    merge_metadata
+                Merge Zenodo metadata into validation metadata
     publish_dataset
                 Publish a validated dataset
 
