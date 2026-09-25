@@ -202,10 +202,10 @@ class Summary:
             ),
             geo=SummaryBlock(
                 fields=[
-                    SummaryField("west", True, None, float),
-                    SummaryField("east", True, None, float),
-                    SummaryField("south", True, None, float),
-                    SummaryField("north", True, None, float),
+                    SummaryField("west", True, None, (float, int)),
+                    SummaryField("east", True, None, (float, int)),
+                    SummaryField("south", True, None, (float, int)),
+                    SummaryField("north", True, None, (float, int)),
                 ],
                 mandatory=False,
                 title="Geographic Extents",
