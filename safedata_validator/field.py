@@ -2009,7 +2009,15 @@ class TimeField(BaseField):
         # Check for consistent class formatting, using first row. Do not try and
         # validate further when data is not consistently formatted.
         if self.consistent_class and self.expected_class:
-            cell_types = [type(dt) for dt in data]
+            # Excel can return midnight (00:00:00) as a datetime rather than a time, so
+            # extra handling is needed for this case
+            cell_types = [
+                datetime.time
+                if isinstance(dt, datetime.datetime)
+                and dt.time() == datetime.time(0, 0)
+                else type(dt)
+                for dt in data
+            ]
             cell_type_set = set(cell_types)
 
             # Are all the values of expected types?
