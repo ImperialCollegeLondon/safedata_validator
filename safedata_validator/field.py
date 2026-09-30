@@ -419,11 +419,6 @@ class Dataset:
             ],
             # Store version of software dataset was validated using
             validator_version=sdv.__version__,
-            # Publication details - these are populated by the
-            # Zenodo publication mechanism.
-            zenodo_concept_id=None,
-            zenodo_record_id=None,
-            zenodo_publication_date=None,
         )
 
         # Extents - summary take priority over dataset.
