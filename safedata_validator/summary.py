@@ -673,7 +673,10 @@ class Summary:
         if geo_extent is not None:
             bbox = geo_extent[0]
 
-            if all([isinstance(v, float) for v in bbox.values()]):
+            # Check that all values are floats or ints
+            if all([isinstance(v, float | int) for v in bbox.values()]):
+                # And then coerce to float values
+                bbox = {k: float(v) for k, v in bbox.items()}
                 if bbox["south"] > bbox["north"]:
                     LOGGER.error("South limit is greater than north limit")
                 else:
