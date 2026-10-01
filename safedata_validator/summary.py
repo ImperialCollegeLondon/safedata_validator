@@ -671,9 +671,15 @@ class Summary:
         geo_extent = self._read_block(self.fields["geo"])
 
         if geo_extent is not None:
-            bbox = geo_extent[0]
-
-            if all([isinstance(v, float) for v in bbox.values()]):
+            try:
+                bbox = {k: float(v) for k, v in geo_extent[0].items()}
+            except ValueError:
+                LOGGER.error("Non numeric values in geographic extent.")
+            except TypeError:
+                # Source of type errors has already been handled so don't want to log
+                # another error here
+                return
+            else:
                 if bbox["south"] > bbox["north"]:
                     LOGGER.error("South limit is greater than north limit")
                 else:
