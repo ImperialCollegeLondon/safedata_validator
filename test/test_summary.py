@@ -1461,8 +1461,29 @@ def test_summary_load(fixture_summary, example_excel_files, n_errors):
         pytest.param(
             True,
             {
+                "project id": [1, 2, 1],
+                "title": ["title", None],
+                "description": ["desc", None],
+                "access status": ["open", None],
+                "author name": ["Author, Anne", None],
+                "keywords": ["testing", "testing"],
+            },
+            (
+                (INFO, "Loading project id metadata"),
+                (INFO, "Metadata for Project IDs found:"),
+                (
+                    ERROR,
+                    "Duplicate project ids are provided, provide each id only once!",
+                ),
+                (INFO, "Valid project ids provided:"),
+            ),
+            id="duplicate project ids provided",
+        ),
+        pytest.param(
+            True,
+            {
                 "safe project id": [1, 2],
-                "project id": [1, 2],
+                "project id": [3, 4],
                 "title": ["title", None],
                 "description": ["desc", None],
                 "access status": ["open", None],
@@ -1548,7 +1569,7 @@ def test_project_ids(caplog, fixture_summary_projects, rows, expected_log_entrie
 
     # Add rows to fixture and toggle project use
     fixture_summary_projects._rows = rows
-    fixture_summary_projects._ncols = 3
+    fixture_summary_projects._ncols = 4
 
     # Check that the mandatory fields are raised by key validation and that project id
     # validation works as expected.

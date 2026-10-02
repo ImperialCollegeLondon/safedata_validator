@@ -1034,6 +1034,14 @@ class Summary:
                 "Unknown project ids provided: ", extra={"join": invalid_proj_ids}
             )
 
+        # Check that all the project IDs that are provided are unique
+        unique_proj_ids = set(valid_proj_ids)
+        if len(valid_proj_ids) != len(unique_proj_ids):
+            LOGGER.error(
+                "Duplicate project ids are provided, provide each id only once!"
+            )
+            valid_proj_ids = list(unique_proj_ids)
+
         self.project_ids = valid_proj_ids
         LOGGER.info("Valid project ids provided: ", extra={"join": valid_proj_ids})
 
