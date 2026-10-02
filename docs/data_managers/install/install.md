@@ -42,3 +42,13 @@ The following steps should allow you to install `safedata_validator`:
 
 * You will now need to provide a [configuration](configuration.md) for the
   `safedata_validator` tools and install some required resources.
+
+<!-- markdownlint-disable MD046 -->
+!!! warning
+    `safedata_validator` is still being actively developed, so it is important to ensure
+    that the package version is kept up to date. This can be done by running
+
+    ```term
+    pip install safedata-validator --upgrade
+    ```
+<!-- markdownlint-enable MD046 -->
