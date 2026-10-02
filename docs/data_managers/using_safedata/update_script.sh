@@ -37,5 +37,11 @@ safedata_zenodo upload_files zenodo_1156212.json \
 #    on Zenodo from the dataset metadata
 safedata_zenodo upload_metadata zenodo_1156212.json Example.json
 
-# 4) Finally, publish the deposit to create the final record and DOI
+# 4) Publish the deposit to create the final record and DOI
 safedata_zenodo publish_deposit zenodo_1156212.json
+
+# 5) Finally add the published zenodo JSON into the validation metadata JSON
+safedata_zenodo merge_metadata zenodo_1156212.json Example.json 
+
+
+

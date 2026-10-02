@@ -671,9 +671,15 @@ class Summary:
         geo_extent = self._read_block(self.fields["geo"])
 
         if geo_extent is not None:
-            bbox = geo_extent[0]
-
-            if all([isinstance(v, float) for v in bbox.values()]):
+            try:
+                bbox = {k: float(v) for k, v in geo_extent[0].items()}
+            except ValueError:
+                LOGGER.error("Non numeric values in geographic extent.")
+            except TypeError:
+                # Source of type errors has already been handled so don't want to log
+                # another error here
+                return
+            else:
                 if bbox["south"] > bbox["north"]:
                     LOGGER.error("South limit is greater than north limit")
                 else:
@@ -1027,6 +1033,14 @@ class Summary:
             LOGGER.error(
                 "Unknown project ids provided: ", extra={"join": invalid_proj_ids}
             )
+
+        # Check that all the project IDs that are provided are unique
+        unique_proj_ids = set(valid_proj_ids)
+        if len(valid_proj_ids) != len(unique_proj_ids):
+            LOGGER.error(
+                "Duplicate project ids are provided, provide each id only once!"
+            )
+            valid_proj_ids = list(unique_proj_ids)
 
         self.project_ids = valid_proj_ids
         LOGGER.info("Valid project ids provided: ", extra={"join": valid_proj_ids})

@@ -1,0 +1,12 @@
+cl_prompt $ safedata_zenodo merge_metadata -h
+usage: safedata_zenodo merge_metadata [-h] zenodo_json dataset_json
+
+Merges the Zenodo metadata from a published dataset into the validation metadata to
+create a single JSON data file for upload to the metadata server.
+
+positional arguments:
+  zenodo_json   Path to a Zenodo JSON file for a deposit
+  dataset_json  Path to a JSON metadata file for a dataset
+
+options:
+  -h, --help    show this help message and exit

@@ -866,9 +866,31 @@ class _CleanUpDeposit:
         return
 
 
+def merge_metadata(path: Path, dataset_metadata: dict, zenodo_metadata: dict):
+    """Merge the Zenodo publication metadata into the validation metadata.
+
+    This creates a single file containing both the the validation metadata and the
+    Zenodo publication details. This file provides the payload for sending data on a new
+    dataset to the metadata server.
+
+    Args:
+        path: The path to the validation metadata JSON file
+        dataset_metadata: The current contents of that metadata JSON file.
+        zenodo_metadata: The ``json_data`` content from the output of the
+            ``publish_deposit`` function, which provides the full publication metadata
+            for the dataset on Zenodo.
+    """
+
+    dataset_metadata["zenodo"] = zenodo_metadata
+
+    with open(path, "w") as md_out:
+        json.dump(dataset_metadata, md_out, indent=4)
+
+
 def publish_dataset(
     resources: Resources,
     dataset: Path,
+    dataset_metadata_path: Path,
     dataset_metadata: dict,
     external_files: list[Path],
     new_version: int | None,
@@ -883,22 +905,27 @@ def publish_dataset(
     the set of provided files (dataset and external files) matches the files documented
     in the dataset.
 
-    When a new version of an existing database is created, the resulting Zenodo deposit
-    contains copies of the most recent files. At present, the publish dataset command
-    deletes all of these files and expects to upload the full set of replacement files.
-    This will be inefficient if only some files need to be changed, and this function
-    may be updated in the future to allow only new files to be updated.
+    If the publication process fails, the partly completed deposit is deleted to avoid
+    cluttering the Zenodo deposit list. When publication succeeds, the function updates
+    the validation metadata file to include the Zenodo publication metadata, ready for
+    upload to the metadata server.
 
-    It returns the URL of the resulting published dataset. If the publication process
-    fails, the partly completed deposit is deleted to avoid cluttering the Zenodo
-    deposit list.
+    The dataset can be published as a new version of an existing dataset using
+    `new_version` and passing in the Zenodo ID of the deposit being updated. This value
+    cannot be the 'concept ID' that groups versions of datasets; it _must_ be the
+    specific ID of the most recent version within a concept. You must also provide the
+    full set of files for the new version - the function compares file checksums to
+    discover which files need to be updated or removed.
+
+    It returns the URL of the resulting published dataset.
 
     Args:
         resources: The safedata_validator resource configuration to be used. If
             none is provided, the standard locations are checked.
         dataset: A path to the dataset file.
         external_files: A list of paths to external files named in the dataset.
-        dataset_metadata: The dataset metadata.
+        dataset_metadata_path: The path to the dataset metadata
+        dataset_metadata: A dictionary of the contents of the dataset metadata file.
         new_version: Optionally, create a new version of the dataset with the provided
             Zenodo ID. This must be the most recent version of the dataset concept.
         no_xml: A flag to suppress the automatic inclusion of Gemini XML metadata.
@@ -1089,6 +1116,14 @@ def publish_dataset(
     if not publish_response.ok:
         clean_up_instance.run()
         raise RuntimeError(publish_response.error_message)
+
+    # Merge the metadata
+    merge_metadata(
+        path=dataset_metadata_path,
+        dataset_metadata=dataset_metadata,
+        zenodo_metadata=publish_response.json_data,
+    )
+    print(f"Metadata merged to: {dataset_metadata_path}")
 
     # Return the new publication ID and link
     zenodo_url = publish_response.json_data["links"]["html"]
