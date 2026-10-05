@@ -1,5 +1,6 @@
-"""Test that Extent logs correctly."""
+"""Test entry points for the package."""
 
+import json
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
@@ -168,6 +169,7 @@ def test_safedata_validate(user_config_file):
     """
 
     from safedata_validator.entry_points import _safedata_validate_cli
+    from safedata_validator.models import Summary
 
     # Need to create fake files to be used for the validation outputs
     user_config_file.create_file("/tmp/validation_log.txt")
@@ -182,3 +184,6 @@ def test_safedata_validate(user_config_file):
             FIXTURE_FILES.rf.good_seq_taxa_file,
         ]
     )
+
+    # Check the output JSON data can be loaded and validated by the pydantic model
+    Summary.model_validate(json.load(open("/tmp/validation_report.json")))

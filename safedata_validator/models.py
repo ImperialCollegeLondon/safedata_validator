@@ -9,34 +9,46 @@
 
 These models currently do not attempt to do the fine scale validation carried out in the
 {mod}`safedata_validator.summary` module. It is possible that the functionality in that
-module could be replaced by extending the validation on these models.
+module could be replaced by extending the validation on these models and that could then
+become the basis of a `summary.toml` file for use with a CSV based deposit system.
 """  # noqa: D205, D415
+
+# NOTES
+#  - current metadata fails on setting an EmailStr validator (badly formed emails)
 
 from __future__ import annotations
 
 from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, model_validator
 
 
-class Author(BaseModel):
+class ForbiddenExtra(BaseModel):
+    """Base class to enforce core configuration settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class Author(ForbiddenExtra):
     """Metadata summary author block."""
 
     name: str
     affiliation: str | None = None  # Affiliation not mandatory
-    email: str | None = None  # Email not mandatory
+    email: str | None  # Email not mandatory
+    # Should be this, but identifies failures
+    # email: EmailStr | None = None  # Email not mandatory
     orcid: str | None = None  # ORCID not mandatory
 
 
-class ExternalFile(BaseModel):
+class ExternalFile(ForbiddenExtra):
     """Metadata summary external file block."""
 
     file: str
     description: str
 
 
-class Field(BaseModel):
+class Field(ForbiddenExtra):
     """Metadata data worksheet field header metadata."""
 
     field_name: str
@@ -53,7 +65,7 @@ class Field(BaseModel):
     col_idx: int
 
 
-class Dataworksheet(BaseModel):
+class Dataworksheet(ForbiddenExtra):
     """Metadata data worksheet summary metadata."""
 
     taxa_fields: list
@@ -69,16 +81,16 @@ class Dataworksheet(BaseModel):
     n_data_row: int
 
 
-class Funders(BaseModel):
+class Funders(ForbiddenExtra):
     """Metadata summary funders block."""
 
     body: str
     type: str
     ref: str | int | None = None
-    url: str | None = None
+    url: AnyHttpUrl | None = None
 
 
-class Permits(BaseModel):
+class Permits(ForbiddenExtra):
     """Metadata summary permits block."""
 
     type: str
@@ -86,7 +98,7 @@ class Permits(BaseModel):
     number: str
 
 
-class Locations(BaseModel):
+class Locations(ForbiddenExtra):
     """Metadata locations."""
 
     name: str
@@ -94,7 +106,7 @@ class Locations(BaseModel):
     wkt_wgs84: str | None = None
 
 
-class GBIFTaxa(BaseModel):
+class GBIFTaxa(ForbiddenExtra):
     """Metadata GBIF Taxa."""
 
     worksheet_name: str | None  # None for parent taxa
@@ -105,7 +117,7 @@ class GBIFTaxa(BaseModel):
     taxon_status: str
 
 
-class Summary(BaseModel):
+class Summary(ForbiddenExtra):
     """Metadata summary model."""
 
     project_ids: list[int]
@@ -126,12 +138,12 @@ class Summary(BaseModel):
     sequenced_taxa: dict[str, Any]  # Needs work
     locations: list[Locations] | None = None
     validator_version: str
-    temporal_extent: list[str]
+    temporal_extent: list[date]
     latitudinal_extent: list[float]
     longitudinal_extent: list[float]
 
 
-class Creator(BaseModel):
+class Creator(ForbiddenExtra):
     """Zenodo creator metadata."""
 
     name: str
@@ -139,7 +151,7 @@ class Creator(BaseModel):
     orcid: str | None = None
 
 
-class Contributor(BaseModel):
+class Contributor(ForbiddenExtra):
     """Zenodo contributor metadata."""
 
     name: str
@@ -148,25 +160,40 @@ class Contributor(BaseModel):
     orcid: str
 
 
-class Community(BaseModel):
+class Community(ForbiddenExtra):
     """Zenodo community metadata."""
 
     identifier: str
 
 
-class PrereserveDoi(BaseModel):
+class PrereserveDoi(ForbiddenExtra):
     """Zenodo prereserve DOI metadata."""
 
     doi: str
     recid: int
 
 
-class ZenodoMetadata(BaseModel):
+class RelatedIdentifier(ForbiddenExtra):
+    """Zenodo related identifier metadata."""
+
+    identifier: str
+    relation: str
+    resource_type: str
+    scheme: str
+
+
+class Grants(ForbiddenExtra):
+    """Zenodo grants metadata."""
+
+    id: str
+
+
+class ZenodoMetadata(ForbiddenExtra):
     """Zenodo metadata section."""
 
     title: str
     doi: str
-    publication_date: str
+    publication_date: date
     description: str
     access_right: str
     creators: list[Creator]
@@ -177,39 +204,47 @@ class ZenodoMetadata(BaseModel):
     communities: list[Community]
     upload_type: str
     prereserve_doi: PrereserveDoi
+    # These last three are only found in a handful of existing records.
+    related_identifiers: list[RelatedIdentifier] | None = None
+    grants: list[Grants] | None = None
+    version: str | None = None
 
 
-class Links(BaseModel):
+class Links(ForbiddenExtra):
     """Zenodo deposit links."""
 
-    self: str
-    html: str
-    doi: str
-    parent_doi: str | None = None  # Not sure why missing in some zenodo metadata
-    badge: str
-    conceptbadge: str | None = None  # Not sure why missing in some zenodo metadata
-    files: str
-    bucket: str
-    latest_draft: str
-    latest_draft_html: str
-    publish: str
-    edit: str
-    discard: str
-    newversion: str
-    record: str
-    record_html: str
-    latest: str
-    latest_html: str
+    self: AnyHttpUrl
+    html: AnyHttpUrl
+    doi: AnyHttpUrl
+    # Not sure why missing in some zenodo metadata
+    parent_doi: AnyHttpUrl | None = None
+    badge: AnyHttpUrl
+    # Not sure why missing in some zenodo metadata
+    conceptbadge: AnyHttpUrl | None = None
+    files: AnyHttpUrl
+    bucket: AnyHttpUrl
+    thumb250: AnyHttpUrl | None = None
+    thumbs: dict[str, AnyHttpUrl] | None = None
+    latest_draft: AnyHttpUrl
+    latest_draft_html: AnyHttpUrl
+    publish: AnyHttpUrl
+    edit: AnyHttpUrl
+    discard: AnyHttpUrl
+    newversion: AnyHttpUrl
+    record: AnyHttpUrl
+    record_html: AnyHttpUrl
+    latest: AnyHttpUrl
+    latest_html: AnyHttpUrl
 
 
-class FileLinks(BaseModel):
+class FileLinks(ForbiddenExtra):
     """Zenodo file links metadata."""
 
-    self: str
-    download: str
+    self: AnyHttpUrl
+    download: AnyHttpUrl
 
 
-class File(BaseModel):
+class File(ForbiddenExtra):
     """Zenodo file metadata."""
 
     id: str
@@ -219,7 +254,7 @@ class File(BaseModel):
     links: FileLinks
 
 
-class Zenodo(BaseModel):
+class Zenodo(ForbiddenExtra):
     """Zenodo metadata model."""
 
     created: str
@@ -228,7 +263,7 @@ class Zenodo(BaseModel):
     conceptrecid: str
     doi: str
     conceptdoi: str
-    doi_url: str
+    doi_url: AnyHttpUrl
     metadata: ZenodoMetadata
     title: str
     links: Links
@@ -237,6 +272,21 @@ class Zenodo(BaseModel):
     files: list[File]
     state: str
     submitted: bool
+
+    @model_validator(mode="after")
+    def check_published(self) -> Zenodo:
+        """Check the record is published."""
+
+        if (self.state != "done") or not self.submitted:
+            raise ValueError(
+                "Zenodo metadata do not show completed publication of the dataset"
+            )
+
+        return self
+
+
+# Enforce
+# - submitted must be true and state 'done'
 
 
 class UploadMetadata(Summary):

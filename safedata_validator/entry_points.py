@@ -17,6 +17,7 @@ import textwrap
 from pathlib import Path
 
 import simplejson
+from pydantic import ValidationError
 
 from safedata_validator import __version__
 from safedata_validator.field import Dataset
@@ -27,6 +28,7 @@ from safedata_validator.logger import (
     use_file_logging,
     use_stream_logging,
 )
+from safedata_validator.models import Summary
 from safedata_validator.resources import Resources
 from safedata_validator.server import MetadataResources, post_metadata, update_resources
 from safedata_validator.taxondb import (
@@ -235,10 +237,22 @@ def _safedata_validate_cli(args_list: list[str] | None = None) -> int:
         sys.stdout.write("File validation failed\n")
         return 1
 
+    # Run the output metadata through the pydantic model - at the moment this is purely
+    # used as a paranoid check on the content being passed out for possible upload to a
+    # safedata_server instance but this could become more integrated into the
+    # validation.
+    try:
+        validated = Summary.model_validate_json(ds.to_json())
+    except ValidationError:
+        sys.stdout.write(
+            "Internal error in validating metadata output: contact developers"
+        )
+        return 1
+
     # Output JSON file
     json_file = args.json or os.path.splitext(args.filename)[0] + ".json"
     with open(json_file, "w", encoding="utf-8") as json_out:
-        json_out.write(ds.to_json())
+        json_out.write(validated.model_dump_json(indent=2))
 
     sys.stdout.write("File validation passed\n")
     sys.stdout.write(f"JSON metadata written to {json_file}\n")
