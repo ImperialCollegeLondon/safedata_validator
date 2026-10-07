@@ -2400,9 +2400,6 @@
       "wkt_wgs84": "Linestring(117.7762 4.9576, 117.7862 4.9676)"
     }
   ],
-  "zenodo_concept_id": null,
-  "zenodo_record_id": null,
-  "zenodo_publication_date": null,
   "temporal_extent": [
     "2012-06-01",
     "2012-07-30"
@@ -2414,5 +2411,6 @@
   "longitudinal_extent": [
     116.75,
     117.82
-  ]
+  ],
+  "validator_version": "3.1.2"
 }

@@ -27,10 +27,12 @@ import rispy
 import simplejson
 from dominate import tags
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pydantic import ValidationError
 from tqdm import tqdm
 from tqdm.utils import CallbackIOWrapper
 
 from safedata_validator.logger import FORMATTER, LOGGER
+from safedata_validator.models import UploadMetadata
 from safedata_validator.resources import Resources
 from safedata_validator.server import MetadataResources
 from safedata_validator.taxa import taxon_index_to_text
@@ -883,8 +885,13 @@ def merge_metadata(path: Path, dataset_metadata: dict, zenodo_metadata: dict):
 
     dataset_metadata["zenodo"] = zenodo_metadata
 
+    try:
+        validated = UploadMetadata.model_validate(dataset_metadata)
+    except ValidationError as error:
+        raise error
+
     with open(path, "w") as md_out:
-        json.dump(dataset_metadata, md_out, indent=4)
+        md_out.write(validated.model_dump_json(indent=2))
 
 
 def publish_dataset(
