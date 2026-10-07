@@ -43,6 +43,7 @@ sympy = "^1.10.1"
 tqdm = "^4.64.0"
 typing-extensions = "^4.8.0"
 pydantic = {extras = ["email"], version = "^2.13.5"}
+email-validator = "^2.3.0"
 
 [tool.poetry.group.test.dependencies]
 freezegun = "^1.5.5"

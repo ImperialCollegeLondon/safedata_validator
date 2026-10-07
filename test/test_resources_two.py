@@ -1,0 +1,472 @@
+"""General tests to check that config files are handled sensibly."""
+
+import os
+from contextlib import contextmanager
+from logging import CRITICAL, INFO
+
+import pytest
+
+from .conftest import FIXTURE_FILES, log_check
+
+from safedata_validator.resources_two import load_resources
+
+
+def test_do_nowt():
+    pass
+
+
+@contextmanager
+def does_not_raise():
+    yield
+
+
+@pytest.fixture()
+def config_file_dict():
+    return {
+        "gazetteer": FIXTURE_FILES.rf.gaz_file,
+        "location_aliases": FIXTURE_FILES.rf.localias_file,
+        "gbif_database": FIXTURE_FILES.rf.gbif_file,
+        "project_database": FIXTURE_FILES.rf.project_database_file,
+        "extents": {
+            "temporal_soft_extent": ["2002-02-01", "2030-02-01"],
+            "temporal_hard_extent": ["2002-02-01", "2030-02-01"],
+            "latitudinal_hard_extent": [-90, 90],
+            "latitudinal_soft_extent": [-4, 2],
+            "longitudinal_hard_extent": [-180, 180],
+            "longitudinal_soft_extent": [110, 120],
+        },
+        "zenodo": {
+            "community_name": "safe",
+            "use_sandbox": True,
+            "zenodo_sandbox_token": "xyz",
+            "zenodo_token": "xyz",
+        },
+    }
+
+
+def nested_set(dic, keys, value):
+    """Convenience function for setting dict config values."""
+    for key in keys[:-1]:
+        dic = dic.setdefault(key, {})
+    dic[keys[-1]] = value
+
+
+@pytest.mark.parametrize(
+    "dict_mod, expected_exception, expected_log",
+    [
+        pytest.param(
+            tuple(),
+            None,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating project database: "),
+            ),
+            id="All correct",
+        ),
+        pytest.param(
+            ((["gazetteer"], ""),),
+            RuntimeError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (CRITICAL, "Gazetteer file missing in configuration"),
+            ),
+            id="Gazetteer not set",
+        ),
+        pytest.param(
+            ((["gazetteer"], FIXTURE_FILES.mf),),
+            OSError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (CRITICAL, "Gazetteer file not found"),
+            ),
+            id="Gazetteer path missing",
+        ),
+        pytest.param(
+            ((["gazetteer"], FIXTURE_FILES.rf.gbif_file),),
+            OSError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (CRITICAL, "Gazetteer file not valid JSON"),
+            ),
+            id="Gazetteer not JSON",
+        ),
+        pytest.param(
+            ((["gazetteer"], FIXTURE_FILES.rf.json_not_locations),),
+            RuntimeError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (CRITICAL, "Gazetteer data not a GeoJSON Feature Collection"),
+            ),
+            id="Gazetteer not GeoJSON",
+        ),
+        pytest.param(
+            ((["location_aliases"], ""),),
+            RuntimeError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (CRITICAL, "Location aliases file missing in configuration"),
+            ),
+            id="Loc aliases not set",
+        ),
+        pytest.param(
+            ((["location_aliases"], FIXTURE_FILES.mf),),
+            OSError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (CRITICAL, "Location aliases file not found"),
+            ),
+            id="Loc aliases path missing",
+        ),
+        pytest.param(
+            ((["location_aliases"], FIXTURE_FILES.rf.gbif_file),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (
+                    CRITICAL,
+                    "Location aliases file not readable as a CSV file with valid "
+                    "headers",
+                ),
+            ),
+            id="Loc aliases not text",
+        ),
+        pytest.param(
+            ((["location_aliases"], FIXTURE_FILES.rf.gaz_file),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (
+                    CRITICAL,
+                    "Location aliases file not readable as a CSV file with valid "
+                    "headers",
+                ),
+            ),
+            id="Loc text not correct CSV",
+        ),
+        pytest.param(
+            ((["location_aliases"], FIXTURE_FILES.rf.empty_localias_file),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (CRITICAL, "Location aliases file is empty"),
+            ),
+            id="Loc alias file empty",
+        ),
+        pytest.param(
+            ((["gbif_database"], ""),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (CRITICAL, "GBIF database not set in configuration"),
+            ),
+            id="GBIF not set",
+        ),
+        pytest.param(
+            ((["gbif_database"], FIXTURE_FILES.mf),),
+            FileNotFoundError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (CRITICAL, "GBIF database not found"),
+            ),
+            id="GBIF path missing",
+        ),
+        pytest.param(
+            ((["gbif_database"], FIXTURE_FILES.rf.gaz_file),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (CRITICAL, "GBIF database not an SQLite3 file"),
+            ),
+            id="GBIF not SQLite",
+        ),
+        pytest.param(
+            ((["project_database"], ""),),
+            None,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Configuration does not use project IDs."),
+            ),
+            id="Project_database provided",
+        ),
+        pytest.param(
+            ((["project_database"], FIXTURE_FILES.mf),),
+            OSError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating project database: "),
+                (CRITICAL, "Project database file not found"),
+            ),
+            id="Project_database path missing",
+        ),
+        pytest.param(
+            ((["project_database"], FIXTURE_FILES.rf.gbif_file),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating project database: "),
+                (
+                    CRITICAL,
+                    "Project database file not readable as a CSV file with valid "
+                    "headers",
+                ),
+            ),
+            id="Project database not text",
+        ),
+        pytest.param(
+            ((["project_database"], FIXTURE_FILES.rf.gaz_file),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating project database: "),
+                (
+                    CRITICAL,
+                    "Project database file does not contain project_id "
+                    "and title headers",
+                ),
+            ),
+            id="Project database not CSV text",
+        ),
+        pytest.param(
+            ((["project_database"], FIXTURE_FILES.rf.empty_localias_file),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating project database: "),
+                (CRITICAL, "Project database file is empty"),
+            ),
+            id="Project database file empty",
+        ),
+        pytest.param(
+            ((["project_database"], FIXTURE_FILES.rf.project_database_file_bad),),
+            ValueError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating project database: "),
+                (
+                    CRITICAL,
+                    "Project database file values not integer IDs and text titles.",
+                ),
+            ),
+            id="Project database bad values",
+        ),
+        pytest.param(
+            ((["extents", "latitudinal_hard_extent"], ["-90deg", "90deg"]),),
+            RuntimeError,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (CRITICAL, "Configuration issues"),
+                (CRITICAL, "In config 'extents.latitudinal_hard_extent':"),
+            ),
+            id="Testing configparser misconfig",
+        ),
+    ],
+)
+def test_load_resources_by_arg(
+    config_filesystem,
+    request,
+    caplog,
+    config_file_dict,
+    dict_mod,
+    expected_exception,
+    expected_log,
+):
+    """Test to check that bad config inputs are logged correctly.
+
+    This test uses the ability to load a config from a list or a dict to
+    validate the behaviour of the config with bad inputs. Arguably overkill to
+    run this using both list and dict inputs...
+    """
+
+    from safedata_validator.resources_two import ResourcesPydantic
+
+    if expected_exception is None:
+        ctxt_manager = does_not_raise()
+    else:
+        ctxt_manager = pytest.raises(expected_exception)
+
+    with ctxt_manager:
+        # Update the config, depending on whether the config is a list or a dict.
+        for keys, mod in dict_mod:
+            nested_set(config_file_dict, keys, mod)
+
+        ResourcesPydantic(config=config_file_dict)
+
+    log_check(caplog, expected_log)
+
+
+@pytest.mark.parametrize(
+    "filepath, expected_log",
+    [
+        (
+            FIXTURE_FILES.vf.fix_config,
+            (
+                (INFO, "Configuring Resources"),
+                (INFO, "Configuring resources from init"),
+                (INFO, "Validating gazetteer: "),
+                (INFO, "Validating location aliases: "),
+                (INFO, "Validating GBIF database: "),
+                (INFO, "Validating project database: "),
+            ),
+        ),
+    ],
+)
+def test_load_resources_by_file(config_filesystem, caplog, filepath, expected_log):
+    """Loads a config from a file to validate the behaviour of the config."""
+
+    load_resources(config=Path(filepath))
+
+    log_check(caplog, expected_log)
+
+
+# TODO  - there may be a way to combine these, but they rely on different fake
+#         file systems as the first argument, so not straightforward
+
+
+@pytest.mark.parametrize(
+    "expected_log",
+    [
+        (
+            (INFO, "Configuring Resources"),
+            (CRITICAL, "No user config in"),
+            (CRITICAL, "No site config in"),
+            (CRITICAL, "No config files provided or found"),
+        ),
+    ],
+)
+def test_load_resources_from_missing_config(config_filesystem, caplog, expected_log):
+    """This test checks failure modes when no config is provided."""
+
+    with pytest.raises(RuntimeError):
+        Resources()
+
+        log_check(caplog, expected_log)
+
+
+@pytest.mark.parametrize(
+    "expected_log",
+    [
+        (
+            (INFO, "Configuring Resources"),
+            (INFO, "Configuring resources from user"),
+            (INFO, "Validating gazetteer: "),
+            (INFO, "Validating location aliases: "),
+            (INFO, "Validating GBIF database: "),
+            (INFO, "Validating project database: "),
+        ),
+    ],
+)
+def test_load_resources_from_user_config(user_config_file, caplog, expected_log):
+    """This test uses the ability to find a user config file."""
+
+    Resources()
+
+    log_check(caplog, expected_log)
+
+
+@pytest.mark.parametrize(
+    "expected_log",
+    [
+        (
+            (INFO, "Configuring Resources"),
+            (INFO, "Configuring resources from site"),
+            (INFO, "Validating gazetteer: "),
+            (INFO, "Validating location aliases: "),
+            (INFO, "Validating GBIF database: "),
+            (INFO, "Validating project database: "),
+        ),
+    ],
+)
+def test_load_resources_from_site_config(site_config_file, caplog, expected_log):
+    """This test uses the ability to find a site config file."""
+
+    Resources()
+
+    log_check(caplog, expected_log)
+
+
+@pytest.mark.parametrize(
+    "expected_log",
+    [
+        (
+            (INFO, "Configuring Resources"),
+            (INFO, "Configuring resources from env_var"),
+            (INFO, "Validating gazetteer: "),
+            (INFO, "Validating location aliases: "),
+            (INFO, "Validating GBIF database: "),
+            (INFO, "Validating project database: "),
+        ),
+    ],
+)
+def test_load_resources_from_env_var(user_config_file, caplog, expected_log):
+    """This test uses the ability to set the config from a environment variable."""
+
+    # Override the user config file by setting an environment variable.
+    os.environ["SAFEDATA_VALIDATOR_CONFIG"] = FIXTURE_FILES["vf"]["fix_config"]
+
+    Resources()
+
+    log_check(caplog, expected_log)
+
+    del os.environ["SAFEDATA_VALIDATOR_CONFIG"]
