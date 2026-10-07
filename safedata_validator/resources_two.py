@@ -25,14 +25,15 @@ details.
 import contextlib
 import os
 import sqlite3
+import tomllib
 from csv import DictReader
 from csv import Error as csvError
 from datetime import date
 from pathlib import Path
+from typing import Self
 
 import appdirs
 import simplejson
-import tomllib
 from dateutil.parser import isoparse
 from pydantic import (
     EmailStr,
@@ -42,7 +43,6 @@ from pydantic import (
 )
 from shapely.geometry import shape
 from simplejson.errors import JSONDecodeError
-from typing_extensions import Self
 
 from safedata_validator.logger import (
     LOGGER,

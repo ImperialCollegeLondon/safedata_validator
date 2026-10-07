@@ -6,9 +6,9 @@ from logging import CRITICAL, INFO
 
 import pytest
 
-from .conftest import FIXTURE_FILES, log_check
-
 from safedata_validator.resources_two import load_resources
+
+from .conftest import FIXTURE_FILES, log_check
 
 
 def test_do_nowt():
