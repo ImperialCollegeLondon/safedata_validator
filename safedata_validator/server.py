@@ -6,10 +6,16 @@
 
 from __future__ import annotations
 
-from dataclasses import InitVar, dataclass, field
+import json
+from dataclasses import dataclass, field
+from hashlib import md5
+from pathlib import Path
 
 import requests  # type: ignore
+from pydantic import ValidationError
 
+from safedata_validator.logger import LOGGER
+from safedata_validator.models import UploadMetadata
 from safedata_validator.resources import Resources
 
 
@@ -33,70 +39,57 @@ class MetadataResources:
 
         # Get the appropriate API and token
         self.api = self.resources.metadata.api
-        self.token = {"access_token": self.resources.metadata.token}
+        self.headers = {"Authorization": f"Token {self.resources.metadata.token}"}
         self.ssl_verify = self.resources.metadata.ssl_verify
 
 
-@dataclass
-class MetadataResponse:
-    """Metadata server response processor.
-
-    This dataclass is a processor around `requests.Response` objects from calls to a
-    metadata server. If the response is successful, it parses the returned data payload;
-    otherwise it formats as much information as possible into an error message.
-    """
-
-    response: InitVar[requests.Response]
-    """The incoming response from a Zenodo API call."""
-    ok: bool = field(init=False)
-    """Was the response ok."""
-    status_code: int = field(init=False)
-    """The status code returned by the response."""
-    json_data: dict = field(init=False, default_factory=lambda: dict())
-    """The JSON data payload from a successful response."""
-    error_message: str | None = field(init=False, default=None)
-    """A formatted error message from a failed response."""
-
-    def __post_init__(self, response: requests.Response) -> None:
-        """Populate the ZenodoResponse object."""
-        # Basic status
-        self.ok = response.ok
-        self.status_code = response.status_code
-        # Now either populate json data or the error message
-        if self.ok:
-            self.json_data = response.json()
-        else:
-            self.error_message = response.text
-
-
-def post_metadata(
-    metadata: dict, server_resources: MetadataResources
-) -> MetadataResponse:
+def post_metadata(metadata_file: Path, server_resources: MetadataResources) -> bool:
     """Post the dataset metadata to the metadata server.
 
     Args:
-        metadata: The dataset metadata dictionary for a dataset
+        metadata_file: The path to the published metadata for a dataset
         server_resources: The server resources to be used.
 
     Returns:
-        See [here][safedata_validator.server.MetadataResources].
+        False on failure or True on success
     """
 
-    if "zenodo" not in metadata:
-        raise ValueError("Metadata does not include published Zenodo metadata.")
+    try:
+        with open(metadata_file) as fobj:
+            _ = UploadMetadata.model_validate(json.load(fobj))
+    except IsADirectoryError:
+        LOGGER.error(f"Metadata file is a directory: {metadata_file}")
+        return False
+    except FileNotFoundError:
+        LOGGER.error(f"Metadata file not found: {metadata_file}")
+        return False
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        LOGGER.error(f"Could not parse JSON file: {metadata_file}")
+        return False
+    except ValidationError as excep:
+        LOGGER.error(f"Validation found errors in: {metadata_file}")
+        LOGGER.error(str(excep))
+        return False
 
     # post the metadata to the server
-    return MetadataResponse(
-        requests.post(
-            f"{server_resources.api}/post_metadata",
-            params=server_resources.token,
-            json=metadata,
-            verify=server_resources.ssl_verify,
-        )
+    response = requests.post(
+        f"{server_resources.api}/api/datasets/upload/",
+        headers=server_resources.headers,
+        files={"file": open(metadata_file, "rb")},
+        verify=server_resources.ssl_verify,
     )
 
+    # Check what is in the response is received from the server
+    response_data = response.json()
+    if not response.ok:
+        LOGGER.error(f"Failed to post metadata: {response_data['detail']}")
+        return False
 
-def update_resources(server_resources: MetadataResources) -> MetadataResponse:
+    LOGGER.info(f"Metadata posted: {server_resources.api}{response_data['url']}")
+    return True
+
+
+def update_resources(server_resources: MetadataResources) -> bool:
     """Update the resources on the metadata server.
 
     The metadata server provides the gazetteer, location aliases and any project IDs as
@@ -108,25 +101,62 @@ def update_resources(server_resources: MetadataResources) -> MetadataResponse:
         server_resources: The server resources to be used.
 
     Returns:
-        See [here][safedata_validator.server.MetadataResources].
+        False on failure or True on success
     """
 
-    # Get payload
-    files = {
-        "gazetteer": open(server_resources.resources.gaz_path, "rb"),
-        "location_aliases": open(server_resources.resources.localias_path, "rb"),
-    }
+    # Setup endpoints to upload files to
+    endpoints: list[tuple[str, str, str]] = [
+        ("Gazetteer", "gazetteer", server_resources.resources.gaz_path),
+        (
+            "Location aliases",
+            "gazetteer/aliases",
+            server_resources.resources.localias_path,
+        ),
+    ]
 
+    # Add the project database if provided
     if server_resources.resources.project_database is not None:
-        files["project_database"] = open(
-            server_resources.resources.project_database, "rb"
+        endpoints.append(
+            (
+                "Project database",
+                "projects",
+                server_resources.resources.project_database,
+            )
         )
 
-    # post the resource files to the server
-    return MetadataResponse(
-        requests.post(
-            f"{server_resources.api}/update_resources",
-            params=server_resources.token,
-            files=files,
-        )
-    )
+    success = True
+
+    # Post changed files - note that these files have been validated by the Resources
+    # class so no further validation here.
+    for name, endpoint, file in endpoints:
+        # Get the md5 digest for the local file
+        local_md5 = md5(open(file, "rb").read()).hexdigest()
+        # Get the md5 digest of the remote file
+        get_remote = requests.get(f"{server_resources.api}/api/{endpoint}/hash/")
+        remote_md5 = get_remote.json()["md5"]
+
+        # Update only if the digests differ
+        if local_md5 == remote_md5:
+            LOGGER.info(f"{name} up to date")
+        else:
+            LOGGER.info(f"{name} update starting...")
+            # post the resource files to the server
+            response = requests.post(
+                f"{server_resources.api}/api/{endpoint}/upload/",
+                headers=server_resources.headers,
+                files={"file": open(file, "rb")},
+            )
+
+            if not response.ok:
+                LOGGER.error(f"{name} update failed:")
+                LOGGER.error(response.json()["detail"])
+                success = False
+            else:
+                LOGGER.info(f"{name} updated")
+
+    if not success:
+        LOGGER.error("Failed to update all resources.")
+    else:
+        LOGGER.info("Resources updated")
+
+    return success
