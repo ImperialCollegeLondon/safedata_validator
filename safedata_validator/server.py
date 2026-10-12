@@ -116,13 +116,15 @@ def update_resources(server_resources: MetadataResources) -> bool:
 
     # Add the project database if provided
     if server_resources.resources.project_database is not None:
-        endpoints.append(
-            (
-                "Project database",
-                "projects",
-                server_resources.resources.project_database,
-            )
-        )
+        LOGGER.warning("Metadata server does not currently handle project database")
+
+        # endpoints.append(
+        #     (
+        #         "Project database",
+        #         "projects",
+        #         server_resources.resources.project_database,
+        #     )
+        # )
 
     success = True
 
