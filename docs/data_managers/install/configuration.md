@@ -343,8 +343,11 @@ URL and then configure the following elements:
 
 **The `api` and `token` elements**
 
-: These provide the URL of the metadata server API and an access token required to
-  authenticate data upload to that server.
+: These provide the URL of the metadata server and an access token required to
+  authenticate data upload to that server. The API access token is generated during the
+  setup process of the `safedata_server` web application: you will need to copy this
+  token into the configuration file to authenticate attempts to post datasets or update
+  resources.
 
 **The `ssl_verify` element**
 

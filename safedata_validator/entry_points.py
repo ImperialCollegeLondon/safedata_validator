@@ -1150,38 +1150,21 @@ def _safedata_metadata_cli(args_list: list[str] | None = None) -> int:
 
     # Handle the remaining subcommands
     if args.subcommand == "post_metadata":
-        # Open the JSON files, checking that they point to a valid json file first
-        # TODO - this loads the file twice, replace with a load and validate function,
-        #        but we might want to go for a proper pydantic model validation?
-        if not check_file_is_metadata_json(Path(args.dataset_json)):
-            LOGGER.error(f"Dataset metadata file has wrong format: {args.dataset_json}")
-            return 1
-
-        with open(args.dataset_json, encoding="utf-8") as ds_json:
-            dataset_json = simplejson.load(ds_json)
-
         # Run the function
-        response = post_metadata(
-            metadata=dataset_json, server_resources=server_resources
+        success = post_metadata(
+            metadata_file=Path(args.dataset_json), server_resources=server_resources
         )
 
-        # Report on the outcome.
-        if not response.ok:
-            LOGGER.error(f"Failed to post metadata: {response.error_message}")
+        if not success:
             return 1
-
-        LOGGER.info("Metadata posted")
 
     if args.subcommand == "update_resources":
         # Run the function
-        response = update_resources(server_resources=server_resources)
+        success = update_resources(server_resources=server_resources)
 
         # Report on the outcome.
-        if not response.ok:
-            LOGGER.error(f"Failed to update resources: {response.error_message}")
+        if not success:
             return 1
-
-        LOGGER.info("Resources updated")
 
     return 0
 
