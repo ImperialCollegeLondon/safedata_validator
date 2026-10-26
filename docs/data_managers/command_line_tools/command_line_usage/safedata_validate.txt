@@ -6,35 +6,34 @@ usage: safedata_validate [-h] [-r RESOURCES] [-s] [--validate_doi]
 
 Validate a dataset using a command line interface.
 
-    This program validates an Excel file formatted as a `safedata` dataset.
-    As it runs, it outputs a report that highlights any problems with the
-    formatting. Much of the validation is to check that the data meets our
-    metadata standards and is internally consistent.
+This program validates an Excel file formatted as a `safedata` dataset.
+As it runs, it outputs a report that highlights any problems with the
+formatting. Much of the validation is to check that the data meets our
+metadata standards and is internally consistent.
 
-    However, the package uses external resources to perform validation of
-    taxa and sampling locations and to provide other information. For
-    this reason, using this program requires you to provide a configuration
-    file for these resources or to have installed a configuration file in a
-    standard location. If you run `safedata_validate` without a
-    configuration file, the output will report the standard locations for
-    your operating system.
+However, the package uses external resources to perform validation of
+taxa and sampling locations and to provide other information. For
+this reason, using this program requires you to provide a configuration
+file for these resources or to have installed a configuration file in a
+standard location. If you run `safedata_validate` without a
+configuration file, the output will report the standard locations for
+your operating system.
 
-    If validation is successful, then a JSON format file containing key
-    metadata will be saved. This is used in the dataset publication process.
-    By default, the JSON file is saved to the same directory as the input
-    file, using the same filename but with the `.json` extension. This can
-    be saved elsewhere using the `--json` option.
+If validation is successful, then a JSON format file containing key
+metadata will be saved. This is used in the dataset publication process.
+By default, the JSON file is saved to the same directory as the input
+file, using the same filename but with the `.json` extension. This can
+be saved elsewhere using the `--json` option.
 
-    The command also outputs a log of the validation process, which
-    identifies validation issues. This defaults to being written to
-    stderr but can be redirected to a file using the `--log` option.
+The command also outputs a log of the validation process, which
+identifies validation issues. This defaults to being written to
 
 positional arguments:
   filename      Path to the Excel file to be validated
 
 options:
   -h, --help    show this help message and exit
-  -r RESOURCES, --resources RESOURCES
+  -r, --resources RESOURCES
                 A path to a resources configuration file
   -s, --show-resources
                 Validate and display the selected resources and exit
@@ -44,8 +43,8 @@ options:
   --chunk_size CHUNK_SIZE
                 Data are loaded from worksheets in chunks: the number of rows
                 in a chunk is set by this argument
-  -l LOG, --log LOG
+  -l, --log LOG
                 Save the validation log to a file, not print to the console.
-  -j JSON, --json JSON
+  -j, --json JSON
                 An optional output path for the validated dataset JSON.
   --version     show program's version number and exit

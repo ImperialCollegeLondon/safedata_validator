@@ -18,10 +18,10 @@ options:
   -h, --help    show this help message and exit
   --live        Use the Zenodo live site, overriding the configuration file
   --sandbox     Use the Zenodo sandbox site, overriding the configuration file
-  -n NEW_VERSION, --new-version NEW_VERSION
+  -n, --new-version NEW_VERSION
                 Create a new version of the dataset with the provided Zenodo
                 ID.
   --no-xml      Do not include metadata XML in the published record
-  -e [EXTERNAL_FILES ...], --external-files [EXTERNAL_FILES ...]
+  -e, --external-files [EXTERNAL_FILES ...]
                 A set of external files documented in the dataset to be
                 included.
