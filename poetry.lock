@@ -1780,14 +1780,14 @@ typing-extensions = ">=4.16.0"
 
 [[package]]
 name = "pyfakefs"
-version = "6.2.0"
+version = "6.3.2"
 description = "Implements a fake file system that mocks the Python file system modules."
 optional = false
 python-versions = ">=3.10"
 groups = ["test"]
 files = [
-    {file = "pyfakefs-6.2.0-py3-none-any.whl", hash = "sha256:0968a49db692694ffed420e54a9f1cbae4636637b880e8ab09c8ccc0f11bd7ae"},
-    {file = "pyfakefs-6.2.0.tar.gz", hash = "sha256:e59a36db447bf509ce9c97ab3d1510c08cc51895c5311325a560a5e5b5dc1940"},
+    {file = "pyfakefs-6.3.2-py3-none-any.whl", hash = "sha256:20b9889981459dde1fe1548b0e6c298a72c373951f9bd81a3c397ddda8591c55"},
+    {file = "pyfakefs-6.3.2.tar.gz", hash = "sha256:7c67bdf4c11b42903c7cb6c74fa63432485afc697ad6f89ecce6fb0a4e4f24ed"},
 ]
 
 [package.extras]
@@ -2364,26 +2364,26 @@ telegram = ["envwrap", "requests"]
 
 [[package]]
 name = "types-python-dateutil"
-version = "2.9.0.20261021"
+version = "2.9.0.20261104"
 description = "Typing stubs for python-dateutil"
 optional = false
 python-versions = ">=3.10"
 groups = ["devenv"]
 files = [
-    {file = "types_python_dateutil-2.9.0.20261021-py3-none-any.whl", hash = "sha256:12aab3bdfe55e1d9de7f54301e025d6276ce17e6a08e31644f2202d59c8d1fca"},
-    {file = "types_python_dateutil-2.9.0.20261021.tar.gz", hash = "sha256:62d66fcdd293e38745eae644e5da4cb399b98799c0ae61f03a54896fb51b3140"},
+    {file = "types_python_dateutil-2.9.0.20261104-py3-none-any.whl", hash = "sha256:f6ee76c91c547716b4795373a53d4c07e8e06cf98384ecb89fcf134d212de2ad"},
+    {file = "types_python_dateutil-2.9.0.20261104.tar.gz", hash = "sha256:5d0495702a5f7343741f5d842c531bcd1c941da8b4a85307d52ef43ba80252db"},
 ]
 
 [[package]]
 name = "types-requests"
-version = "2.33.0.20261006"
+version = "2.33.0.20261030"
 description = "Typing stubs for requests"
 optional = false
 python-versions = ">=3.10"
 groups = ["devenv"]
 files = [
-    {file = "types_requests-2.33.0.20261006-py3-none-any.whl", hash = "sha256:26cc8146505cab33cda9737991929e4144c559bebe05078ccc6998f27c4ca2c1"},
-    {file = "types_requests-2.33.0.20261006.tar.gz", hash = "sha256:0652999e9306aea345f40732d58fa49a7f6cade6a0d74d92119c5c8d82eddaf0"},
+    {file = "types_requests-2.33.0.20261030-py3-none-any.whl", hash = "sha256:06cfc2e92399bf46eda78a65cd0e2203d29ebbeede78b4ab0a5922f749ce1492"},
+    {file = "types_requests-2.33.0.20261030.tar.gz", hash = "sha256:42d75eb02ed0f8220904c8fc08d3129742e7fce42fd5cf706395c8bb4c0ad990"},
 ]
 
 [package.dependencies]
@@ -2391,14 +2391,14 @@ urllib3 = ">=2"
 
 [[package]]
 name = "types-simplejson"
-version = "4.2.0.20261006"
+version = "4.2.0.20261104"
 description = "Typing stubs for simplejson"
 optional = false
 python-versions = ">=3.10"
 groups = ["devenv"]
 files = [
-    {file = "types_simplejson-4.2.0.20261006-py3-none-any.whl", hash = "sha256:0a11e50d899f593738e013c728353eba3d83376da4093d3e7da1e0f22c533254"},
-    {file = "types_simplejson-4.2.0.20261006.tar.gz", hash = "sha256:af8957b430aded84f6f872be2ea3e21e1c3121da917d1585edd34ac1822c3fdd"},
+    {file = "types_simplejson-4.2.0.20261104-py3-none-any.whl", hash = "sha256:1386854bda922979d70e365126b060c249c7bf7a3145a46688fd908e7176dfd6"},
+    {file = "types_simplejson-4.2.0.20261104.tar.gz", hash = "sha256:1a49702240f6ae803ef9c664312f4d9b51781905d8d5f9533b586e98edf83fe1"},
 ]
 
 [[package]]
