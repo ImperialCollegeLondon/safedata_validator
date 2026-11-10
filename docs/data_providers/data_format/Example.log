@@ -79,20 +79,20 @@
             - Taxon found in GBIF backbone (accepted)
         - Indexing taxonomic hierarchy
             - Added kingdom Animalia
-            - Added phylum Annelida
             - Added phylum Arthropoda
+            - Added phylum Annelida
             - Added phylum Chordata
-            - Added class Insecta
             - Added class Mammalia
             - Added class Clitellata
             - Added class Aves
-            - Added order Erinaceomorpha
-            - Added order Hymenoptera
-            - Added order Primates
+            - Added class Insecta
             - Added order Suliformes
             - Added order Rodentia
             - Added order Arhynchobdellida
             - Added order Carnivora
+            - Added order Erinaceomorpha
+            - Added order Primates
+            - Added order Hymenoptera
             - Added family Erinaceidae
             - Added family Felidae
             - Added family Hominidae
