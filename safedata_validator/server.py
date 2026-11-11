@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+from collections import namedtuple
 from dataclasses import dataclass, field
 from hashlib import md5
 from pathlib import Path
@@ -89,6 +90,12 @@ def post_metadata(metadata_file: Path, server_resources: MetadataResources) -> b
     return True
 
 
+ResourceData = namedtuple(
+    "ResourceData", ["label", "md5_key", "upload_api", "local_path"]
+)
+"""Named tuple for resource data."""
+
+
 def update_resources(server_resources: MetadataResources) -> bool:
     """Update the resources on the metadata server.
 
@@ -104,13 +111,19 @@ def update_resources(server_resources: MetadataResources) -> bool:
         False on failure or True on success
     """
 
-    # Setup endpoints to upload files to
-    endpoints: list[tuple[str, str, str]] = [
-        ("Gazetteer", "gazetteer", server_resources.resources.gaz_path),
-        (
-            "Location aliases",
-            "gazetteer/aliases",
-            server_resources.resources.localias_path,
+    # Setup endpoints to upload files
+    endpoints: list[ResourceData] = [
+        ResourceData(
+            label="Gazetteer",
+            md5_key="gazetteer",
+            upload_api="api/gazetteer/upload/",
+            local_path=server_resources.resources.gaz_path,
+        ),
+        ResourceData(
+            label="Location aliases",
+            md5_key="location_aliases",
+            upload_api="api/gazetteer/aliases/upload/",
+            local_path=server_resources.resources.localias_path,
         ),
     ]
 
@@ -119,42 +132,46 @@ def update_resources(server_resources: MetadataResources) -> bool:
         LOGGER.warning("Metadata server does not currently handle project database")
 
         # endpoints.append(
-        #     (
-        #         "Project database",
-        #         "projects",
-        #         server_resources.resources.project_database,
+        #     ResourceData(
+        #         label="Project Database",
+        #         md5_key="projects",
+        #         upload_api="projects",
+        #         local_path=server_resources.resources.project_database,
         #     )
         # )
 
     success = True
 
-    # Post changed files - note that these files have been validated by the Resources
-    # class so no further validation here.
-    for name, endpoint, file in endpoints:
+    # Get the md5 digest of the remote file
+    remote_md5_dict = requests.get(
+        f"{server_resources.api}/resources/hashes.json"
+    ).json()
+
+    # Post changed files
+    # - Note that these files have been validated by the Resources  class
+    #   so no further validation here.
+    for resource_data in endpoints:
         # Get the md5 digest for the local file
-        local_md5 = md5(open(file, "rb").read()).hexdigest()
-        # Get the md5 digest of the remote file
-        get_remote = requests.get(f"{server_resources.api}/api/{endpoint}/hash/")
-        remote_md5 = get_remote.json()["md5"]
+        local_md5 = md5(open(resource_data.local_path, "rb").read()).hexdigest()
 
         # Update only if the digests differ
-        if local_md5 == remote_md5:
-            LOGGER.info(f"{name} up to date")
+        if local_md5 == remote_md5_dict[resource_data.md5_key]:
+            LOGGER.info(f"{resource_data.label} up to date")
         else:
-            LOGGER.info(f"{name} update starting...")
+            LOGGER.info(f"{resource_data.label} update starting...")
             # post the resource files to the server
             response = requests.post(
-                f"{server_resources.api}/api/{endpoint}/upload/",
+                f"{server_resources.api}/{resource_data.upload_api}",
                 headers=server_resources.headers,
-                files={"file": open(file, "rb")},
+                files={"file": open(resource_data.local_path, "rb")},
             )
 
             if not response.ok:
-                LOGGER.error(f"{name} update failed:")
+                LOGGER.error(f"{resource_data.label} update failed:")
                 LOGGER.error(response.json()["detail"])
                 success = False
             else:
-                LOGGER.info(f"{name} updated")
+                LOGGER.info(f"{resource_data.label} updated")
 
     if not success:
         LOGGER.error("Failed to update all resources.")
