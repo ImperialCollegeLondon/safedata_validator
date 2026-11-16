@@ -1080,8 +1080,11 @@ def check_link_validity(link_address: str) -> None:
 
     try:
         r = requests.head(link_address)
-    except requests.exceptions.ConnectionError:
-        LOGGER.error(f"Could not connect to link: {link_address}")
+    except requests.exceptions.RequestException as err:
+        LOGGER.error(
+            f"Could not connect to link: {link_address}, due to the following "
+            f"error: {err}"
+        )
         return
 
     if r.status_code != 200:
